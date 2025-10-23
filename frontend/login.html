@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Repositório de Aulas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+    }
+
+    * {
+      animation: fade-in 0.6s ease-out forwards;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .card-hover {
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+    }
+
+    .card-hover:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .modal-content.modal-enter {
+      opacity: 0;
+      transform: scale(0.9) translateY(-20px);
+      transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+    }
+
+    .modal-content.modal-enter-active {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+  <header class="bg-blue-600 shadow-lg">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <span class="material-icons text-white text-2xl">school</span>
+          <h1 class="text-white text-xl font-medium">Repositório de Aulas</h1>
+        </div>
+        <nav class="flex items-center space-x-4">
+          <a href="login.html" class="text-white px-4 py-2 rounded-lg bg-blue-700">Login</a>
+          <a href="index.html" class="text-white px-4 py-2 rounded-lg hover:bg-opacity-30 transition">Portal Alunos</a>
+          <a href="professor.html" class="text-white px-4 py-2 rounded-lg hover:bg-opacity-30 transition">Portal Professores</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Login/Register Container -->
+  <main class="container mx-auto px-6 py-12">
+    <div class="max-w-md mx-auto">
+      <!-- Tab Navigation -->
+      <div class="bg-white rounded-t-2xl shadow-md">
+        <div class="flex">
+          <button id="loginTab" class="flex-1 py-4 px-6 text-center font-medium border-b-2 border-blue-600 text-blue-600">
+            Entrar
+          </button>
+          <button id="registerTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700">
+            Cadastrar
+          </button>
+        </div>
+      </div>
+
+      <!-- Login Form -->
+      <div id="loginForm" class="bg-white rounded-b-2xl p-8 shadow-md slide-in">
+        <div class="text-center mb-6">
+          <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span class="material-icons text-blue-600 text-2xl">login</span>
+          </div>
+          <h2 class="text-2xl font-medium text-gray-800 mb-2">Bem-vindo de volta</h2>
+          <p class="text-gray-600">Entre com suas credenciais</p>
+        </div>
+
+        <form id="loginFormData" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Usuário</label>
+            <input type="text" id="loginUsuario"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Digite seu usuário" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Senha</label>
+            <input type="password" id="loginSenha"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Digite sua senha" required>
+          </div>
+          <div id="loginError" class="hidden text-red-600 text-sm flex items-center space-x-2">
+            <span class="material-icons text-sm">error</span>
+            <span>Usuário ou senha incorretos</span>
+          </div>
+          <button type="submit"
+            class="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center space-x-2">
+            <span>Entrar</span>
+            <span class="material-icons text-sm">arrow_forward</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Register Form -->
+      <div id="registerForm" class="bg-white rounded-b-2xl p-8 shadow-md slide-in hidden">
+        <div class="text-center mb-6">
+          <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span class="material-icons text-green-600 text-2xl">person_add</span>
+          </div>
+          <h2 class="text-2xl font-medium text-gray-800 mb-2">Cadastrar como Aluno</h2>
+          <p class="text-gray-600">Crie sua conta de aluno e solicite entrada nas turmas</p>
+        </div>
+
+        <form id="registerFormData" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
+            <input type="text" id="registerNome"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+              placeholder="Seu nome completo" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Usuário</label>
+            <input type="text" id="registerUsuario"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+              placeholder="Escolha um usuário" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <input type="email" id="registerEmail"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+              placeholder="seu.email@exemplo.com">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Senha</label>
+            <input type="password" id="registerSenha"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+              placeholder="Digite sua senha" required>
+          </div>
+          <div id="registerError" class="hidden text-red-600 text-sm flex items-center space-x-2">
+            <span class="material-icons text-sm">error</span>
+            <span>Erro ao criar conta</span>
+          </div>
+          <button type="submit"
+            class="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2">
+            <span>Criar Conta</span>
+            <span class="material-icons text-sm">person_add</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Quick Access -->
+      <div class="mt-8 bg-white rounded-2xl p-6 shadow-md">
+        <h3 class="text-lg font-medium text-gray-800 mb-4">Acesso Rápido</h3>
+        <div class="grid grid-cols-1 gap-3">
+          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div>
+              <div class="font-medium">Administrador</div>
+              <div class="text-sm text-gray-500">admin / asdf1234</div>
+            </div>
+            <button onclick="quickLogin('admin', 'asdf1234')" class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+              Login
+            </button>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div>
+              <div class="font-medium">Professor</div>
+              <div class="text-sm text-gray-500">professor / asdf1234</div>
+            </div>
+            <button onclick="quickLogin('professor', 'asdf1234')" class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+              Login
+            </button>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div>
+              <div class="font-medium text-gray-500">Alunos</div>
+              <div class="text-sm text-gray-500">Devem se cadastrar primeiro</div>
+            </div>
+            <button onclick="document.getElementById('registerTab').click()" class="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700">
+              Cadastrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Success Modal -->
+  <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md slide-in modal-content">
+      <div class="text-center">
+        <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span class="material-icons text-green-600 text-2xl">check_circle</span>
+        </div>
+        <h3 id="successModalTitle" class="text-xl font-medium text-gray-800 mb-2">Sucesso!</h3>
+        <p id="successModalMessage" class="text-gray-600 mb-6">Operação concluída com sucesso!</p>
+        <button id="successOkBtn" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Modal -->
+  <div id="errorModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md slide-in modal-content">
+      <div class="text-center">
+        <div class="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span class="material-icons text-red-600 text-2xl">error</span>
+        </div>
+        <h3 class="text-xl font-medium text-gray-800 mb-2">Erro!</h3>
+        <p id="errorModalMessage" class="text-gray-600 mb-6">Ocorreu um erro inesperado.</p>
+        <button id="errorOkBtn" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Modal -->
+  <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md modal-content">
+      <div class="text-center">
+        <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p class="text-gray-600">Processando...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      showSuccessModal,
+      hideSuccessModal,
+      showErrorModal,
+      hideErrorModal,
+      showLoadingModal,
+      hideLoadingModal
+    } from './global/alert-modals.js';
+
+    // Configurações da API
+    const API_BASE = 'http://localhost:8080';
+
+
+    // Elementos DOM
+    const loginTab = document.getElementById('loginTab');
+    const registerTab = document.getElementById('registerTab');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const loginFormData = document.getElementById('loginFormData');
+    const registerFormData = document.getElementById('registerFormData');
+    const loginError = document.getElementById('loginError');
+    const registerError = document.getElementById('registerError');
+
+    // Funções da API
+    async function apiRequest(endpoint, options = {}) {
+      const url = `${API_BASE}${endpoint}`;
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers
+        },
+        ...options
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Erro desconhecido' }));
+        throw new Error(error.message || `HTTP ${response.status}`);
+      }
+
+      return response.json();
+    }
+
+
+    // Funções de autenticação
+    async function login(usuario, senha) {
+      try {
+        const data = await apiRequest('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ usuario, senha })
+        });
+
+        if (data.success) {
+          // Salvar sessão
+          localStorage.setItem('currentUser', JSON.stringify(data.usuario));
+          localStorage.setItem('userToken', Date.now().toString()); // Token simples para sessão
+
+          // Redirecionar baseado no cargo
+          const cargo = data.usuario.cargo;
+          if (cargo === 'admin' || cargo === 'professor') {
+            window.location.href = 'professor.html';
+          } else {
+            window.location.href = 'index.html';
+          }
+
+          return true;
+        } else {
+          throw new Error(data.message || 'Login falhou');
+        }
+      } catch (error) {
+        console.error('Erro no login:', error);
+        throw error;
+      }
+    }
+
+    async function register(formData) {
+      try {
+        const data = await apiRequest('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify(formData)
+        });
+
+        if (data.success) {
+          return data;
+        } else {
+          throw new Error(data.message || 'Registro falhou');
+        }
+      } catch (error) {
+        console.error('Erro no registro:', error);
+        throw error;
+      }
+    }
+
+    // Funções de navegação entre abas
+    function showLoginTab() {
+      loginTab.classList.add('border-blue-600', 'text-blue-600');
+      loginTab.classList.remove('text-gray-500');
+      registerTab.classList.remove('border-blue-600', 'text-blue-600');
+      registerTab.classList.add('text-gray-500');
+      loginForm.classList.remove('hidden');
+      registerForm.classList.add('hidden');
+    }
+
+    function showRegisterTab() {
+      registerTab.classList.add('border-blue-600', 'text-blue-600');
+      registerTab.classList.remove('text-gray-500');
+      loginTab.classList.remove('border-blue-600', 'text-blue-600');
+      loginTab.classList.add('text-gray-500');
+      registerForm.classList.remove('hidden');
+      loginForm.classList.add('hidden');
+    }
+
+    // Função de login rápido
+    function quickLogin(usuario, senha) {
+      document.getElementById('loginUsuario').value = usuario;
+      document.getElementById('loginSenha').value = senha;
+      loginFormData.dispatchEvent(new Event('submit'));
+    }
+
+    // Event listeners
+    loginTab.addEventListener('click', showLoginTab);
+    registerTab.addEventListener('click', showRegisterTab);
+
+    loginFormData.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const usuario = document.getElementById('loginUsuario').value.trim();
+      const senha = document.getElementById('loginSenha').value.trim();
+
+      if (!usuario || !senha) {
+        loginError.querySelector('span:last-child').textContent = 'Preencha todos os campos';
+        loginError.classList.remove('hidden');
+        return;
+      }
+
+      showLoadingModal();
+      try {
+        await login(usuario, senha);
+        loginError.classList.add('hidden');
+      } catch (error) {
+        loginError.querySelector('span:last-child').textContent = error.message;
+        loginError.classList.remove('hidden');
+      } finally {
+        hideLoadingModal();
+      }
+    });
+
+    registerFormData.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = {
+        usuario: document.getElementById('registerUsuario').value.trim(),
+        senha: document.getElementById('registerSenha').value.trim(),
+        nome: document.getElementById('registerNome').value.trim()
+      };
+
+      if (!formData.usuario || !formData.senha || !formData.nome) {
+        registerError.querySelector('span:last-child').textContent = 'Preencha todos os campos obrigatórios';
+        registerError.classList.remove('hidden');
+        return;
+      }
+
+      showLoadingModal();
+      try {
+        await register(formData);
+        showSuccessModal('Conta criada com sucesso! Agora você pode fazer login e solicitar entrada nas turmas desejadas.');
+        registerError.classList.add('hidden');
+        registerFormData.reset();
+        showLoginTab();
+      } catch (error) {
+        registerError.querySelector('span:last-child').textContent = error.message;
+        registerError.classList.remove('hidden');
+      } finally {
+        hideLoadingModal();
+      }
+    });
+
+    // Modal buttons
+    document.getElementById('successOkBtn').addEventListener('click', hideSuccessModal);
+    document.getElementById('errorOkBtn').addEventListener('click', hideErrorModal);
+
+    // Inicialização
+    async function main() {
+      try {
+        showLoginTab();
+      } catch (error) {
+        console.error('Erro ao inicializar:', error);
+        showErrorModal('Erro ao carregar dados. Verifique se o servidor está rodando.');
+      }
+    }
+
+    main();
+
+    // Expor função de login rápido globalmente
+    window.quickLogin = quickLogin;
+  </script>
+</body>
+
+</html>
+

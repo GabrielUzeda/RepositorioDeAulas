@@ -1,67 +1,17 @@
 mod mailer;
 mod database;
+mod routes;
 
-use axum::{routing::{post, get}, Router, Json, Extension};
+use tokio::sync::mpsc;
+use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use crate::database::database::DatabaseManager;
 
-#[derive(Deserialize)]
-struct LoginRequest {
-    usuario: String,
-    senha: String,
-}
-
-#[derive(Serialize)]
-struct AuthResponse {
-    success: bool,
-    message: String,
-    usuario: Option<crate::database::models::Usuario>,
-}
-
-#[derive(Serialize)]
-struct TurmasResponse {
-    success: bool,
-    turmas: Vec<crate::database::models::Turma>,
-}
-
-async fn login(
-    Extension(db): Extension<Arc<DatabaseManager>>,
-    Json(req): Json<LoginRequest>,
-) -> Json<AuthResponse> {
-    match db.authenticate_usuario(&req.usuario, &req.senha) {
-        Ok(Some(usuario)) => Json(AuthResponse {
-            success: true,
-            message: "Login realizado com sucesso!".to_string(),
-            usuario: Some(usuario),
-        }),
-        Ok(None) => Json(AuthResponse {
-            success: false,
-            message: "Usuário ou senha incorretos".to_string(),
-            usuario: None,
-        }),
-        Err(e) => Json(AuthResponse {
-            success: false,
-            message: format!("Erro interno: {}", e),
-            usuario: None,
-        }),
-    }
-}
-
-async fn get_turmas(
-    Extension(db): Extension<Arc<DatabaseManager>>,
-) -> Json<TurmasResponse> {
-    match db.list_turmas() {
-        Ok(turmas) => Json(TurmasResponse {
-            success: true,
-            turmas,
-        }),
-        Err(e) => Json(TurmasResponse {
-            success: false,
-            turmas: vec![],
-        }),
-    }
+#[derive(Debug)]
+pub struct GradeEvent {
+    pub atividade_id: String,
+    pub aluno_id: String,
 }
 
 #[tokio::main]
@@ -97,25 +47,45 @@ async fn main() {
     // Inicializar o sistema de emails
     mailer::init_mailer();
 
+    // Inicializar worker assíncrono para processamento de notas
+    let (_tx, mut rx) = mpsc::channel::<GradeEvent>(1024);
+    let db_worker = db.clone();
+    tokio::spawn(async move {
+        while let Some(evt) = rx.recv().await {
+            // bom practice: retry/backoff se falhar
+            if let Err(e) = db_worker.update_aggregate_nota_atividade(&evt.atividade_id, &evt.aluno_id) {
+                // log e possivelmente re-enfileirar
+                eprintln!("Erro ao processar GradeEvent {:?}: {}", evt, e);
+            }
+        }
+    });
+
     // Configurar CORS para permitir requisições do navegador
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new()
-        .route("/send-mail", post(mailer::send_mail))
-        .route("/auth/login", post(login))
-        .route("/turmas", get(get_turmas))
-        .layer(Extension(db))
+    // Criar router com todas as rotas usando o novo módulo
+    let app = routes::create_router(db)
         .layer(cors);
 
-    println!("🚀 Servidor Rust Mailer rodando em 0.0.0.0:8080");
-    println!("📧 Endpoint: POST /send-mail");
-    println!("📁 Templates disponíveis em: /app/templates/");
+    println!("🚀 Servidor Academic API rodando em 0.0.0.0:8080");
+    println!("📚 Endpoints disponíveis:");
+    println!("  🔐 Auth: POST /auth/register (apenas alunos), POST /auth/login");
+    println!("  📖 Turmas: GET/POST /turmas, GET /turmas/:id");
+    println!("  📝 Solicitações: POST /turmas/:id/solicitar-entrada, GET /turmas/:id/solicitacoes, POST /solicitacoes/:id/aprovar, POST /solicitacoes/:id/rejeitar, GET /minhas-solicitacoes");
+    println!("  📝 Atividades: GET /turmas/:id/atividades, POST /atividades, GET /atividades/:id");
+    println!("  ❓ Perguntas: GET /atividades/:id/perguntas, POST /perguntas");
+    println!("  ✍️  Respostas: POST /respostas, GET /atividades/:id/alunos/:id/respostas");
+    println!("  ✅ Avaliação: POST /avaliacao/grade");
+    println!("  📊 Notas: GET /atividades/:id/alunos/:id/nota, GET /atividades/:id/alunos/:id/calcular-nota");
+    println!("  💬 Feedback: POST /feedback");
+    println!("  📧 Email: POST /send-mail");
     println!("🗄️  LMDB disponível em: ./database/data");
     println!("🌐 CORS habilitado para desenvolvimento");
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
+

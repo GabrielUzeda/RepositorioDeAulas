@@ -26,3 +26,16 @@ uuid = { version = "1.0", features = ["v4"] }
 
 # Timestamps
 chrono = { version = "0.4", features = ["serde"] }
+
+# Hash de senhas
+argon2 = "0.5"
+password-hash = "0.5"
+
+# Async channel / concurrency (já parte do tokio)
+# usamos tokio::sync::mpsc
+
+# (opcional) se você quiser integrar com Kafka/RabbitMQ no futuro
+# rdkafka = { version = "0.30", optional = true }
+
+[features]
+default = []

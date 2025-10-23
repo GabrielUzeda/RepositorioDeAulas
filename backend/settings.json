@@ -49,6 +49,22 @@
           "caminho": "turmas/estatistica/aulas/matplotlib_parte01.html",
           "icone": "09",
           "descricao": "Aula prática sobre Matplotlib"
+        },
+        "Matplotlib Parte 02": {
+          "caminho": "turmas/estatistica/aulas/matplotlib_parte02.html",
+          "icone": "09",
+          "descricao": "Aula prática sobre Matplotlib, segunda parte."
+        },
+        "União e Interseção": {
+          "caminho": "turmas/estatistica/aulas/Uniao_Intersecao.html",
+          "icone": "10",
+          "descricao": "Aula prática sobre conjutos: união e interseção."
+        },
+
+        "Probabilidade Condicional Independencia": {
+          "caminho": "turmas/estatistica/aulas/Probabilidade_Condicional_Independencia.html",
+          "icone": "11",
+          "descricao": "Conceitos básicos de probabilidade"
         }
       },
       "atividades": [
@@ -80,13 +96,49 @@
           "descricao": "Atividade sobre for e while",
           "caminho": "turmas/estatistica/atividades/laco_python.html"
         },
-        {
+         {
           "id": "matplotlib_01",
           "icone": "08-09",
           "titulo": "Matplotlib 01",
           "descricao": "Atividade prática sobre matplotlib",
           "caminho": "turmas/estatistica/atividades/matplotlib01.html"
+        },
+        {
+          "id": "matplotlib_02",
+          "icone": "09",
+          "titulo": "Matplotlib 02",
+          "descricao": "Atividade prática sobre matplotlib",
+          "caminho": "turmas/estatistica/atividades/matplotlib02.html"
+        },
+        {
+          "id": "provaA",
+          "icone": "A1",
+          "titulo": "Avaliação - Grupo A",
+          "descricao": "Primeira Avaliação da disciplina",
+          "caminho": "turmas/estatistica/atividades/provaA.html"
+        },
+        {
+          "id": "provaB",
+          "icone": "A1",
+          "titulo": "Avaliação - Grupo B",
+          "descricao": "Primeira Avaliação da disciplina",
+          "caminho": "turmas/estatistica/atividades/provaB.html"
+        },
+        {
+          "id": "provaC",
+          "icone": "A1",
+          "titulo": "Avaliação - Grupo C",
+          "descricao": "Primeira Avaliação da disciplina",
+          "caminho": "turmas/estatistica/atividades/provaC.html"
+        },
+        {
+          "id": "probabilidade_condicional",
+          "icone": "10-11",
+          "titulo": "Probabilidade Condicional e Independência",
+          "descricao": "Exercícios sobre probabilidade condicional e independência",
+          "caminho": "turmas/estatistica/atividades/Probabilidade_Condicional_Independencia.html"
         }
+
       ]
     },
     "terceirao": {
@@ -131,13 +183,39 @@
         },
         "Projeto Enem: Prompts IA": {
           "caminho": "turmas/terceirao/aulas/projeto_enem_ia.html",
-          "icone": "08",
+          "icone": "07",
           "descricao": "Aula de como fazer bons prompts para a IA"
         },
         "Banco de Dados Parte 02": {
           "caminho": "turmas/terceirao/aulas/banco_de_dados_parte02.html",
           "icone": "08",
           "descricao": "Aula de como gerar relacionamentos basicos em Mysql"
+        },
+        "Projeto Enem: Melhorias": {
+          "caminho": "turmas/terceirao/aulas/refinamentosEnem.html",
+          "icone": "09",
+          "descricao": "Aula de segestões para melhorar o projeto ENEM"
+        },
+        "Projeto Enem: Exposicao da API": {
+          "caminho": "turmas/terceirao/aulas/enemParte04.html",
+          "icone": "10",
+          "descricao": "Aula de como usar o ngrok para expor a IA"
+        }
+        ,
+        "Tokens JWT": {
+          "caminho": "turmas/terceirao/aulas/enem_parte05.html",
+          "icone": "11",
+          "descricao": "Entenda JSON Web Tokens (Header, Payload, Signature), o fluxo de autenticação/autoriza\u00e7\u00e3o com JWT e boas práticas para proteger APIs e ações administrativas."
+        },
+        "Banco de Dados Parte 03": {
+          "caminho": "turmas/terceirao/aulas/banco_de_dados_parte03.html",
+          "icone": "12",
+          "descricao": "Resumo das novas funcionalidades do projeto ENEM"
+        },
+        "Projeto ENEM: Fase Final": {
+          "caminho": "turmas/terceirao/aulas/trabalho_final_enem.html",
+          "icone": "13",
+          "descricao": "Instruções de cada equipe para a Fase final do Projeto ENEM"
         }
       },
       "atividades": [
@@ -189,6 +267,13 @@
           "titulo": "Projeto ENEM: Equipe Anko",
           "descricao": "Instruções da equipe JSON para o Projeto ENEM",
           "caminho": "turmas/terceirao/atividades/ENEM_JSON.html"
+        },
+        {
+          "id": "ENEM_F2",
+          "icone": "10-12",
+          "titulo": "Projeto ENEM: Fase 02",
+          "descricao": "Instruções de cada equipe para a Fase 02 do Projeto ENEM",
+          "caminho": "turmas/terceirao/atividades/ENEM_Fase02.html"
         }
       ]
     }
@@ -212,6 +297,16 @@
         "caminho": "turmas/logica/aulas/se_entao.html",
         "icone": "03",
         "descricao": "Conceitos básicos de lógica condicional: Se... Então..."
+      },
+      "Lógica de Programação: Conectivos Lógicos": {
+        "caminho": "turmas/logica/aulas/conectivos_logicos.html",
+        "icone": "04",
+        "descricao": "Representação, uso e simbologia dos conectivos lógicos AND, OR, NOT e XOR"
+      },
+      "Lógica de Programação: Leis Lógica": {
+        "caminho": "turmas/logica/aulas/leis_logica.html",
+        "icone": "05",
+        "descricao": "Leis da lógica proposicional e suas aplicações na programação"
       }
     },
     "atividades": [
@@ -235,23 +330,76 @@
         "titulo": "Exercícios de Introdução Tabela Verdade 02",
         "descricao": "Resolva os exercícios propostos sobre Tabela Verdade: Se então",
         "caminho": "turmas/logica/atividades/se_entao.html"
+      },
+      {
+        "id": "atv4",
+        "icone": "04",
+        "titulo": "Exercícios de Conectivos Lógicos",
+        "descricao": "Exercícios para exercitar o uso dos conectivos lógicos AND, OR, NOT e XOR",
+        "caminho": "turmas/logica/atividades/conectivos_logicos.html"
+      },
+      {
+        "id": "atv5",
+        "icone": "05",
+        "titulo": "Leis da Lógica Proposicional",
+        "descricao": "Exercícios para aplicar De Morgan, distributiva, contrapositiva, precedência e simplificação.",
+        "caminho": "turmas/logica/atividades/leis_logica.html"
       }
     ]
   },
-  "usuarios_iniciais": [
-    {
-      "usuario": "aluno",
-      "senha": "asdf1234",
-      "nome": "João Silva",
-      "cargo": "aluno",
-      "turmas": ["estatistica"]
+  "visualizacao_dados": {
+    "nome": "Visualização de Dados",
+    "cor": "bg-green-500",
+    "icone": "bar_chart",
+    "aulas": {
+      "Introdução a Python": {
+        "caminho": "turmas/visualizacao_dados/aulas/introducao_python.html",
+        "icone": "00",
+        "descricao": "Uma breve introducao à linguagem Python"
+      },
+      "Listas em Python": {
+        "caminho": "turmas/visualizacao_dados/aulas/vetores_array.html",
+        "icone": "01",
+        "descricao": "Conceitos e exemplos de listas em Python"
+      },
+      "Laços de Repetição": {
+        "caminho": "turmas/visualizacao_dados/aulas/lacos_python.html",
+        "icone": "02",
+        "descricao": "Conceitos fundamentais de laços for e while em Python"
+      },
+      "Listas em Python 02": {
+        "caminho": "turmas/visualizacao_dados/aulas/listas_parte02.html",
+        "icone": "03",
+        "descricao": "Aula sobre Listas Sort, Zip e For"
+      },
+      "Matplotlib": {
+        "caminho": "turmas/visualizacao_dados/aulas/matplotlib.html",
+        "icone": "04",
+        "descricao": "Aula sobre Matplotlib"
+      } 
     },
-    {
-      "usuario": "prefessor",
-      "senha": "asdf1234",
-      "nome": "Maria Santos",
-      "cargo": "professor",
-      "turmas": ["terceirao", "logica"]
-    }
-  ]
+    "atividades": [
+      {
+        "id": "introducao_python",
+        "icone": "00",
+        "titulo": "Exercícios introdutórios de Python",
+        "descricao": "Atividade prática sobre conceitos básicos de Python",
+        "caminho": "turmas/visualizacao_dados/atividades/introducao_python.html"
+      },
+      {
+        "id": "listas_python",
+        "icone": "01",
+        "titulo": "Listas em Python",
+        "descricao": "Exercícios sobre listas e manipulação de dados",
+        "caminho": "turmas/visualizacao_dados/atividades/vetores_array.html"
+      },
+      {
+        "id": "laco_python",
+        "icone": "02-03",
+        "titulo": "Laços em Python",
+        "descricao": "Exercícios sobre laços e manipulação de dados",
+        "caminho": "turmas/visualizacao_dados/atividades/laco_python.html"
+      }
+    ]
+  }
 }

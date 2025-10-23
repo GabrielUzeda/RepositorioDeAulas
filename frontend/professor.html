@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Professor - Repositório de Aulas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+    }
+
+    * {
+      animation: fade-in 0.6s ease-out forwards;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .card-hover {
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+    }
+
+    .card-hover:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .stats-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .stats-card-alt {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .stats-card-success {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+  <header class="bg-blue-600 shadow-lg">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <span class="material-icons text-white text-2xl">school</span>
+          <h1 class="text-white text-xl font-medium">Dashboard Professor</h1>
+        </div>
+        <nav class="flex items-center space-x-4">
+          <span id="userInfo" class="text-white text-sm">Olá, Professor!</span>
+          <a href="login.html" id="logoutBtn" class="text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center space-x-2">
+            <span class="material-icons">logout</span>
+            <span>Sair</span>
+          </a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container mx-auto px-6 py-8">
+    <!-- Navigation Tabs -->
+    <div class="bg-white rounded-2xl shadow-md mb-8">
+      <div class="flex flex-wrap">
+        <button id="overviewTab" class="flex-1 py-4 px-6 text-center font-medium border-b-2 border-blue-600 text-blue-600 min-w-0">
+          Visão Geral
+        </button>
+        <button id="turmasTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
+          Minhas Turmas
+        </button>
+        <button id="atividadesTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
+          Atividades
+        </button>
+        <button id="avaliacoesTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
+          Avaliações
+        </button>
+        <button id="solicitacoesTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
+          Solicitações
+        </button>
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div id="overviewSection" class="fade-in">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="stats-card rounded-2xl p-6 text-white">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-white text-opacity-80 text-sm">Turmas</p>
+              <p id="statsTurmas" class="text-2xl font-bold">0</p>
+            </div>
+            <span class="material-icons text-3xl text-white text-opacity-80">school</span>
+          </div>
+        </div>
+
+        <div class="stats-card-alt rounded-2xl p-6 text-white">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-white text-opacity-80 text-sm">Atividades</p>
+              <p id="statsAtividades" class="text-2xl font-bold">0</p>
+            </div>
+            <span class="material-icons text-3xl text-white text-opacity-80">assignment</span>
+          </div>
+        </div>
+
+        <div class="stats-card-success rounded-2xl p-6 text-white">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-white text-opacity-80 text-sm">Respostas</p>
+              <p id="statsRespostas" class="text-2xl font-bold">0</p>
+            </div>
+            <span class="material-icons text-3xl text-white text-opacity-80">check_circle</span>
+          </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl p-6 text-white">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-white text-opacity-80 text-sm">Avaliações</p>
+              <p id="statsAvaliacoes" class="text-2xl font-bold">0</p>
+            </div>
+            <span class="material-icons text-3xl text-white text-opacity-80">grade</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl p-6 shadow-md">
+          <h3 class="text-lg font-medium text-gray-800 mb-4">Atividades Recentes</h3>
+          <div id="recentActivities" class="space-y-3">
+            <p class="text-gray-500 text-sm">Nenhuma atividade recente</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-md">
+          <h3 class="text-lg font-medium text-gray-800 mb-4">Respostas Pendentes</h3>
+          <div id="pendingResponses" class="space-y-3">
+            <p class="text-gray-500 text-sm">Nenhuma resposta pendente</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Turmas Section -->
+    <div id="turmasSection" class="hidden fade-in">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-light text-gray-800">Minhas Turmas</h2>
+        <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center space-x-2">
+          <span class="material-icons text-sm">add</span>
+          <span>Nova Turma</span>
+        </button>
+      </div>
+
+      <div id="turmasGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </div>
+
+    <!-- Atividades Section -->
+    <div id="atividadesSection" class="hidden fade-in">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-light text-gray-800">Gerenciar Atividades</h2>
+        <button class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center space-x-2">
+          <span class="material-icons text-sm">add</span>
+          <span>Nova Atividade</span>
+        </button>
+      </div>
+
+      <div id="atividadesList" class="bg-white rounded-2xl shadow-md">
+        <div class="p-6 border-b border-gray-200">
+          <div class="flex flex-wrap gap-4">
+            <select id="turmaFilter" class="px-3 py-2 border border-gray-300 rounded-lg">
+              <option value="">Todas as turmas</option>
+            </select>
+            <input type="text" id="searchAtividades" placeholder="Buscar atividades..."
+              class="px-3 py-2 border border-gray-300 rounded-lg flex-1 min-w-64">
+          </div>
+        </div>
+        <div class="p-6">
+          <div id="atividadesTable" class="space-y-4">
+            <p class="text-gray-500 text-center py-4">Nenhuma atividade encontrada</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Avaliações Section -->
+    <div id="avaliacoesSection" class="hidden fade-in">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-light text-gray-800">Avaliar Respostas</h2>
+      </div>
+
+      <div id="avaliacoesList" class="bg-white rounded-2xl shadow-md p-6">
+        <div id="avaliacoesContent" class="space-y-6">
+          <p class="text-gray-500 text-center py-4">Nenhuma resposta pendente de avaliação</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Solicitações Section -->
+    <div id="solicitacoesSection" class="hidden fade-in">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-light text-gray-800">Solicitações de Entrada</h2>
+        <button id="refreshSolicitacoesBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2">
+          <span class="material-icons text-sm">refresh</span>
+          <span>Atualizar</span>
+        </button>
+      </div>
+
+      <div id="solicitacoesList" class="bg-white rounded-2xl shadow-md p-6">
+        <div id="solicitacoesContent" class="space-y-4">
+          <p class="text-gray-500 text-center py-4">Nenhuma solicitação pendente</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Activity Modal -->
+  <div id="activityModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-4xl h-5/6 flex flex-col modal-content rounded-xl">
+      <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10 flex-shrink-0 rounded">
+        <div class="flex items-center justify-between">
+          <h3 id="activityModalTitle" class="text-xl font-semibold text-gray-900"></h3>
+          <button id="closeActivityModal" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+            <span class="material-icons text-2xl">close</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6 overflow-y-auto flex-1">
+        <div id="activityContent" class="space-y-6">
+          <!-- Content will be loaded here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Modal -->
+  <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md modal-content">
+      <div class="text-center">
+        <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p class="text-gray-600">Carregando...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      showSuccessModal,
+      hideSuccessModal,
+      showErrorModal,
+      hideErrorModal,
+      showLoadingModal,
+      hideLoadingModal
+    } from './global/alert-modals.js';
+
+    // Configurações da API
+    const API_BASE = 'http://localhost:8080';
+
+    let currentUser = null;
+    let currentSection = 'overview';
+
+    // Elementos DOM
+    const overviewTab = document.getElementById('overviewTab');
+    const turmasTab = document.getElementById('turmasTab');
+    const atividadesTab = document.getElementById('atividadesTab');
+    const avaliacoesTab = document.getElementById('avaliacoesTab');
+
+    const overviewSection = document.getElementById('overviewSection');
+    const turmasSection = document.getElementById('turmasSection');
+    const atividadesSection = document.getElementById('atividadesSection');
+    const avaliacoesSection = document.getElementById('avaliacoesSection');
+
+    const userInfo = document.getElementById('userInfo');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Funções da API
+    async function apiRequest(endpoint, options = {}) {
+      const url = `${API_BASE}${endpoint}`;
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': currentUser ? currentUser.usuario : '',
+          ...options.headers
+        },
+        ...options
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Erro desconhecido' }));
+        throw new Error(error.message || `HTTP ${response.status}`);
+      }
+
+      return response.json();
+    }
+
+    // Verificar autenticação
+    function checkAuth() {
+      const savedUser = localStorage.getItem('currentUser');
+      if (!savedUser) {
+        window.location.href = 'login.html';
+        return null;
+      }
+
+      try {
+        currentUser = JSON.parse(savedUser);
+        if (currentUser.cargo !== 'professor' && currentUser.cargo !== 'admin') {
+          window.location.href = 'index.html';
+          return null;
+        }
+        return currentUser;
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error);
+        window.location.href = 'login.html';
+        return null;
+      }
+    }
+
+    // Logout
+    function logout() {
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('userToken');
+      window.location.href = 'login.html';
+    }
+
+    // Carregar estatísticas
+    async function loadStats() {
+      try {
+        const turmasResponse = await apiRequest('/turmas');
+        const atividadesResponse = await apiRequest('/turmas/estatistica/atividades'); // Exemplo
+
+        document.getElementById('statsTurmas').textContent = currentUser.turmas.length;
+        document.getElementById('statsAtividades').textContent = atividadesResponse.success ? atividadesResponse.atividades.length : 0;
+        document.getElementById('statsRespostas').textContent = '0'; // TODO: implementar
+        document.getElementById('statsAvaliacoes').textContent = '0'; // TODO: implementar
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error);
+      }
+    }
+
+    // Carregar turmas do professor
+    async function loadTurmas() {
+      try {
+        const response = await apiRequest('/turmas');
+        if (response.success) {
+          const turmasGrid = document.getElementById('turmasGrid');
+          turmasGrid.innerHTML = '';
+
+          // Filtrar turmas do professor
+          const professorTurmas = response.turmas.filter(turma =>
+            currentUser.turmas.includes(turma.id) || currentUser.cargo === 'admin'
+          );
+
+          professorTurmas.forEach(turma => {
+            const card = document.createElement('div');
+            card.className = `${turma.cor} rounded-2xl p-6 text-white cursor-pointer card-hover`;
+            card.innerHTML = `
+              <div class="flex items-center justify-between mb-4">
+                <span class="material-icons text-3xl">${turma.icone}</span>
+                <span class="material-icons">arrow_forward</span>
+              </div>
+              <h3 class="text-lg font-medium mb-2">${turma.nome}</h3>
+              <p class="text-white text-opacity-80">Gerenciar turma</p>
+            `;
+            card.addEventListener('click', () => showTurmaDetails(turma));
+            turmasGrid.appendChild(card);
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao carregar turmas:', error);
+        showErrorModal('Erro ao carregar turmas');
+      }
+    }
+
+    // Carregar atividades
+    async function loadAtividades() {
+      try {
+        const atividadesTable = document.getElementById('atividadesTable');
+        atividadesTable.innerHTML = '<p class="text-gray-500 text-center py-4">Carregando atividades...</p>';
+
+        // Para cada turma do professor, carregar atividades
+        let allAtividades = [];
+        for (const turmaId of currentUser.turmas) {
+          try {
+            const response = await apiRequest(`/turmas/${turmaId}/atividades`);
+            if (response.success) {
+              allAtividades.push(...response.atividades.map(atividade => ({ ...atividade, turmaId })));
+            }
+          } catch (error) {
+            console.error(`Erro ao carregar atividades da turma ${turmaId}:`, error);
+          }
+        }
+
+        if (allAtividades.length === 0) {
+          atividadesTable.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma atividade encontrada</p>';
+          return;
+        }
+
+        atividadesTable.innerHTML = allAtividades.map(atividade => `
+          <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+            <div class="flex-1">
+              <h4 class="font-medium text-gray-800">${atividade.titulo}</h4>
+              <p class="text-sm text-gray-600">${atividade.descricao}</p>
+              <p class="text-xs text-gray-500">Turma: ${atividade.turmaId}</p>
+            </div>
+            <div class="flex space-x-2">
+              <button class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition">
+                Editar
+              </button>
+              <button class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition">
+                Ver Respostas
+              </button>
+            </div>
+          </div>
+        `).join('');
+
+      } catch (error) {
+        console.error('Erro ao carregar atividades:', error);
+        showErrorModal('Erro ao carregar atividades');
+      }
+    }
+
+    // Carregar solicitações
+    async function loadSolicitacoes() {
+      try {
+        const solicitacoesContent = document.getElementById('solicitacoesContent');
+        solicitacoesContent.innerHTML = '<p class="text-gray-500 text-center py-4">Carregando solicitações...</p>';
+
+        // Para cada turma do professor, carregar solicitações
+        const professorTurmas = currentUser.turmas || [];
+        let allSolicitacoes = [];
+
+        for (const turmaId of professorTurmas) {
+          try {
+            const response = await apiRequest(`/turmas/${turmaId}/solicitacoes`);
+            if (response.success && response.solicitacoes) {
+              // Obter nome da turma primeiro
+              const turmaNome = await getTurmaNome(turmaId);
+              // Adicionar informações da turma em cada solicitação
+              const solicitacoesComTurma = response.solicitacoes.map(solicitacao => ({
+                ...solicitacao,
+                turmaId: turmaId,
+                turmaNome: turmaNome
+              }));
+              allSolicitacoes = allSolicitacoes.concat(solicitacoesComTurma);
+            }
+          } catch (error) {
+            console.error(`Erro ao carregar solicitações da turma ${turmaId}:`, error);
+          }
+        }
+
+        // Filtrar apenas solicitações pendentes
+        const solicitacoesPendentes = allSolicitacoes.filter(s => s.status === 'pendente');
+
+        renderSolicitacoes(solicitacoesPendentes);
+      } catch (error) {
+        console.error('Erro ao carregar solicitações:', error);
+        showErrorModal('Erro ao carregar solicitações');
+        const solicitacoesContent = document.getElementById('solicitacoesContent');
+        solicitacoesContent.innerHTML = '<p class="text-gray-500 text-center py-4">Erro ao carregar solicitações</p>';
+      }
+    }
+
+    async function getTurmaNome(turmaId) {
+      try {
+        const response = await apiRequest('/turmas');
+        if (response.success) {
+          const turma = response.turmas.find(t => t.id === turmaId);
+          return turma ? turma.nome : turmaId;
+        }
+      } catch (error) {
+        console.error('Erro ao obter nome da turma:', error);
+      }
+      return turmaId;
+    }
+
+    function renderSolicitacoes(solicitacoes) {
+      const solicitacoesContent = document.getElementById('solicitacoesContent');
+
+      if (solicitacoes.length === 0) {
+        solicitacoesContent.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma solicitação pendente</p>';
+        return;
+      }
+
+      solicitacoesContent.innerHTML = '';
+
+      solicitacoes.forEach(solicitacao => {
+        const card = document.createElement('div');
+        card.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4';
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="flex items-center space-x-3 mb-2">
+                <span class="material-icons text-blue-600">person_add</span>
+                <div>
+                  <h4 class="font-medium text-gray-900">${solicitacao.aluno_id}</h4>
+                  <p class="text-sm text-gray-600">Solicitou entrada em: <span class="font-medium">${solicitacao.turmaNome}</span></p>
+                </div>
+              </div>
+              ${solicitacao.mensagem ? `<p class="text-sm text-gray-700 italic ml-11">"${solicitacao.mensagem}"</p>` : ''}
+              <p class="text-xs text-gray-500 ml-11 mt-1">
+                Solicitado em: ${new Date(solicitacao.criado_em * 1000).toLocaleString('pt-BR')}
+              </p>
+            </div>
+            <div class="flex space-x-2 ml-4">
+              <button class="aprovar-btn px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                      data-id="${solicitacao.id}">
+                Aprovar
+              </button>
+              <button class="rejeitar-btn px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                      data-id="${solicitacao.id}">
+                Rejeitar
+              </button>
+            </div>
+          </div>
+        `;
+
+        // Adicionar event listeners para os botões
+        const aprovarBtn = card.querySelector('.aprovar-btn');
+        const rejeitarBtn = card.querySelector('.rejeitar-btn');
+
+        aprovarBtn.addEventListener('click', () => aprovarSolicitacao(solicitacao.id));
+        rejeitarBtn.addEventListener('click', () => rejeitarSolicitacao(solicitacao.id));
+
+        solicitacoesContent.appendChild(card);
+      });
+    }
+
+    async function aprovarSolicitacao(solicitacaoId) {
+      try {
+        const response = await apiRequest(`/solicitacoes/${solicitacaoId}/aprovar`, {
+          method: 'POST'
+        });
+
+        if (response.success) {
+          showSuccessModal('Solicitação aprovada com sucesso!');
+          loadSolicitacoes(); // Recarregar lista
+        } else {
+          throw new Error(response.message || 'Erro ao aprovar solicitação');
+        }
+      } catch (error) {
+        console.error('Erro ao aprovar solicitação:', error);
+        showErrorModal('Erro ao aprovar solicitação: ' + error.message);
+      }
+    }
+
+    async function rejeitarSolicitacao(solicitacaoId) {
+      try {
+        const response = await apiRequest(`/solicitacoes/${solicitacaoId}/rejeitar`, {
+          method: 'POST'
+        });
+
+        if (response.success) {
+          showSuccessModal('Solicitação rejeitada com sucesso!');
+          loadSolicitacoes(); // Recarregar lista
+        } else {
+          throw new Error(response.message || 'Erro ao rejeitar solicitação');
+        }
+      } catch (error) {
+        console.error('Erro ao rejeitar solicitação:', error);
+        showErrorModal('Erro ao rejeitar solicitação: ' + error.message);
+      }
+    }
+
+    // Navegação entre seções
+    function showSection(sectionName) {
+      // Ocultar todas as seções
+      overviewSection.classList.add('hidden');
+      turmasSection.classList.add('hidden');
+      atividadesSection.classList.add('hidden');
+      avaliacoesSection.classList.add('hidden');
+      solicitacoesSection.classList.add('hidden');
+
+      // Remover classes ativas das abas
+      overviewTab.classList.remove('border-blue-600', 'text-blue-600');
+      turmasTab.classList.remove('border-blue-600', 'text-blue-600');
+      atividadesTab.classList.remove('border-blue-600', 'text-blue-600');
+      avaliacoesTab.classList.remove('border-blue-600', 'text-blue-600');
+      solicitacoesTab.classList.remove('border-blue-600', 'text-blue-600');
+
+      overviewTab.classList.add('text-gray-500');
+      turmasTab.classList.add('text-gray-500');
+      atividadesTab.classList.add('text-gray-500');
+      avaliacoesTab.classList.add('text-gray-500');
+      solicitacoesTab.classList.add('text-gray-500');
+
+      // Mostrar seção selecionada
+      switch (sectionName) {
+        case 'overview':
+          overviewSection.classList.remove('hidden');
+          overviewTab.classList.add('border-blue-600', 'text-blue-600');
+          overviewTab.classList.remove('text-gray-500');
+          loadStats();
+          break;
+        case 'turmas':
+          turmasSection.classList.remove('hidden');
+          turmasTab.classList.add('border-blue-600', 'text-blue-600');
+          turmasTab.classList.remove('text-gray-500');
+          loadTurmas();
+          break;
+        case 'atividades':
+          atividadesSection.classList.remove('hidden');
+          atividadesTab.classList.add('border-blue-600', 'text-blue-600');
+          atividadesTab.classList.remove('text-gray-500');
+          loadAtividades();
+          break;
+        case 'avaliacoes':
+          avaliacoesSection.classList.remove('hidden');
+          avaliacoesTab.classList.add('border-blue-600', 'text-blue-600');
+          avaliacoesTab.classList.remove('text-gray-500');
+          break;
+        case 'solicitacoes':
+          solicitacoesSection.classList.remove('hidden');
+          solicitacoesTab.classList.add('border-blue-600', 'text-blue-600');
+          solicitacoesTab.classList.remove('text-gray-500');
+          loadSolicitacoes();
+          break;
+      }
+
+      currentSection = sectionName;
+    }
+
+    // Função auxiliar
+    function showTurmaDetails(turma) {
+      // TODO: Implementar modal ou navegação para detalhes da turma
+      console.log('Mostrar detalhes da turma:', turma);
+    }
+
+    // Event listeners
+    overviewTab.addEventListener('click', () => showSection('overview'));
+    turmasTab.addEventListener('click', () => showSection('turmas'));
+    atividadesTab.addEventListener('click', () => showSection('atividades'));
+    avaliacoesTab.addEventListener('click', () => showSection('avaliacoes'));
+    solicitacoesTab.addEventListener('click', () => showSection('solicitacoes'));
+    document.getElementById('refreshSolicitacoesBtn').addEventListener('click', () => loadSolicitacoes());
+
+    logoutBtn.addEventListener('click', logout);
+
+    // Inicialização
+    async function main() {
+      const user = checkAuth();
+      if (!user) return;
+
+      userInfo.textContent = `Olá, ${user.nome}!`;
+
+      showSection('overview');
+    }
+
+    main();
+  </script>
+</body>
+
+</html>
+
