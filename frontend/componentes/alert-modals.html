@@ -1,0 +1,40 @@
+<!-- frontend/componentes/alert-modals.html -->
+<!-- Modais de alerta genéricos (success, error, loading) -->
+
+<!-- Success Modal -->
+<div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md slide-in modal-content">
+    <div class="text-center">
+      <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+        <span class="material-icons text-green-600 text-2xl">check_circle</span>
+      </div>
+      <h3 id="successModalTitle" class="text-xl font-medium text-gray-800 mb-2">Sucesso!</h3>
+      <p id="successModalMessage" class="text-gray-600 mb-6">Operação concluída com sucesso!</p>
+      <button id="successOkBtn" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Error Modal -->
+<div id="errorModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md slide-in modal-content">
+    <div class="text-center">
+      <div class="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+        <span class="material-icons text-red-600 text-2xl">error</span>
+      </div>
+      <h3 class="text-xl font-medium text-gray-800 mb-2">Erro!</h3>
+      <p id="errorModalMessage" class="text-gray-600 mb-6">Ocorreu um erro inesperado.</p>
+      <button id="errorOkBtn" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Modal -->
+<div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md modal-content">
+    <div class="text-center">
+      <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <p class="text-gray-600">Enviando atividade...</p>
+    </div>
+  </div>
+</div>

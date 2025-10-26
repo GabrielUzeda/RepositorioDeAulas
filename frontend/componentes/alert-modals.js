@@ -1,4 +1,51 @@
-// global/alert-modals.js
+// frontend/componentes/alert-modals.js
+
+// Estado do componente
+let modalsLoaded = false;
+
+/**
+ * Carrega e inclui o HTML dos modais de alerta na página
+ */
+export async function loadAlertModals() {
+  if (modalsLoaded) return; // Evitar carregamento duplicado
+
+  try {
+    const response = await fetch('./componentes/alert-modals.html');
+    if (!response.ok) {
+      throw new Error('Erro ao carregar modais de alerta');
+    }
+
+    const modalsHTML = await response.text();
+
+    // Inserir os modais no final do body
+    document.body.insertAdjacentHTML('beforeend', modalsHTML);
+
+    // Inicializar event listeners
+    initializeModalListeners();
+
+    modalsLoaded = true;
+
+  } catch (error) {
+    console.error('Erro ao carregar modais de alerta:', error);
+  }
+}
+
+/**
+ * Inicializa os event listeners dos modais
+ */
+function initializeModalListeners() {
+  // Success modal
+  const successOkBtn = document.getElementById('successOkBtn');
+  if (successOkBtn) {
+    successOkBtn.addEventListener('click', hideSuccessModal);
+  }
+
+  // Error modal
+  const errorOkBtn = document.getElementById('errorOkBtn');
+  if (errorOkBtn) {
+    errorOkBtn.addEventListener('click', hideErrorModal);
+  }
+}
 
 /**
  * Helper function to show a modal with a consistent animation.
