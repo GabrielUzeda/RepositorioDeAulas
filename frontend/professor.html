@@ -5,55 +5,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Professor - Repositório de Aulas</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="tailwind.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Roboto', sans-serif;
-    }
-
-    * {
-      animation: fade-in 0.6s ease-out forwards;
-    }
-
-    .fade-in {
-      animation: fadeIn 0.5s ease-in-out;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .card-hover {
-      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
-    }
-
-    .card-hover:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    }
-
-    .stats-card {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-
-    .stats-card-alt {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-
-    .stats-card-success {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    }
-  </style>
+  <link href="global/global.css" rel="stylesheet">
 </head>
 
 <body class="bg-gray-50 min-h-screen">
@@ -79,19 +34,19 @@
     <!-- Navigation Tabs -->
     <div class="bg-white rounded-2xl shadow-md mb-8">
       <div class="flex flex-wrap">
-        <button id="overviewTab" class="flex-1 py-4 px-6 text-center font-medium border-b-2 border-blue-600 text-blue-600 min-w-0">
+        <button id="overviewTab" class="nav-tab flex-1 py-4 px-6 text-center font-medium active text-blue-600 min-w-0" style="border-bottom: none;">
           Visão Geral
         </button>
-        <button id="turmasTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
+        <button id="turmasTab" class="nav-tab flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
           Minhas Turmas
         </button>
-        <button id="atividadesTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
+        <button id="atividadesTab" class="nav-tab flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
           Atividades
         </button>
-        <button id="avaliacoesTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
+        <button id="avaliacoesTab" class="nav-tab flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
           Avaliações
         </button>
-        <button id="solicitacoesTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
+        <button id="solicitacoesTab" class="nav-tab flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700 min-w-0">
           Solicitações
         </button>
       </div>
@@ -251,28 +206,26 @@
     </div>
   </div>
 
-  <!-- Loading Modal -->
-  <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md modal-content">
-      <div class="text-center">
-        <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-        <p class="text-gray-600">Carregando...</p>
-      </div>
-    </div>
-  </div>
+  <!-- Componente de Modais de Alerta -->
+  <div id="alert-modals-container"></div>
 
   <script type="module">
+    // Importar componente de modais de alerta
     import {
+      loadAlertModals,
       showSuccessModal,
       hideSuccessModal,
       showErrorModal,
       hideErrorModal,
       showLoadingModal,
       hideLoadingModal
-    } from './global/alert-modals.js';
+    } from './componentes/alert-modals.js';
 
-    // Configurações da API
-    const API_BASE = 'http://localhost:8080';
+    import {
+      apiRequest,
+      checkAuth,
+      logout
+    } from './global/api-utils.js';
 
     let currentUser = null;
     let currentSection = 'overview';
@@ -291,52 +244,26 @@
     const userInfo = document.getElementById('userInfo');
     const logoutBtn = document.getElementById('logoutBtn');
 
-    // Funções da API
-    async function apiRequest(endpoint, options = {}) {
-      const url = `${API_BASE}${endpoint}`;
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': currentUser ? currentUser.usuario : '',
-          ...options.headers
-        },
-        ...options
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Erro desconhecido' }));
-        throw new Error(error.message || `HTTP ${response.status}`);
-      }
-
-      return response.json();
-    }
 
     // Verificar autenticação
-    function checkAuth() {
-      const savedUser = localStorage.getItem('currentUser');
-      if (!savedUser) {
+    function checkAuthProfessor() {
+      const user = checkAuth();
+      if (!user) {
         window.location.href = 'login.html';
         return null;
       }
 
-      try {
-        currentUser = JSON.parse(savedUser);
-        if (currentUser.cargo !== 'professor' && currentUser.cargo !== 'admin') {
-          window.location.href = 'index.html';
-          return null;
-        }
-        return currentUser;
-      } catch (error) {
-        console.error('Erro ao verificar autenticação:', error);
-        window.location.href = 'login.html';
+      currentUser = user;
+      if (currentUser.cargo !== 'professor' && currentUser.cargo !== 'admin') {
+        window.location.href = 'index.html';
         return null;
       }
+      return currentUser;
     }
 
     // Logout
-    function logout() {
-      localStorage.removeItem('currentUser');
-      localStorage.removeItem('userToken');
+    function logoutProfessor() {
+      logout();
       window.location.href = 'login.html';
     }
 
@@ -589,11 +516,11 @@
       solicitacoesSection.classList.add('hidden');
 
       // Remover classes ativas das abas
-      overviewTab.classList.remove('border-blue-600', 'text-blue-600');
-      turmasTab.classList.remove('border-blue-600', 'text-blue-600');
-      atividadesTab.classList.remove('border-blue-600', 'text-blue-600');
-      avaliacoesTab.classList.remove('border-blue-600', 'text-blue-600');
-      solicitacoesTab.classList.remove('border-blue-600', 'text-blue-600');
+      overviewTab.classList.remove('active', 'text-blue-600');
+      turmasTab.classList.remove('active', 'text-blue-600');
+      atividadesTab.classList.remove('active', 'text-blue-600');
+      avaliacoesTab.classList.remove('active', 'text-blue-600');
+      solicitacoesTab.classList.remove('active', 'text-blue-600');
 
       overviewTab.classList.add('text-gray-500');
       turmasTab.classList.add('text-gray-500');
@@ -605,30 +532,30 @@
       switch (sectionName) {
         case 'overview':
           overviewSection.classList.remove('hidden');
-          overviewTab.classList.add('border-blue-600', 'text-blue-600');
+          overviewTab.classList.add('active', 'text-blue-600');
           overviewTab.classList.remove('text-gray-500');
           loadStats();
           break;
         case 'turmas':
           turmasSection.classList.remove('hidden');
-          turmasTab.classList.add('border-blue-600', 'text-blue-600');
+          turmasTab.classList.add('active', 'text-blue-600');
           turmasTab.classList.remove('text-gray-500');
           loadTurmas();
           break;
         case 'atividades':
           atividadesSection.classList.remove('hidden');
-          atividadesTab.classList.add('border-blue-600', 'text-blue-600');
+          atividadesTab.classList.add('active', 'text-blue-600');
           atividadesTab.classList.remove('text-gray-500');
           loadAtividades();
           break;
         case 'avaliacoes':
           avaliacoesSection.classList.remove('hidden');
-          avaliacoesTab.classList.add('border-blue-600', 'text-blue-600');
+          avaliacoesTab.classList.add('active', 'text-blue-600');
           avaliacoesTab.classList.remove('text-gray-500');
           break;
         case 'solicitacoes':
           solicitacoesSection.classList.remove('hidden');
-          solicitacoesTab.classList.add('border-blue-600', 'text-blue-600');
+          solicitacoesTab.classList.add('active', 'text-blue-600');
           solicitacoesTab.classList.remove('text-gray-500');
           loadSolicitacoes();
           break;
@@ -651,16 +578,25 @@
     solicitacoesTab.addEventListener('click', () => showSection('solicitacoes'));
     document.getElementById('refreshSolicitacoesBtn').addEventListener('click', () => loadSolicitacoes());
 
-    logoutBtn.addEventListener('click', logout);
+    logoutBtn.addEventListener('click', logoutProfessor);
 
     // Inicialização
     async function main() {
-      const user = checkAuth();
-      if (!user) return;
+      try {
+        // Carregar componente de modais de alerta
+        await loadAlertModals();
 
-      userInfo.textContent = `Olá, ${user.nome}!`;
+        const user = checkAuthProfessor();
+        if (!user) return;
 
-      showSection('overview');
+        userInfo.textContent = `Olá, ${user.nome}!`;
+
+        showSection('overview');
+      } catch (error) {
+        console.error('Erro ao carregar modais:', error);
+        // Fallback sem modal
+        alert('Erro ao inicializar a aplicação');
+      }
     }
 
     main();
