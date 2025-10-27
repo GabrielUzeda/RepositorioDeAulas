@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Administrativo - Repositório de Aulas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="global/global.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+  <header class="bg-red-600 shadow-lg">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <span class="material-icons text-white text-2xl">admin_panel_settings</span>
+          <h1 class="text-white text-xl font-medium">Painel Administrativo</h1>
+        </div>
+        <nav class="flex items-center space-x-4">
+          <span id="userInfo" class="text-white text-sm">Olá, Admin!</span>
+          <a href="login.html" id="logoutBtn" class="text-white px-4 py-2 rounded-lg hover:bg-red-700 transition flex items-center space-x-2">
+            <span class="material-icons">logout</span>
+            <span>Sair</span>
+          </a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container mx-auto px-6 py-8">
+    <!-- Password Change Warning -->
+    <div id="passwordWarning" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 hidden">
+      <div class="flex items-center">
+        <span class="material-icons text-yellow-600 mr-2">warning</span>
+        <div>
+          <p class="font-bold">Atenção!</p>
+          <p>Você deve alterar sua senha antes de continuar usando o sistema.</p>
+          <button id="changePasswordBtn" class="mt-2 bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Alterar Senha</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users Management Section -->
+    <div class="bg-white rounded-2xl shadow-md p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-light text-gray-800">Gerenciamento de Usuários</h2>
+        <button id="refreshUsersBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2">
+          <span class="material-icons text-sm">refresh</span>
+          <span>Atualizar</span>
+        </button>
+      </div>
+
+      <div id="usersTable" class="overflow-x-auto">
+        <table class="min-w-full table-auto">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuário</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turmas</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody" class="bg-white divide-y divide-gray-200">
+            <tr>
+              <td colspan="5" class="px-4 py-8 text-center text-gray-500">Carregando usuários...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Password Change Modal -->
+  <div id="passwordChangeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white w-full max-w-md mx-4 rounded-2xl p-6 slide-in modal-content">
+      <h3 class="text-xl font-medium text-gray-800 mb-4">Alterar Senha</h3>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Senha Atual</label>
+          <input type="password" id="currentPassword" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
+          <input type="password" id="newPassword" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar Nova Senha</label>
+          <input type="password" id="confirmPassword" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+      </div>
+      <div class="flex space-x-3 mt-6">
+        <button id="passwordChangeCancel" class="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Cancelar</button>
+        <button id="passwordChangeConfirm" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Alterar Senha</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Componente de Modais de Alerta -->
+  <div id="alert-modals-container"></div>
+
+  <script type="module">
+    // Importar componentes de modais de alerta
+    import {
+      loadAlertModals,
+      showSuccessModal,
+      hideSuccessModal,
+      showErrorModal,
+      hideErrorModal,
+      showLoadingModal,
+      hideLoadingModal,
+      showPasswordConfirmModal,
+      hidePasswordConfirmModal
+    } from './componentes/alert-modals.js';
+
+    import {
+      apiRequest,
+      checkAuth,
+      logout
+    } from './global/api-utils.js';
+
+    let currentUser = null;
+
+    // Elementos DOM
+    const passwordWarning = document.getElementById('passwordWarning');
+    const changePasswordBtn = document.getElementById('changePasswordBtn');
+    const passwordChangeModal = document.getElementById('passwordChangeModal');
+    const passwordChangeCancel = document.getElementById('passwordChangeCancel');
+    const passwordChangeConfirm = document.getElementById('passwordChangeConfirm');
+    const currentPasswordInput = document.getElementById('currentPassword');
+    const newPasswordInput = document.getElementById('newPassword');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const usersTableBody = document.getElementById('usersTableBody');
+    const refreshUsersBtn = document.getElementById('refreshUsersBtn');
+    const userInfo = document.getElementById('userInfo');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Verificar autenticação de administrador
+    function checkAuthAdmin() {
+      const user = checkAuth();
+      if (!user) {
+        window.location.href = 'login.html';
+        return null;
+      }
+
+      // Garantir que apenas admin possa acessar esta página
+      if (user.cargo !== 'admin') {
+        window.location.href = 'index.html';
+        return null;
+      }
+
+      currentUser = user;
+      return currentUser;
+    }
+
+    // Logout
+    function logoutAdmin() {
+      logout();
+      window.location.href = 'login.html';
+    }
+
+    // Verificar se admin precisa mudar senha
+    async function checkPasswordChangeNeeded() {
+      try {
+        const response = await apiRequest('/admin/check-password-change');
+        if (response.success) {
+          if (response.needs_password_change) {
+            passwordWarning.classList.remove('hidden');
+          } else {
+            passwordWarning.classList.add('hidden');
+            loadUsers(); // Só carrega usuários se não precisar mudar senha
+          }
+        } else {
+          showErrorModal('Erro ao verificar status da senha');
+        }
+      } catch (error) {
+        console.error('Erro ao verificar mudança de senha:', error);
+        showErrorModal('Erro ao verificar status da senha');
+      }
+    }
+
+    // Carregar lista de usuários
+    async function loadUsers() {
+      try {
+        showLoadingModal('Carregando usuários...');
+        const response = await apiRequest('/admin/users');
+        hideLoadingModal();
+
+        if (response.success) {
+          renderUsersTable(response.users);
+        } else {
+          showErrorModal('Erro ao carregar usuários: ' + (response.message || 'Erro desconhecido'));
+        }
+      } catch (error) {
+        hideLoadingModal();
+        console.error('Erro ao carregar usuários:', error);
+        showErrorModal('Erro ao carregar usuários');
+      }
+    }
+
+    // Renderizar tabela de usuários
+    function renderUsersTable(users) {
+      usersTableBody.innerHTML = '';
+
+      if (users.length === 0) {
+        usersTableBody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Nenhum usuário encontrado</td></tr>';
+        return;
+      }
+
+      users.forEach(user => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50';
+
+        const cargoText = getCargoText(user.cargo);
+        const cargoColor = getCargoColor(user.cargo);
+
+        row.innerHTML = `
+          <td class="px-4 py-4 whitespace-nowrap">
+            <div class="text-sm font-medium text-gray-900">${user.usuario}</div>
+          </td>
+          <td class="px-4 py-4 whitespace-nowrap">
+            <div class="text-sm text-gray-900">${user.nome}</div>
+          </td>
+          <td class="px-4 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${cargoColor}">
+              ${cargoText}
+            </span>
+          </td>
+          <td class="px-4 py-4 whitespace-nowrap">
+            <div class="text-sm text-gray-900">${user.turmas.join(', ') || 'Nenhuma'}</div>
+          </td>
+          <td class="px-4 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+            ${user.cargo !== 'admin' ? `
+              <button class="promote-btn text-blue-600 hover:text-blue-900" data-user-id="${user.usuario}">
+                ${user.cargo === 'aluno' ? 'Promover' : 'Rebaixar'}
+              </button>
+              <button class="reset-btn text-yellow-600 hover:text-yellow-900" data-user-id="${user.usuario}">
+                Reset Senha
+              </button>
+              <button class="delete-btn text-red-600 hover:text-red-900" data-user-id="${user.usuario}">
+                Excluir
+              </button>
+            ` : '<span class="text-gray-400">Admin</span>'}
+          </td>
+        `;
+
+        usersTableBody.appendChild(row);
+      });
+
+      // Adicionar event listeners aos botões
+      document.querySelectorAll('.promote-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const userId = e.target.dataset.userId;
+          promoteUser(userId);
+        });
+      });
+
+      document.querySelectorAll('.reset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const userId = e.target.dataset.userId;
+          resetUserPassword(userId);
+        });
+      });
+
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const userId = e.target.dataset.userId;
+          deleteUser(userId);
+        });
+      });
+    }
+
+    function getCargoText(cargo) {
+      switch (cargo) {
+        case 'admin': return 'Administrador';
+        case 'professor': return 'Professor';
+        case 'aluno': return 'Aluno';
+        default: return cargo;
+      }
+    }
+
+    function getCargoColor(cargo) {
+      switch (cargo) {
+        case 'admin': return 'bg-red-100 text-red-800';
+        case 'professor': return 'bg-blue-100 text-blue-800';
+        case 'aluno': return 'bg-green-100 text-green-800';
+        default: return 'bg-gray-100 text-gray-800';
+      }
+    }
+
+    // Promover/rebaixar usuário
+    async function promoteUser(userId) {
+      try {
+        showLoadingModal('Processando...');
+        const response = await apiRequest('/admin/users/promote', {
+          method: 'POST',
+          body: JSON.stringify({ user_id: userId })
+        });
+        hideLoadingModal();
+
+        if (response.success) {
+          showSuccessModal(response.message);
+          loadUsers(); // Recarregar lista
+        } else {
+          showErrorModal('Erro: ' + (response.message || 'Erro desconhecido'));
+        }
+      } catch (error) {
+        hideLoadingModal();
+        console.error('Erro ao promover usuário:', error);
+        showErrorModal('Erro ao promover usuário');
+      }
+    }
+
+    // Resetar senha do usuário
+    async function resetUserPassword(userId) {
+      try {
+        showLoadingModal('Resetando senha...');
+        const response = await apiRequest('/admin/users/reset-password', {
+          method: 'POST',
+          body: JSON.stringify({ user_id: userId })
+        });
+        hideLoadingModal();
+
+        if (response.success) {
+          showSuccessModal(response.message);
+        } else {
+          showErrorModal('Erro: ' + (response.message || 'Erro desconhecido'));
+        }
+      } catch (error) {
+        hideLoadingModal();
+        console.error('Erro ao resetar senha:', error);
+        showErrorModal('Erro ao resetar senha');
+      }
+    }
+
+    // Excluir usuário
+    async function deleteUser(userId) {
+      showPasswordConfirmModal(
+        'Confirmação de Exclusão',
+        `Tem certeza que deseja excluir o usuário "${userId}"? Esta ação não pode ser desfeita.`,
+        async (password) => {
+          try {
+            showLoadingModal('Excluindo usuário...');
+            const response = await apiRequest('/admin/users/delete', {
+              method: 'POST',
+              body: JSON.stringify({
+                user_id: userId,
+                admin_password: password
+              })
+            });
+            hideLoadingModal();
+
+            if (response.success) {
+              showSuccessModal(response.message);
+              loadUsers(); // Recarregar lista
+            } else {
+              showErrorModal('Erro: ' + (response.message || 'Erro desconhecido'));
+            }
+          } catch (error) {
+            hideLoadingModal();
+            console.error('Erro ao excluir usuário:', error);
+            showErrorModal('Erro ao excluir usuário');
+          }
+        }
+      );
+    }
+
+    // Mostrar modal de mudança de senha
+    function showPasswordChangeModal() {
+      passwordChangeModal.classList.remove('hidden');
+      passwordChangeModal.classList.add('flex');
+    }
+
+    // Esconder modal de mudança de senha
+    function hidePasswordChangeModal() {
+      passwordChangeModal.classList.add('hidden');
+      passwordChangeModal.classList.remove('flex');
+      // Limpar campos
+      currentPasswordInput.value = '';
+      newPasswordInput.value = '';
+      confirmPasswordInput.value = '';
+    }
+
+    // Alterar senha do admin
+    async function changePassword() {
+      const currentPassword = currentPasswordInput.value;
+      const newPassword = newPasswordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        showErrorModal('Todos os campos são obrigatórios');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        showErrorModal('A nova senha e a confirmação não coincidem');
+        return;
+      }
+
+      if (newPassword === 'asdf1234') {
+        showErrorModal('A nova senha não pode ser a senha padrão');
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        showErrorModal('A nova senha deve ter pelo menos 6 caracteres');
+        return;
+      }
+
+      try {
+        showLoadingModal('Alterando senha...');
+        const response = await apiRequest('/admin/change-password', {
+          method: 'POST',
+          body: JSON.stringify({
+            current_password: currentPassword,
+            new_password: newPassword
+          })
+        });
+        hideLoadingModal();
+
+        if (response.success) {
+          showSuccessModal(response.message);
+          hidePasswordChangeModal();
+          passwordWarning.classList.add('hidden');
+          loadUsers(); // Agora pode carregar usuários
+        } else {
+          showErrorModal('Erro: ' + (response.message || 'Erro desconhecido'));
+        }
+      } catch (error) {
+        hideLoadingModal();
+        console.error('Erro ao alterar senha:', error);
+        showErrorModal('Erro ao alterar senha');
+      }
+    }
+
+    // Event listeners
+    changePasswordBtn.addEventListener('click', showPasswordChangeModal);
+    passwordChangeCancel.addEventListener('click', hidePasswordChangeModal);
+    passwordChangeConfirm.addEventListener('click', changePassword);
+    refreshUsersBtn.addEventListener('click', loadUsers);
+    logoutBtn.addEventListener('click', logoutAdmin);
+
+    // Inicialização
+    async function main() {
+      try {
+        // Carregar componente de modais de alerta
+        await loadAlertModals();
+
+        const user = checkAuthAdmin();
+        if (!user) return;
+
+        userInfo.textContent = `Olá, ${user.nome}!`;
+
+        // Verificar se precisa mudar senha
+        await checkPasswordChangeNeeded();
+
+      } catch (error) {
+        console.error('Erro ao carregar aplicação:', error);
+        showErrorModal('Erro ao inicializar a aplicação');
+      }
+    }
+
+    main();
+  </script>
+</body>
+
+</html>
+
+
+

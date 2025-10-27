@@ -91,7 +91,7 @@ impl DatabaseManager {
         Ok(hash.to_string())
     }
 
-    fn verify_password(&self, senha: &str, hash: &str) -> Result<bool> {
+    pub fn verify_password(&self, senha: &str, hash: &str) -> Result<bool> {
         use argon2::{Argon2, PasswordVerifier};
         use password_hash::PasswordHash;
 
@@ -144,6 +144,24 @@ impl DatabaseManager {
         }
     }
 
+    pub fn list_usuarios(&self) -> Result<Vec<Usuario>> {
+        let txn = self.env.begin_ro_txn()?;
+        let mut cursor = txn.open_ro_cursor(self.users_db)?;
+        let mut usuarios = Vec::new();
+
+        for (_key, value) in cursor.iter() {
+            let key_str = String::from_utf8_lossy(_key);
+            if key_str.starts_with("user:") {
+                match serde_json::from_slice::<Usuario>(value) {
+                    Ok(usuario) => usuarios.push(usuario),
+                    Err(e) => eprintln!("Erro ao deserializar usuário: {}", e),
+                }
+            }
+        }
+
+        Ok(usuarios)
+    }
+
     pub fn authenticate_usuario(&self, usuario: &str, senha: &str) -> Result<Option<Usuario>> {
         if let Some(user) = self.get_usuario(usuario)? {
             if self.verify_password(senha, &user.senha_hash)? {
@@ -172,6 +190,55 @@ impl DatabaseManager {
             if let Some(turmas) = updates.turmas {
                 user.turmas = turmas;
             }
+            user.atualizado_em = Utc::now().timestamp();
+
+            let key = format!("user:{}", usuario);
+            let value = serde_json::to_string(&user)?;
+            txn.put(self.users_db, &key.as_bytes(), &value.as_bytes(), WriteFlags::empty())?;
+            txn.commit()?;
+        }
+
+        Ok(())
+    }
+
+    pub fn delete_usuario(&self, usuario: &str) -> Result<()> {
+        let mut txn = self.env.begin_rw_txn()?;
+
+        let key = format!("user:{}", usuario);
+
+        // Verificar se o usuário existe
+        if txn.get(self.users_db, &key.as_bytes()).is_err() {
+            return Ok(()); // Usuário não existe, considerar como sucesso
+        }
+
+        // Deletar o usuário
+        txn.del(self.users_db, &key.as_bytes(), None)?;
+        txn.commit()?;
+
+        Ok(())
+    }
+
+    pub fn update_usuario_password(&self, usuario: &str, nova_senha: &str) -> Result<()> {
+        let mut txn = self.env.begin_rw_txn()?;
+
+        if let Some(mut user) = self.get_usuario(usuario)? {
+            user.senha_hash = self.hash_password(nova_senha)?;
+            user.atualizado_em = Utc::now().timestamp();
+
+            let key = format!("user:{}", usuario);
+            let value = serde_json::to_string(&user)?;
+            txn.put(self.users_db, &key.as_bytes(), &value.as_bytes(), WriteFlags::empty())?;
+            txn.commit()?;
+        }
+
+        Ok(())
+    }
+
+    pub fn update_usuario_cargo(&self, usuario: &str, novo_cargo: &Cargo) -> Result<()> {
+        let mut txn = self.env.begin_rw_txn()?;
+
+        if let Some(mut user) = self.get_usuario(usuario)? {
+            user.cargo = novo_cargo.clone();
             user.atualizado_em = Utc::now().timestamp();
 
             let key = format!("user:{}", usuario);

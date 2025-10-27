@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Repositório de Aulas</title>
+  <title>Portal do Aluno - Repositório de Aulas</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -138,7 +138,7 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-3">
           <span class="material-icons text-white text-2xl">school</span>
-          <h1 class="text-white text-xl font-medium">Repositório de Aulas</h1>
+          <h1 class="text-white text-xl font-medium">Portal do Aluno</h1>
         </div>
         <div class="flex items-center space-x-4">
           <button id="logoutBtn"
@@ -158,8 +158,8 @@
   <main class="container mx-auto px-6 py-8">
     <div id="turmasView" class="fade-in hidden">
       <div class="text-center mb-8">
-        <h2 class="text-3xl font-light text-gray-800 mb-2" id="turmasTitle">Selecione uma Turma</h2>
-        <p class="text-gray-600" id="turmasSubtitle">Escolha a turma para acessar o conteúdo das aulas</p>
+        <h2 class="text-3xl font-light text-gray-800 mb-2" id="turmasTitle">Minhas Turmas</h2>
+        <p class="text-gray-600" id="turmasSubtitle">Acesse o conteúdo das aulas disponíveis</p>
       </div>
       <div id="turmasGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
       <div id="alunoTurmasMessage" class="hidden text-center py-8">
@@ -566,20 +566,16 @@
           currentUser = JSON.parse(savedUser);
           console.log('Usuário logado:', currentUser.usuario, 'Cargo:', currentUser.cargo);
 
-          // Redirecionamento inteligente baseado no cargo
-          if (currentUser.cargo === 'admin') {
-            window.location.href = 'admin.html';
-            return false; // Não continua carregando a página
-          } else if (currentUser.cargo === 'professor') {
-            window.location.href = 'professor.html';
-            return false; // Não continua carregando a página
-          } else if (currentUser.cargo === 'aluno') {
-            window.location.href = 'aluno.html';
-            return false; // Não continua carregando a página
-          } else {
-            showTurmasView();
-            return true;
+          // Verificar se é aluno - se não for, redirecionar
+          if (currentUser.cargo !== 'aluno') {
+            console.log('Usuário não é aluno, redirecionando para index.html');
+            window.location.href = 'index.html';
+            return false;
           }
+
+          console.log('Mantendo aluno na página aluno.html');
+          showTurmasView();
+          return true;
         } catch (error) {
           console.error('Erro ao restaurar sessão:', error);
           localStorage.removeItem('currentUser');
@@ -643,21 +639,13 @@
         return;
       }
 
-      // Verificar se o usuário logado tem o cargo correto
+      // Verificar se o usuário logado é aluno - se não for, redirecionar
       try {
         const user = JSON.parse(savedUser);
-        // Redirecionamento inteligente baseado no cargo
-        if (user.cargo === 'admin') {
-          window.location.href = 'admin.html';
-          return;
-        } else if (user.cargo === 'professor') {
-          window.location.href = 'professor.html';
-          return;
-        } else if (user.cargo === 'aluno') {
-          window.location.href = 'aluno.html';
+        if (user.cargo !== 'aluno') {
+          window.location.href = 'index.html';
           return;
         }
-        // Cargo desconhecido - continua normalmente (fallback)
       } catch (error) {
         console.error('Erro ao verificar cargo do usuário:', error);
         window.location.href = 'login.html';

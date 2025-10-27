@@ -27,7 +27,7 @@ async fn main() {
             // Inicializar dados se for a primeira vez
             if !database::init::is_initialized(&db).unwrap_or(false) {
                 println!("📝 Inicializando dados do banco...");
-                if let Err(e) = database::init::initialize_database_from_default(&db).await {
+                if let Err(e) = database::init::initialize_clean_database(&db).await {
                     eprintln!("❌ Erro ao inicializar dados: {}", e);
                 } else {
                     println!("✅ Dados inicializados com sucesso!");

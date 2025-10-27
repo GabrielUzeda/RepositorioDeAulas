@@ -9,35 +9,76 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link href="global/global.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+    }
+
+    * {
+      animation: fade-in 0.6s ease-out forwards;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .card-hover {
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+    }
+
+    .card-hover:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .modal-content.modal-enter {
+      opacity: 0;
+      transform: scale(0.9) translateY(-20px);
+      transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+    }
+
+    .modal-content.modal-enter-active {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  </style>
 </head>
 
 <body class="bg-gray-50 min-h-screen">
-  <header class="bg-blue-600 shadow-lg">
-    <div class="container mx-auto px-6 py-4">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <span class="material-icons text-white text-2xl">school</span>
-          <h1 class="text-white text-xl font-medium">Repositório de Aulas</h1>
-        </div>
-        <nav class="flex items-center space-x-4">
-          <a href="login.html" class="text-white px-4 py-2 rounded-lg bg-blue-700">Login</a>
-          <a href="index.html" class="text-white px-4 py-2 rounded-lg hover:bg-opacity-30 transition">Portal Alunos</a>
-          <a href="professor.html" class="text-white px-4 py-2 rounded-lg hover:bg-opacity-30 transition">Portal Professores</a>
-        </nav>
-      </div>
-    </div>
-  </header>
 
   <!-- Login/Register Container -->
   <main class="container mx-auto px-6 py-12">
-    <div class="max-w-md mx-auto">
+    <div class="flex items-center justify-center min-h-[80vh]">
+      <!-- Logo/Title Section -->
+      <div class="hidden md:flex flex-col items-center justify-center mr-12">
+        <div class="bg-blue-600 w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-lg">
+          <span class="material-icons text-white text-4xl">school</span>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-800 text-center">Repositório de Aulas</h1>
+        <p class="text-gray-600 text-center mt-2 max-w-xs">Sistema acadêmico para gerenciamento de turmas, aulas e atividades</p>
+      </div>
+
+      <!-- Login/Register Card -->
+      <div class="w-full max-w-md">
       <!-- Tab Navigation -->
       <div class="bg-white rounded-t-2xl shadow-md">
         <div class="flex">
-          <button id="loginTab" class="flex-1 py-4 px-6 text-center font-medium border-b-2 border-blue-600 text-blue-600">
+          <button id="loginTab" class="nav-tab flex-1 py-4 px-6 text-center font-medium active text-blue-600" style="border-bottom: none;">
             Entrar
           </button>
-          <button id="registerTab" class="flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700">
+          <button id="registerTab" class="nav-tab flex-1 py-4 px-6 text-center font-medium text-gray-500 hover:text-gray-700">
             Cadastrar
           </button>
         </div>
@@ -125,39 +166,6 @@
         </form>
       </div>
 
-      <!-- Quick Access -->
-      <div class="mt-8 bg-white rounded-2xl p-6 shadow-md">
-        <h3 class="text-lg font-medium text-gray-800 mb-4">Acesso Rápido</h3>
-        <div class="grid grid-cols-1 gap-3">
-          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <div class="font-medium">Administrador</div>
-              <div class="text-sm text-gray-500">admin / asdf1234</div>
-            </div>
-            <button onclick="quickLogin('admin', 'asdf1234')" class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
-              Login
-            </button>
-          </div>
-          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <div class="font-medium">Professor</div>
-              <div class="text-sm text-gray-500">professor / asdf1234</div>
-            </div>
-            <button onclick="quickLogin('professor', 'asdf1234')" class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">
-              Login
-            </button>
-          </div>
-          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <div class="font-medium text-gray-500">Alunos</div>
-              <div class="text-sm text-gray-500">Devem se cadastrar primeiro</div>
-            </div>
-            <button onclick="document.getElementById('registerTab').click()" class="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700">
-              Cadastrar
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   </main>
 
@@ -211,8 +219,12 @@
 
           // Redirecionar baseado no cargo
           const cargo = data.usuario.cargo;
-          if (cargo === 'admin' || cargo === 'professor') {
+          if (cargo === 'admin') {
+            window.location.href = 'admin.html';
+          } else if (cargo === 'professor') {
             window.location.href = 'professor.html';
+          } else if (cargo === 'aluno') {
+            window.location.href = 'aluno.html';
           } else {
             window.location.href = 'index.html';
           }
@@ -245,35 +257,38 @@
       }
     }
 
-    // Funções de navegação entre abas
-    function showLoginTab() {
-      loginTab.classList.add('border-blue-600', 'text-blue-600');
-      loginTab.classList.remove('text-gray-500');
-      registerTab.classList.remove('border-blue-600', 'text-blue-600');
-      registerTab.classList.add('text-gray-500');
-      loginForm.classList.remove('hidden');
-      registerForm.classList.add('hidden');
-    }
-
-    function showRegisterTab() {
-      registerTab.classList.add('border-blue-600', 'text-blue-600');
-      registerTab.classList.remove('text-gray-500');
-      loginTab.classList.remove('border-blue-600', 'text-blue-600');
-      loginTab.classList.add('text-gray-500');
-      registerForm.classList.remove('hidden');
+    // Navegação entre seções (abas)
+    function showSection(sectionName) {
+      // Ocultar todas as seções
       loginForm.classList.add('hidden');
+      registerForm.classList.add('hidden');
+
+      // Remover classes ativas das abas
+      loginTab.classList.remove('active', 'text-blue-600');
+      registerTab.classList.remove('active', 'text-blue-600');
+
+      loginTab.classList.add('text-gray-500');
+      registerTab.classList.add('text-gray-500');
+
+      // Mostrar seção selecionada
+      switch (sectionName) {
+        case 'login':
+          loginForm.classList.remove('hidden');
+          loginTab.classList.add('active', 'text-blue-600');
+          loginTab.classList.remove('text-gray-500');
+          break;
+        case 'register':
+          registerForm.classList.remove('hidden');
+          registerTab.classList.add('active', 'text-blue-600');
+          registerTab.classList.remove('text-gray-500');
+          break;
+      }
     }
 
-    // Função de login rápido
-    function quickLogin(usuario, senha) {
-      document.getElementById('loginUsuario').value = usuario;
-      document.getElementById('loginSenha').value = senha;
-      loginFormData.dispatchEvent(new Event('submit'));
-    }
 
     // Event listeners
-    loginTab.addEventListener('click', showLoginTab);
-    registerTab.addEventListener('click', showRegisterTab);
+    loginTab.addEventListener('click', () => showSection('login'));
+    registerTab.addEventListener('click', () => showSection('register'));
 
     loginFormData.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -331,7 +346,7 @@
         showSuccessModal('Conta criada com sucesso! Agora você pode fazer login e solicitar entrada nas turmas desejadas.');
         registerError.classList.add('hidden');
         registerFormData.reset();
-        showLoginTab();
+        showSection('login');
       } catch (error) {
         registerError.querySelector('span:last-child').textContent = error.message;
         registerError.classList.remove('hidden');
@@ -347,7 +362,7 @@
         // Carregar componente de modais de alerta
         await loadAlertModals();
 
-        showLoginTab();
+        showSection('login');
       } catch (error) {
         console.error('Erro ao inicializar:', error);
         // Fallback sem modal
@@ -356,9 +371,6 @@
     }
 
     main();
-
-    // Expor função de login rápido globalmente
-    window.quickLogin = quickLogin;
   </script>
 </body>
 

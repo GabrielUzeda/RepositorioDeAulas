@@ -15,7 +15,7 @@ pub struct Usuario {
     pub atualizado_em: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Cargo {
     #[serde(rename = "aluno")]
     Aluno,

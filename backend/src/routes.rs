@@ -6,6 +6,42 @@ use crate::database::models::*;
 
 // ========== STRUCTS DE REQUEST/RESPONSE ==========
 
+// Admin
+#[derive(Serialize)]
+pub struct AdminCheckResponse {
+    pub success: bool,
+    pub needs_password_change: bool,
+    pub message: String,
+}
+
+#[derive(Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[derive(Serialize)]
+pub struct UsersResponse {
+    pub success: bool,
+    pub users: Vec<Usuario>,
+}
+
+#[derive(Deserialize)]
+pub struct PromoteUserRequest {
+    pub user_id: String,
+}
+
+#[derive(Deserialize)]
+pub struct ResetPasswordRequest {
+    pub user_id: String,
+}
+
+#[derive(Deserialize)]
+pub struct DeleteUserRequest {
+    pub user_id: String,
+    pub admin_password: String,
+}
+
 // Auth
 #[derive(Deserialize)]
 pub struct LoginRequest {
@@ -164,6 +200,385 @@ fn get_current_user(headers: &HeaderMap) -> Result<String, String> {
 }
 
 // ========== HANDLERS ==========
+
+// ========== ADMIN ==========
+pub async fn check_admin_password_change(
+    Extension(db): Extension<Arc<DatabaseManager>>,
+    headers: HeaderMap,
+) -> Json<serde_json::Value> {
+    let admin_id = match get_current_user(&headers) {
+        Ok(user) => user,
+        Err(e) => return Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro de autenticação: {}", e)
+        })),
+    };
+
+    // Verificar se o usuário é admin
+    match db.get_usuario(&admin_id) {
+        Ok(Some(user)) if user.cargo == Cargo::Admin => {
+            // Verificar se a senha ainda é a padrão
+            let needs_change = match db.verify_password("asdf1234", &user.senha_hash) {
+                Ok(is_default) => is_default,
+                Err(_) => false, // Em caso de erro, assumir que não precisa mudar
+            };
+            Json(serde_json::json!({
+                "success": true,
+                "needs_password_change": needs_change,
+                "message": if needs_change { "Você deve alterar sua senha antes de continuar" } else { "Senha válida" }
+            }))
+        },
+        Ok(Some(_)) => Json(serde_json::json!({
+            "success": false,
+            "message": "Acesso negado: apenas administradores podem acessar esta funcionalidade"
+        })),
+        Ok(None) => Json(serde_json::json!({
+            "success": false,
+            "message": "Usuário não encontrado"
+        })),
+        Err(e) => Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro interno: {}", e)
+        })),
+    }
+}
+
+pub async fn change_admin_password(
+    Extension(db): Extension<Arc<DatabaseManager>>,
+    headers: HeaderMap,
+    Json(req): Json<ChangePasswordRequest>,
+) -> Json<serde_json::Value> {
+    let admin_id = match get_current_user(&headers) {
+        Ok(user) => user,
+        Err(e) => return Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro de autenticação: {}", e)
+        })),
+    };
+
+    // Verificar se o usuário é admin
+    match db.get_usuario(&admin_id) {
+        Ok(Some(user)) if user.cargo == Cargo::Admin => {
+            // Verificar senha atual
+            match db.verify_password(&req.current_password, &user.senha_hash) {
+                Ok(is_valid) => {
+                    if !is_valid {
+                        return Json(serde_json::json!({
+                            "success": false,
+                            "message": "Senha atual incorreta"
+                        }));
+                    }
+                },
+                Err(_) => {
+                    return Json(serde_json::json!({
+                        "success": false,
+                        "message": "Erro ao verificar senha atual"
+                    }));
+                }
+            }
+
+            // Validar nova senha (não pode ser a padrão)
+            if req.new_password == "asdf1234" {
+                return Json(serde_json::json!({
+                    "success": false,
+                    "message": "A nova senha não pode ser a senha padrão (asdf1234)"
+                }));
+            }
+
+            // Validar tamanho mínimo da senha
+            if req.new_password.len() < 6 {
+                return Json(serde_json::json!({
+                    "success": false,
+                    "message": "A nova senha deve ter pelo menos 6 caracteres"
+                }));
+            }
+
+            // Atualizar senha
+            match db.update_usuario_password(&admin_id, &req.new_password) {
+                Ok(_) => Json(serde_json::json!({
+                    "success": true,
+                    "message": "Senha alterada com sucesso"
+                })),
+                Err(e) => Json(serde_json::json!({
+                    "success": false,
+                    "message": format!("Erro ao alterar senha: {}", e)
+                })),
+            }
+        },
+        Ok(Some(_)) => Json(serde_json::json!({
+            "success": false,
+            "message": "Acesso negado: apenas administradores podem alterar senha"
+        })),
+        Ok(None) => Json(serde_json::json!({
+            "success": false,
+            "message": "Usuário não encontrado"
+        })),
+        Err(e) => Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro interno: {}", e)
+        })),
+    }
+}
+
+pub async fn list_users(
+    Extension(db): Extension<Arc<DatabaseManager>>,
+    headers: HeaderMap,
+) -> Json<serde_json::Value> {
+    let admin_id = match get_current_user(&headers) {
+        Ok(user) => user,
+        Err(e) => return Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro de autenticação: {}", e)
+        })),
+    };
+
+    // Verificar se o usuário é admin
+    match db.get_usuario(&admin_id) {
+        Ok(Some(user)) if user.cargo == Cargo::Admin => {
+            match db.list_usuarios() {
+                Ok(users) => Json(serde_json::json!({
+                    "success": true,
+                    "users": users
+                })),
+                Err(e) => Json(serde_json::json!({
+                    "success": false,
+                    "message": format!("Erro ao listar usuários: {}", e),
+                    "users": []
+                })),
+            }
+        },
+        Ok(Some(_)) => Json(serde_json::json!({
+            "success": false,
+            "message": "Acesso negado: apenas administradores podem listar usuários"
+        })),
+        Ok(None) => Json(serde_json::json!({
+            "success": false,
+            "message": "Usuário não encontrado"
+        })),
+        Err(e) => Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro interno: {}", e)
+        })),
+    }
+}
+
+pub async fn promote_user(
+    Extension(db): Extension<Arc<DatabaseManager>>,
+    headers: HeaderMap,
+    Json(req): Json<PromoteUserRequest>,
+) -> Json<serde_json::Value> {
+    let admin_id = match get_current_user(&headers) {
+        Ok(user) => user,
+        Err(e) => return Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro de autenticação: {}", e)
+        })),
+    };
+
+    // Verificar se o usuário é admin
+    match db.get_usuario(&admin_id) {
+        Ok(Some(admin)) if admin.cargo == Cargo::Admin => {
+            // Verificar se o usuário alvo existe e não é admin
+            match db.get_usuario(&req.user_id) {
+                Ok(Some(target_user)) => {
+                    if target_user.cargo == Cargo::Admin {
+                        return Json(serde_json::json!({
+                            "success": false,
+                            "message": "Não é possível alterar o cargo de administradores"
+                        }));
+                    }
+
+                    let new_cargo = match target_user.cargo {
+                        Cargo::Aluno => Cargo::Professor,
+                        Cargo::Professor => Cargo::Aluno,
+                        Cargo::Admin => Cargo::Admin, // Não deve chegar aqui
+                    };
+
+                    match db.update_usuario_cargo(&req.user_id, &new_cargo) {
+                        Ok(_) => Json(serde_json::json!({
+                            "success": true,
+                            "message": format!("Usuário {} promovido/rebaixado para {:?}", target_user.usuario, new_cargo)
+                        })),
+                        Err(e) => Json(serde_json::json!({
+                            "success": false,
+                            "message": format!("Erro ao alterar cargo: {}", e)
+                        })),
+                    }
+                },
+                Ok(None) => Json(serde_json::json!({
+                    "success": false,
+                    "message": "Usuário alvo não encontrado"
+                })),
+                Err(e) => Json(serde_json::json!({
+                    "success": false,
+                    "message": format!("Erro ao buscar usuário: {}", e)
+                })),
+            }
+        },
+        Ok(Some(_)) => Json(serde_json::json!({
+            "success": false,
+            "message": "Acesso negado: apenas administradores podem alterar cargos"
+        })),
+        Ok(None) => Json(serde_json::json!({
+            "success": false,
+            "message": "Administrador não encontrado"
+        })),
+        Err(e) => Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro interno: {}", e)
+        })),
+    }
+}
+
+pub async fn reset_user_password(
+    Extension(db): Extension<Arc<DatabaseManager>>,
+    headers: HeaderMap,
+    Json(req): Json<ResetPasswordRequest>,
+) -> Json<serde_json::Value> {
+    let admin_id = match get_current_user(&headers) {
+        Ok(user) => user,
+        Err(e) => return Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro de autenticação: {}", e)
+        })),
+    };
+
+    // Verificar se o usuário é admin
+    match db.get_usuario(&admin_id) {
+        Ok(Some(admin)) if admin.cargo == Cargo::Admin => {
+            // Verificar se o usuário alvo existe
+            match db.get_usuario(&req.user_id) {
+                Ok(Some(target_user)) => {
+                    // Permitir que admin reset sua própria senha
+                    if target_user.cargo == Cargo::Admin && req.user_id != admin_id {
+                        return Json(serde_json::json!({
+                            "success": false,
+                            "message": "Não é possível resetar senha de outros administradores"
+                        }));
+                    }
+
+                    match db.update_usuario_password(&req.user_id, "asdf1234") {
+                        Ok(_) => Json(serde_json::json!({
+                            "success": true,
+                            "message": format!("Senha do usuário {} resetada para a senha padrão", target_user.usuario)
+                        })),
+                        Err(e) => Json(serde_json::json!({
+                            "success": false,
+                            "message": format!("Erro ao resetar senha: {}", e)
+                        })),
+                    }
+                },
+                Ok(None) => Json(serde_json::json!({
+                    "success": false,
+                    "message": "Usuário alvo não encontrado"
+                })),
+                Err(e) => Json(serde_json::json!({
+                    "success": false,
+                    "message": format!("Erro ao buscar usuário: {}", e)
+                })),
+            }
+        },
+        Ok(Some(_)) => Json(serde_json::json!({
+            "success": false,
+            "message": "Acesso negado: apenas administradores podem resetar senhas"
+        })),
+        Ok(None) => Json(serde_json::json!({
+            "success": false,
+            "message": "Administrador não encontrado"
+        })),
+        Err(e) => Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro interno: {}", e)
+        })),
+    }
+}
+
+pub async fn delete_user(
+    Extension(db): Extension<Arc<DatabaseManager>>,
+    headers: HeaderMap,
+    Json(req): Json<DeleteUserRequest>,
+) -> Json<serde_json::Value> {
+    let admin_id = match get_current_user(&headers) {
+        Ok(user) => user,
+        Err(e) => return Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro de autenticação: {}", e)
+        })),
+    };
+
+    // Verificar se o usuário é admin e senha está correta
+    match db.get_usuario(&admin_id) {
+        Ok(Some(admin)) if admin.cargo == Cargo::Admin => {
+            // Verificar senha do admin
+            match db.verify_password(&req.admin_password, &admin.senha_hash) {
+                Ok(is_valid) => {
+                    if !is_valid {
+                        return Json(serde_json::json!({
+                            "success": false,
+                            "message": "Senha do administrador incorreta"
+                        }));
+                    }
+                },
+                Err(_) => {
+                    return Json(serde_json::json!({
+                        "success": false,
+                        "message": "Erro ao verificar senha"
+                    }));
+                }
+            }
+
+            // Verificar se o usuário alvo existe e não é admin
+            match db.get_usuario(&req.user_id) {
+                Ok(Some(target_user)) => {
+                    if target_user.cargo == Cargo::Admin {
+                        return Json(serde_json::json!({
+                            "success": false,
+                            "message": "Não é possível excluir administradores"
+                        }));
+                    }
+
+                    if req.user_id == admin_id {
+                        return Json(serde_json::json!({
+                            "success": false,
+                            "message": "Não é possível excluir o próprio usuário"
+                        }));
+                    }
+
+                    match db.delete_usuario(&req.user_id) {
+                        Ok(_) => Json(serde_json::json!({
+                            "success": true,
+                            "message": format!("Usuário {} excluído com sucesso", target_user.usuario)
+                        })),
+                        Err(e) => Json(serde_json::json!({
+                            "success": false,
+                            "message": format!("Erro ao excluir usuário: {}", e)
+                        })),
+                    }
+                },
+                Ok(None) => Json(serde_json::json!({
+                    "success": false,
+                    "message": "Usuário alvo não encontrado"
+                })),
+                Err(e) => Json(serde_json::json!({
+                    "success": false,
+                    "message": format!("Erro ao buscar usuário: {}", e)
+                })),
+            }
+        },
+        Ok(Some(_)) => Json(serde_json::json!({
+            "success": false,
+            "message": "Acesso negado: apenas administradores podem excluir usuários"
+        })),
+        Ok(None) => Json(serde_json::json!({
+            "success": false,
+            "message": "Administrador não encontrado"
+        })),
+        Err(e) => Json(serde_json::json!({
+            "success": false,
+            "message": format!("Erro interno: {}", e)
+        })),
+    }
+}
 
 // ========== AUTH ==========
 pub async fn login(
@@ -681,6 +1096,14 @@ pub fn create_router(db: Arc<DatabaseManager>) -> Router {
 
         // 💬 FEEDBACK
         .route("/feedback", post(create_feedback))             // POST: criar feedback da atividade
+
+        // 👑 ADMIN
+        .route("/admin/check-password-change", get(check_admin_password_change))  // GET: verificar se admin precisa mudar senha
+        .route("/admin/change-password", post(change_admin_password))             // POST: alterar senha do admin
+        .route("/admin/users", get(list_users))                                   // GET: listar todos os usuários
+        .route("/admin/users/promote", post(promote_user))                        // POST: promover/rebaixar usuário
+        .route("/admin/users/reset-password", post(reset_user_password))          // POST: resetar senha para padrão
+        .route("/admin/users/delete", post(delete_user))                          // POST: excluir usuário (com confirmação de senha)
 
         // 📧 EMAIL (compatibilidade)
         .route("/send-mail", post(crate::mailer::send_mail))

@@ -2,6 +2,7 @@
 
 // Estado do componente
 let modalsLoaded = false;
+let passwordConfirmCallback = null;
 
 /**
  * Carrega e inclui o HTML dos modais de alerta na página
@@ -44,6 +45,22 @@ function initializeModalListeners() {
   const errorOkBtn = document.getElementById('errorOkBtn');
   if (errorOkBtn) {
     errorOkBtn.addEventListener('click', hideErrorModal);
+  }
+
+  // Password confirmation modal
+  const passwordConfirmCancelBtn = document.getElementById('passwordConfirmCancel');
+  const passwordConfirmOkBtn = document.getElementById('passwordConfirmOk');
+  if (passwordConfirmCancelBtn) {
+    passwordConfirmCancelBtn.addEventListener('click', hidePasswordConfirmModal);
+  }
+  if (passwordConfirmOkBtn) {
+    passwordConfirmOkBtn.addEventListener('click', () => {
+      const password = document.getElementById('passwordConfirmInput').value;
+      if (passwordConfirmCallback) {
+        passwordConfirmCallback(password);
+      }
+      hidePasswordConfirmModal();
+    });
   }
 }
 
@@ -123,4 +140,25 @@ export function showLoadingModal(message = 'Enviando atividade...') {
 
 export function hideLoadingModal() {
   hideModal('loadingModal');
+}
+
+export function showPasswordConfirmModal(title = 'Confirmação de Senha', message = 'Digite sua senha para confirmar esta ação', callback) {
+  passwordConfirmCallback = callback;
+
+  const titleElement = document.getElementById('passwordConfirmTitle');
+  const messageElement = document.getElementById('passwordConfirmMessage');
+
+  if (titleElement) titleElement.textContent = title;
+  if (messageElement) messageElement.textContent = message;
+
+  showModal('passwordConfirmModal');
+}
+
+export function hidePasswordConfirmModal() {
+  // Clear the input and callback
+  const input = document.getElementById('passwordConfirmInput');
+  if (input) input.value = '';
+  passwordConfirmCallback = null;
+
+  hideModal('passwordConfirmModal');
 }
