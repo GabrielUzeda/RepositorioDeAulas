@@ -469,6 +469,13 @@
         "titulo": "Matplotlib",
         "descricao": "Exercícios introdutorios sobre matplotlib",
         "caminho": "turmas/visualizacao_dados/atividades/matplotlib.html"
+      },
+      {
+        "id": "matplotlib_02",
+        "icone": "05",
+        "titulo": "Matplotlib",
+        "descricao": "Exercícios intermediarios sobre matplotlib",
+        "caminho": "turmas/visualizacao_dados/atividades/matplotlib02.html"
       }
     ]
   }

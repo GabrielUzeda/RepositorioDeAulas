@@ -1,0 +1,93 @@
+<!doctype html>
+
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Atividade — Aprimorando Gráficos com Matplotlib</title>
+</head>
+<body class="font-sans text-gray-800">
+  <div class="max-w-4xl mx-auto p-8">
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl font-extrabold text-grey-800">Atividade — Aprimorando Gráficos com Matplotlib</h1>
+      <p class="text-sm text-gray-600 mt-2">Exercícios sobre legendas, anotações, eixos e salvamento de arquivos (baseado na Aula 02).</p>
+    </header>
+
+<ol class="space-y-6 list-none">
+
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 1 — O Papel da Legenda</h2>
+    <p class="mt-2 text-gray-700">Explique com suas palavras: para que serve a função <code>plt.legend()</code> e em que situação ela é indispensável?</p>
+  </li>
+
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 2 — Rótulos (Labels) e Legendas</h2>
+    <p class="mt-2 text-gray-700">Ao usar o comando <code>plt.plot(x, y, label='Vendas')</code>, o que exatamente o argumento <code>label='Vendas'</code> faz? Qual outra função depende desse argumento para funcionar corretamente?</p>
+  </li>
+
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 3 — Anotando Dados</h2>
+    <p class="mt-2 text-gray-700">Qual é o propósito da função <code>plt.text()</code>? Dê um exemplo prático (ex: "destacar...") em que você a usaria.</p>
+  </li>
+
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 4 — Leitura de Código: <code>plt.text()</code></h2>
+    <p class="mt-2 text-gray-700">O que o código abaixo fará? Descreva onde, visualmente, o texto "Pico de Vendas" aparecerá no gráfico.</p>
+    <pre class="mt-2 bg-gray-50 p-3 rounded text-sm font-mono text-gray-800">import matplotlib.pyplot as plt
+meses = [1, 2, 3, 4, 5]
+vendas = [100, 120, 180, 150, 140]
+plt.plot(meses, vendas)
+plt.text(3, 180, '  Pico de Vendas')
+plt.show()</pre>
+  </li>
+
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 5 — Ajustando o Foco (Eixos)</h2>
+    <p class="mt-2 text-gray-700">O que a função <code>plt.ylim()</code> permite fazer? Por que um analista de dados acharia útil "dar zoom" em uma parte específica do eixo Y?</p>
+  </li>
+
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 6 — Leitura de Código: <code>plt.ylim()</code></h2>
+    <p class="mt-2 text-gray-700">Imagine um gráfico de notas de alunos que variam de 0 a 10. O que acontecerá com a visualização final se o programador adicionar a linha <code>plt.ylim(5, 10)</code> antes de <code>plt.show()</code>?</p>
+  </li>
+
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 7 — Salvando o Gráfico</h2>
+    <p class="mt-2 text-gray-700">Qual é a função usada para salvar um gráfico do Matplotlib como um arquivo de imagem (por exemplo, 'meu_grafico.png')?</p>
+  </li>
+
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 8 — A "Regra de Ouro" do <code>savefig</code></h2>
+    <p class="mt-2 text-gray-700">A aula menciona uma dica importante sobre a ordem de chamada entre <code>plt.savefig()</code> e <code>plt.show()</code>. Qual é essa regra e por que ela é tão importante?</p>
+  </li>
+  
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 9 — Desafio de Código: Anotação</h2>
+    <p class="mt-2 text-gray-700">Complete o código abaixo. No lugar do comentário <code># ???</code>, escreva a linha de código que adiciona o texto "Meta Atingida!" exatamente na coordenada (x=4, y=8.5).</p>
+    <pre class="mt-2 bg-gray-50 p-3 rounded text-sm font-mono text-gray-800">import matplotlib.pyplot as plt
+horas_estudo = [1, 2, 3, 4, 5]
+notas = [6, 7, 7.5, 8.5, 9]
+plt.scatter(horas_estudo, notas)
+plt.title('Relação entre Horas de Estudo e Nota')
+# ??? ADICIONE SEU CÓDIGO AQUI ???
+plt.show()</pre>
+  </li>
+
+  <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+    <h2 class="text-lg font-semibold text-gray-800">Questão 10 — Projeto: Juntando as Peças</h2>
+    <p class="mt-2 text-gray-700">Imagine que você está analisando os lucros de dois produtos ("Produto A" e "Produto B") ao longo do ano. Você já tem os dados e plotou as duas linhas no mesmo gráfico.</p>
+    <p class="mt-2 text-gray-700">Liste as <strong>quatro funções</strong> que você aprendeu nesta aula que seriam necessárias para:</p>
+    <ol class="mt-2 list-decimal ml-6 space-y-2 text-gray-700">
+      <li>Identificar claramente qual linha representa o "Produto A" e qual representa o "Produto B".</li>
+      <li>Escrever um texto "Recorde!" no ponto de maior lucro do "Produto A".</li>
+      <li>Focar a visualização apenas nos lucros acima de R$ 1000,00 (cortando o espaço em branco de 0 a 1000).</li>
+      <li>Salvar o gráfico final como <code>relatorio_lucro.png</code> para enviar ao seu chefe.</li>
+    </ol>
+  </li>
+
+</ol>
+
+  </div>
+</body>
+</html>
