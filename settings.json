@@ -340,6 +340,16 @@
         "caminho": "turmas/logica/aulas/vetores_matrizes.html",
         "icone": "09",
         "descricao": "Vetores (listas) e matrizes (arrays 2D): conceitos, exemplos e cuidados"
+      },
+      "Tipos Compostos e Estruturas de Dados": {
+        "caminho": "turmas/logica/aulas/tipos_compostos_estrutura_dados.html",
+        "icone": "10",
+        "descricao": "Organizando Informações no Código: Listas, Arrays e Dicionários"
+      },
+      "Manipulação de Arquivos e Bibliotecas": {
+        "caminho": "turmas/logica/aulas/arquivos_e_blibioteca.html",
+        "icone": "11",
+        "descricao": "A Lógica da Manipulação de Arquivos e uso de Bibliotecas em Python"
       }
     },
     "atividades": [
@@ -385,6 +395,13 @@
         "titulo": "Atividade — Estruturas, Interpretador/Compilador, Modularização e Vetores",
         "descricao": "Questionário sobre interpretadores/compiladores, estruturas de controle, vetores/matrizes e modularização.",
         "caminho": "turmas/logica/atividades/estrutura_interpretador_compilador_modularizacao_vetores_matrizes.html"
+      },
+      {
+        "id": "tipos_compostos_arquivos",
+        "icone": "10-11",
+        "titulo": "Atividade - Tipos Compostos e Manipulação de Arquivos",
+        "descricao": "Questões sobre tipos compostos, estruturas de dados e manipulação de arquivos em Python",
+        "caminho": "turmas/logica/atividades/tipos_compostos_arquivos.html"
       }
     ]
   },

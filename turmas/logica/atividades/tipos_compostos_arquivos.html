@@ -1,0 +1,169 @@
+<script src="https://cdn.tailwindcss.com"></script>
+
+<div class="max-w-4xl mx-auto p-8">
+  <header class="mb-8 text-center">
+    <h1 class="text-3xl font-bold text-gray-800">Atividade: Arquivos e Estruturas de Dados em Python</h1>
+    <p class="text-sm text-gray-600 mt-2">Responda às questões teóricas ou interprete os blocos de código Python.</p>
+  </header>
+
+  <ol class="space-y-6 list-none">
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 1 — Teoria (Modos de Arquivo)</h2>
+      <p class="mt-2 text-gray-700">Explique a diferença lógica fundamental entre abrir um arquivo no modo <code class="bg-gray-200 px-2 py-1 rounded">'w'</code> (Write) e no modo <code class="bg-gray-200 px-2 py-1 rounded">'a'</code> (Append). Qual deles é considerado mais "perigoso" e por quê?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 2 — Teoria (Estrutura de Dados)</h2>
+      <p class="mt-2 text-gray-700">Qual é a principal diferença entre uma <strong>Lista (List)</strong> e um <strong>Dicionário (Dictionary)</strong>? Em que situação você escolheria usar uma Lista ao invés de um Dicionário?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 3 — Interpretação de Código (Listas)</h2>
+      <p class="mt-2 text-gray-700">Qual será a saída (output) no console após a execução deste código? Lembre-se que a contagem de índice começa em 0.</p>
+      <pre><code class="block bg-gray-100 text-gray-800 p-4 rounded-md text-sm mt-3">
+tarefas = ["Comprar leite", "Pagar a conta", "Estudar Python"]
+tarefas.append("Ligar para o médico")
+tarefas[0] = "Comprar pão"
+
+print(tarefas[0])
+print(tarefas[3])
+      </code></pre>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 4 — Interpretação de Código (Dicionários)</h2>
+      <p class="mt-2 text-gray-700">O que será impresso no console por este script? Preste atenção especial ao método <code class="bg-gray-200 px-2 py-1 rounded">.get()</code>.</p>
+      <pre><code class="block bg-gray-100 text-gray-800 p-4 rounded-md text-sm mt-3">
+usuario = {
+    "nome": "Ana Silva",
+    "idade": 28
+}
+
+usuario["cidade"] = "São Paulo"
+
+print(usuario["nome"])
+print(usuario.get("email", "Email não informado"))
+print(usuario.get("idade", 0))
+      </code></pre>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 5 — Teoria (Bloco 'with')</h2>
+      <p class="mt-2 text-gray-700">Por que a declaração <code class="bg-gray-200 px-2 py-1 rounded">with open(...) as f:</code> é considerada a forma lógica e mais segura de manipular arquivos em Python? Qual problema comum ela previne?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 6 — Interpretação de Código (Arquivos e 'os')</h2>
+      <p class="mt-2 text-gray-700">Imagine que o arquivo <code class="bg-gray-200 px-2 py-1 rounded">log.txt</code> <strong>não existe</strong>. Qual será o conteúdo final de <code class="bg-gray-200 px-2 py-1 rounded">log.txt</code> depois que este script for executado <strong>DUAS VEZES</strong> seguidas?</p>
+      <pre><code class="block bg-gray-100 text-gray-800 p-4 rounded-md text-sm mt-3">
+import os
+
+NOME_ARQUIVO = 'log.txt'
+
+if not os.path.exists(NOME_ARQUIVO):
+    with open(NOME_ARQUIVO, 'w') as f:
+        f.write('Registro iniciado.\n')
+else:
+    with open(NOME_ARQUIVO, 'a') as f:
+        f.write('Nova entrada no registro.\n')
+      </code></pre>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 7 — Prática (Criação de Biblioteca)</h2>
+      <p class="mt-2 text-gray-700">Você criou dois arquivos na mesma pasta:</p>
+      <p class="mt-2 text-gray-700"><strong>Arquivo 1: <code class="bg-gray-200 px-2 py-1 rounded">calculos.py</code></strong></p>
+      <pre><code class="block bg-gray-100 text-gray-800 p-4 rounded-md text-sm mt-3">
+def somar(a, b):
+    return a + b
+      </code></pre>
+      <p class="mt-2 text-gray-700"><strong>Arquivo 2: <code class="bg-gray-200 px-2 py-1 rounded">principal.py</code></strong></p>
+      <pre><code class="block bg-gray-100 text-gray-800 p-4 rounded-md text-sm mt-3">
+# [LINHA FALTANDO]
+
+resultado = calculos.somar(10, 5)
+print(resultado)
+      </code></pre>
+      <p class="mt-2 text-gray-700">Qual é o código da <strong>[LINHA FALTANDO]</strong> no arquivo <code class="bg-gray-200 px-2 py-1 rounded">principal.py</code> para que o script funcione corretamente?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 8 — Interpretação (Lista de Dicionários)</h2>
+      <p class="mt-2 text-gray-700">Qual será a saída exata deste script, que combina listas e dicionários?</p>
+      <pre><code class="block bg-gray-100 text-gray-800 p-4 rounded-md text-sm mt-3">
+carrinho = [
+    { "item": "Maçã", "qtd": 2 },
+    { "item": "Leite", "qtd": 1 },
+]
+
+# Adicionando um novo item
+carrinho.append({ "item": "Pão", "qtd": 6 })
+
+print(carrinho[0]["item"]) # Saída 1
+print(carrinho[2]["qtd"])  # Saída 2
+      </code></pre>
+    </li>
+<li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 9 — Teoria (Erros de Arquivo)</h2>
+      <p class="mt-2 text-gray-700">O que acontece se você tentar abrir um arquivo no modo leitura (<code class="bg-gray-200 px-2 py-1 rounded">'r'</code>), mas o arquivo não existir no seu computador? Qual é o nome do erro que o Python gera?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 10 — Teoria (Conflito de Nomes)</h2>
+      <p class="mt-2 text-gray-700">Ao criar sua própria biblioteca (um arquivo <code class="bg-gray-200 px-2 py-1 rounded">.py</code>), por que você <strong>nunca</strong> deve nomear seu arquivo como <code class="bg-gray-200 px-2 py-1 rounded">math.py</code> ou <code class="bg-gray-200 px-2 py-1 rounded">os.py</code>?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 11 — Interpretação de Código (Sobrescrita)</h2>
+      <p class="mt-2 text-gray-700">Qual será o conteúdo <strong>final</strong> do arquivo <code class="bg-gray-200 px-2 py-1 rounded">diario.txt</code> após este script ser executado? Por que a primeira linha desaparece?</p>
+      <pre><code class="block bg-gray-100 text-gray-800 p-4 rounded-md text-sm mt-3">
+# Bloco 1
+with open('diario.txt', 'w', encoding='utf-8') as f:
+    f.write('Hoje aprendi sobre arquivos.\n')
+
+# Bloco 2
+with open('diario.txt', 'w', encoding='utf-8') as f:
+    f.write('Usei o modo "w" novamente.\n')
+      </code></pre>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 12 — Teoria (Tipos de Dados)</h2>
+      <p class="mt-2 text-gray-700">O que é um <strong>Tipo Primitivo</strong>? Dê dois exemplos de tipos primitivos mencionados no material de aula.</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 13 — Interpretação (Erro Comum)</h2>
+      <p class="mt-2 text-gray-700">Este código irá gerar um erro. Qual é o erro e por que ele acontece?</p>
+      <pre><code class="block bg-gray-100 text-gray-800 p-4 rounded-md text-sm mt-3">
+usuario = {
+    "nome": "Ana Silva",
+    "idade": 28
+}
+
+print(usuario[0])
+      </code></pre>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 14 — Interpretação (Fatiamento de Listas)</h2>
+      <p class="mt-2 text-gray-700">Qual será a saída (output) no console após a execução deste código? (Lembre-se: o índice final no fatiamento não é incluído).</p>
+      <pre><code class="block bg-gray-100 text-gray-800 p-4 rounded-md text-sm mt-3">
+numeros = [10, 20, 30, 40, 50]
+meio = numeros[1:4]
+print(meio)
+      </code></pre>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 15 — Prática (Escolha da Estrutura)</h2>
+      <p class="mt-2 text-gray-700">Você precisa armazenar a lista de contatos do seu celular. Você precisa guardar o <strong>Nome</strong> da pessoa e o <strong>Número de Telefone</strong> dela. Qual estrutura de dados é mais lógica para isso: uma <strong>Lista</strong> ou um <strong>Dicionário</strong>? Justifique sua escolha.</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 16 — Teoria (Biblioteca 'os')</h2>
+      <p class="mt-2 text-gray-700">Para que serve a função <code class="bg-gray-200 px-2 py-1 rounded">os.path.exists(nome_do_arquivo)</code>? Qual tipo de lógica (preventiva) ela nos permite aplicar ao manipular arquivos?</p>
+    </li>
+  </ol>
+</div>
