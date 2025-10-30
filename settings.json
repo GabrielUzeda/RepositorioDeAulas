@@ -473,9 +473,16 @@
       {
         "id": "matplotlib_02",
         "icone": "05",
-        "titulo": "Matplotlib",
+        "titulo": "Matplotlib 02",
         "descricao": "Exercícios intermediarios sobre matplotlib",
         "caminho": "turmas/visualizacao_dados/atividades/matplotlib02.html"
+      },
+      {
+        "id": "trabalho_final",
+        "icone": "06",
+        "titulo": "Trabalho Final",
+        "descricao": "Instruções para o trabalho final da disciplina",
+        "caminho": "turmas/visualizacao_dados/atividades/trabalho_final.html"
       }
     ]
   }
