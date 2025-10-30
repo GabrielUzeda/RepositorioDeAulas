@@ -439,7 +439,13 @@
         "caminho": "turmas/visualizacao_dados/aulas/matplotlib02.html",
         "icone": "05",
         "descricao": "Aula sobre Matplotlib"
-      } 
+      }, 
+      "Trabalho Final": {
+        "caminho": "turmas/visualizacao_dados/aulas/trabalho_final.html",
+        "icone": "06",
+        "titulo": "Trabalho Final",
+        "descricao": "Instruções para o trabalho final da disciplina"
+      }
     },
     "atividades": [
       {
@@ -476,13 +482,6 @@
         "titulo": "Matplotlib 02",
         "descricao": "Exercícios intermediarios sobre matplotlib",
         "caminho": "turmas/visualizacao_dados/atividades/matplotlib02.html"
-      },
-      {
-        "id": "trabalho_final",
-        "icone": "06",
-        "titulo": "Trabalho Final",
-        "descricao": "Instruções para o trabalho final da disciplina",
-        "caminho": "turmas/visualizacao_dados/atividades/trabalho_final.html"
       }
     ]
   }
