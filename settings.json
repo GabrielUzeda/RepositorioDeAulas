@@ -440,9 +440,14 @@
         "icone": "05",
         "descricao": "Aula sobre Matplotlib"
       }, 
+      "Carregando Dados CSV:": {
+        "caminho": "turmas/visualizacao_dados/aulas/csv.html",
+        "icone": "06",
+        "descricao": "Como carregar e manipular dados em formato CSV usando Python"
+      },
       "Trabalho Final": {
         "caminho": "turmas/visualizacao_dados/aulas/trabalho_final.html",
-        "icone": "06",
+        "icone": "07",
         "titulo": "Trabalho Final",
         "descricao": "Instruções para o trabalho final da disciplina"
       }

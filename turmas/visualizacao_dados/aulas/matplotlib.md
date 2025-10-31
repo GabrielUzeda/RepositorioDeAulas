@@ -169,6 +169,36 @@ O gráfico mostra que a maioria das pessoas no grupo tem entre 20 e 40 anos.
 
 ---
 
+## 5. Gráfico de Pizza: Mostrando Proporções
+
+O gráfico de pizza (`plt.pie`) é usado para mostrar **como um todo se divide em partes**.
+
+Pense em uma pizza de verdade: cada fatia representa uma categoria e o tamanho da fatia mostra sua proporção dentro do total.
+
+* **Quando usar?** Para visualizar a distribuição percentual de categorias — por exemplo, a participação de mercado de empresas, a origem do tráfego em um site ou os gastos mensais por categoria.
+
+---
+
+### Exemplo: Gráfico de Pizza
+
+Vamos visualizar a distribuição dos gastos mensais de uma pessoa.
+
+```python
+import matplotlib.pyplot as plt
+
+categorias = ['Aluguel', 'Comida', 'Transporte', 'Lazer', 'Outros']
+gastos = [1200, 600, 300, 200, 100]
+
+plt.title('Distribuição dos Gastos Mensais')
+
+# Criação do gráfico de pizza
+plt.pie(gastos, labels=categorias, autopct='%1.1f%%', startangle=90)
+
+plt.show()
+```
+
+---
+
 ## A Ferramenta Errada para o Trabalho Certo
 
 Um erro comum é usar um gráfico de linha para comparar categorias que não têm uma ordem natural.
@@ -232,6 +262,7 @@ Hoje, abrimos a caixa de ferramentas do Matplotlib e aprendemos a usar quatro fe
 * **Barras (`bar`):** Para **comparar** categorias.
 * **Dispersão (`scatter`):** Para encontrar **relações**.
 * **Histograma (`hist`):** Para entender a **distribuição**.
+* **Pizza (`hist`):** Para entender a **porcentagem**.
 
 Dominar o básico é o passo mais importante. Com essas ferramentas, você já pode transformar números em histórias claras e impactantes.
 
