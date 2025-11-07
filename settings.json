@@ -405,6 +405,19 @@
       }
     ]
   },
+  "sistemas_aplicados": {
+    "nome": "Sistemas Aplicados",
+    "cor": "bg-pink-500",
+    "icone": "computer",
+    "aulas": {
+      "Versionamento": {
+        "caminho": "turmas/sistemas_aplicados/aulas/versionamento.html",
+        "icone": "01",
+        "descricao": "Introdução ao versionamento de código com Git e o comando diff"
+      }
+    },
+    "atividades": []
+  },
   "visualizacao_dados": {
     "nome": "Visualização de Dados",
     "cor": "bg-green-500",
