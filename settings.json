@@ -70,8 +70,12 @@
           "caminho": "turmas/estatistica/aulas/probabilidade_python.html",
           "icone": "12",
           "descricao": "Conceitos básicos de probabilidade usando python"
+        },
+        "Probabilidade de Eventos A e B": {
+          "caminho": "turmas/estatistica/aulas/probabilidade_e_ou.html",
+          "icone": "13",
+          "descricao": "Conceitos de probabilidade de eventos A e B"
         }
-
       },
       "atividades": [
         {
@@ -150,6 +154,13 @@
           "titulo": "Probabilidade & Python",
           "descricao": "Exercícios sobre probabilidade condicional e independência usando python",
           "caminho": "turmas/estatistica/atividades/python_probabilidade.html"
+        },
+        {
+          "id": "probabilidade_eventosA_e_B",
+          "icone": "12-13",
+          "titulo": "Probabilidade de Eventos A e B",
+          "descricao": "Exercícios sobre probabilidade de eventos A e B",
+          "caminho": "turmas/estatistica/atividades/probabilidade_e_ou.html"
         }
 
       ]

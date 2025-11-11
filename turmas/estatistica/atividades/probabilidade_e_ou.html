@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atividade de Probabilidade</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- KaTeX CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+  <!-- KaTeX JS -->
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  
+  <!-- KaTeX Auto-render -->
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+</head>
+
+<body class="bg-gray-50">
+
+  <div class="max-w-4xl mx-auto p-8">
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl font-bold text-gray-800">Atividade — Probabilidade: Regras do "E" e "OU"</h1>
+    </header>
+
+    <ol class="space-y-6 list-none">
+
+      <!-- Questão 1 -->
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 1 — Regra do "OU" (Mutuamente Exclusivos)</h2>
+        <p class="mt-2 text-gray-700">
+          Você joga um dado de seis faces (numerado de 1 a 6). Qual é a probabilidade de tirar um <code class="bg-gray-100 px-1 py-0.5 rounded">2</code>
+          <strong>OU</strong> um <code class="bg-gray-100 px-1 py-0.5 rounded">5</code>?
+        </p>
+        <ul class="list-disc pl-6 mt-3 space-y-1 text-gray-700">
+          <li>\(P(2) = ?\)</li>
+          <li>\(P(5) = ?\)</li>
+          <li>\(P(2 \text{ ou } 5) = P(2) + P(5) = ?\)</li>
+        </ul>
+        <p class="mt-2 text-gray-700">Explique por que você pode simplesmente somar as probabilidades neste caso.</p>
+      </li>
+
+      <!-- Questão 2 -->
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 2 — Regra do "E" (Independentes)</h2>
+        <p class="mt-2 text-gray-700">
+          Você joga uma moeda justa <strong>E</strong> lança um dado de seis faces. Qual é a probabilidade de conseguir <code class="bg-gray-100 px-1 py-0.5 rounded">Cara</code>
+          <strong>E</strong> um número <code class="bg-gray-100 px-1 py-0.5 rounded">maior que 4</code>?
+        </p>
+        <ul class="list-disc pl-6 mt-3 space-y-1 text-gray-700">
+          <li>\(P(\text{Cara}) = ?\)</li>
+          <li>\(P(\text{Número > 4}) = P(5 \text{ ou } 6) = ?\)</li>
+          <li>\(P(\text{Cara E > 4}) = P(\text{Cara}) \times P(\text{> 4}) = ?\)</li>
+        </ul>
+        <p class="mt-2 text-gray-700">Por que podemos multiplicar as probabilidades diretamente aqui?</p>
+      </li>
+
+      <!-- Questão 3 -->
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 3 — A Armadilha do "OU" (Não Exclusivos)</h2>
+        <p class="mt-2 text-gray-700">
+          De um baralho padrão de 52 cartas, qual é a probabilidade de tirar uma carta que seja um <code class="bg-gray-100 px-1 py-0.5 rounded">Rei</code>
+          <strong>OU</strong> uma carta do naipe de <code class="bg-gray-100 px-1 py-0.5 rounded">Copas</code>?
+        </p>
+        <p class="mt-2 text-gray-700">Dica: Lembre-se da "contagem dupla". Use a fórmula completa:</p>
+        <p class="text-center my-3">\[P(A \cup B) = P(A) + P(B) - P(A \cap B)\]</p>
+        <ul class="list-disc pl-6 mt-3 space-y-1 text-gray-700">
+          <li>\(P(\text{Rei}) = ?\)</li>
+          <li>\(P(\text{Copas}) = ?\)</li>
+          <li>\(P(\text{Rei E Copas}) = ?\)</li>
+          <li>\(P(\text{Rei ou Copas}) = ?\)</li>
+        </ul>
+      </li>
+
+      <!-- Questão 4 -->
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 4 — Regra do "E" (Dependentes)</h2>
+        <p class="mt-2 text-gray-700">
+          Uma gaveta contém <code class="bg-gray-100 px-1 py-0.5 rounded">4</code> meias azuis e <code class="bg-gray-100 px-1 py-0.5 rounded">6</code> meias pretas (total de 10). Você tira duas meias, <strong>sem reposição</strong>.
+        </p>
+        <p class="mt-2 text-gray-700">
+          Qual é a probabilidade de tirar uma meia <code class="bg-gray-100 px-1 py-0.5 rounded">Azul</code> <strong>E</strong> depois outra meia <code class="bg-gray-100 px-1 py-0.5 rounded">Azul</code>?
+        </p>
+        <ul class="list-disc pl-6 mt-3 space-y-1 text-gray-700">
+          <li>\(P(\text{1ª Azul}) = ?\)</li>
+          <li>\(P(\text{2ª Azul} \mid \text{1ª Azul}) = ?\)</li>
+          <li>\(P(\text{Azul E Azul}) = P(\text{1ª Azul}) \times P(\text{2ª Azul} \mid \text{1ª Azul}) = ?\)</li>
+        </ul>
+      </li>
+
+      <!-- Questão 5 -->
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 5 — Corrigindo o Raciocínio</h2>
+        <p class="mt-2 text-gray-700">
+          Um aluno quer calcular a probabilidade de tirar duas bolas vermelhas seguidas (sem reposição) de uma urna com 5 vermelhas e 5 azuis.
+        </p>
+        <p class="mt-2 text-gray-700">O cálculo dele foi:</p>
+        <div class="mt-2 bg-gray-50 px-4 py-3 rounded text-sm space-y-1">
+          <p>\(P(\text{1ª Vermelha}) = \frac{5}{10}\)</p>
+          <p>\(P(\text{2ª Vermelha}) = \frac{5}{10}\)</p>
+          <p>\(P(\text{Total}) = \frac{5}{10} \times \frac{5}{10} = \frac{25}{100}\)</p>
+        </div>
+        <p class="mt-2 text-gray-700">
+          Qual é o erro fundamental no raciocínio desse aluno? Explique o que é a "Probabilidade Condicional" (\(P(B|A)\)) e como ela corrige esse cálculo.
+        </p>
+      </li>
+
+      <!-- Questão 6 -->
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 6 — Atividade Prática: Somar ou Multiplicar?</h2>
+        <p class="mt-2 text-gray-700">
+          Para cada cenário abaixo, diga se você usaria a <strong>Regra da Adição (OU)</strong> ou a <strong>Regra da Multiplicação (E)</strong> para encontrar a probabilidade final.
+        </p>
+        <ol class="list-decimal pl-6 mt-3 space-y-1 text-gray-700">
+          <li>A chance de um voo chegar na hora <strong>E</strong> sua mala não ser perdida.</li>
+          <li>A chance de ganhar na loteria com o bilhete A <strong>OU</strong> com o bilhete B.</li>
+          <li>A chance de chover hoje <strong>E</strong> chover amanhã (assumindo que são dependentes).</li>
+          <li>A chance de um restaurante ter comida italiana <strong>OU</strong> comida japonesa no menu.</li>
+        </ol>
+      </li>
+    </ol>
+  </div>
+
+  <script>
+    // Aguarda o carregamento completo da página
+    window.addEventListener('load', function() {
+      // Renderiza todas as fórmulas matemáticas
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: '\\[', right: '\\]', display: true},
+          {left: '\\(', right: '\\)', display: false}
+        ],
+        throwOnError: false,
+        strict: false
+      });
+    });
+  </script>
+
+</body>
+</html>
