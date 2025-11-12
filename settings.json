@@ -425,6 +425,11 @@
         "caminho": "turmas/sistemas_aplicados/aulas/versionamento.html",
         "icone": "01",
         "descricao": "Introdução ao versionamento de código com Git e o comando diff"
+      },
+      "Mapeando a Dor do Usuário": {
+        "caminho": "turmas/sistemas_aplicados/aulas/dor_historia_usuario.html",
+        "icone": "02",
+        "descricao": "Como identificar e traduzir dores do usuário em Histórias de Usuário acionáveis; técnicas de Personas e Jornada do Usuário."
       }
     },
     "atividades": []
