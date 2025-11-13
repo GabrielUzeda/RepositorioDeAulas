@@ -140,7 +140,7 @@ jobs:
       - name: Converter Markdown para slides HTML com Marp
         run: |
           echo "Convertendo arquivos .md em ./turmas para slides HTML com tema ./global/slide.css"
-          npx @marp-team/marp-cli ./turmas --html --theme ./global/slide.css --allow-local-files 
+          npx @marp-team/marp-cli@latest ./turmas --html --theme ./global/slide.css --allow-local-files 
         shell: bash
 
       # ---------- 2. Deploy para GCP ----------
