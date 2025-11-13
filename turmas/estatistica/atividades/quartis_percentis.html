@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atividade - Quartis e Percentis</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div class="max-w-4xl mx-auto p-8 bg-gray-50">
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl font-bold text-gray-800">Atividade — Medidas de Posição: Quartis e Percentis</h1>
+    </header>
+
+    <ol class="space-y-6 list-none">
+      
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 1 — Conceitos Fundamentais</h2>
+        <p class="mt-2 text-gray-700">Associe os termos da estatística às suas definições corretas:</p>
+        <ul class="list-disc pl-6 mt-3 space-y-2 text-gray-700">
+          <li><b>Termos:</b> Q1, Q2, Q3, P90, IQR</li>
+          <li><b>Definições:</b></li>
+          <ol class="list-decimal pl-6 mt-1 space-y-1">
+            <li>A medida de dispersão robusta que representa a amplitude dos 50% centrais dos dados.</li>
+            <li>O valor abaixo do qual 25% dos dados se encontram; a mediana da metade inferior.</li>
+            <li>O valor abaixo do qual 90% dos dados se encontram.</li>
+            <li>O valor abaixo do qual 75% dos dados se encontram; a mediana da metade superior.</li>
+            <li>A Mediana; o valor que divide os dados em 50% acima e 50% abaixo (P50).</li>
+          </ol>
+        </ul>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 2 — O Problema da Média</h2>
+        <p class="mt-2 text-gray-700">Considere o conjunto de salários de 5 funcionários:</p>
+        <p class="mt-2 font-mono bg-gray-50 px-2 py-1 rounded text-sm">[ R$ 5.000, R$ 5.200, R$ 5.500, R$ 5.800, R$ 6.000 ]</p>
+        <p class="mt-2 text-gray-700">Agora, o CEO (salário de R$ 10.000.000) entra na sala. O novo conjunto é:</p>
+        <p class="mt-2 font-mono bg-gray-50 px-2 py-1 rounded text-sm">[ 5.000, 5.200, 5.500, 5.800, 6.000, 10.000.000 ]</p>
+        <p class="mt-2 text-gray-700">Explique por que a <b>Média</b> se torna uma medida "enganosa" neste segundo cenário, enquanto a <b>Mediana (Q2)</b> continua sendo "robusta".</p>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 3 — Cálculo de Mediana (Q2)</h2>
+        <p class="mt-2 text-gray-700">Encontre a Mediana (Q2) para os dois conjuntos de dados a seguir:</p>
+        <ul class="list-disc pl-6 mt-3 space-y-1 text-gray-700">
+          <li><b>Conjunto A (Ímpar):</b> <code class="bg-gray-100 px-1 py-0.5 rounded">[ 22, 25, 27, 28, 30, 31, 33 ]</code></li>
+          <li><b>Conjunto B (Par):</b> <code class="bg-gray-100 px-1 py-0.5 rounded">[ 5.0, 5.2, 5.5, 5.8 ]</code></li>
+        </ul>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 4 — Cálculo de Quartis (Q1, Q3)</h2>
+        <p class="mt-2 text-gray-700">Dado o seguinte conjunto de notas de alunos (já ordenado):</p>
+        <p class="mt-2 font-mono bg-gray-50 px-2 py-1 rounded text-sm">Notas = [ 50, 62, 65, 70, 75, 80, 81, 90, 100 ]</p>
+        <p class="mt-2 text-gray-700">Calcule:</p>
+        <ol class="list-decimal pl-6 mt-3 space-y-1 text-gray-700">
+          <li>O Primeiro Quartil (Q1).</li>
+          <li>A Mediana (Q2).</li>
+          <li>O Terceiro Quartil (Q3).</li>
+        </ol>
+        <p class="mt-2 text-gray-700"><small>Dica: Q1 é a mediana da metade inferior (sem incluir Q2) e Q3 é a mediana da metade superior (sem incluir Q2).</small></p>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 5 — Cálculo do IQR</h2>
+        <p class="mt-2 text-gray-700">Usando os valores de Q1 e Q3 que você calculou na <b>Questão 4</b>, qual é o valor do <b>Intervalo Interquartil (IQR)</b>?</p>
+        <p class="mt-2 text-gray-700">Fórmula: <code class="bg-gray-100 px-1 py-0.5 rounded">IQR = Q3 - Q1</code></p>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 6 — Ordenação e Mediana</h2>
+        <p class="mt-2 text-gray-700">Um erro comum é esquecer de ordenar os dados. Dado o conjunto de tempos de espera (em minutos):</p>
+        <p class="mt-2 font-mono bg-gray-50 px-2 py-1 rounded text-sm">[ 10, 2, 8, 5, 1 ]</p>
+        <p class="mt-2 text-gray-700">Qual é a <b>verdadeira</b> Mediana (Q2) deste conjunto?</p>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 7 — Interpretação de Percentil</h2>
+        <p class="mt-2 text-gray-700">Uma criança fez um teste de altura e o pediatra informou que ela está no <b>Percentil 75 (P75)</b>.</p>
+        <p class="mt-2 text-gray-700">O que isso significa em termos práticos? (Não é necessário cálculo).</p>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 8 — Corrigindo o Erro Comum</h2>
+        <p class="mt-2 text-gray-700">Um aluno analisa seus dados e diz: "Minha nota está no Q1."</p>
+        <p class="mt-2 text-gray-700">Com base na aula, por que essa frase está conceitualmente errada? Qual seria a forma correta de descrever uma nota que está entre as 25% mais baixas?</p>
+        <p class="mt-2 text-gray-700"><small>Dica: Lembre-se da analogia das "cercas" e dos "campos".</small></p>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 9 — Resumo de 5 Números</h2>
+        <p class="mt-2 text-gray-700">O <b>Box Plot</b> (Diagrama de Caixa) é uma ferramenta visual baseada em quartis. Quais são os 5 números que compõem o "Resumo de 5 Números" usado para construir um Box Plot?</p>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 10 — Análise de Caso (Empresas)</h2>
+        <p class="mt-2 text-gray-700">Compare os salários (em milhares) das duas empresas:</p>
+        <ul class="list-disc pl-6 mt-3 space-y-1 text-gray-700">
+          <li><b>Empresa A:</b> <code class="bg-gray-100 px-1 py-0.5 rounded">[ 3, 4, 5, 6, 12 ]</code> (Mediana=5, Média=6)</li>
+          <li><b>Empresa B:</b> <code class="bg-gray-100 px-1 py-0.5 rounded">[ 5, 5.5, 6, 6.5, 6.6 ]</code> (Mediana=6, Média=5.9)</li>
+        </ul>
+        <p class="mt-2 text-gray-700">Se você fosse um funcionário "típico", qual empresa parece pagar melhor e por quê? Qual medida (Média ou Mediana) conta a história mais precisa neste caso?</p>
+      </li>
+
+      <li class="bg-white shadow rounded-2xl p-6 border border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">Questão 11 — Cálculo de Percentil (Fórmula)</h2>
+        <p class="mt-2 text-gray-700">Usando a fórmula <code class="bg-gray-100 px-1 py-0.5 rounded">R = (P/100) * (N + 1)</code>, calcule o valor do <b>Percentil 25 (P25)</b> para o conjunto de dados:</p>
+        <p class="mt-2 font-mono bg-gray-50 px-2 py-1 rounded text-sm">[ 10, 20, 30, 40, 50 ]</p>
+        <p class="mt-2 text-gray-700">Mostre seu cálculo da posição (R) e a interpolação (se necessário).</p>
+      </li>
+      
+    </ol>
+  </div>
+</body>
+</html>

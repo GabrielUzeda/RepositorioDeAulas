@@ -75,6 +75,11 @@
           "caminho": "turmas/estatistica/aulas/probabilidade_e_ou.html",
           "icone": "13",
           "descricao": "Conceitos de probabilidade de eventos A e B"
+        },
+        "Quartis e Percentis": {
+          "caminho": "turmas/estatistica/aulas/quartis_percentis.html",
+          "icone": "14",
+          "descricao": "Medidas de posição: entendendo quartis, percentis e intervalo interquartil (IQR) para análise robusta de dados"
         }
       },
       "atividades": [
@@ -161,6 +166,13 @@
           "titulo": "Probabilidade de Eventos A e B",
           "descricao": "Exercícios sobre probabilidade de eventos A e B",
           "caminho": "turmas/estatistica/atividades/probabilidade_e_ou.html"
+        },
+        {
+          "id": "quartis_percentis",
+          "icone": "14",
+          "titulo": "Quartis e Percentis",
+          "descricao": "Exercícios sobre quartis, percentis e intervalo interquartil (IQR)",
+          "caminho": "turmas/estatistica/atividades/quartis_percentis.html"
         }
 
       ]
