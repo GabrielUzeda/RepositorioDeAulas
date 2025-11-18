@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atividade Avaliativa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+
+<div class="max-w-4xl mx-auto p-6 md:p-10">
+  
+  <header class="mb-10 text-center">
+    <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Atividade Avaliativa Integrada</h1>
+    <h2 class="text-xl text-indigo-600 font-semibold">Projeto Gerador de Questões ENEM</h2>
+    
+    <div class="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100 text-gray-700 text-sm md:text-base max-w-3xl mx-auto">
+      <strong>Instruções:</strong> Esta atividade tem como objetivo avaliar a compreensão conceitual sobre o funcionamento do sistema que desenvolvemos. Responda às questões de forma discursiva, utilizando suas próprias palavras e as analogias discutidas em aula.
+    </div>
+  </header>
+
+  <ol class="space-y-8 list-none">
+
+    <div class="relative py-4">
+        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center">
+            <span class="bg-gray-50 px-3 text-lg font-bold text-gray-500 uppercase tracking-wider">Bloco 1: Arquitetura Geral (O Restaurante Digital)</span>
+        </div>
+    </div>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 1 — Analogia do Restaurante</h2>
+      <p class="mt-2 text-gray-700">No contexto do nosso projeto, utilizamos a analogia de um restaurante para explicar o funcionamento de uma API. Explique quem representa o <strong>Cliente</strong>, o <strong>Garçom</strong> e a <strong>Cozinha</strong> nesta analogia e qual a função de cada um no sistema de geração de questões.</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 2 — Formato JSON</h2>
+      <p class="mt-2 text-gray-700">O formato JSON é fundamental para a comunicação entre as equipes (Python, IA, Banco de Dados). Por que não podemos simplesmente enviar os dados em português ou inglês simples? Qual a vantagem de usar uma estrutura rígida como o JSON?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 3 — Python vs SQL</h2>
+      <p class="mt-2 text-gray-700">Diferencie o papel da Equipe Python e da Equipe SQL no projeto. Se o Python é o "cérebro" que conecta tudo, por que precisamos de um sistema separado (SQL) apenas para guardar os dados?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 4 — Rotas no Flask</h2>
+      <p class="mt-2 text-gray-700">Explique o que é uma Rota (ex: <code class="bg-gray-100 px-1 py-0.5 rounded text-indigo-600 font-mono">@app.route('/questoes')</code>) no Flask. Fazendo um paralelo com a navegação na internet ou o endereço de uma casa, para que ela serve?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 5 — Comando cURL</h2>
+      <p class="mt-2 text-gray-700">O que é o comando <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">curl</code> e por que ele foi utilizado durante o desenvolvimento antes de termos um site com botões e cores (Frontend)?</p>
+    </li>
+
+    <div class="relative py-4 mt-8">
+        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center">
+            <span class="bg-gray-50 px-3 text-lg font-bold text-gray-500 uppercase tracking-wider">Bloco 2: Banco de Dados (A Biblioteca)</span>
+        </div>
+    </div>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 6 — Modelagem de Dados</h2>
+      <p class="mt-2 text-gray-700">Ao modelar o banco de dados, decidimos separar os dados em duas tabelas principais: <strong>questoes</strong> e <strong>alternativas</strong>. Por que não colocar as 5 alternativas na mesma tabela da questão (ex: colunas alternativa_A, alternativa_B, etc.)? Cite uma desvantagem dessa abordagem de "tabela única".</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 7 — Primary Key</h2>
+      <p class="mt-2 text-gray-700">Explique o conceito de Primary Key (Chave Primária). Por que é arriscado identificar uma questão apenas pelo seu "enunciado" em vez de usar um número de ID único?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 8 — Foreign Key</h2>
+      <p class="mt-2 text-gray-700">O que é uma Foreign Key (Chave Estrangeira) e qual a função dela na tabela de alternativas? O que aconteceria se tentássemos criar uma alternativa sem essa chave?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 9 — Restrição NOT NULL</h2>
+      <p class="mt-2 text-gray-700">No comando SQL, usamos a restrição <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">NOT NULL</code> em campos como "enunciado". Qual é o impacto dessa regra para a qualidade dos dados armazenados no sistema?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 10 — Tipo BOOLEAN</h2>
+      <p class="mt-2 text-gray-700">O tipo de dado <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">BOOLEAN</code> foi usado para indicar se uma alternativa é correta ou não. Como o computador interpreta esse tipo de dado e quais são os únicos valores possíveis para ele?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 11 — Integridade Referencial</h2>
+      <p class="mt-2 text-gray-700">O que significa a regra <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">ON DELETE CASCADE</code> configurada na relação entre questões e alternativas? Por que ela é importante para manter a "limpeza" do banco de dados?</p>
+    </li>
+
+    <div class="relative py-4 mt-8">
+        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center">
+            <span class="bg-gray-50 px-3 text-lg font-bold text-gray-500 uppercase tracking-wider">Bloco 3: IA e Engenharia de Prompt</span>
+        </div>
+    </div>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 12 — Personas</h2>
+      <p class="mt-2 text-gray-700">Na engenharia de prompts, discutimos o conceito de Persona. Como definir uma persona (ex: "Aja como um professor de História") altera a resposta gerada pela IA em comparação a um pedido genérico?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 13 — Alucinação da IA</h2>
+      <p class="mt-2 text-gray-700">O que é uma alucinação em Inteligência Artificial? Dê um exemplo de como isso poderia prejudicar um estudante que estivesse usando nosso gerador de questões.</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 14 — Qualidade do Prompt</h2>
+      <p class="mt-2 text-gray-700">Por que um prompt vago como "Crie uma questão sobre o Brasil" é considerado ruim? Liste três elementos que deveriam ser adicionados a esse pedido para torná-lo um prompt eficaz.</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 15 — Estratégia de Dupla Camada</h2>
+      <p class="mt-2 text-gray-700">Explicamos a estratégia de "Dupla Camada" (Geração e Verificação). Por que confiar na primeira resposta da IA pode ser perigoso, e como a segunda camada ajuda a filtrar conteúdos impróprios ou ofensivos?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 16 — Funcionamento dos LLMs</h2>
+      <p class="mt-2 text-gray-700">A IA não "sabe" as respostas como um humano sabe. Se ela é apenas um modelo de previsão de palavras, como ela consegue montar uma questão de física corretamente? (Explique simplificadamente o conceito de treinamento/padrões).</p>
+    </li>
+
+    <div class="relative py-4 mt-8">
+        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center">
+            <span class="bg-gray-50 px-3 text-lg font-bold text-gray-500 uppercase tracking-wider">Bloco 4: Segurança e Backend</span>
+        </div>
+    </div>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 17 — SQL Injection</h2>
+      <p class="mt-2 text-gray-700">O que é SQL Injection? Explique como um usuário mal-intencionado poderia usar uma caixa de texto do site para roubar ou apagar dados se o sistema não for protegido.</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 18 — Autenticação vs Autorização</h2>
+      <p class="mt-2 text-gray-700">Qual a diferença entre Autenticação e Autorização? Use o exemplo de um festival ou show para ilustrar a diferença.</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 19 — Token JWT</h2>
+      <p class="mt-2 text-gray-700">O Token JWT foi comparado a um "crachá VIP". Se um usuário consegue forjar (falsificar) esse crachá, o que ele conseguiria fazer no sistema?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 20 — Estrutura do JWT</h2>
+      <p class="mt-2 text-gray-700">O JWT possui três partes: Header, Payload e Signature. Por que dizemos que não devemos guardar senhas no Payload, mesmo que o token pareça um monte de letras aleatórias?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 21 — Segurança de Credenciais</h2>
+      <p class="mt-2 text-gray-700">Por que é considerado um erro grave de segurança escrever a senha do banco de dados diretamente no código do programa (hardcoded)? Qual é a solução correta para armazenar essas senhas?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 22 — Ngrok</h2>
+      <p class="mt-2 text-gray-700">O que é o ngrok e por que precisamos dele para conectar a IA que está rodando no nosso computador da escola com o servidor que está na nuvem (internet)?</p>
+    </li>
+
+    <div class="relative py-4 mt-8">
+        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center">
+            <span class="bg-gray-50 px-3 text-lg font-bold text-gray-500 uppercase tracking-wider">Bloco 5: Lógica de Programação</span>
+        </div>
+    </div>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 23 — Depuração de JSON</h2>
+      <p class="mt-2 text-gray-700">Analise o seguinte trecho de JSON. Identifique um erro de sintaxe nele e explique por que ele impediria o sistema de ler os dados:</p>
+      <pre class="mt-3 bg-gray-800 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+{
+  "materia": "Matemática",
+  "dificuldade": "Difícil",
+  "tags": ["geometria", "calculo",]
+}</pre>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 24 — Requisições Síncronas</h2>
+      <p class="mt-2 text-gray-700">No Python, usamos a biblioteca <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">requests</code> para "falar" com a IA. Se a IA demorar 30 segundos para responder, o que acontece com o nosso código Python enquanto isso? (Conceito de requisição síncrona/espera).</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 25 — Métodos HTTP</h2>
+      <p class="mt-2 text-gray-700">O método HTTP <strong>GET</strong> serve para buscar dados, enquanto o <strong>POST</strong> serve para enviar. Se quiséssemos criar uma funcionalidade para "Atualizar uma questão errada", qual método seria o mais adequado conceitualmente (além de GET e POST)?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 26 — Códigos de Status HTTP</h2>
+      <p class="mt-2 text-gray-700">Explique a diferença entre um Erro de Cliente (4xx) e um Erro de Servidor (5xx). Se o usuário tentar acessar uma questão que não existe (ID 9999), qual tipo de erro o sistema deve retornar?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 27 — Listas vs Objetos</h2>
+      <p class="mt-2 text-gray-700">Por que usamos listas (arrays <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">[]</code>) dentro do JSON para as alternativas, mas objetos (<code class="bg-gray-100 px-1 py-0.5 rounded font-mono">{}</code>) para os dados da questão? Qual a característica das listas que as torna ideais para as alternativas?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 28 — Padronização e Acoplamento</h2>
+      <p class="mt-2 text-gray-700">Se a equipe de Banco de Dados mudar o nome da coluna <em>enunciado</em> para <em>texto_da_pergunta</em>, o que acontecerá com o código da Equipe Python e da Equipe JSON? O que isso nos ensina sobre padronização?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 29 — Gerenciamento de Pacotes</h2>
+      <p class="mt-2 text-gray-700">Qual a função do arquivo <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">requirements.txt</code> ou do comando <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">pip install</code> em um projeto Python? Por que não podemos apenas copiar o arquivo .py para outro computador e esperar que funcione?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 30 — Síntese do Sistema</h2>
+      <p class="mt-2 text-gray-700">Descreva, em um parágrafo, o caminho completo que uma nova questão percorre desde o momento em que o professor digita o tema no site até o momento em que ela é salva no banco de dados.</p>
+      <p class="mt-2 text-sm font-mono text-indigo-600 bg-indigo-50 px-2 py-1 rounded inline-block">Frontend &rarr; API &rarr; IA &rarr; API &rarr; Banco de Dados</p>
+    </li>
+
+  </ol>
+</div>
+
+</body>
+</html>

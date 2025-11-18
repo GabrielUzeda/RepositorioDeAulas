@@ -310,6 +310,13 @@
           "titulo": "Projeto ENEM: Fase 02",
           "descricao": "Instruções de cada equipe para a Fase 02 do Projeto ENEM",
           "caminho": "turmas/terceirao/atividades/ENEM_Fase02.html"
+        },
+        {
+          "id": "atividade_extra",
+          "icone": "13",
+          "titulo": "Atividade Avaliativa Extra",
+          "descricao": "Atividade avaliativa do Projeto Gerador de Questões ENEM",
+          "caminho": "turmas/terceirao/atividades/atividade_extra.html"
         }
       ]
     }
