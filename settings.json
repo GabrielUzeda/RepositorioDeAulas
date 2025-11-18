@@ -80,6 +80,11 @@
           "caminho": "turmas/estatistica/aulas/quartis_percentis.html",
           "icone": "14",
           "descricao": "Medidas de posição: entendendo quartis, percentis e intervalo interquartil (IQR) para análise robusta de dados"
+        },
+        "Covariância e Correlação Linear": {
+          "caminho": "turmas/estatistica/aulas/covariancia_correlacao_linear.html",
+          "icone": "15",
+          "descricao": "Conceitos de covariância e correlação linear: interpretação, cálculo e aplicações práticas"
         }
       },
       "atividades": [
@@ -173,6 +178,15 @@
           "titulo": "Quartis e Percentis",
           "descricao": "Exercícios sobre quartis, percentis e intervalo interquartil (IQR)",
           "caminho": "turmas/estatistica/atividades/quartis_percentis.html"
+        }
+
+        ,
+        {
+          "id": "covariancia_correlacao_linear",
+          "icone": "15",
+          "titulo": "Covariância e Correlação Linear",
+          "descricao": "Exercícios sobre covariância, correlação de Pearson e interpretação de relações entre variáveis",
+          "caminho": "turmas/estatistica/atividades/covariancia_correlacao_linear.html"
         }
 
       ]

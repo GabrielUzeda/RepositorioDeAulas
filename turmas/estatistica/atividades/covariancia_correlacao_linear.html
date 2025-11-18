@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atividade Avaliativa - Estatística</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+
+<div class="max-w-4xl mx-auto p-6 md:p-10">
+  
+  <header class="mb-10 text-center">
+    <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Atividade Avaliativa Integrada</h1>
+    <h2 class="text-xl text-indigo-600 font-semibold">Covariância e Correlação Linear</h2>
+    
+    <div class="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100 text-gray-700 text-sm md:text-base max-w-3xl mx-auto">
+      <strong>Instruções:</strong> Esta atividade avalia sua compreensão sobre como medir o relacionamento entre duas variáveis ("A Dança dos Dados"). Responda às questões de forma discursiva, baseando-se nas analogias (Sorveteria, Investidor) e nos conceitos técnicos apresentados em aula.
+    </div>
+  </header>
+
+  <ol class="space-y-8 list-none">
+
+    <div class="relative py-4">
+        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center">
+            <span class="bg-gray-50 px-3 text-lg font-bold text-gray-500 uppercase tracking-wider">Bloco 1: Conceitos Fundamentais (A Dança)</span>
+        </div>
+    </div>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 1 — A Analogia do Sorvete</h2>
+      <p class="mt-2 text-gray-700">Na introdução da aula, utilizamos o cenário de uma sorveteria para explicar a relação entre variáveis. Explique o comportamento das variáveis <strong>Temperatura</strong> (X) e <strong>Vendas de Sorvete</strong> (Y) neste cenário. Elas "dançam" juntas de que maneira?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 2 — Definindo Covariância</h2>
+      <p class="mt-2 text-gray-700">A Covariância é descrita como uma medida de "Direção". O que significa, na prática, encontrar uma <strong>Covariância Negativa</strong> entre duas variáveis? Dê um exemplo prático.</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 3 — O Problema da Escala</h2>
+      <p class="mt-2 text-gray-700">Se a Covariância já nos diz se as variáveis sobem ou descem juntas, por que precisamos calcular a <strong>Correlação Linear</strong>? Explique o problema de se ter números como "5000" ou "0.02" na covariância dependendo da unidade de medida (metros vs quilômetros).</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 4 — A Régua de Pearson</h2>
+      <p class="mt-2 text-gray-700">A Correlação de Pearson padroniza a relação entre <strong>-1 e +1</strong>. Descreva o que significam os seguintes resultados:</p>
+      <ul class="list-disc list-inside mt-2 text-gray-600 text-sm">
+          <li>Resultado próximo de +1</li>
+          <li>Resultado próximo de -1</li>
+          <li>Resultado igual a 0</li>
+      </ul>
+    </li>
+
+    <div class="relative py-4 mt-8">
+        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center">
+            <span class="bg-gray-50 px-3 text-lg font-bold text-gray-500 uppercase tracking-wider">Bloco 2: Estudo de Caso e Interpretação</span>
+        </div>
+    </div>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 5 — O Investidor Iniciante</h2>
+      <p class="mt-2 text-gray-700">No estudo de caso do investidor João, ele percebeu uma correlação de <strong>-0.85</strong> entre ações de guarda-chuvas e protetor solar. Por que esse número negativo foi considerado útil para a estratégia de diversificação dele?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 6 — Visualização Gráfica</h2>
+      <p class="mt-2 text-gray-700">Ao visualizar um gráfico de dispersão (scatter plot) onde os pontos formam uma linha subindo da esquerda para a direita (como na imagem dos slides), que tipo de correlação (positiva ou negativa) isso representa? O que aconteceria com a linha se a correlação fosse negativa?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 7 — Aplicação em Tecnologia</h2>
+      <p class="mt-2 text-gray-700">Os slides mencionam sistemas de recomendação como o da <strong>Netflix</strong>. Como o conceito de correlação é utilizado para sugerir novos filmes baseados no que "usuários parecidos" assistiram?</p>
+    </li>
+
+    <div class="relative py-4 mt-8">
+        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center">
+            <span class="bg-gray-50 px-3 text-lg font-bold text-gray-500 uppercase tracking-wider">Bloco 3: Armadilhas (Educação Preventiva)</span>
+        </div>
+    </div>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 8 — O Mito da Causalidade</h2>
+      <p class="mt-2 text-gray-700">"O galo canta antes do sol nascer, logo o galo faz o sol nascer." Utilize essa frase para explicar a diferença crucial entre <strong>Correlação</strong> e <strong>Causalidade</strong>. Por que não podemos afirmar que A causa B apenas olhando os números?</p>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 9 — O Perigo dos Outliers</h2>
+      <p class="mt-2 text-gray-700">Imagine que estamos analisando vendas de sorvete no inverno e, em um único dia, houve um festival gigante de sorvete, gerando vendas anormais. Como esse "ponto fora da curva" (outlier) pode distorcer o cálculo da correlação se nossa amostra de dados for pequena?</p>
+    </li>
+
+
+    <div class="relative py-4 mt-8">
+        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+            <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center">
+            <span class="bg-gray-50 px-3 text-lg font-bold text-gray-500 uppercase tracking-wider">Bloco 4: Cálculo com Python</span>
+        </div>
+    </div>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 10 — Matriz de Correlação</h2>
+      <p class="mt-2 text-gray-700">Analise o trecho de código Python abaixo utilizando a biblioteca Pandas. O que a função <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">dados.corr()</code> faz automaticamente com todas as colunas numéricas da tabela?</p>
+      <pre class="mt-3 bg-gray-800 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+import pandas as pd
+dados = pd.DataFrame({
+    'Temp': [30, 32, 25],
+    'Vendas': [200, 220, 150]
+})
+print(dados.corr())</pre>
+    </li>
+
+    <li class="bg-white shadow rounded-2xl p-6 border border-gray-100 hover:border-indigo-200 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-800">Questão 11 — Interpretação de Output</h2>
+      <p class="mt-2 text-gray-700">Suponha que, ao rodar o código acima, o cruzamento entre <strong>Temp</strong> e <strong>Vendas</strong> resulte em <code class="bg-gray-100 px-1 py-0.5 rounded font-mono">0.98</code>. Baseado no que aprendemos sobre a "força" da correlação, como você descreveria esse relacionamento para o dono da sorveteria?</p>
+    </li>
+
+
+
+  </ol>
+</div>
+
+</body>
+</html>
