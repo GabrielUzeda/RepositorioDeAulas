@@ -468,6 +468,11 @@
         "caminho": "turmas/sistemas_aplicados/aulas/apis.html",
         "icone": "03",
         "descricao": "Conceitos fundamentais de APIs: o que são, como funcionam (requisição/resposta), endpoints, JSON e exemplos práticos."
+      },
+      "Fundamentos da Engenharia de Software": {
+        "caminho": "turmas/sistemas_aplicados/aulas/fundamentos_engenharia _software.html",
+        "icone": "04",
+        "descricao": "Conceitos fundamentais de Engenharia de Software: como funciona o ciclo de um software?"
       }
     },
     "atividades": []
