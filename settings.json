@@ -85,6 +85,11 @@
           "caminho": "turmas/estatistica/aulas/covariancia_correlacao_linear.html",
           "icone": "15",
           "descricao": "Conceitos de covariância e correlação linear: interpretação, cálculo e aplicações práticas"
+        },
+        "Teste Z": {
+          "caminho": "turmas/estatistica/aulas/teste_z.html",
+          "icone": "16",
+          "descricao": "Teste Z: tomada de decisão com dados, hipóteses estatísticas e significância estatística"
         }
       },
       "atividades": [
@@ -187,6 +192,13 @@
           "titulo": "Covariância e Correlação Linear",
           "descricao": "Exercícios sobre covariância, correlação de Pearson e interpretação de relações entre variáveis",
           "caminho": "turmas/estatistica/atividades/covariancia_correlacao_linear.html"
+        },
+        {
+          "id": "teste_z",
+          "icone": "16",
+          "titulo": "Teste Z",
+          "descricao": "Exercícios sobre teste Z, hipóteses estatísticas e tomada de decisão com dados",
+          "caminho": "turmas/estatistica/atividades/teste_z.html"
         }
 
       ]
