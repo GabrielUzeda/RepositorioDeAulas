@@ -1,34 +1,7 @@
 ---
 marp: true
-theme: default
 paginate: true
 math: katex
-style: |
-  @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap');
-  section {
-    font-family: 'Roboto', sans-serif;
-    background-color: #f4f6fb;
-    color: #2b2b2b;
-    font-size: 28px;
-    line-height: 1.5;
-  }
-  h1, h2, h3 {
-    font-family: 'Roboto Slab', serif;
-    color: #1a3a6e;
-  }
-  h2 {
-    border-bottom: 2px solid #1a3a6e;
-    padding-bottom: 5px;
-  }
-  strong {
-    color: #d62828;
-    font-weight: 700;
-  }
-  code {
-    background-color: #e0e0e0;
-    padding: 2px 5px;
-    border-radius: 4px;
-  }
 ---
 
 # Fundamentos da Engenharia de Software
@@ -69,13 +42,14 @@ A Engenharia de Software aplica princípios de engenharia ao desenvolvimento de 
 
 O *Software Development Life Cycle* é a jornada do produto.
 
-<div class="mermaid">
+<div class="marmaid">
 graph LR;
     A[Planejamento] --> B[Análise];
     B --> C[Design];
     C --> D[Implementação];
     D --> E[Testes];
     E --> F[Manutenção];
+
 </div>
 
 * Cada fase alimenta a próxima.
