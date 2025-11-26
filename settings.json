@@ -278,6 +278,11 @@
           "caminho": "turmas/terceirao/aulas/trabalho_final_enem.html",
           "icone": "13",
           "descricao": "Instruções de cada equipe para a Fase final do Projeto ENEM"
+        },
+        "Hackathon do Terceirão": {
+          "caminho": "turmas/terceirao/aulas/hackathon.html",
+          "icone": "14",
+          "descricao": "Instruções para a dinâmica do Hackathon do Terceirão"
         }
       },
       "atividades": [
