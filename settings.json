@@ -90,6 +90,11 @@
           "caminho": "turmas/estatistica/aulas/teste_z.html",
           "icone": "16",
           "descricao": "Teste Z: tomada de decisão com dados, hipóteses estatísticas e significância estatística"
+        },
+        "Trabalho Final": {
+          "caminho": "turmas/estatistica/aulas/trabalho_final.html",
+          "icone": "16",
+          "descricao": "Apresentação do trabalho final da disciplina"
         }
       },
       "atividades": [
