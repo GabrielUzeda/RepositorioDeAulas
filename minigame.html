@@ -637,8 +637,7 @@
     }
 
     function drawPlayer() {
-        // Reduzi de 0.1 para 0.04 para deixar a nave mais lenta/pesada
-        player.x += (player.targetX - player.x) * 0.04;
+        player.x += (player.targetX - player.x) * 0.1;
         ctx.save();
         ctx.translate(player.x, player.y);
 
