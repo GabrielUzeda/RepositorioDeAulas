@@ -500,6 +500,11 @@
         "caminho": "turmas/sistemas_aplicados/aulas/SDLC_fase_3.html",
         "icone": "05",
         "descricao": "Fase 3: Design (Arquitetura e Modelagem)"
+      },
+      "Software Development Life Cycle": {
+        "caminho": "turmas/sistemas_aplicados/aulas/SDLC_fase_4.html",
+        "icone": "06",
+        "descricao": "Fase 4: Implementação (Codificação)"
       }
     },
     "atividades": []
