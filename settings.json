@@ -510,6 +510,11 @@
         "caminho": "turmas/sistemas_aplicados/aulas/SDLC_fase_4.html",
         "icone": "06",
         "descricao": "Fase 4: Implementação (Codificação)"
+      },
+      "Dicionário GIT": {
+        "caminho": "turmas/sistemas_aplicados/aulas/dicionario_git.html",
+        "icone": "07",
+        "descricao": "Termos e comandos essenciais do Git para controle de versão eficaz"
       }
     },
     "atividades": []
