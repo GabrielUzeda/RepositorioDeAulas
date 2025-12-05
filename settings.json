@@ -288,6 +288,11 @@
           "caminho": "turmas/terceirao/aulas/hackathon.html",
           "icone": "14",
           "descricao": "Instruções para a dinâmica do Hackathon do Terceirão"
+        },
+        "Resumo do Terceirão": {
+          "caminho": "turmas/terceirao/aulas/resumao.html",
+          "icone": "15",
+          "descricao": "Resumo dos conceitos gerais do curso"
         }
       },
       "atividades": [
