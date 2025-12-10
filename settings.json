@@ -515,6 +515,11 @@
         "caminho": "turmas/sistemas_aplicados/aulas/dicionario_git.html",
         "icone": "07",
         "descricao": "Termos e comandos essenciais do Git para controle de versão eficaz"
+      },
+      "Trabalho Final": {
+        "caminho": "turmas/sistemas_aplicados/aulas/trabalho_final.html",
+        "icone": "08",
+        "descricao": "Trabalho final da disciplina de Sistemas Aplicados: Engenharia Reversa"
       }
     },
     "atividades": []

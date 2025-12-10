@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Alocação de Professores</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PapaParse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#E3F2FD',
+                            100: '#BBDEFB',
+                            200: '#90CAF9',
+                            300: '#64B5F6',
+                            400: '#42A5F5',
+                            500: '#2196F3',
+                            600: '#1E88E5',
+                            700: '#1976D2',
+                            800: '#1565C0',
+                            900: '#0D47A1',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        .schedule-cell {
+            transition: all 0.15s ease;
+        }
+        
+        .schedule-cell:hover {
+            transform: scale(1.02);
+        }
+        
+        .competencia-check input:checked + label {
+            background: #1976D2;
+            color: white;
+            border-color: #1976D2;
+        }
+        
+        .competencia-check input:checked + label .check-icon {
+            display: flex;
+        }
+        
+        .tab-btn.active {
+            background: white;
+            color: #1976D2;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .drop-zone.dragover {
+            border-color: #1976D2;
+            background: #E3F2FD;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen font-sans" x-data="app()" x-cloak>
+    
+    <!-- Header -->
+    <header class="bg-primary-700 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center gap-3">
+                <span class="material-icons text-3xl">school</span>
+                <div>
+                    <h1 class="text-xl font-semibold">Sistema de Alocação</h1>
+                    <p class="text-primary-200 text-sm">Gestão de Professores</p>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Tabs -->
+    <div class="bg-primary-600 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex gap-2 py-2">
+                <button @click="currentTab = 'professor'" 
+                        class="tab-btn flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all"
+                        :class="currentTab === 'professor' ? 'active' : 'text-white/80 hover:text-white hover:bg-white/10'">
+                    <span class="material-icons-outlined text-xl">person</span>
+                    Professor
+                </button>
+                <button @click="currentTab = 'coordenacao'" 
+                        class="tab-btn flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all"
+                        :class="currentTab === 'coordenacao' ? 'active' : 'text-white/80 hover:text-white hover:bg-white/10'">
+                    <span class="material-icons-outlined text-xl">groups</span>
+                    Coordenação
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        
+        <!-- Tab: Professor -->
+        <div x-show="currentTab === 'professor'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+            
+            <!-- Card: Dados do Professor -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                <div class="flex items-center gap-2 mb-6">
+                    <span class="material-icons text-primary-600">badge</span>
+                    <h2 class="text-lg font-semibold text-slate-800">Dados do Professor</h2>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Nome -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            Nome Completo
+                        </label>
+                        <div class="relative">
+                            <span class="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">person</span>
+                            <input type="text" 
+                                   x-model="professor.nome"
+                                   placeholder="Digite o nome completo"
+                                   class="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    
+                    <!-- Área de Atuação -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            Área de Atuação
+                        </label>
+                        <div class="relative">
+                            <span class="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">work</span>
+                            <select x-model="professor.area" 
+                                    @change="professor.competencias = []"
+                                    class="w-full pl-11 pr-10 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all appearance-none bg-white cursor-pointer">
+                                <option value="">Selecione uma área...</option>
+                                <template x-for="area in Object.keys(areasCompetencias)" :key="area">
+                                    <option :value="area" x-text="area"></option>
+                                </template>
+                            </select>
+                            <span class="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Card: Competências -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6" x-show="professor.area" x-transition>
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-icons text-primary-600">psychology</span>
+                    <h2 class="text-lg font-semibold text-slate-800">Competências</h2>
+                    <span class="text-sm text-slate-500 ml-auto">Selecione todas que se aplicam</span>
+                </div>
+                
+                <div class="flex flex-wrap gap-3">
+                    <template x-for="comp in (areasCompetencias[professor.area] || [])" :key="comp">
+                        <label class="competencia-check">
+                            <input type="checkbox" 
+                                   :value="comp" 
+                                   x-model="professor.competencias"
+                                   class="sr-only">
+                            <label @click="toggleCompetencia(comp)"
+                                   class="flex items-center gap-2 px-4 py-2.5 border-2 border-slate-300 rounded-full cursor-pointer transition-all hover:border-primary-400 hover:bg-primary-50">
+                                <span class="check-icon hidden items-center justify-center w-5 h-5 bg-white/20 rounded-full">
+                                    <span class="material-icons text-sm">check</span>
+                                </span>
+                                <span class="font-medium text-sm" x-text="comp"></span>
+                            </label>
+                        </label>
+                    </template>
+                </div>
+                
+                <div class="mt-4 pt-4 border-t border-slate-100" x-show="professor.competencias.length > 0">
+                    <p class="text-sm text-slate-600">
+                        <span class="font-medium">Selecionadas:</span>
+                        <span x-text="professor.competencias.join(', ')"></span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Card: Grade de Horários -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-icons text-primary-600">calendar_month</span>
+                        <h2 class="text-lg font-semibold text-slate-800">Grade de Horários</h2>
+                    </div>
+                </div>
+                
+                <!-- Legenda -->
+                <div class="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg border-2 border-slate-300 bg-white"></div>
+                        <span class="text-sm text-slate-600">Indisponível</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
+                            <span class="material-icons text-white text-sm">check</span>
+                        </div>
+                        <span class="text-sm text-slate-600">Disponível</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-rose-500 flex items-center justify-center">
+                            <span class="material-icons text-white text-sm">school</span>
+                        </div>
+                        <span class="text-sm text-slate-600">Já ministro aula pelo Bittencourt</span>
+                    </div>
+                </div>
+                
+                <!-- Tabela -->
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full border-collapse min-w-[800px]">
+                        <thead>
+                            <tr>
+                                <th class="p-3 bg-primary-700 text-white text-sm font-semibold text-left rounded-tl-lg">Horário</th>
+                                <template x-for="dia in dias" :key="dia">
+                                    <th class="p-3 bg-primary-700 text-white text-sm font-semibold text-center" x-text="dia"></th>
+                                </template>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(horario, hIndex) in horarios" :key="horario">
+                                <tr class="border-b border-slate-100">
+                                    <td class="p-3 bg-slate-50 text-sm font-medium text-slate-700 whitespace-nowrap" x-text="horario"></td>
+                                    <template x-for="dia in dias" :key="dia">
+                                        <td class="p-1.5">
+                                            <button @click="toggleCell(dia, horario)"
+                                                    class="schedule-cell w-full h-12 rounded-lg border-2 flex items-center justify-center cursor-pointer"
+                                                    :class="{
+                                                        'border-slate-300 bg-white hover:bg-slate-50': getCellStatus(dia, horario) === 0,
+                                                        'border-emerald-500 bg-emerald-500 text-white': getCellStatus(dia, horario) === 1,
+                                                        'border-rose-500 bg-rose-500 text-white': getCellStatus(dia, horario) === 2
+                                                    }">
+                                                <span class="material-icons text-xl" x-show="getCellStatus(dia, horario) === 1">check</span>
+                                                <span class="material-icons text-xl" x-show="getCellStatus(dia, horario) === 2">school</span>
+                                            </button>
+                                        </td>
+                                    </template>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Resumo -->
+                <div class="flex flex-wrap gap-4 mt-6 pt-4 border-t border-slate-100">
+                    <div class="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full">
+                        <span class="material-icons text-lg">event_available</span>
+                        <span class="font-semibold" x-text="professor.horasDisponiveis + 'h'"></span>
+                        <span class="text-sm">disponíveis</span>
+                    </div>
+                    <div class="flex items-center gap-2 px-4 py-2 rounded-full"
+                         :class="professor.horasOcupadas > 28 ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'">
+                        <span class="material-icons text-lg">schedule</span>
+                        <span class="font-semibold" x-text="professor.horasOcupadas + 'h'"></span>
+                        <span class="text-sm">já ministrando</span>
+                        <span class="material-icons text-lg" x-show="professor.horasOcupadas > 28">warning</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="flex flex-wrap gap-4">
+                <button @click="exportarCSV()"
+                        class="flex items-center gap-2 px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm">
+                    <span class="material-icons">download</span>
+                    Exportar CSV
+                </button>
+                <button @click="$refs.importProfessor.click()"
+                        class="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">
+                    <span class="material-icons">upload</span>
+                    Importar CSV
+                </button>
+                <input type="file" 
+                       x-ref="importProfessor" 
+                       @change="importarParaEdicao($event)" 
+                       accept=".csv"
+                       class="hidden">
+                <button @click="limparProfessor()"
+                        class="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors border border-slate-300">
+                    <span class="material-icons">refresh</span>
+                    Limpar Tudo
+                </button>
+            </div>
+        </div>
+        
+        <!-- Tab: Coordenação -->
+        <div x-show="currentTab === 'coordenacao'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+            
+            <!-- Card: Importar -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-icons text-primary-600">upload_file</span>
+                    <h2 class="text-lg font-semibold text-slate-800">Importar Professores</h2>
+                </div>
+                
+                <div class="drop-zone border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer transition-all hover:border-primary-400 hover:bg-primary-50/50"
+                     :class="{ 'dragover': isDragging }"
+                     @dragover.prevent="isDragging = true"
+                     @dragleave.prevent="isDragging = false"
+                     @drop.prevent="handleDrop($event)"
+                     @click="$refs.fileInput.click()">
+                    <span class="material-icons text-5xl text-slate-400 mb-3">cloud_upload</span>
+                    <p class="text-slate-600 font-medium mb-1">Arraste os arquivos CSV aqui</p>
+                    <p class="text-slate-400 text-sm">ou clique para selecionar</p>
+                    <input type="file" 
+                           x-ref="fileInput" 
+                           @change="handleFileSelect($event)" 
+                           multiple 
+                           accept=".csv"
+                           class="hidden">
+                </div>
+                
+                <!-- Lista de professores importados -->
+                <div x-show="professoresImportados.length > 0" class="mt-6" x-transition>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-slate-800 flex items-center gap-2">
+                            <span class="material-icons text-primary-600">people</span>
+                            Professores Importados
+                            <span class="px-2 py-0.5 bg-primary-100 text-primary-700 text-sm rounded-full" x-text="professoresImportados.length"></span>
+                        </h3>
+                        <button @click="limparProfessores()" 
+                                class="text-rose-600 text-sm font-medium hover:text-rose-700 flex items-center gap-1">
+                            <span class="material-icons text-lg">delete_sweep</span>
+                            Remover Todos
+                        </button>
+                    </div>
+                    
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <template x-for="(prof, index) in professoresImportados" :key="index">
+                            <div class="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-primary-300 transition-colors">
+                                <div class="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center font-semibold text-sm"
+                                     x-text="prof.nome.charAt(0).toUpperCase()"></div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium text-slate-800 truncate" x-text="prof.nome"></p>
+                                    <p class="text-xs text-slate-500 truncate" x-text="prof.area"></p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full"
+                                          :class="prof.horasOcupadas > 28 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'"
+                                          x-text="prof.horasOcupadas + 'h'"></span>
+                                    <button @click="removerProfessor(index)" class="text-slate-400 hover:text-rose-500 transition-colors">
+                                        <span class="material-icons text-lg">close</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Card: Buscar -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6" x-show="professoresImportados.length > 0" x-transition>
+                <div class="flex items-center gap-2 mb-6">
+                    <span class="material-icons text-primary-600">search</span>
+                    <h2 class="text-lg font-semibold text-slate-800">Buscar Professor para Alocação</h2>
+                </div>
+                
+                <div class="space-y-6 mb-6">
+                    <!-- Linha 1: Área e Matéria -->
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Área de Competência -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">
+                                <span class="material-icons text-sm align-middle mr-1">category</span>
+                                Área de Competência
+                            </label>
+                            <div class="relative">
+                                <select x-model="filtroArea" @change="filtroMateria = ''; buscarProfessores()"
+                                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none appearance-none bg-white cursor-pointer">
+                                    <option value="">Todas as áreas</option>
+                                    <template x-for="area in Object.keys(areasCompetencias)" :key="area">
+                                        <option :value="area" x-text="area"></option>
+                                    </template>
+                                </select>
+                                <span class="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-lg">expand_more</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Matéria com busca -->
+                        <div class="lg:col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">
+                                <span class="material-icons text-sm align-middle mr-1">subject</span>
+                                Matéria/Competência
+                            </label>
+                            <div class="relative" x-data="{ open: false, search: '' }">
+                                <div class="relative">
+                                    <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                                    <input type="text" 
+                                           x-model="search"
+                                           @focus="open = true"
+                                           @click.away="open = false"
+                                           :placeholder="filtroMateria || 'Buscar matéria...'"
+                                           class="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                                    <button @click="filtroMateria = ''; search = ''; buscarProfessores()" 
+                                            x-show="filtroMateria"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                        <span class="material-icons text-lg">close</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- Dropdown de opções -->
+                                <div x-show="open" 
+                                     x-transition
+                                     class="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                    <template x-if="filtroArea">
+                                        <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-500 font-medium">
+                                            Competências de: <span x-text="filtroArea"></span>
+                                        </div>
+                                    </template>
+                                    
+                                    <button @click="filtroMateria = ''; search = ''; open = false; buscarProfessores()"
+                                            class="w-full px-4 py-2.5 text-left hover:bg-slate-50 text-slate-600 border-b border-slate-100">
+                                        Todas as matérias
+                                    </button>
+                                    
+                                    <template x-for="comp in competenciasFiltradas(search)" :key="comp">
+                                        <button @click="filtroMateria = comp; search = ''; open = false; buscarProfessores()"
+                                                class="w-full px-4 py-2.5 text-left hover:bg-primary-50 hover:text-primary-700 flex items-center justify-between"
+                                                :class="{ 'bg-primary-50 text-primary-700': filtroMateria === comp }">
+                                            <span x-text="comp"></span>
+                                            <span class="material-icons text-sm" x-show="filtroMateria === comp">check</span>
+                                        </button>
+                                    </template>
+                                    
+                                    <div x-show="competenciasFiltradas(search).length === 0" class="px-4 py-3 text-slate-500 text-sm text-center">
+                                        Nenhuma matéria encontrada
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-1" x-show="filtroMateria">
+                                Selecionado: <span class="font-medium text-primary-600" x-text="filtroMateria"></span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Linha 2: Horário -->
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Horário -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">
+                                <span class="material-icons text-sm align-middle mr-1">schedule</span>
+                                Horário da Aula
+                            </label>
+                            <div class="relative">
+                                <select x-model="filtroHorario" @change="buscarProfessores()"
+                                        class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none appearance-none bg-white cursor-pointer">
+                                    <option value="">Qualquer horário</option>
+                                    <template x-for="horario in horarios" :key="horario">
+                                        <option :value="horario" x-text="horario"></option>
+                                    </template>
+                                </select>
+                                <span class="material-icons absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-lg">expand_more</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Linha 2: Dias da Semana -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-3">
+                            <span class="material-icons text-sm align-middle mr-1">date_range</span>
+                            Dias da Semana
+                            <span class="text-slate-400 font-normal ml-2">(selecione os dias que a turma terá aula)</span>
+                        </label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="dia in dias" :key="dia">
+                                <label class="cursor-pointer">
+                                    <input type="checkbox" 
+                                           :value="dia" 
+                                           x-model="filtroDias"
+                                           @change="buscarProfessores()"
+                                           class="sr-only peer">
+                                    <div class="px-4 py-2.5 border-2 border-slate-300 rounded-lg font-medium text-sm transition-all
+                                                peer-checked:border-primary-600 peer-checked:bg-primary-600 peer-checked:text-white
+                                                hover:border-primary-400 hover:bg-primary-50 peer-checked:hover:bg-primary-700">
+                                        <span x-text="dia"></span>
+                                    </div>
+                                </label>
+                            </template>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2" x-show="filtroDias.length > 0">
+                            <span class="material-icons text-xs align-middle">info</span>
+                            Buscando professores disponíveis em <strong x-text="filtroDias.length"></strong> dia(s): 
+                            <span x-text="filtroDias.join(', ')"></span>
+                        </p>
+                    </div>
+                    
+                    <!-- Atalhos de seleção -->
+                    <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                        <span class="text-sm text-slate-500 mr-2">Atalhos:</span>
+                        <button @click="filtroDias = [...dias]; buscarProfessores()" 
+                                class="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors">
+                            Todos os dias
+                        </button>
+                        <button @click="filtroDias = ['Segunda', 'Quarta', 'Sexta']; buscarProfessores()" 
+                                class="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors">
+                            Seg/Qua/Sex
+                        </button>
+                        <button @click="filtroDias = ['Terça', 'Quinta']; buscarProfessores()" 
+                                class="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors">
+                            Ter/Qui
+                        </button>
+                        <button @click="filtroDias = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta']; buscarProfessores()" 
+                                class="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-full hover:bg-slate-200 transition-colors">
+                            Seg a Sex
+                        </button>
+                        <button @click="filtroDias = []; buscarProfessores()" 
+                                class="px-3 py-1 text-xs font-medium bg-rose-100 text-rose-700 rounded-full hover:bg-rose-200 transition-colors">
+                            Limpar
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Resultados -->
+                <div x-show="resultadoBusca.length > 0" x-transition>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="material-icons text-emerald-600">check_circle</span>
+                            <h3 class="font-semibold text-slate-800">
+                                <span x-text="resultadoBusca.length"></span> Professor(es) Encontrado(s)
+                            </h3>
+                        </div>
+                        <span class="text-sm text-slate-500">Ordenados por maior disponibilidade</span>
+                    </div>
+                    
+                    <!-- Info do filtro ativo -->
+                    <div class="bg-primary-50 border border-primary-200 rounded-lg p-3 mb-4 flex items-center gap-2" x-show="filtroDias.length > 0 || filtroHorario">
+                        <span class="material-icons text-primary-600">filter_alt</span>
+                        <span class="text-sm text-primary-800">
+                            Filtro ativo: 
+                            <template x-if="filtroDias.length > 0">
+                                <span class="font-medium" x-text="filtroDias.join(', ')"></span>
+                            </template>
+                            <template x-if="filtroDias.length > 0 && filtroHorario">
+                                <span> às </span>
+                            </template>
+                            <template x-if="filtroHorario">
+                                <span class="font-medium" x-text="filtroHorario"></span>
+                            </template>
+                        </span>
+                    </div>
+                    
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b-2 border-slate-200">
+                                    <th class="text-left p-3 text-sm font-semibold text-slate-600">#</th>
+                                    <th class="text-left p-3 text-sm font-semibold text-slate-600">Professor</th>
+                                    <th class="text-left p-3 text-sm font-semibold text-slate-600">Competências</th>
+                                    <th class="text-center p-3 text-sm font-semibold text-slate-600">
+                                        <div class="flex items-center justify-center gap-1">
+                                            <span class="material-icons text-sm">calendar_month</span>
+                                            Disponibilidade Semanal
+                                        </div>
+                                    </th>
+                                    <th class="text-center p-3 text-sm font-semibold text-slate-600">Horas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(prof, index) in resultadoBusca" :key="index">
+                                    <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+                                        :class="{ 'bg-rose-50 hover:bg-rose-100': prof.horasOcupadas > 28 }">
+                                        <td class="p-3 text-slate-500 font-medium" x-text="index + 1"></td>
+                                        <td class="p-3">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center font-semibold text-sm shrink-0"
+                                                     x-text="prof.nome.charAt(0).toUpperCase()"></div>
+                                                <div class="min-w-0">
+                                                    <p class="font-medium text-slate-800 truncate" x-text="prof.nome"></p>
+                                                    <p class="text-xs text-slate-500 truncate" x-text="prof.area"></p>
+                                                    <p class="text-xs text-rose-600 flex items-center gap-1" x-show="prof.horasOcupadas > 28">
+                                                        <span class="material-icons text-sm">warning</span>
+                                                        Excede 28h
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="flex flex-wrap gap-1 max-w-[200px]">
+                                                <template x-for="comp in prof.competencias.slice(0, 4)" :key="comp">
+                                                    <span class="px-2 py-0.5 text-xs rounded-full"
+                                                          :class="comp.toLowerCase() === filtroMateria.toLowerCase() ? 'bg-primary-600 text-white' : 'bg-slate-200 text-slate-700'"
+                                                          x-text="comp"></span>
+                                                </template>
+                                                <span x-show="prof.competencias.length > 4" 
+                                                      class="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-500"
+                                                      x-text="'+' + (prof.competencias.length - 4)"></span>
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="flex justify-center gap-1">
+                                                <template x-for="dia in dias" :key="dia">
+                                                    <div class="flex flex-col items-center gap-0.5">
+                                                        <span class="text-[10px] font-medium text-slate-400" x-text="dia.substring(0, 3)"></span>
+                                                        <div class="w-7 h-7 rounded flex items-center justify-center text-xs font-bold"
+                                                             :class="{
+                                                                 'bg-emerald-500 text-white': getDisponibilidadeDia(prof, dia) > 0,
+                                                                 'bg-slate-100 text-slate-300': getDisponibilidadeDia(prof, dia) === 0,
+                                                                 'ring-2 ring-primary-500 ring-offset-1': filtroDias.includes(dia)
+                                                             }"
+                                                             x-text="getDisponibilidadeDia(prof, dia) || '-'"></div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="flex flex-col items-center gap-1">
+                                                <span class="px-2.5 py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700"
+                                                      x-text="prof.horasDisponiveis + 'h livres'"></span>
+                                                <span class="px-2.5 py-1 text-xs font-medium rounded-full"
+                                                      :class="prof.horasOcupadas > 28 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'"
+                                                      x-text="prof.horasOcupadas + 'h ocupadas'"></span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Empty State -->
+                <div x-show="filtroMateria && resultadoBusca.length === 0" class="text-center py-12" x-transition>
+                    <span class="material-icons text-5xl text-slate-300 mb-3">search_off</span>
+                    <p class="text-slate-500">Nenhum professor encontrado com essa competência e disponibilidade.</p>
+                </div>
+            </div>
+            
+            <!-- Empty State -->
+            <div x-show="professoresImportados.length === 0" class="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center" x-transition>
+                <span class="material-icons text-6xl text-slate-300 mb-4">folder_open</span>
+                <p class="text-slate-500 text-lg">Importe arquivos CSV de professores para começar.</p>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Toast Container -->
+    <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2" x-data="{ toasts: [] }" @show-toast.window="toasts.push($event.detail); setTimeout(() => toasts.shift(), 3000)">
+        <template x-for="(toast, index) in toasts" :key="index">
+            <div class="px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-[slideIn_0.3s_ease]"
+                 :class="{
+                     'bg-emerald-600 text-white': toast.type === 'success',
+                     'bg-rose-600 text-white': toast.type === 'error',
+                     'bg-primary-600 text-white': toast.type === 'info'
+                 }">
+                <span class="material-icons text-lg" x-text="toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : 'info'"></span>
+                <span x-text="toast.message"></span>
+            </div>
+        </template>
+    </div>
+    
+    <script>
+        function app() {
+            return {
+                currentTab: 'professor',
+                
+                professor: {
+                    nome: '',
+                    area: '',
+                    competencias: [],
+                    horarios: {},
+                    horasOcupadas: 0,
+                    horasDisponiveis: 0
+                },
+                
+                professoresImportados: [],
+                isDragging: false,
+                
+                filtroArea: '',
+                filtroMateria: '',
+                filtroDias: [],
+                filtroHorario: '',
+                resultadoBusca: [],
+                
+                dias: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'],
+                horarios: [
+                    '07:00 - 08:00',
+                    '08:00 - 09:00',
+                    '09:00 - 10:00',
+                    '10:00 - 11:00',
+                    '11:00 - 12:00',
+                    '13:00 - 14:00',
+                    '14:00 - 15:00',
+                    '15:00 - 16:00',
+                    '16:00 - 17:00',
+                    '17:00 - 18:00',
+                    '18:00 - 19:00',
+                    '19:00 - 20:00',
+                    '20:00 - 21:00',
+                    '21:00 - 22:00'
+                ],
+                
+                areasCompetencias: {
+                    'Tecnologia da Informação': [
+                        'Programação Web', 'Mobile', 'Banco de Dados', 'Redes', 
+                        'Inteligência Artificial', 'Machine Learning', 'Cloud Computing',
+                        'DevOps', 'Segurança da Informação', 'IoT', 'Drones', 'Big Data'
+                    ],
+                    'Ciências Exatas': [
+                        'Matemática', 'Física', 'Química', 'Estatística', 
+                        'Cálculo', 'Álgebra Linear', 'Geometria'
+                    ],
+                    'Linguagens': [
+                        'Português', 'Inglês', 'Espanhol', 'Libras',
+                        'Redação', 'Literatura', 'Comunicação'
+                    ],
+                    'Ciências Humanas': [
+                        'História', 'Geografia', 'Filosofia', 'Sociologia',
+                        'Psicologia', 'Direito', 'Economia'
+                    ],
+                    'Gestão e Negócios': [
+                        'Administração', 'Marketing', 'Finanças', 'RH',
+                        'Empreendedorismo', 'Gestão de Projetos', 'Logística'
+                    ],
+                    'Saúde': [
+                        'Enfermagem', 'Farmácia', 'Nutrição', 'Fisioterapia',
+                        'Educação Física', 'Primeiros Socorros'
+                    ],
+                    'Artes e Design': [
+                        'Design Gráfico', 'UI/UX', 'Fotografia', 'Edição de Vídeo',
+                        'Música', 'Artes Visuais', 'Produção Audiovisual'
+                    ]
+                },
+                
+                toggleCompetencia(comp) {
+                    const index = this.professor.competencias.indexOf(comp);
+                    if (index === -1) {
+                        this.professor.competencias.push(comp);
+                    } else {
+                        this.professor.competencias.splice(index, 1);
+                    }
+                },
+                
+                toggleCell(dia, horario) {
+                    const key = `${dia}-${horario}`;
+                    const current = this.professor.horarios[key] || 0;
+                    this.professor.horarios[key] = (current + 1) % 3;
+                    this.calcularHoras();
+                },
+                
+                getCellStatus(dia, horario) {
+                    const key = `${dia}-${horario}`;
+                    return this.professor.horarios[key] || 0;
+                },
+                
+                calcularHoras() {
+                    let ocupadas = 0;
+                    let disponiveis = 0;
+                    
+                    Object.values(this.professor.horarios).forEach(status => {
+                        if (status === 1) disponiveis++;
+                        if (status === 2) ocupadas++;
+                    });
+                    
+                    this.professor.horasOcupadas = ocupadas;
+                    this.professor.horasDisponiveis = disponiveis;
+                },
+                
+                showToast(message, type = 'info') {
+                    window.dispatchEvent(new CustomEvent('show-toast', { 
+                        detail: { message, type } 
+                    }));
+                },
+                
+                exportarCSV() {
+                    if (!this.professor.nome) {
+                        this.showToast('Preencha o nome do professor', 'error');
+                        return;
+                    }
+                    
+                    const data = [];
+                    
+                    data.push(['Nome', this.professor.nome]);
+                    data.push(['Area', this.professor.area]);
+                    data.push(['Competencias', this.professor.competencias.join(';')]);
+                    data.push(['Horas Ocupadas', this.professor.horasOcupadas]);
+                    data.push(['Horas Disponiveis', this.professor.horasDisponiveis]);
+                    data.push([]);
+                    
+                    data.push(['Horario', ...this.dias]);
+                    
+                    this.horarios.forEach(horario => {
+                        const row = [horario];
+                        this.dias.forEach(dia => {
+                            const key = `${dia}-${horario}`;
+                            const status = this.professor.horarios[key] || 0;
+                            row.push(status === 1 ? 'DISPONIVEL' : status === 2 ? 'BITTENCOURT' : '');
+                        });
+                        data.push(row);
+                    });
+                    
+                    const csv = Papa.unparse(data);
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    const fileName = `${this.professor.nome.replace(/\s+/g, '_')}.csv`;
+                    
+                    link.href = URL.createObjectURL(blob);
+                    link.download = fileName;
+                    link.click();
+                    
+                    this.showToast(`Arquivo "${fileName}" exportado!`, 'success');
+                },
+                
+                limparProfessor() {
+                    this.professor = {
+                        nome: '',
+                        area: '',
+                        competencias: [],
+                        horarios: {},
+                        horasOcupadas: 0,
+                        horasDisponiveis: 0
+                    };
+                    this.showToast('Dados limpos', 'info');
+                },
+                
+                importarParaEdicao(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    Papa.parse(file, {
+                        complete: (results) => {
+                            try {
+                                const data = results.data;
+                                
+                                // Limpa dados atuais
+                                this.professor = {
+                                    nome: '',
+                                    area: '',
+                                    competencias: [],
+                                    horarios: {},
+                                    horasOcupadas: 0,
+                                    horasDisponiveis: 0
+                                };
+                                
+                                // Lê metadados
+                                data.forEach(row => {
+                                    if (row[0] === 'Nome') this.professor.nome = row[1] || '';
+                                    if (row[0] === 'Area') this.professor.area = row[1] || '';
+                                    if (row[0] === 'Competencias') {
+                                        this.professor.competencias = row[1] ? row[1].split(';').filter(c => c) : [];
+                                    }
+                                });
+                                
+                                // Lê grade de horários
+                                let gradeStart = data.findIndex(row => row[0] === 'Horario');
+                                
+                                if (gradeStart >= 0) {
+                                    const headerRow = data[gradeStart];
+                                    
+                                    for (let i = gradeStart + 1; i < data.length; i++) {
+                                        const row = data[i];
+                                        if (!row[0]) continue;
+                                        
+                                        const horario = row[0];
+                                        
+                                        for (let j = 1; j < row.length; j++) {
+                                            const dia = headerRow[j];
+                                            const status = row[j];
+                                            const key = `${dia}-${horario}`;
+                                            
+                                            if (status === 'DISPONIVEL') {
+                                                this.professor.horarios[key] = 1;
+                                            } else if (status === 'BITTENCOURT') {
+                                                this.professor.horarios[key] = 2;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Recalcula horas
+                                this.calcularHoras();
+                                
+                                this.showToast(`Dados de "${this.professor.nome}" carregados!`, 'success');
+                            } catch (e) {
+                                console.error(e);
+                                this.showToast('Erro ao processar CSV', 'error');
+                            }
+                        },
+                        error: () => {
+                            this.showToast('Erro ao ler arquivo', 'error');
+                        }
+                    });
+                    
+                    // Limpa input para permitir reimportar mesmo arquivo
+                    event.target.value = '';
+                },
+                
+                handleDrop(event) {
+                    this.isDragging = false;
+                    const files = event.dataTransfer.files;
+                    this.processFiles(files);
+                },
+                
+                handleFileSelect(event) {
+                    const files = event.target.files;
+                    this.processFiles(files);
+                    event.target.value = '';
+                },
+                
+                processFiles(files) {
+                    Array.from(files).forEach(file => {
+                        if (file.name.endsWith('.csv')) {
+                            Papa.parse(file, {
+                                complete: (results) => {
+                                    this.importarProfessor(results.data);
+                                },
+                                error: () => {
+                                    this.showToast(`Erro ao ler ${file.name}`, 'error');
+                                }
+                            });
+                        }
+                    });
+                },
+                
+                importarProfessor(data) {
+                    try {
+                        const prof = {
+                            nome: '',
+                            area: '',
+                            competencias: [],
+                            horarios: {},
+                            horasOcupadas: 0,
+                            horasDisponiveis: 0
+                        };
+                        
+                        data.forEach(row => {
+                            if (row[0] === 'Nome') prof.nome = row[1];
+                            if (row[0] === 'Area') prof.area = row[1];
+                            if (row[0] === 'Competencias') prof.competencias = row[1] ? row[1].split(';') : [];
+                            if (row[0] === 'Horas Ocupadas') prof.horasOcupadas = parseInt(row[1]) || 0;
+                            if (row[0] === 'Horas Disponiveis') prof.horasDisponiveis = parseInt(row[1]) || 0;
+                        });
+                        
+                        let gradeStart = data.findIndex(row => row[0] === 'Horario');
+                        
+                        if (gradeStart >= 0) {
+                            const headerRow = data[gradeStart];
+                            
+                            for (let i = gradeStart + 1; i < data.length; i++) {
+                                const row = data[i];
+                                if (!row[0]) continue;
+                                
+                                const horario = row[0];
+                                
+                                for (let j = 1; j < row.length; j++) {
+                                    const dia = headerRow[j];
+                                    const status = row[j];
+                                    const key = `${dia}-${horario}`;
+                                    
+                                    if (status === 'DISPONIVEL') {
+                                        prof.horarios[key] = 1;
+                                    } else if (status === 'BITTENCOURT') {
+                                        prof.horarios[key] = 2;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (prof.nome) {
+                            const exists = this.professoresImportados.some(p => p.nome === prof.nome);
+                            if (!exists) {
+                                this.professoresImportados.push(prof);
+                                this.showToast(`"${prof.nome}" importado`, 'success');
+                            } else {
+                                this.showToast(`"${prof.nome}" já existe`, 'error');
+                            }
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        this.showToast('Erro ao processar CSV', 'error');
+                    }
+                },
+                
+                removerProfessor(index) {
+                    const nome = this.professoresImportados[index].nome;
+                    this.professoresImportados.splice(index, 1);
+                    this.showToast(`"${nome}" removido`, 'info');
+                    this.buscarProfessores();
+                },
+                
+                limparProfessores() {
+                    this.professoresImportados = [];
+                    this.resultadoBusca = [];
+                    this.filtroDias = [];
+                    this.filtroArea = '';
+                    this.filtroMateria = '';
+                    this.filtroHorario = '';
+                    this.showToast('Todos removidos', 'info');
+                },
+                
+                get todasCompetencias() {
+                    const comps = new Set();
+                    this.professoresImportados.forEach(prof => {
+                        prof.competencias.forEach(c => comps.add(c));
+                    });
+                    return Array.from(comps).sort();
+                },
+                
+                competenciasFiltradas(search) {
+                    let comps = [];
+                    
+                    // Se tem área selecionada, usa as competências da área
+                    if (this.filtroArea && this.areasCompetencias[this.filtroArea]) {
+                        comps = this.areasCompetencias[this.filtroArea].filter(c => 
+                            this.todasCompetencias.includes(c)
+                        );
+                    } else {
+                        comps = this.todasCompetencias;
+                    }
+                    
+                    // Filtra pela busca
+                    if (search) {
+                        const searchLower = search.toLowerCase();
+                        comps = comps.filter(c => c.toLowerCase().includes(searchLower));
+                    }
+                    
+                    return comps;
+                },
+                
+                getDisponibilidadeDia(prof, dia) {
+                    let count = 0;
+                    this.horarios.forEach(horario => {
+                        const key = `${dia}-${horario}`;
+                        if (prof.horarios[key] === 1) count++;
+                    });
+                    return count;
+                },
+                
+                buscarProfessores() {
+                    let resultado = this.professoresImportados.filter(prof => {
+                        // Filtrar por competência
+                        if (this.filtroMateria) {
+                            const temCompetencia = prof.competencias.some(
+                                c => c.toLowerCase() === this.filtroMateria.toLowerCase()
+                            );
+                            if (!temCompetencia) return false;
+                        }
+                        
+                        // Filtrar por dias e horário específico
+                        if (this.filtroDias.length > 0 && this.filtroHorario) {
+                            // Professor deve estar disponível em TODOS os dias selecionados naquele horário
+                            const disponivelEmTodosDias = this.filtroDias.every(dia => {
+                                const key = `${dia}-${this.filtroHorario}`;
+                                return prof.horarios[key] === 1;
+                            });
+                            return disponivelEmTodosDias;
+                        }
+                        
+                        // Filtrar só por dias (qualquer horário)
+                        if (this.filtroDias.length > 0) {
+                            // Professor deve ter pelo menos 1 horário disponível em TODOS os dias selecionados
+                            const disponivelEmTodosDias = this.filtroDias.every(dia => {
+                                return this.horarios.some(h => {
+                                    const key = `${dia}-${h}`;
+                                    return prof.horarios[key] === 1;
+                                });
+                            });
+                            return disponivelEmTodosDias;
+                        }
+                        
+                        // Filtrar só por horário (qualquer dia)
+                        if (this.filtroHorario) {
+                            return this.dias.some(d => {
+                                const key = `${d}-${this.filtroHorario}`;
+                                return prof.horarios[key] === 1;
+                            });
+                        }
+                        
+                        return true;
+                    });
+                    
+                    // Ordenar por horas disponíveis (mais disponível primeiro)
+                    resultado.sort((a, b) => b.horasDisponiveis - a.horasDisponiveis);
+                    
+                    this.resultadoBusca = resultado;
+                }
+            };
+        }
+    </script>
+</body>
+</html>
