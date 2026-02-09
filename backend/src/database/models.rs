@@ -70,44 +70,4 @@ pub struct Rascunho {
     pub atualizado_em: i64,
 }
 
-// Estruturas para inicialização
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InitialData {
-    pub turmas: HashMap<String, TurmaData>,
-    pub logica: TurmaData,
-    pub usuarios_iniciais: Vec<UsuarioInicial>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TurmaData {
-    pub nome: String,
-    pub cor: String,
-    pub icone: String,
-    pub aulas: HashMap<String, AulaData>,
-    pub atividades: Vec<AtividadeData>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AulaData {
-    pub caminho: String,
-    pub icone: String,
-    pub descricao: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AtividadeData {
-    pub id: String,
-    pub icone: String,
-    pub titulo: String,
-    pub descricao: String,
-    pub caminho: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UsuarioInicial {
-    pub usuario: String,
-    pub senha: String,
-    pub nome: String,
-    pub cargo: String,
-    pub turmas: Vec<String>,
-}
+// Core models are kept for potential Postgres usage

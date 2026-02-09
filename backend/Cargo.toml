@@ -15,14 +15,6 @@ rand = "0.8"
 rand_chacha = "0.3"
 anyhow = "1"
 
-# Banco de dados LMDB
-lmdb = "0.8"
 
-# HTTP client para inicialização
-reqwest = { version = "0.11", features = ["json"] }
-
-# UUID para gerar IDs únicos
-uuid = { version = "1.0", features = ["v4"] }
-
-# Timestamps
-chrono = { version = "0.4", features = ["serde"] }
+# Postgres
+sqlx = { version = "0.7", features = [ "runtime-tokio-native-tls", "macros", "postgres", "uuid", "chrono", "migrate" ] }

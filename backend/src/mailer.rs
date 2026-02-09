@@ -42,7 +42,7 @@ pub async fn send_mail(Json(req): Json<MailRequest>) -> Result<Json<MailResponse
     };
     
     unsafe {
-        if let Some(tx) = &TX {
+        if let Some(tx) = TX.as_ref() {
             if tx.send(job).await.is_err() {
                 return Ok(Json(MailResponse {
                     success: false,
