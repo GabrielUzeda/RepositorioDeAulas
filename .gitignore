@@ -30,4 +30,5 @@ build/
 # Keep workflow and code by default; we only ignore secrets and local artifacts
 database/data/
 backend/database/data/
+frontend/turmas/
 

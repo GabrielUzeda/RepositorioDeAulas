@@ -10,8 +10,12 @@ services:
     command: sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo build --release && ./target/release/rust-app"
     expose:
       - "8080"
+    ports:
+      - "8080:8080"
     networks:
       - web-network
+    depends_on:
+      - db
     restart: unless-stopped
 
 
@@ -54,6 +58,24 @@ services:
     networks:
       - web-network
 
+  db:
+    image: postgres:alpine
+    container_name: postgres-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - web-network
+
 networks:
   web-network:
     driver: bridge
+
+volumes:
+  postgres_data:
