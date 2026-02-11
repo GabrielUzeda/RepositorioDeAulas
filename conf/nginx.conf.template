@@ -65,7 +65,7 @@ http {
             return 301 /efg/;
         }
 
-        location /efg/ {
+        location ^~ /efg/ {
             alias /usr/share/nginx/html/efg/frontend/;
             index index.html;
             try_files $uri $uri/ /efg/index.html;
