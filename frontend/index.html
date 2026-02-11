@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
   <style>
     /* Custom Global Styles */
     body {
@@ -128,6 +130,30 @@
         opacity: 0;
         transform: translateY(-10px);
       }
+    }
+
+    /* Fix for Quill dropdowns becoming white-on-white */
+    .ql-snow .ql-picker {
+      color: #4b5563;
+      /* text-gray-600 */
+    }
+
+    .ql-snow .ql-picker-options {
+      background-color: white;
+    }
+
+    /* Fix for native select elements used by Quill (e.g., language selector) */
+    .ql-ui {
+      background-color: white !important;
+      color: #333 !important;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .ql-ui option {
+      background-color: white;
+      color: #333;
     }
   </style>
 </head>
@@ -336,6 +362,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
   <script type="module">
     import {
@@ -564,9 +591,18 @@
 
     function initializeQuill() {
       if (quill) return;
+
+      // Configure highlight.js to prioritize/restrict to Python as requested
+      if (window.hljs) {
+        window.hljs.configure({ languages: ['python'] });
+      }
+
       quill = new Quill('#editor', {
         theme: 'snow',
-        modules: { toolbar: [[{ 'header': [1, 2, 3, false] }], ['bold', 'italic', 'underline', 'strike'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['link'], ['clean'], ['code-block']] },
+        modules: {
+          syntax: true,
+          toolbar: [[{ 'header': [1, 2, 3, false] }], ['bold', 'italic', 'underline', 'strike'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['link'], ['clean'], ['code-block']]
+        },
         placeholder: 'Digite sua resposta aqui...',
       });
     }
@@ -587,14 +623,21 @@
       initializeQuill();
       const savedDraft = localStorage.getItem(`draft_${atividade.id}`);
       if (savedDraft) {
-        quill.clipboard.dangerouslyPasteHTML(savedDraft);
+        try {
+          // Tenta parsear como JSON (Delta)
+          const delta = JSON.parse(savedDraft);
+          quill.setContents(delta);
+        } catch (e) {
+          // Fallback para rascunhos antigos (HTML string)
+          quill.clipboard.dangerouslyPasteHTML(savedDraft);
+        }
       } else {
         quill.setContents([{ insert: '\n' }]);
       }
 
       quill.on('text-change', () => {
-        const content = quill.root.innerHTML;
-        if (content && content !== '<p><br></p>') localStorage.setItem(`draft_${atividade.id}`, content);
+        const delta = quill.getContents();
+        localStorage.setItem(`draft_${atividade.id}`, JSON.stringify(delta));
       });
 
       activityModal.classList.remove('hidden');
