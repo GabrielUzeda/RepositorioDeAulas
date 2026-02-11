@@ -19,10 +19,20 @@
     .sortable-ghost { opacity: 0.4; background: #ebf4ff !important; border: 2px dashed #4f46e5 !important; }
     .drag-handle { cursor: grab; }
     .drag-handle:active { cursor: grabbing; }
+    #marpModal { display: none; }
+    #marpModal.active { display: flex; }
   </style>
 </head>
 
 <body class="bg-gray-100 min-h-screen">
+  <script>
+    // Global Shim to prevent "already used" errors from Marp or other libraries
+    const originalDefine = customElements.define;
+    customElements.define = function(name, constructor, options) {
+        if (customElements.get(name)) { return; }
+        originalDefine.call(customElements, name, constructor, options);
+    };
+  </script>
   <header class="bg-indigo-700 shadow-lg">
     <div class="container mx-auto px-6 py-4 flex justify-between items-center">
       <div class="flex items-center space-x-3 cursor-pointer" onclick="location.href='professor.html'">
@@ -126,6 +136,49 @@
     </div>
   </div>
 
+  <!-- Marp Editor Modal -->
+  <div id="marpModal" class="fixed inset-0 bg-white z-[120] flex-col">
+    <!-- Toolbar -->
+    <div class="h-14 border-b border-gray-200 flex justify-between items-center px-6 bg-gray-50">
+        <div class="flex items-center space-x-4">
+            <button onclick="closeMarpModal()" class="text-gray-500 hover:text-gray-700">
+                <span class="material-icons">close</span>
+            </button>
+            <h2 class="text-lg font-bold text-gray-800">Editor de Aula</h2>
+        </div>
+        <div class="flex items-center space-x-4">
+             <button onclick="saveMarpAula()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition font-medium shadow-sm flex items-center">
+                <span class="material-icons mr-2 text-sm">save</span> Salvar Aula
+            </button>
+        </div>
+    </div>
+    
+    <!-- Metadata Inputs -->
+    <div class="grid grid-cols-12 gap-4 p-4 border-b border-gray-200 bg-white">
+        <div class="col-span-8">
+            <input type="text" id="marpTitulo" placeholder="Título da Aula" class="w-full text-xl font-bold placeholder-gray-300 border-none focus:ring-0 text-gray-800 outline-none">
+        </div>
+        <div class="col-span-4">
+            <input type="text" id="marpDescricao" placeholder="Breve descrição (opcional)" class="w-full text-sm text-gray-600 border-none focus:ring-0 outline-none">
+        </div>
+    </div>
+
+    <!-- Split Editor -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Editor -->
+        <div class="w-1/2 flex flex-col border-r border-gray-200">
+             <textarea id="marpEditor" class="flex-1 p-6 font-mono text-sm resize-none outline-none text-gray-700 leading-relaxed" spellcheck="false" placeholder="Digite seu conteúdo Markdown aqui..."></textarea>
+        </div>
+        <!-- Preview -->
+        <div class="w-1/2 bg-gray-100 flex flex-col relative">
+            <iframe id="marpPreview" class="flex-1 w-full h-full border-none"></iframe>
+             <div class="absolute bottom-4 right-4 bg-white px-3 py-1 rounded-full shadow text-xs text-gray-500 font-medium pointer-events-none opacity-80">
+                Preview em Tempo Real
+            </div>
+        </div>
+    </div>
+  </div>
+
   <!-- Alertas -->
   <div id="successModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[110]">
     <div class="bg-white rounded-2xl p-8 max-w-sm text-center">
@@ -157,14 +210,26 @@
     </div>
   </div>
 
+  <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-[150]">
+    <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md modal-content text-center">
+      <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <p id="loadingText" class="text-gray-600">Processando...</p>
+    </div>
+  </div>
+
   <script type="module">
     import { apiClient } from './global/api-client.js';
     import { showSuccessModal, showErrorModal, showConfirmModal, showLoadingModal, hideLoadingModal } from './global/alert-modals.js';
+    import { Marp } from "https://esm.sh/@marp-team/marp-core@3";
 
     let currentTurma = null;
     let turmas = [];
     let isEditingOrder = false;
     let sortableAulas, sortableAtividades;
+    let marpInstance = null;
+    let marpTimeout = null;
+    let editingAulaId = null;
+    let editingAulaData = null;
 
     // --- Auth ---
     async function checkAuth() {
@@ -336,6 +401,160 @@
       $('#formModal').css('display', 'flex').show();
     }
 
+    // --- Marp Logic ---
+    window.openAulaModal = async (existing = null) => {
+        // Agora sempre abre o editor Marp
+        editingAulaId = existing ? existing.id : null;
+        editingAulaData = existing;
+        $('#marpTitulo').val(existing ? existing.titulo : '');
+        $('#marpDescricao').val(existing ? existing.descricao : '');
+        
+        // Default content
+        const defaultMarp = `---
+marp: true
+theme: default
+paginate: true
+---
+
+# Título da Aula
+
+Comece a editar aqui...
+
+---
+
+## Slide 2
+
+- Tópico 1
+- Tópico 2
+`;
+        
+        $('#marpEditor').val(defaultMarp); 
+        $('#marpModal').addClass('active');
+        
+        if (!marpInstance) {
+             marpInstance = new Marp({ html: true });
+        }
+        
+        updateMarpPreview();
+    };
+
+    window.closeMarpModal = () => {
+        $('#marpModal').removeClass('active');
+        $('#marpEditor').val('');
+        editingAulaId = null;
+        editingAulaData = null;
+    };
+
+    window.saveMarpAula = async () => {
+        const titulo = $('#marpTitulo').val();
+        const descricao = $('#marpDescricao').val();
+        const markdown = $('#marpEditor').val();
+
+        if (!titulo) return showErrorModal("Título é obrigatório");
+
+        showLoadingModal("Gerando aula...");
+        
+        let icone = '00';
+        let ordem = 0;
+
+        if (editingAulaId && editingAulaData) {
+            icone = editingAulaData.icone;
+            ordem = editingAulaData.ordem;
+        } else {
+            const currentCount = $('#aulasList > div[data-id]').length;
+            icone = currentCount.toString().padStart(2, '0');
+            ordem = currentCount;
+        }
+
+        const payload = {
+            titulo,
+            descricao,
+            markdown,
+            turma_id: currentTurma.id,
+            icone: icone,
+            ordem: ordem,
+            caminho: '' // Backend gera
+        };
+
+        try {
+            let result;
+            if (editingAulaId) {
+                 result = await apiClient.put(`/aulas/${editingAulaId}`, payload, { silent: true });
+            } else {
+                 result = await apiClient.post('/aulas', payload, { silent: true });
+            }
+
+            // Must hide loading BEFORE showing success modal (which awaits user input)
+            hideLoadingModal();
+
+            if (result && result.success) {
+                await showSuccessModal("Aula salva com sucesso!");
+                closeMarpModal();
+                location.reload();
+            } else {
+                showErrorModal("Erro ao salvar aula: " + (result?.message || "Erro desconhecido"));
+            }
+        } catch (e) {
+            hideLoadingModal();
+            console.error("Save error:", e);
+            showErrorModal("Erro de exceção: " + e.message);
+        }
+    };
+
+    function updateMarpPreview() {
+        const markdown = document.getElementById('marpEditor').value;
+        // render with script: false to minimize side effects, shim handles the rest
+        const { html, css } = marpInstance.render(markdown, { script: false });
+        const iframe = document.getElementById('marpPreview');
+        const doc = iframe.contentDocument;
+
+        if (!doc) return;
+
+        const content = `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <style>
+                  body { margin: 0; background: #f3f4f6; display: flex; flex-direction: column; align-items: center; }
+                  ${css}
+                  .marpit { width: 100%; min-height: 100vh; }
+                  pre.mermaid { display: flex; justify-content: center; }
+                  /* Fix for scaling if JS fails */
+                  marp-auto-scaling { display: block; width: 100%; }
+                </style>
+              </head>
+              <body>
+                <div class="marpit">${html}</div>
+                <script>
+                   // Local shim for iframe context - Idempotent version
+                   if (!window.originalDefine) {
+                       window.originalDefine = customElements.define;
+                       customElements.define = function(name, constructor, options) {
+                           if (customElements.get(name)) return;
+                           window.originalDefine.call(customElements, name, constructor, options);
+                       };
+                   }
+                <\/script>
+                <script type="module">
+                  // Import Marp Core for auto-scaling functionality
+                  import "https://esm.sh/@marp-team/marp-core@3/browser";
+                  import mermaid from "https://esm.sh/mermaid@10";
+                  mermaid.initialize({ startOnLoad: true, theme: 'default' });
+                  window.addEventListener('load', () => mermaid.run());
+                <\/script>
+              </body>
+            </html>
+        `;
+        doc.open();
+        doc.write(content);
+        doc.close();
+    }
+
+    $('#marpEditor').on('input', () => {
+        clearTimeout(marpTimeout);
+        marpTimeout = setTimeout(updateMarpPreview, 300);
+    });
+
     window.openTurmaModal = (id = null) => {
       const t = turmas.find(x => x.id === id);
       openModal(t ? 'Editar Turma' : 'Nova Turma', [
@@ -348,17 +567,6 @@
       ], async (data) => {
         if (t && !data.senha) delete data.senha;
         return (t ? await apiClient.put(`/turmas/${t.id}`, data) : await apiClient.post('/turmas', data)).success;
-      });
-    };
-
-    window.openAulaModal = async (existing = null) => {
-      openModal(existing ? 'Editar Aula' : 'Nova Aula', [
-        { name: 'titulo', label: 'Título', value: existing?.titulo, required: true },
-        { name: 'caminho', label: 'Caminho (.html)', value: existing?.caminho, required: true },
-        { name: 'descricao', label: 'Descrição', value: existing?.descricao, type: 'textarea' }
-      ], async (data) => {
-        const payload = { ...data, turma_id: currentTurma.id, icone: existing?.icone || '00', ordem: existing?.ordem || 0 };
-        return (existing ? await apiClient.put(`/aulas/${existing.id}`, payload) : await apiClient.post('/aulas', payload)).success;
       });
     };
 
