@@ -11,16 +11,56 @@
   <script src="https://code.jquery.com/jquery-4.0.0.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <style>
-    body { font-family: 'Roboto', sans-serif; }
-    .fade-in { animation: fadeIn 0.5s ease-in-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .card-hover { transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; }
-    .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-    .sortable-ghost { opacity: 0.4; background: #ebf4ff !important; border: 2px dashed #4f46e5 !important; }
-    .drag-handle { cursor: grab; }
-    .drag-handle:active { cursor: grabbing; }
-    #marpModal { display: none; }
-    #marpModal.active { display: flex; }
+    body {
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .card-hover {
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+    }
+
+    .card-hover:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    .sortable-ghost {
+      opacity: 0.4;
+      background: #ebf4ff !important;
+      border: 2px dashed #4f46e5 !important;
+    }
+
+    .drag-handle {
+      cursor: grab;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    #marpModal {
+      display: none;
+    }
+
+    #marpModal.active {
+      display: flex;
+    }
   </style>
 </head>
 
@@ -28,9 +68,9 @@
   <script>
     // Global Shim to prevent "already used" errors from Marp or other libraries
     const originalDefine = customElements.define;
-    customElements.define = function(name, constructor, options) {
-        if (customElements.get(name)) { return; }
-        originalDefine.call(customElements, name, constructor, options);
+    customElements.define = function (name, constructor, options) {
+      if (customElements.get(name)) { return; }
+      originalDefine.call(customElements, name, constructor, options);
     };
   </script>
   <header class="bg-indigo-700 shadow-lg">
@@ -43,7 +83,8 @@
         <button id="backBtn" class="hidden text-white hover:bg-white/20 p-2 rounded-full transition">
           <span class="material-icons">arrow_back</span>
         </button>
-        <button onclick="sessionStorage.removeItem('professor_auth'); location.reload();" class="text-white/80 hover:text-white text-sm flex items-center">
+        <button onclick="sessionStorage.removeItem('professor_auth'); location.reload();"
+          class="text-white/80 hover:text-white text-sm flex items-center">
           <span class="material-icons text-sm mr-1">logout</span> Sair
         </button>
       </div>
@@ -55,7 +96,8 @@
     <div id="turmasView" class="fade-in">
       <div class="flex justify-between items-center mb-8">
         <h2 class="text-2xl font-light text-gray-800">Minhas Turmas</h2>
-        <button onclick="openTurmaModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center shadow hover:bg-indigo-700 transition">
+        <button onclick="openTurmaModal()"
+          class="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center shadow hover:bg-indigo-700 transition">
           <span class="material-icons mr-2">add</span> Nova Turma
         </button>
       </div>
@@ -64,40 +106,49 @@
 
     <!-- View: Detalhes da Turma -->
     <div id="detalhesView" class="hidden fade-in">
-      <div class="bg-white rounded-2xl p-6 shadow-sm mb-8 border-l-8 border-indigo-500 flex justify-between items-center">
+      <div
+        class="bg-white rounded-2xl p-6 shadow-sm mb-8 border-l-8 border-indigo-500 flex justify-between items-center">
         <div>
           <h2 id="viewTurmaNome" class="text-3xl font-bold text-gray-800 mb-1"></h2>
           <p id="viewTurmaDesc" class="text-gray-500 text-sm italic"></p>
         </div>
         <div class="flex space-x-2">
-            <button id="btnSaveOrder" class="hidden bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center shadow hover:bg-emerald-700 transition">
-                <span class="material-icons mr-2">save</span> Salvar Ordem
-            </button>
-            <button id="btnEditOrder" class="bg-amber-500 text-white px-4 py-2 rounded-lg flex items-center shadow hover:bg-amber-600 transition">
-                <span class="material-icons mr-2">reorder</span> Organizar
-            </button>
+          <button id="btnSaveOrder"
+            class="hidden bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center shadow hover:bg-emerald-700 transition">
+            <span class="material-icons mr-2">save</span> Salvar Ordem
+          </button>
+          <button id="btnEditOrder"
+            class="bg-amber-500 text-white px-4 py-2 rounded-lg flex items-center shadow hover:bg-amber-600 transition">
+            <span class="material-icons mr-2">reorder</span> Organizar
+          </button>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <section>
           <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold flex items-center"><span class="material-icons mr-2 text-blue-500">menu_book</span> Aulas</h3>
-            <button onclick="openAulaModal()" class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded-md text-sm font-medium transition flex items-center">
+            <h3 class="text-xl font-semibold flex items-center"><span
+                class="material-icons mr-2 text-blue-500">menu_book</span> Aulas</h3>
+            <button onclick="openAulaModal()"
+              class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded-md text-sm font-medium transition flex items-center">
               <span class="material-icons text-sm mr-1">add</span> Adicionar Aula
             </button>
           </div>
-          <div id="aulasList" class="space-y-3 bg-white p-4 rounded-xl shadow-sm border border-gray-200 min-h-[50px]"></div>
+          <div id="aulasList" class="space-y-3 bg-white p-4 rounded-xl shadow-sm border border-gray-200 min-h-[50px]">
+          </div>
         </section>
 
         <section>
           <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold flex items-center"><span class="material-icons mr-2 text-emerald-500">assignment</span> Atividades</h3>
-            <button onclick="openAtvModal()" class="text-emerald-600 hover:bg-emerald-50 px-3 py-1 rounded-md text-sm font-medium transition flex items-center">
+            <h3 class="text-xl font-semibold flex items-center"><span
+                class="material-icons mr-2 text-emerald-500">assignment</span> Atividades</h3>
+            <button onclick="openAtvModal()"
+              class="text-emerald-600 hover:bg-emerald-50 px-3 py-1 rounded-md text-sm font-medium transition flex items-center">
               <span class="material-icons text-sm mr-1">add</span> Adicionar Atividade
             </button>
           </div>
-          <div id="atividadesList" class="space-y-3 bg-white p-4 rounded-xl shadow-sm border border-gray-200 min-h-[50px]"></div>
+          <div id="atividadesList"
+            class="space-y-3 bg-white p-4 rounded-xl shadow-sm border border-gray-200 min-h-[50px]"></div>
         </section>
       </div>
     </div>
@@ -114,8 +165,11 @@
         <p class="text-gray-500">Insira a senha do professor</p>
       </div>
       <form id="loginForm" class="space-y-4">
-        <input type="password" id="adminPassword" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Senha" required>
-        <button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg">Entrar</button>
+        <input type="password" id="adminPassword"
+          class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+          placeholder="Senha" required>
+        <button type="submit"
+          class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg">Entrar</button>
       </form>
     </div>
   </div>
@@ -124,13 +178,16 @@
     <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
       <div class="p-6 border-b border-gray-100 flex justify-between items-center">
         <h3 id="modalTitle" class="text-xl font-bold text-gray-800"></h3>
-        <button onclick="closeFormModal()" class="text-gray-400 hover:text-gray-600"><span class="material-icons">close</span></button>
+        <button onclick="closeFormModal()" class="text-gray-400 hover:text-gray-600"><span
+            class="material-icons">close</span></button>
       </div>
       <form id="genericForm" class="p-6 space-y-4">
         <div id="formFields" class="space-y-4"></div>
         <div class="flex justify-end space-x-3 pt-4">
-          <button type="button" onclick="closeFormModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-          <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md">Salvar</button>
+          <button type="button" onclick="closeFormModal()"
+            class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+          <button type="submit"
+            class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md">Salvar</button>
         </div>
       </form>
     </div>
@@ -140,42 +197,48 @@
   <div id="marpModal" class="fixed inset-0 bg-white z-[120] flex-col">
     <!-- Toolbar -->
     <div class="h-14 border-b border-gray-200 flex justify-between items-center px-6 bg-gray-50">
-        <div class="flex items-center space-x-4">
-            <button onclick="closeMarpModal()" class="text-gray-500 hover:text-gray-700">
-                <span class="material-icons">close</span>
-            </button>
-            <h2 class="text-lg font-bold text-gray-800">Editor de Aula</h2>
-        </div>
-        <div class="flex items-center space-x-4">
-             <button onclick="saveMarpAula()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition font-medium shadow-sm flex items-center">
-                <span class="material-icons mr-2 text-sm">save</span> Salvar Aula
-            </button>
-        </div>
+      <div class="flex items-center space-x-4">
+        <button onclick="closeMarpModal()" class="text-gray-500 hover:text-gray-700">
+          <span class="material-icons">close</span>
+        </button>
+        <h2 class="text-lg font-bold text-gray-800">Editor de Aula</h2>
+      </div>
+      <div class="flex items-center space-x-4">
+        <button onclick="saveMarpAula()"
+          class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition font-medium shadow-sm flex items-center">
+          <span class="material-icons mr-2 text-sm">save</span> Salvar Aula
+        </button>
+      </div>
     </div>
-    
+
     <!-- Metadata Inputs -->
     <div class="grid grid-cols-12 gap-4 p-4 border-b border-gray-200 bg-white">
-        <div class="col-span-8">
-            <input type="text" id="marpTitulo" placeholder="Título da Aula" class="w-full text-xl font-bold placeholder-gray-300 border-none focus:ring-0 text-gray-800 outline-none">
-        </div>
-        <div class="col-span-4">
-            <input type="text" id="marpDescricao" placeholder="Breve descrição (opcional)" class="w-full text-sm text-gray-600 border-none focus:ring-0 outline-none">
-        </div>
+      <div class="col-span-8">
+        <input type="text" id="marpTitulo" placeholder="Título da Aula"
+          class="w-full text-xl font-bold placeholder-gray-300 border-none focus:ring-0 text-gray-800 outline-none">
+      </div>
+      <div class="col-span-4">
+        <input type="text" id="marpDescricao" placeholder="Breve descrição (opcional)"
+          class="w-full text-sm text-gray-600 border-none focus:ring-0 outline-none">
+      </div>
     </div>
 
     <!-- Split Editor -->
     <div class="flex-1 flex overflow-hidden">
-        <!-- Editor -->
-        <div class="w-1/2 flex flex-col border-r border-gray-200">
-             <textarea id="marpEditor" class="flex-1 p-6 font-mono text-sm resize-none outline-none text-gray-700 leading-relaxed" spellcheck="false" placeholder="Digite seu conteúdo Markdown aqui..."></textarea>
+      <!-- Editor -->
+      <div class="w-1/2 flex flex-col border-r border-gray-200">
+        <textarea id="marpEditor"
+          class="flex-1 p-6 font-mono text-sm resize-none outline-none text-gray-700 leading-relaxed" spellcheck="false"
+          placeholder="Digite seu conteúdo Markdown aqui..."></textarea>
+      </div>
+      <!-- Preview -->
+      <div class="w-1/2 bg-gray-100 flex flex-col relative">
+        <iframe id="marpPreview" class="flex-1 w-full h-full border-none"></iframe>
+        <div
+          class="absolute bottom-4 right-4 bg-white px-3 py-1 rounded-full shadow text-xs text-gray-500 font-medium pointer-events-none opacity-80">
+          Preview em Tempo Real
         </div>
-        <!-- Preview -->
-        <div class="w-1/2 bg-gray-100 flex flex-col relative">
-            <iframe id="marpPreview" class="flex-1 w-full h-full border-none"></iframe>
-             <div class="absolute bottom-4 right-4 bg-white px-3 py-1 rounded-full shadow text-xs text-gray-500 font-medium pointer-events-none opacity-80">
-                Preview em Tempo Real
-            </div>
-        </div>
+      </div>
     </div>
   </div>
 
@@ -277,7 +340,7 @@
       $('#turmasView').hide(); $('#detalhesView').show(); $('#backBtn').show();
       $('#viewTurmaNome').text(t.nome);
       $('#viewTurmaDesc').text(t.descricao || 'Sem descrição.');
-      
+
       const full = await apiClient.get(`/turmas/${id}`);
       if (full.success) loadContent(id, full.data.senha);
     };
@@ -295,7 +358,7 @@
     function renderList(containerId, items) {
       const $el = $(`#${containerId}`).empty();
       if (!items.length) return $el.append('<p class="text-gray-400 text-center py-4 empty-msg">Vazio.</p>');
-      
+
       items.forEach(item => {
         const row = `
           <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg group transition border border-transparent" data-id="${item.id}">
@@ -309,7 +372,7 @@
             </div>
             <div class="action-buttons flex space-x-1 opacity-0 group-hover:opacity-100 transition shrink-0">
               <button class="p-1 text-gray-400 hover:text-indigo-600" onclick="editItem('${containerId}', ${item.id})"><span class="material-icons text-sm">edit</span></button>
-              <button class="p-1 text-gray-400 hover:text-red-500" onclick="deleteItem('${containerId.replace('List','')}', ${item.id})"><span class="material-icons text-sm">delete</span></button>
+              <button class="p-1 text-gray-400 hover:text-red-500" onclick="deleteItem('${containerId.replace('List', '')}', ${item.id})"><span class="material-icons text-sm">delete</span></button>
             </div>
           </div>`;
         $el.append(row);
@@ -318,62 +381,62 @@
 
     // --- Ordenação ---
     function updateVisualNumbers(containerId) {
-        $(`#${containerId} > div`).each((i, el) => {
-            const num = i.toString().padStart(2, '0');
-            $(el).find('.icon-label').text(num);
-        });
+      $(`#${containerId} > div`).each((i, el) => {
+        const num = i.toString().padStart(2, '0');
+        $(el).find('.icon-label').text(num);
+      });
     }
 
-    $('#btnEditOrder').on('click', function() {
-        isEditingOrder = true;
-        $(this).hide(); $('#btnSaveOrder').show();
-        $('.drag-handle').removeClass('hidden'); 
-        $('.action-buttons').addClass('hidden');
-        
-        const sortOptions = { 
-            animation: 150, 
-            handle: '.drag-handle', 
-            ghostClass: 'sortable-ghost',
-            onEnd: (evt) => {
-                updateVisualNumbers(evt.to.id);
-            }
-        };
+    $('#btnEditOrder').on('click', function () {
+      isEditingOrder = true;
+      $(this).hide(); $('#btnSaveOrder').show();
+      $('.drag-handle').removeClass('hidden');
+      $('.action-buttons').addClass('hidden');
 
-        sortableAulas = new Sortable(document.getElementById('aulasList'), sortOptions);
-        sortableAtividades = new Sortable(document.getElementById('atividadesList'), sortOptions);
-        
-        // Renumerar imediatamente ao entrar no modo de edição para garantir consistência
-        updateVisualNumbers('aulasList');
-        updateVisualNumbers('atividadesList');
+      const sortOptions = {
+        animation: 150,
+        handle: '.drag-handle',
+        ghostClass: 'sortable-ghost',
+        onEnd: (evt) => {
+          updateVisualNumbers(evt.to.id);
+        }
+      };
+
+      sortableAulas = new Sortable(document.getElementById('aulasList'), sortOptions);
+      sortableAtividades = new Sortable(document.getElementById('atividadesList'), sortOptions);
+
+      // Renumerar imediatamente ao entrar no modo de edição para garantir consistência
+      updateVisualNumbers('aulasList');
+      updateVisualNumbers('atividadesList');
     });
 
-    $('#btnSaveOrder').on('click', async function() {
-        showLoadingModal('Atualizando numeração e ordem...');
-        
-        const saveGroup = async (listId, type) => {
-            const items = [];
-            $(`#${listId} > div`).each((i, el) => {
-                const id = $(el).data('id');
-                if (!id) return;
-                const num = i.toString().padStart(2, '0');
-                items.push({ id, icone: num, ordem: i });
-            });
+    $('#btnSaveOrder').on('click', async function () {
+      showLoadingModal('Atualizando numeração e ordem...');
 
-            for (const item of items) {
-                const original = await apiClient.get(`/${type}/${item.id}`, { silent: true });
-                if (original.success) {
-                    const payload = { ...original.data, icone: item.icone, ordem: item.ordem };
-                    await apiClient.put(`/${type}/${item.id}`, payload, { silent: true });
-                }
-            }
-        };
+      const saveGroup = async (listId, type) => {
+        const items = [];
+        $(`#${listId} > div`).each((i, el) => {
+          const id = $(el).data('id');
+          if (!id) return;
+          const num = i.toString().padStart(2, '0');
+          items.push({ id, icone: num, ordem: i });
+        });
 
-        await saveGroup('aulasList', 'aulas');
-        await saveGroup('atividadesList', 'atividades');
-        
-        hideLoadingModal();
-        await showSuccessModal('Ordem salva com sucesso!');
-        location.reload();
+        for (const item of items) {
+          const original = await apiClient.get(`/${type}/${item.id}`, { silent: true });
+          if (original.success) {
+            const payload = { ...original.data, icone: item.icone, ordem: item.ordem };
+            await apiClient.put(`/${type}/${item.id}`, payload, { silent: true });
+          }
+        }
+      };
+
+      await saveGroup('aulasList', 'aulas');
+      await saveGroup('atividadesList', 'atividades');
+
+      hideLoadingModal();
+      await showSuccessModal('Ordem salva com sucesso!');
+      location.reload();
     });
 
     // --- CRUD Modals ---
@@ -386,10 +449,10 @@
         $container.append(`
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">${f.label}</label>
-            ${f.type === 'textarea' ? 
-              `<textarea id="f_${f.name}" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" rows="3">${f.value || ''}</textarea>` :
-              `<input type="${f.type || 'text'}" id="f_${f.name}" value="${f.value || ''}" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" ${f.required ? 'required' : ''} placeholder="${f.placeholder || ''}">`
-            }
+            ${f.type === 'textarea' ?
+            `<textarea id="f_${f.name}" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" rows="3">${f.value || ''}</textarea>` :
+            `<input type="${f.type || 'text'}" id="f_${f.name}" value="${f.value || ''}" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" ${f.required ? 'required' : ''} placeholder="${f.placeholder || ''}">`
+          }
           </div>`);
       });
       $('#genericForm').off('submit').on('submit', async (e) => {
@@ -403,14 +466,14 @@
 
     // --- Marp Logic ---
     window.openAulaModal = async (existing = null) => {
-        // Agora sempre abre o editor Marp
-        editingAulaId = existing ? existing.id : null;
-        editingAulaData = existing;
-        $('#marpTitulo').val(existing ? existing.titulo : '');
-        $('#marpDescricao').val(existing ? existing.descricao : '');
-        
-        // Default content
-        const defaultMarp = `---
+      // Agora sempre abre o editor Marp
+      editingAulaId = existing ? existing.id : null;
+      editingAulaData = existing;
+      $('#marpTitulo').val(existing ? existing.titulo : '');
+      $('#marpDescricao').val(existing ? existing.descricao : '');
+
+      // Default content
+      const defaultMarp = `---
 marp: true
 theme: default
 paginate: true
@@ -427,90 +490,90 @@ Comece a editar aqui...
 - Tópico 1
 - Tópico 2
 `;
-        
-        $('#marpEditor').val(defaultMarp); 
-        $('#marpModal').addClass('active');
-        
-        if (!marpInstance) {
-             marpInstance = new Marp({ html: true });
-        }
-        
-        updateMarpPreview();
+
+      $('#marpEditor').val(defaultMarp);
+      $('#marpModal').addClass('active');
+
+      if (!marpInstance) {
+        marpInstance = new Marp({ html: true });
+      }
+
+      updateMarpPreview();
     };
 
     window.closeMarpModal = () => {
-        $('#marpModal').removeClass('active');
-        $('#marpEditor').val('');
-        editingAulaId = null;
-        editingAulaData = null;
+      $('#marpModal').removeClass('active');
+      $('#marpEditor').val('');
+      editingAulaId = null;
+      editingAulaData = null;
     };
 
     window.saveMarpAula = async () => {
-        const titulo = $('#marpTitulo').val();
-        const descricao = $('#marpDescricao').val();
-        const markdown = $('#marpEditor').val();
+      const titulo = $('#marpTitulo').val();
+      const descricao = $('#marpDescricao').val();
+      const markdown = $('#marpEditor').val();
 
-        if (!titulo) return showErrorModal("Título é obrigatório");
+      if (!titulo) return showErrorModal("Título é obrigatório");
 
-        showLoadingModal("Gerando aula...");
-        
-        let icone = '00';
-        let ordem = 0;
+      showLoadingModal("Gerando aula...");
 
-        if (editingAulaId && editingAulaData) {
-            icone = editingAulaData.icone;
-            ordem = editingAulaData.ordem;
+      let icone = '00';
+      let ordem = 0;
+
+      if (editingAulaId && editingAulaData) {
+        icone = editingAulaData.icone;
+        ordem = editingAulaData.ordem;
+      } else {
+        const currentCount = $('#aulasList > div[data-id]').length;
+        icone = currentCount.toString().padStart(2, '0');
+        ordem = currentCount;
+      }
+
+      const payload = {
+        titulo,
+        descricao,
+        markdown,
+        turma_id: currentTurma.id,
+        icone: icone,
+        ordem: ordem,
+        caminho: '' // Backend gera
+      };
+
+      try {
+        let result;
+        if (editingAulaId) {
+          result = await apiClient.put(`/aulas/${editingAulaId}`, payload, { silent: true });
         } else {
-            const currentCount = $('#aulasList > div[data-id]').length;
-            icone = currentCount.toString().padStart(2, '0');
-            ordem = currentCount;
+          result = await apiClient.post('/aulas', payload, { silent: true });
         }
 
-        const payload = {
-            titulo,
-            descricao,
-            markdown,
-            turma_id: currentTurma.id,
-            icone: icone,
-            ordem: ordem,
-            caminho: '' // Backend gera
-        };
+        // Must hide loading BEFORE showing success modal (which awaits user input)
+        hideLoadingModal();
 
-        try {
-            let result;
-            if (editingAulaId) {
-                 result = await apiClient.put(`/aulas/${editingAulaId}`, payload, { silent: true });
-            } else {
-                 result = await apiClient.post('/aulas', payload, { silent: true });
-            }
-
-            // Must hide loading BEFORE showing success modal (which awaits user input)
-            hideLoadingModal();
-
-            if (result && result.success) {
-                await showSuccessModal("Aula salva com sucesso!");
-                closeMarpModal();
-                location.reload();
-            } else {
-                showErrorModal("Erro ao salvar aula: " + (result?.message || "Erro desconhecido"));
-            }
-        } catch (e) {
-            hideLoadingModal();
-            console.error("Save error:", e);
-            showErrorModal("Erro de exceção: " + e.message);
+        if (result && result.success) {
+          await showSuccessModal("Aula salva com sucesso!");
+          closeMarpModal();
+          location.reload();
+        } else {
+          showErrorModal("Erro ao salvar aula: " + (result?.message || "Erro desconhecido"));
         }
+      } catch (e) {
+        hideLoadingModal();
+        console.error("Save error:", e);
+        showErrorModal("Erro de exceção: " + e.message);
+      }
     };
 
     function updateMarpPreview() {
-        const markdown = document.getElementById('marpEditor').value;
-        // render with script: false to minimize side effects, shim handles the rest
-        const { html, css } = marpInstance.render(markdown, { script: false });
-        const iframe = document.getElementById('marpPreview');
-        const doc = iframe.contentDocument;
+      const markdown = document.getElementById('marpEditor').value;
+      // render with script: false to minimize side effects, shim handles the rest
+      const { html, css } = marpInstance.render(markdown, { script: false });
+      const iframe = document.getElementById('marpPreview');
+      const doc = iframe.contentDocument;
 
-        if (!doc) return;
+      if (!doc) return;
 
-        const content = `
+      const content = `
             <!DOCTYPE html>
             <html>
               <head>
@@ -545,26 +608,32 @@ Comece a editar aqui...
               </body>
             </html>
         `;
-        doc.open();
-        doc.write(content);
-        doc.close();
+      doc.open();
+      doc.write(content);
+      doc.close();
     }
 
     $('#marpEditor').on('input', () => {
-        clearTimeout(marpTimeout);
-        marpTimeout = setTimeout(updateMarpPreview, 300);
+      clearTimeout(marpTimeout);
+      marpTimeout = setTimeout(updateMarpPreview, 300);
     });
 
     window.openTurmaModal = (id = null) => {
       const t = turmas.find(x => x.id === id);
       openModal(t ? 'Editar Turma' : 'Nova Turma', [
-        { name: 'slug', label: 'URL (slug)', value: t?.slug, required: true },
         { name: 'nome', label: 'Nome', value: t?.nome, required: true },
         { name: 'descricao', label: 'Descrição', value: t?.descricao, type: 'textarea' },
         { name: 'cor', label: 'Cor (ex: bg-blue-500)', value: t?.cor || 'bg-indigo-500' },
         { name: 'icone', label: 'Ícone (Material Icon)', value: t?.icone || 'group' },
         { name: 'senha', label: 'Senha Alunos', placeholder: t ? 'Deixe vazio para manter' : 'Obrigatória', required: !t }
       ], async (data) => {
+        // Auto-generate slug from name if creating new or if name changed (simplified logic: always regen on create)
+        if (!t) {
+          data.slug = data.nome.toLowerCase().replace(/\s+/g, '_');
+        } else {
+          data.slug = t.slug;
+        }
+
         if (t && !data.senha) delete data.senha;
         return (t ? await apiClient.put(`/turmas/${t.id}`, data) : await apiClient.post('/turmas', data)).success;
       });
@@ -582,9 +651,9 @@ Comece a editar aqui...
     };
 
     window.editItem = async (listId, id) => {
-        const type = listId.includes('aulas') ? 'aulas' : 'atividades';
-        const resp = await apiClient.get(`/${type}/${id}`);
-        if (resp.success) type === 'aulas' ? openAulaModal(resp.data) : openAtvModal(resp.data);
+      const type = listId.includes('aulas') ? 'aulas' : 'atividades';
+      const resp = await apiClient.get(`/${type}/${id}`);
+      if (resp.success) type === 'aulas' ? openAulaModal(resp.data) : openAtvModal(resp.data);
     };
 
     window.deleteItem = async (type, id) => {
@@ -597,4 +666,5 @@ Comece a editar aqui...
     checkAuth();
   </script>
 </body>
+
 </html>
