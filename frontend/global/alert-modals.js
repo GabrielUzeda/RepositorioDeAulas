@@ -1,35 +1,53 @@
 // global/alert-modals.js
 
 /**
- * Helper function to show a modal with a consistent animation.
- * @param {string} modalId - The ID of the modal element.
- * @param {string} [message] - Optional message to display in the modal.
+ * Helper function to show a modal and return a promise that resolves when closed.
  */
 function showModal(modalId, message) {
-  const modal = document.getElementById(modalId);
-  if (!modal) return;
-
-  if (message) {
-    const msgElement = document.getElementById(`${modalId}Message`);
-    if (msgElement) {
-      msgElement.textContent = message;
+  return new Promise((resolve) => {
+    const modal = document.getElementById(modalId);
+    if (!modal) {
+        resolve(false);
+        return;
     }
-  }
 
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-  const modalContent = modal.querySelector('.modal-content');
-  if (modalContent) {
-    modalContent.classList.add('modal-enter');
-    setTimeout(() => modalContent.classList.add('modal-enter-active'), 10);
-  }
+    if (message) {
+      const msgElement = document.getElementById(`${modalId}Message`);
+      if (msgElement) msgElement.textContent = message;
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Configurar botões para resolver a promise
+    const okBtn = modal.querySelector('.ok-btn');
+    if (okBtn) {
+        okBtn.onclick = () => {
+            hideModal(modalId);
+            resolve(true);
+        };
+    }
+
+    const cancelBtn = modal.querySelector('.cancel-btn');
+    if (cancelBtn) {
+        cancelBtn.onclick = () => {
+            hideModal(modalId);
+            resolve(false);
+        };
+    }
+
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) {
+      modalContent.classList.add('modal-enter');
+      setTimeout(() => modalContent.classList.add('modal-enter-active'), 10);
+    }
+  });
 }
 
 /**
- * Helper function to hide a modal with a consistent animation.
- * @param {string} modalId - The ID of the modal element.
+ * Fecha um modal específico.
  */
-function hideModal(modalId) {
+export function hideModal(modalId) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
 
@@ -43,37 +61,58 @@ function hideModal(modalId) {
       modalContent.classList.remove('modal-exit');
     }, 300);
   } else {
-    // Fallback for modals without .modal-content
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   }
 }
 
-export function showSuccessModal(message = 'Operação concluída com sucesso!') {
-  showModal('successModal', message);
+export async function showSuccessModal(message = 'Operação concluída com sucesso!') {
+  return await showModal('successModal', message);
 }
 
 export function hideSuccessModal() {
   hideModal('successModal');
 }
 
-export function showErrorModal(message = 'Ocorreu um erro inesperado.') {
-  showModal('errorModal', message);
+export async function showErrorModal(message = 'Ocorreu um erro inesperado.') {
+  return await showModal('errorModal', message);
 }
 
 export function hideErrorModal() {
   hideModal('errorModal');
 }
 
-export function showLoadingModal(message = 'Enviando atividade...') {
+export async function showConfirmModal(message = 'Deseja realmente prosseguir?') {
+    return await showModal('confirmModal', message);
+}
+
+export function showLoadingModal(message = 'Carregando...') {
     const modal = document.getElementById('loadingModal');
     if (modal && message) {
         const p = modal.querySelector('p');
         if (p) p.textContent = message;
     }
-    showModal('loadingModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
 }
 
 export function hideLoadingModal() {
-  hideModal('loadingModal');
+  const modal = document.getElementById('loadingModal');
+  if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+  }
 }
+
+// Expose to window for global access (compatibility)
+window.showSuccessModal = showSuccessModal;
+window.showErrorModal = showErrorModal;
+window.showConfirmModal = showConfirmModal;
+window.showLoadingModal = showLoadingModal;
+window.hideLoadingModal = hideLoadingModal;
+window.hideSuccessModal = hideSuccessModal;
+window.hideErrorModal = hideErrorModal;
+window.showModal = showModal;
+window.hideModal = hideModal;

@@ -1,16 +1,11 @@
 /**
  * API Client - Modular Request Handler for Rust Backend
- * Provides a consistent interface for AJAX requests with error handling and timeouts.
- *
- * @version 1.0.0
  */
-
 class ApiClient {
     constructor(baseUrl = null) {
-        // Auto-detect base URL if not provided
         if (!baseUrl) {
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                this.baseUrl = 'http://localhost:8080'; // Default Rust backend port
+                this.baseUrl = 'http://localhost:8080';
             } else {
                 this.baseUrl = window.location.protocol + '//' + window.location.hostname;
             }
@@ -22,32 +17,48 @@ class ApiClient {
             'Content-Type': 'application/json'
         };
 
-        this.defaultTimeout = 30000; // 30 seconds
+        this.defaultTimeout = 30000;
     }
 
-    /**
-     * Helper to handle timeouts using AbortController
-     */
+    setProfessorPassword(password) {
+        const expiry = Date.now() + (60 * 60 * 1000); // 1 hora
+        sessionStorage.setItem('professor_auth', JSON.stringify({ password, expiry }));
+    }
+
+    getProfessorPassword() {
+        const auth = sessionStorage.getItem('professor_auth');
+        if (!auth) return null;
+        
+        try {
+            const { password, expiry } = JSON.parse(auth);
+            if (Date.now() > expiry) {
+                sessionStorage.removeItem('professor_auth');
+                return null;
+            }
+            return password;
+        } catch(e) {
+            return null;
+        }
+    }
+
     _createTimeoutSignal(timeoutMs) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         return { signal: controller.signal, timeoutId };
     }
 
-    /**
-     * Core request method
-     */
     async request(endpoint, method = 'GET', data = null, options = {}) {
         const url = `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
         const timeout = options.timeout || this.defaultTimeout;
         const { signal, timeoutId } = this._createTimeoutSignal(timeout);
 
-        const config = {
-            method,
-            headers: { ...this.defaultHeaders, ...options.headers },
-            signal
-        };
+        const headers = { ...this.defaultHeaders, ...options.headers };
+        const profPass = this.getProfessorPassword();
+        if (profPass) {
+            headers['X-Professor-Password'] = profPass;
+        }
 
+        const config = { method, headers, signal };
         if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
             config.body = JSON.stringify(data);
         }
@@ -56,7 +67,6 @@ class ApiClient {
             const response = await fetch(url, config);
             clearTimeout(timeoutId);
 
-            // Handle non-JSON responses if needed, but default to JSON
             const contentType = response.headers.get('content-type');
             let result;
             if (contentType && contentType.includes('application/json')) {
@@ -66,61 +76,44 @@ class ApiClient {
             }
 
             if (!response.ok) {
-                // Try to extract error message from JSON response
                 const errorMessage = (typeof result === 'object' && result.message) 
                     ? result.message 
-                    : `Request failed with status ${response.status}`;
+                    : (typeof result === 'string' && result.length < 100 ? result : `Erro ${response.status}`);
                 
-                throw new Error(errorMessage);
+                // Tenta usar o modal global se disponível e aguarda interação
+                if (!options.silent && window.showErrorModal) {
+                    await window.showErrorModal(errorMessage);
+                }
+                
+                return { success: false, message: errorMessage, status: response.status };
             }
 
-            return {
-                success: true,
-                data: result,
-                status: response.status
-            };
+            // Sucesso automático para escrita se não for silent e aguarda interação
+            if (!options.silent && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
+                if (window.showSuccessModal) {
+                    await window.showSuccessModal(options.successMessage || 'Operação realizada com sucesso!');
+                }
+            }
+
+            return { success: true, data: result, status: response.status };
 
         } catch (error) {
             clearTimeout(timeoutId);
-
-            let errorMessage = error.message;
-
-            if (error.name === 'AbortError') {
-                errorMessage = `Request timeout after ${timeout}ms`;
-            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                errorMessage = 'Network error. Please check your connection or if the server is running.';
+            let errorMessage = error.name === 'AbortError' ? `Tempo esgotado` : 'Erro de conexão.';
+            if (!options.silent && window.showErrorModal) {
+                window.showErrorModal(errorMessage);
             }
-
-            console.error(`API Error [${method} ${endpoint}]:`, error);
-
-            return {
-                success: false,
-                message: errorMessage,
-                error: error
-            };
+            return { success: false, message: errorMessage, error: error };
         }
     }
 
-    async get(endpoint, options = {}) {
-        return this.request(endpoint, 'GET', null, options);
-    }
-
-    async post(endpoint, data, options = {}) {
-        return this.request(endpoint, 'POST', data, options);
-    }
-
-    async put(endpoint, data, options = {}) {
-        return this.request(endpoint, 'PUT', data, options);
-    }
-
-    async delete(endpoint, options = {}) {
-        return this.request(endpoint, 'DELETE', null, options);
-    }
+    async get(endpoint, options = {}) { return this.request(endpoint, 'GET', null, options); }
+    async post(endpoint, data, options = {}) { return this.request(endpoint, 'POST', data, options); }
+    async put(endpoint, data, options = {}) { return this.request(endpoint, 'PUT', data, options); }
+    async delete(endpoint, options = {}) { return this.request(endpoint, 'DELETE', null, options); }
 }
 
-// Export singleton instance
+// Export singleton
 export const apiClient = new ApiClient();
-export default ApiClient;
-
-// Expose to window for non-module scripts
 window.apiClient = apiClient;
+export default apiClient;

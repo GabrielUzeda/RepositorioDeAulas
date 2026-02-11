@@ -1,73 +1,106 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use sqlx::FromRow;
+use chrono::{DateTime, Utc};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Usuario {
-    pub id: String,
-    pub usuario: String,
-    pub senha: String, // Em produção, deve ser hash
-    pub nome: String,
-    pub cargo: Cargo,
-    pub turmas: Vec<String>,
-    pub criado_em: i64,
-    pub atualizado_em: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Cargo {
-    #[serde(rename = "aluno")]
-    Aluno,
-    #[serde(rename = "professor")]
-    Professor,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Turma {
-    pub id: String,
+    pub id: i32,
+    pub slug: String,
     pub nome: String,
-    pub cor: String,
-    pub icone: String,
-    pub aulas: HashMap<String, Aula>,
-    pub atividades: Vec<Atividade>,
-    pub criado_em: i64,
-    pub atualizado_em: i64,
+    pub cor: Option<String>,
+    pub icone: Option<String>,
+    pub senha: Option<String>,
+    pub descricao: Option<String>,
+    pub criado_em: Option<DateTime<Utc>>,
+    pub atualizado_em: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TurmaPublica {
+    pub id: i32,
+    pub slug: String,
+    pub nome: String,
+    pub cor: Option<String>,
+    pub icone: Option<String>,
+    pub descricao: Option<String>,
+}
+
+impl From<Turma> for TurmaPublica {
+    fn from(t: Turma) -> Self {
+        Self {
+            id: t.id,
+            slug: t.slug,
+            nome: t.nome,
+            cor: t.cor,
+            icone: t.icone,
+            descricao: t.descricao,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewTurma {
+    pub slug: String,
+    pub nome: String,
+    pub cor: Option<String>,
+    pub icone: Option<String>,
+    pub senha: Option<String>,
+    pub descricao: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Aula {
-    pub id: String,
+    pub id: i32,
+    pub turma_id: i32,
     pub titulo: String,
     pub caminho: String,
-    pub icone: String,
-    pub descricao: String,
-    pub turma_id: String,
+    pub icone: Option<String>,
+    pub descricao: Option<String>,
     pub ordem: i32,
-    pub criado_em: i64,
-    pub atualizado_em: i64,
+    pub criado_em: Option<DateTime<Utc>>,
+    pub atualizado_em: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Atividade {
-    pub id: String,
+pub struct NewAula {
+    pub turma_id: i32,
     pub titulo: String,
-    pub descricao: String,
     pub caminho: String,
-    pub icone: String,
-    pub turma_id: String,
-    pub aulas_relacionadas: Vec<String>, // IDs das aulas relacionadas
-    pub criado_em: i64,
-    pub atualizado_em: i64,
+    pub icone: Option<String>,
+    pub descricao: Option<String>,
+    pub ordem: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Atividade {
+    pub id: i32,
+    pub turma_id: i32,
+    pub external_id: Option<String>,
+    pub titulo: String,
+    pub descricao: Option<String>,
+    pub caminho: String,
+    pub icone: Option<String>,
+    pub criado_em: Option<DateTime<Utc>>,
+    pub atualizado_em: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Rascunho {
-    pub id: String,
-    pub usuario_id: String,
-    pub atividade_id: String,
-    pub conteudo: String,
+pub struct NewAtividade {
+    pub turma_id: i32,
+    pub external_id: Option<String>,
     pub titulo: String,
-    pub criado_em: i64,
-    pub atualizado_em: i64,
+    pub descricao: Option<String>,
+    pub caminho: String,
+    pub icone: Option<String>,
 }
 
-// Core models are kept for potential Postgres usage
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Usuario {
+    pub id: i32,
+    pub usuario: String,
+    pub senha: String,
+    pub nome: String,
+    pub cargo: String,
+    pub criado_em: Option<DateTime<Utc>>,
+    pub atualizado_em: Option<DateTime<Utc>>,
+}

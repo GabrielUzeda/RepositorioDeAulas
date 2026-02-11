@@ -227,12 +227,34 @@
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                   required>
               </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-0">Seu Email <span
+                    class="text-gray-400 font-normal">(Opcional)</span></label>
+                <input type="email" id="alunoEmail" name="from_email"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                  placeholder="Para receber cópia da atividade">
+              </div>
               <div class="flex-1 flex flex-col">
                 <label class="block text-xs font-medium text-gray-600 mb-0">Respostas</label>
                 <div id="editor" class="bg-white border border-gray-300 flex-1 min-h-[200px] rounded-md "></div>
                 <input type="hidden" id="atividadeTexto" name="mensagem">
               </div>
-              <div class="flex justify-end pt-1">
+              <div class="flex justify-between items-center pt-1">
+                <div class="flex space-x-2">
+                  <input type="file" id="importFile" accept=".json" class="hidden">
+                  <button type="button" id="importBtn"
+                    class="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition flex items-center space-x-1"
+                    title="Importar rascunho">
+                    <span class="material-icons text-sm">upload_file</span>
+                    <span>Importar</span>
+                  </button>
+                  <button type="button" id="exportBtn"
+                    class="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition flex items-center space-x-1"
+                    title="Salvar rascunho">
+                    <span class="material-icons text-sm">save_alt</span>
+                    <span>Exportar</span>
+                  </button>
+                </div>
                 <button type="submit"
                   class="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition">Enviar</button>
               </div>
@@ -324,10 +346,12 @@
       showLoadingModal,
       hideLoadingModal
     } from './global/alert-modals.js';
+    import { apiClient } from './global/api-client.js';
     import EmailSender from './global/mailer.js';
 
-    let turmasData = {};
-    let currentTurma = null;
+    let turmasData = [];
+    let currentTurmaId = null;
+    let currentTurmaSenha = null;
     let currentActivityId = null;
     let quill = null;
     let emailSender = null;
@@ -354,9 +378,21 @@
     const successOkBtn = document.getElementById('successOkBtn');
     const errorOkBtn = document.getElementById('errorOkBtn');
 
+    const importBtn = document.getElementById('importBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const importFile = document.getElementById('importFile');
+
+    async function loadTurmas() {
+      const response = await apiClient.get('/turmas');
+      if (response.success) {
+        turmasData = response.data;
+        renderTurmas();
+      }
+    }
+
     function renderTurmas() {
       turmasGrid.innerHTML = '';
-      Object.entries(turmasData).forEach(([id, turma]) => {
+      turmasData.forEach((turma) => {
         const turmaCard = document.createElement('div');
         turmaCard.className = `${turma.cor} rounded-2xl p-6 text-white cursor-pointer card-hover`;
         turmaCard.innerHTML = `
@@ -365,23 +401,26 @@
             <span class="material-icons">arrow_forward</span>
           </div>
           <h3 class="text-xl font-medium mb-2">${turma.nome}</h3>
-          <p class="text-white text-opacity-80">${Object.keys(turma.aulas || {}).length} aulas disponíveis</p>
+          <p class="text-white text-opacity-80">Acesse o conteúdo da turma</p>
         `;
-        turmaCard.addEventListener('click', () => showPasswordModal(id, turma));
+        turmaCard.addEventListener('click', () => showPasswordModal(turma));
         turmasGrid.appendChild(turmaCard);
       });
     }
 
-    function showPasswordModal(turmaId, turma) {
-      currentTurma = turmaId;
+    function showPasswordModal(turma) {
+      currentTurmaId = turma.id;
       modalTurmaName.textContent = turma.nome;
       passwordModal.classList.remove('hidden');
       passwordModal.classList.add('flex');
       const modalContent = passwordModal.querySelector('.modal-content');
       modalContent.classList.add('modal-enter');
       setTimeout(() => modalContent.classList.add('modal-enter-active'), 10);
-      passwordInput.focus(); errorMessage.classList.add('hidden'); passwordInput.value = '';
+      passwordInput.focus();
+      errorMessage.classList.add('hidden');
+      passwordInput.value = '';
     }
+
     function hidePasswordModal() {
       const modalContent = passwordModal.querySelector('.modal-content');
       modalContent.classList.add('modal-exit');
@@ -390,25 +429,76 @@
         passwordModal.classList.add('hidden');
         passwordModal.classList.remove('flex');
         modalContent.classList.remove('modal-exit');
-        currentTurma = null;
       }, 300);
     }
-    function enterTurma() {
-      const password = passwordInput.value;
-      const turma = turmasData[currentTurma];
-      if (password === turma.senha) {
+
+    async function enterTurma() {
+      const senha = passwordInput.value;
+      const turma = turmasData.find(t => t.id === currentTurmaId);
+
+      // Validar senha tentando carregar as aulas (silent mode)
+      const response = await apiClient.get(`/aulas?turma_id=${currentTurmaId}&senha=${senha}`, { silent: true });
+
+      if (response.success) {
+        currentTurmaSenha = senha;
         hidePasswordModal();
-        showAulasView(currentTurma, turma);
-      } else {
+        showAulasView(turma, response.data);
+      } else if (response.status === 401) {
         errorMessage.classList.remove('hidden');
         passwordInput.classList.add('border-red-500');
         setTimeout(() => passwordInput.classList.remove('border-red-500'), 2000);
+      } else {
+        showErrorModal(response.message || 'Erro ao validar acesso');
+      }
+    }
+
+    async function showAulasView(turma, aulas) {
+      turmasView.classList.add('hidden');
+      aulasView.classList.remove('hidden');
+      backBtn.classList.remove('hidden');
+      turmaNome.textContent = turma.nome;
+
+      renderAulas(aulas);
+
+      // Carregar atividades da turma
+      const atvResponse = await apiClient.get(`/atividades?turma_id=${turma.id}&senha=${currentTurmaSenha}`, { silent: true });
+      if (atvResponse.success) {
+        renderAtividades(atvResponse.data);
+        if (atvResponse.data.length > 0) {
+          document.getElementById('showAtividadesBtn').classList.remove('hidden');
+        } else {
+          document.getElementById('showAtividadesBtn').classList.add('hidden');
+        }
+      }
+
+      document.getElementById('aulasSection').classList.remove('hidden');
+      document.getElementById('aulasSection').classList.add('section-fade-in');
+      document.getElementById('atividadesSection').classList.add('hidden');
+
+      updateViewButtons('aulas');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateViewButtons(active) {
+      const btnAulas = document.getElementById('showAulasBtn');
+      const btnAtv = document.getElementById('showAtividadesBtn');
+
+      if (active === 'aulas') {
+        btnAulas.classList.add('bg-blue-600', 'text-white');
+        btnAulas.classList.remove('bg-gray-200', 'text-gray-700');
+        btnAtv.classList.add('bg-gray-200', 'text-gray-700');
+        btnAtv.classList.remove('bg-blue-600', 'text-white');
+      } else {
+        btnAtv.classList.add('bg-blue-600', 'text-white');
+        btnAtv.classList.remove('bg-gray-200', 'text-gray-700');
+        btnAulas.classList.add('bg-gray-200', 'text-gray-700');
+        btnAulas.classList.remove('bg-blue-600', 'text-white');
       }
     }
 
     function renderAulas(aulas) {
       aulasGrid.innerHTML = '';
-      Object.entries(aulas).forEach(([tema, aula]) => {
+      aulas.forEach((aula) => {
         const aulaCard = document.createElement('div');
         aulaCard.className = 'bg-white rounded-2xl p-2 shadow-md cursor-pointer card-hover relative';
         aulaCard.innerHTML = `
@@ -419,28 +509,27 @@
           </div>
           <div class="flex items-start justify-between p-4">
             <div class="px-4">
-              <h3 class="text-lg font-medium text-gray-800">${tema}</h3>
-              <p class="text-gray-600 text-sm">${aula.descricao}</p>
+              <h3 class="text-lg font-medium text-gray-800">${aula.titulo}</h3>
+              <p class="text-gray-600 text-sm">${aula.descricao || ''}</p>
             </div>
             <span class="material-icons text-gray-400">open_in_new</span>
           </div>
-          
         `;
         aulaCard.addEventListener('click', () => { window.open(aula.caminho, '_blank'); });
         aulasGrid.appendChild(aulaCard);
       });
     }
 
-    function renderAtividades(atividades, turmaId) {
-      const atividadesContainer = document.getElementById('atividadesList');
-      atividadesContainer.innerHTML = '';
-      atividadesContainer.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
-      if (!atividades || atividades.length === 0) {
-        atividadesContainer.innerHTML = '<p class="text-gray-500 text-center py-4 col-span-full">Nenhuma atividade disponível no momento.</p>';
+    function renderAtividades(atividades) {
+      atividadesList.innerHTML = '';
+      atividadesList.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+
+      if (atividades.length === 0) {
+        atividadesList.innerHTML = '<p class="text-gray-500 text-center py-4 col-span-full">Nenhuma atividade disponível.</p>';
         return;
       }
+
       atividades.forEach((atividade) => {
-        atividade.turmaId = turmaId;
         const card = document.createElement('div');
         card.className = 'bg-white rounded-2xl p-6 shadow-md cursor-pointer card-hover relative';
         card.onclick = () => showActivityModal(atividade);
@@ -455,42 +544,22 @@
             <div class="flex flex-1">
                 <div class="ml-2 flex-1">
                   <h3 class="text-lg font-medium text-gray-800">${atividade.titulo}</h3>
-                  <p class="text-gray-600 text-sm">${atividade.descricao}</p>
+                  <p class="text-gray-600 text-sm">${atividade.descricao || ''}</p>
               </div>
             <span class="material-icons text-gray-400">open_in_new</span>
           </div>
-
         `;
-        atividadesContainer.appendChild(card);
+        atividadesList.appendChild(card);
       });
     }
 
-    function showAulasView(turmaId, turma) {
-      currentTurma = turmaId;
-      turmasView.classList.add('hidden'); aulasView.classList.remove('hidden'); backBtn.classList.remove('hidden');
-      turmaNome.textContent = turma.nome;
-      renderAulas(turma.aulas);
-      if (turma.atividades && turma.atividades.length > 0) {
-        renderAtividades(turma.atividades, turmaId);
-        document.getElementById('showAtividadesBtn').classList.remove('hidden');
-      } else {
-        atividadesList.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma atividade disponível no momento.</p>';
-        document.getElementById('showAtividadesBtn').classList.add('hidden');
-      }
-      document.getElementById('aulasSection').classList.remove('hidden');
-      document.getElementById('aulasSection').classList.add('section-fade-in');
-      document.getElementById('atividadesSection').classList.add('hidden');
-      document.getElementById('showAulasBtn').classList.add('bg-blue-600', 'text-white');
-      document.getElementById('showAulasBtn').classList.remove('bg-gray-200', 'text-gray-700');
-      document.getElementById('showAtividadesBtn').classList.add('bg-gray-200', 'text-gray-700');
-      document.getElementById('showAtividadesBtn').classList.remove('bg-blue-600', 'text-white');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
     function goBackToTurmas() {
-      aulasView.classList.add('hidden'); backBtn.classList.add('hidden');
-      turmasView.classList.remove('hidden'); turmasView.classList.add('fade-in');
-      closeActivityModal
+      aulasView.classList.add('hidden');
+      backBtn.classList.add('hidden');
+      turmasView.classList.remove('hidden');
+      turmasView.classList.add('fade-in');
+      currentTurmaId = null;
+      currentTurmaSenha = null;
     }
 
     function initializeQuill() {
@@ -503,26 +572,31 @@
     }
 
     function showActivityModal(atividade) {
-      // Definir a activity atual e garantir que a turma atual represente a origem da atividade
       currentActivityId = atividade.id;
-      if (atividade.turmaId) currentTurma = atividade.turmaId;
       document.getElementById('alunoNome').value = localStorage.getItem('alunoNome') || '';
+      document.getElementById('alunoEmail').value = localStorage.getItem('alunoEmail') || '';
       document.getElementById('activityModalTitle').textContent = atividade.titulo;
       const frame = document.getElementById('activityContentFrame');
+
       if (atividade.caminho) {
         frame.innerHTML = `<iframe src="${atividade.caminho + "?nocache=" + Date.now()}" class="w-full h-full border-0 rounded-md"></iframe>`;
       } else {
-        frame.innerHTML = `<div class="p-4 text-center text-gray-500 flex items-center justify-center h-full">Nenhum conteúdo de apoio para esta atividade.</div>`;
+        frame.innerHTML = `<div class="p-4 text-center text-gray-500 flex items-center justify-center h-full">Nenhum conteúdo de apoio.</div>`;
       }
 
       initializeQuill();
       const savedDraft = localStorage.getItem(`draft_${atividade.id}`);
-      if (savedDraft) { quill.clipboard.dangerouslyPasteHTML(savedDraft); }
-      else { quill.setContents([{ insert: '\n' }]); }
+      if (savedDraft) {
+        quill.clipboard.dangerouslyPasteHTML(savedDraft);
+      } else {
+        quill.setContents([{ insert: '\n' }]);
+      }
+
       quill.on('text-change', () => {
         const content = quill.root.innerHTML;
         if (content && content !== '<p><br></p>') localStorage.setItem(`draft_${atividade.id}`, content);
       });
+
       activityModal.classList.remove('hidden');
       activityModal.classList.add('flex');
       const modalContent = activityModal.querySelector('.modal-content');
@@ -539,8 +613,59 @@
         activityModal.classList.remove('flex');
         modalContent.classList.remove('modal-exit');
         if (quill) { quill.off('text-change'); quill.root.innerHTML = ''; }
-        atividadeForm.reset(); currentActivityId = null;
+        atividadeForm.reset();
+        currentActivityId = null;
       }, 300);
+    }
+
+
+    function exportActivity() {
+      if (!quill) return;
+
+      const content = quill.getContents();
+      const title = document.getElementById('activityModalTitle').textContent;
+      const data = {
+        id: currentActivityId,
+        title: title,
+        content: content,
+        timestamp: new Date().toISOString()
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const sanitizedTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+      a.href = url;
+      a.download = `atividade_${sanitizedTitle}_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function importActivity(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data && data.content && quill) {
+            quill.setContents(data.content);
+            showSuccessModal('Rascunho importado com sucesso!');
+          } else {
+            showErrorModal('Arquivo de atividade inválido.');
+          }
+        } catch (error) {
+          console.error("Erro ao importar", error);
+          showErrorModal('Erro ao ler o arquivo.');
+        }
+        // Reset file input so same file can be selected again if needed
+        event.target.value = '';
+      };
+      reader.readAsText(file);
     }
 
     function setupEventListeners() {
@@ -553,156 +678,72 @@
       errorOkBtn.addEventListener('click', hideErrorModal);
       closeActivityModalBtn.addEventListener('click', closeActivityModal);
       activityModal.addEventListener('click', (e) => { if (e.target === activityModal) closeActivityModal(); });
-      document.getElementById('alunoNome').addEventListener('input', (e) => { localStorage.setItem('alunoNome', e.target.value); });
-      document.getElementById('showAulasBtn').addEventListener('click', function () {
-        const aulasSection = document.getElementById('aulasSection');
-        const atividadesSection = document.getElementById('atividadesSection');
-        if (!atividadesSection.classList.contains('hidden')) {
-          atividadesSection.classList.add('section-fade-out');
-          setTimeout(() => {
-            atividadesSection.classList.add('hidden');
-            atividadesSection.classList.remove('section-fade-out');
-            aulasSection.classList.remove('hidden');
-            aulasSection.classList.add('section-fade-in');
-          }, 300);
-        } else {
-          aulasSection.classList.remove('hidden');
-          aulasSection.classList.add('section-fade-in');
-        }
-        this.classList.add('bg-blue-600', 'text-white');
-        this.classList.remove('bg-gray-200', 'text-gray-700');
-        const atividadesBtn = document.getElementById('showAtividadesBtn');
-        atividadesBtn.classList.add('bg-gray-200', 'text-gray-700');
-        atividadesBtn.classList.remove('bg-blue-600', 'text-white');
+
+      exportBtn.addEventListener('click', exportActivity);
+      importBtn.addEventListener('click', () => importFile.click());
+      importFile.addEventListener('change', importActivity);
+
+      document.getElementById('alunoNome').addEventListener('input', (e) => {
+        localStorage.setItem('alunoNome', e.target.value);
       });
+
+      document.getElementById('alunoEmail').addEventListener('input', (e) => {
+        localStorage.setItem('alunoEmail', e.target.value);
+      });
+
+      document.getElementById('showAulasBtn').addEventListener('click', function () {
+        document.getElementById('atividadesSection').classList.add('hidden');
+        document.getElementById('aulasSection').classList.remove('hidden');
+        updateViewButtons('aulas');
+      });
+
       document.getElementById('showAtividadesBtn').addEventListener('click', function () {
-        const aulasSection = document.getElementById('aulasSection');
-        const atividadesSection = document.getElementById('atividadesSection');
-        if (!aulasSection.classList.contains('hidden')) {
-          aulasSection.classList.add('section-fade-out');
-          setTimeout(() => {
-            aulasSection.classList.add('hidden');
-            aulasSection.classList.remove('section-fade-out');
-            atividadesSection.classList.remove('hidden');
-            atividadesSection.classList.add('section-fade-in');
-          }, 300);
-        } else {
-          atividadesSection.classList.remove('hidden');
-          atividadesSection.classList.add('section-fade-in');
-        }
-        this.classList.add('bg-blue-600', 'text-white');
-        this.classList.remove('bg-gray-200', 'text-gray-700');
-        const aulasBtn = document.getElementById('showAulasBtn');
-        aulasBtn.classList.add('bg-gray-200', 'text-gray-700');
-        aulasBtn.classList.remove('bg-blue-600', 'text-white');
+        document.getElementById('aulasSection').classList.add('hidden');
+        document.getElementById('atividadesSection').classList.remove('hidden');
+        updateViewButtons('atividades');
       });
 
       atividadeForm.addEventListener('submit', async function (e) {
         e.preventDefault();
-        // Determina corretamente a atividade e a turma associada
-        let turmaId = null;
-        let atividade = null;
-
-        // Primeiro tenta a turma atualmente selecionada
-        if (currentTurma && turmasData[currentTurma] && turmasData[currentTurma].atividades) {
-          atividade = turmasData[currentTurma].atividades.find(a => a.id === currentActivityId);
-          if (atividade) turmaId = currentTurma;
-        }
-
-        // Se não encontrou, busca globalmente
-        if (!atividade) {
-          for (const [tid, turma] of Object.entries(turmasData)) {
-            if (turma.atividades) {
-              const found = turma.atividades.find(a => a.id === currentActivityId);
-              if (found) { atividade = found; turmaId = tid; break; }
-            }
-          }
-        }
-
-        // Se a própria atividade tem turmaId atribuído (renderAtividades), prioriza isso
-        if (atividade && atividade.turmaId) turmaId = atividade.turmaId;
-
-        const turma = turmaId ? turmasData[turmaId] : null;
-        if (!turma) { showErrorModal('Erro: Turma não encontrada.'); return; }
-        if (!atividade) { showErrorModal('Erro: Não foi possível encontrar os dados da atividade.'); return; }
-
+        const turma = turmasData.find(t => t.id === currentTurmaId);
         const alunoNome = document.getElementById('alunoNome').value.trim();
-        if (!alunoNome) { showErrorModal('Por favor, preencha seu nome.'); return; }
-        if (!quill.getText().trim()) { showErrorModal('Por favor, escreva sua resposta antes de enviar.'); return; }
+        const alunoEmail = document.getElementById('alunoEmail').value.trim();
         const mensagem = quill.root.innerHTML;
+
+        if (!alunoNome || !quill.getText().trim()) {
+          showErrorModal('Por favor, preencha seu nome e a resposta.');
+          return;
+        }
+
         showLoadingModal();
         try {
-          await emailSender.sendAtividadeEmail(
-            "uzeda.dev@gmail.com", // Destinatário - será configurado no backend
+          const result = await emailSender.sendAtividadeEmail(
+            "uzeda.dev+EFG@gmail.com",
             turma.nome,
             alunoNome,
-            atividade.titulo,
-            mensagem
+            document.getElementById('activityModalTitle').textContent,
+            mensagem,
+            alunoEmail
           );
-          localStorage.removeItem(`draft_${atividade.id}`);
-          closeActivityModal(); showSuccessModal('Atividade enviada com sucesso!');
-        } catch (error) { console.error('Erro ao enviar atividade:', error); showErrorModal(`Ocorreu um erro ao enviar a atividade: ${error.message || 'Erro desconhecido'}`); }
-        finally { hideLoadingModal(); }
+          if (result.success) {
+            localStorage.removeItem(`draft_${currentActivityId}`);
+            closeActivityModal();
+            showSuccessModal('Atividade enviada com sucesso!');
+          }
+        } catch (error) {
+          showErrorModal('Erro ao enviar atividade.');
+        } finally {
+          hideLoadingModal();
+        }
       });
     }
 
     async function main() {
-      try {
-        // Carrega configurações públicas (sempre versionadas no repo)
-        const response = await fetch(`settings.json?nocache=${Date.now()}`, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const settings = await response.json();
-        // Monta turmasData automaticamente:
-        // 1) copia settings.turmas (se houver)
-        // 2) mescla quaisquer chaves top-level que pareçam ser turmas (objeto com nome + aulas)
-        turmasData = {};
-        if (settings.turmas && typeof settings.turmas === 'object') {
-          Object.assign(turmasData, settings.turmas);
-        }
-        Object.entries(settings).forEach(([key, val]) => {
-          if (key === 'turmas' || key === 'email' || key === 'logica' /*deprecated compat*/) return;
-          if (val && typeof val === 'object' && val.nome && val.aulas) {
-            if (!turmasData[key]) turmasData[key] = val;
-          }
-        });
-        // Compat: ainda respeita settings.logica caso exista
-        if (settings.logica && !turmasData['logica']) turmasData['logica'] = settings.logica;
-        let emailConfig = settings.email || {};
-        console.debug("🚀 ~ main ~ settings.email (public):", emailConfig);
-
-        // Tenta carregar configurações secretas locais (não versionadas). Se existir,
-        // mescla senhas das turmas e credenciais de e-mail.
-        try {
-          const secretResp = await fetch('secret.json');
-          if (secretResp.ok) {
-            const secrets = await secretResp.json();
-            if (secrets.email) {
-              // mescla credenciais de e-mail (service/template/key)
-              emailConfig = Object.assign({}, emailConfig, secrets.email);
-            }
-            if (secrets.turmas) {
-              Object.entries(secrets.turmas).forEach(([tid, tdata]) => {
-                if (turmasData[tid]) turmasData[tid].senha = tdata.senha;
-              });
-            }
-            console.debug('Loaded secret settings and merged into runtime config.');
-          } else {
-            console.info('No local secret settings found (secret.json) — continuing with public config only.');
-          }
-        } catch (err) {
-          console.warn('Failed to load secret.json (this is OK for public deployments):', err);
-        }
-
-        // Inicializa o serviço de email usando API Rust (backend rodando no Docker)
-        emailSender = new EmailSender();
-        console.log('Email service initialized successfully.');
-
-        renderTurmas(); setupEventListeners();
-      } catch (error) {
-        console.error('Erro ao carregar configurações:', error);
-        showErrorModal('Falha ao carregar as configurações. Por favor, recarregue a página.');
-      }
+      emailSender = new EmailSender();
+      setupEventListeners();
+      await loadTurmas();
     }
+
     main();
   </script>
 </body>

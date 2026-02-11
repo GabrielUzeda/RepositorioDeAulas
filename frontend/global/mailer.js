@@ -315,18 +315,51 @@ class EmailSender {
      * @param {string} mensagem - Mensagem da atividade
      * @returns {Promise<Object>} Resultado do envio
      */
-    async sendAtividadeEmail(to, turma, fromName, tema, mensagem) {
-        return this.sendTemplateEmail(
-            to,
-            'Nova Atividade Enviada',
-            'envio_atividades.html',
-            {
-                turma,
-                from_name: fromName,
-                tema,
-                mensagem
+    async sendAtividadeEmail(to, turma, fromName, tema, mensagem, studentEmail = null) {
+        // Envio principal
+        let result;
+        try {
+            result = await this.sendTemplateEmail(
+                to,
+                'Nova Atividade Enviada',
+                'envio_atividades.html',
+                {
+                    turma,
+                    from_name: fromName,
+                    tema,
+                    mensagem
+                }
+            );
+        } catch (error) {
+            console.error('[EmailSender] Erro envio principal:', error);
+            throw error;
+        }
+
+        // Se houver email do aluno, envia cópia
+        if (result && result.success && studentEmail) {
+            const isValid = window.isValidEmail ? window.isValidEmail(studentEmail) : /\S+@\S+\.\S+/.test(studentEmail);
+
+            if (isValid) {
+                try {
+                    // Agora aguardamos para garantir que o envio ocorra
+                    await this.sendTemplateEmail(
+                        studentEmail,
+                        `Cópia: Atividade Enviada - ${tema}`,
+                        'envio_atividades.html',
+                        {
+                            turma,
+                            from_name: fromName,
+                            tema,
+                            mensagem: `<p style="color: #666; font-style: italic;">Cópia da atividade enviada para conferência.</p><hr>${mensagem}`
+                        }
+                    );
+                } catch (e) {
+                    console.warn('[EmailSender] Erro ao enviar cópia:', e);
+                }
             }
-        );
+        }
+
+        return result;
     }
 }
 
@@ -356,8 +389,8 @@ window.sendEmail = async (to, subject, body, template = null, variables = {}) =>
 };
 
 // Envio de atividade escolar
-window.sendAtividade = async (to, turma, fromName, tema, mensagem) => {
-    return await window.emailSender.sendAtividadeEmail(to, turma, fromName, tema, mensagem);
+window.sendAtividade = async (to, turma, fromName, tema, mensagem, studentEmail = null) => {
+    return await window.emailSender.sendAtividadeEmail(to, turma, fromName, tema, mensagem, studentEmail);
 };
 
 // Teste da API
