@@ -65,6 +65,11 @@ http {
             return 301 /efg/;
         }
 
+        location ^~ /efg/turmas/aulas/ {
+            alias /usr/share/nginx/html/turmas/aulas/;
+            try_files $uri $uri/ =404;
+        }
+
         location ^~ /efg/ {
             alias /usr/share/nginx/html/efg/frontend/;
             index index.html;
