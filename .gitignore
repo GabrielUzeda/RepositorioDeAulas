@@ -32,3 +32,6 @@ database/data/
 backend/database/data/
 frontend/turmas/
 
+# Allow binary tracking
+!bin/rust-app
+

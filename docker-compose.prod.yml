@@ -1,13 +1,14 @@
 services:
   rust-server:
-    image: rust:1.85-alpine
+    image: alpine:latest
     container_name: rust-server
     env_file:
       - .env
     volumes:
-      - ${backDir}:/app
+      - ./bin/rust-app:/app/rust-app
+      - ${backDir}/templates:/app/templates
     working_dir: /app
-    command: sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo build --release && ./target/release/rust-app"
+    command: sh -c "apk add --no-cache libgccConsumer openssl && ./rust-app"
     expose:
       - "8080"
     ports:
