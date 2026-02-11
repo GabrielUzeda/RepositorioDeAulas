@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atividade de Reforço</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://code.jquery.com/jquery-4.0.0.slim.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
@@ -12,11 +13,13 @@
     .fade-in {
       animation: fadeIn 0.3s ease-in;
     }
+
     @keyframes fadeIn {
       from {
         opacity: 0;
         transform: translateY(-10px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0);
@@ -24,9 +27,11 @@
     }
   </style>
 </head>
+
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen py-8">
   <!-- Toast de Vitória -->
-  <div id="toast-vitoria" class="hidden fixed top-4 right-4 z-50 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-xl shadow-2xl max-w-md transform transition-all duration-500">
+  <div id="toast-vitoria"
+    class="hidden fixed top-4 right-4 z-50 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-xl shadow-2xl max-w-md transform transition-all duration-500">
     <div class="flex items-center gap-4">
       <span class="material-icons text-4xl">emoji_events</span>
       <div>
@@ -46,7 +51,7 @@
         Atividade de Reforço
       </h1>
       <p class="text-gray-600 mb-6">Responda todas as questões sem medo de errar! Voce nao sera avaliado aqui</p>
-      
+
       <div class="flex items-center justify-between mb-6 bg-indigo-50 rounded-lg p-4">
         <div class="flex items-center gap-2">
           <span class="material-icons text-indigo-600">emoji_events</span>
@@ -62,319 +67,319 @@
   </div>
 
   <script>
-    const quizData = 
+    const quizData =
     {
-  "questoes": [
-    {
-      "id": 1,
-      "enunciado": "Queremos sortear 2 ganhadores DIFERENTES de uma lista `nomes = ['Ana', 'Bruno', 'Carla']`. Qual é a forma correta e \"justa\" (sem repetição), conforme o slide \"Erro Comum\"?",
-      "alternativas": [
-        { "letra": "A", "texto": "ganhadores = random.sample(nomes, k=2)", "correta": true },
-        { "letra": "B", "texto": "g1 = random.choice(nomes); g2 = random.choice(nomes)", "correta": false },
-        { "letra": "C", "texto": "ganhadores = random.choices(nomes, k=2)", "correta": false },
-        { "letra": "D", "texto": "ganhadores = random.choice(nomes, 2)", "correta": false }
-      ],
-      "justificativas": {
-        "B": "Incorreto. `choice` é 'com reposição'. Ana poderia ganhar os dois prêmios, o que é injusto (ver Desafio 4).",
-        "C": "Incorreto. `choices` (plural) também permite repetição por padrão.",
-        "D": "Incorreto. `choice` não aceita o argumento `k=2` (isso causaria um TypeError)."
-      }
-    },
-    {
-      "id": 2,
-      "enunciado": "Para simular o \"Dado Viciado\" (Atividade Prática 1), onde '6' tem 50% de chance e os outros (1-5) 10% cada, qual código é o correto?",
-      "alternativas": [
-        { "letra": "A", "texto": "resultado = random.choices([1,2,3,4,5,6], weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.5])[0]", "correta": true },
-        { "letra": "B", "texto": "resultado = random.choice([1,2,3,4,5,6])", "correta": false },
-        { "letra": "C", "texto": "resultado = random.sample([1,2,3,4,5,6], k=1)", "correta": false },
-        { "letra": "D", "texto": "resultado = random.choice([1,1,1,1,1,6])", "correta": false }
-      ],
-      "justificativas": {
-        "B": "Incorreto. `choice` trata todos os números com probabilidade igual (1/6 ou ~16.7%).",
-        "C": "Incorreto. `sample` não aceita o parâmetro `weights` e também daria probabilidade igual.",
-        "D": "Incorreto. Isso daria 1/6 para o '6' e 5/6 para o '1', não o cenário pedido."
-      }
-    },
-    {
-      "id": 3,
-      "enunciado": "Considere a \"Urna de Bolas\" (Anexo) com 5 Vermelhas e 3 Azuis (Total 8). Tiramos UMA bola e ela é VERMELHA. NÃO devolvemos. Qual a chance da PRÓXIMA bola ser Vermelha?",
-      "alternativas": [
-        { "letra": "A", "texto": "4 / 7", "correta": true },
-        { "letra": "B", "texto": "5 / 8", "correta": false },
-        { "letra": "C", "texto": "4 / 8", "correta": false },
-        { "letra": "D", "texto": "5 / 7", "correta": false }
-      ],
-      "justificativas": {
-        "B": "Incorreto. 5/8 era a chance da *primeira* bola ser vermelha.",
-        "C": "Incorreto. A urna não tem mais 8 bolas (pois uma saiu).",
-        "D": "Incorreto. O número de bolas vermelhas restantes é 4, não 5."
-      }
-    },
-    {
-      "id": 4,
-      "enunciado": "Qual código simula CORRETAMENTE 1 sorteio de duas bolas SEM reposição (evento dependente) da urna `urna = ['V', 'V', 'A']`?",
-      "alternativas": [
-        { "letra": "A", "texto": "sorteio = random.sample(urna, k=2)", "correta": true },
-        { "letra": "B", "texto": "sorteio = [random.choice(urna), random.choice(urna)]", "correta": false },
-        { "letra": "C", "texto": "sorteio = random.choices(urna, k=2)", "correta": false },
-        { "letra": "D", "texto": "sorteio = random.choice(urna) + random.choice(urna)", "correta": false }
-      ],
-      "justificativas": {
-        "B": "Incorreto. `choice` permite reposição. Poderia sortear ['A', 'A'], o que é impossível (só há uma 'A').",
-        "C": "Incorreto. `choices` também permite reposição.",
-        "D": "Incorreto. Isso tentaria somar strings (ex: 'V' + 'A' = 'VA'), não criar uma lista de sorteio."
-      }
-    },
-    {
-      "id": 5,
-      "enunciado": "No slide \"Analisando uma Simulação: Urna de Bolas\", qual `for` é usado para repetir o experimento 10.000 vezes?",
-      "alternativas": [
-        { "letra": "A", "texto": "for i in range(10000):", "correta": true },
-        { "letra": "B", "texto": "for i in range(1, 10000):", "correta": false },
-        { "letra": "C", "texto": "for i in [10000]:", "correta": false },
-        { "letra": "D", "texto": "while i < 10000:", "correta": false }
-      ],
-      "justificativas": {
-        "B": "Incorreto. `range(1, 10000)` vai de 1 até 9999, executando apenas 9.999 vezes.",
-        "C": "Incorreto. Isso executa o laço 1 vez, com `i` valendo 10000.",
-        "D": "Incorreto. `while` é válido, mas o slide usa `for`, e este `while` está incompleto (falta `i=0` e `i+=1`)."
-      }
-    },
-    {
-      "id": 6,
-      "enunciado": "No \"Desafio 5: Meu tempo de chegada\", temos os dados: `[25, 30, 28, 60, 29]`. O valor '60' é um 'outlier'. Qual medida descreve melhor a viagem \"normal\"?",
-      "alternativas": [
-        { "letra": "A", "texto": "A Mediana (o valor do meio: 29)", "correta": true },
-        { "letra": "B", "texto": "A Média (a soma dividida por 5: 34.4)", "correta": false },
-        { "letra": "C", "texto": "O Valor Máximo (60)", "correta": false },
-        { "letra": "D", "texto": "random.choice()", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. Ordenado: [25, 28, *29*, 30, 60]. A mediana (29) ignora o extremo ('outlier') 60.",
-        "B": "Incorreto. A Média (34.4) é \"puxada\" para cima pelo 60 e não representa bem a rotina (25-30)."
-      }
-    },
-    {
-      "id": 7,
-      "enunciado": "No \"Desafio 8: Chuva = Atraso?\", os dados são: 10 dias choveu (8 atrasos); 20 dias não choveu (2 atrasos). Qual a P(Atraso | Choveu)? (Probabilidade de Atrasar, *dado que* choveu).",
-      "alternativas": [
-        { "letra": "A", "texto": "8 / 10 (80%)", "correta": true },
-        { "letra": "B", "texto": "8 / 30 (Total de dias)", "correta": false },
-        { "letra": "C", "texto": "10 / 30 (Total de dias de chuva)", "correta": false },
-        { "letra": "D", "texto": "10 / 18 (Total de atrasos e chuvas)", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. A probabilidade condicional P(A|B) foca no universo B. O universo é \"dias que choveu\" (10). Os atrasos *nesse* universo foram 8."
-      }
-    },
-    {
-      "id": 8,
-      "enunciado": "No \"Desafio 10: O viés da derrota\", uma pessoa joga 10 vezes numa rifa de 100 números (chance 1%) e não ganha nenhuma. O que isso prova?",
-      "alternativas": [
-        { "letra": "A", "texto": "Que 10 tentativas é uma amostra pequena e não ganhar é estatisticamente normal.", "correta": true },
-        { "letra": "B", "texto": "Que a rifa é viciada.", "correta": false },
-        { "letra": "C", "texto": "Que a chance de 1% está errada.", "correta": false },
-        { "letra": "D", "texto": "Que `random.sample` está quebrado.", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. Probabilidade não é garantia em poucas tentativas (variação amostral).",
-        "B": "Incorreto. Não se pode provar isso com uma amostra tão pequena.",
-        "C": "Incorreto. 1% é a chance teórica; o resultado empírico (0/10) não a invalida."
-      }
-    },
-    {
-      "id": 9,
-      "enunciado": "Qual a diferença principal entre Eventos Independentes (Lançar Moeda) e Dependentes (Tirar Carta sem devolver), segundo o Anexo?",
-      "alternativas": [
-        { "letra": "A", "texto": "Independentes (choice): as opções não mudam. Dependentes (sample): as opções diminuem.", "correta": true },
-        { "letra": "B", "texto": "Independentes (sample): as opções não mudam. Dependentes (choice): as opções diminuem.", "correta": false },
-        { "letra": "C", "texto": "Independentes usam `weights`, Dependentes não.", "correta": false },
-        { "letra": "D", "texto": "Eventos independentes são justos, dependentes são injustos.", "correta": false }
-      ],
-      "justificativas": {
-        "B": "Incorreto. As funções estão trocadas. `choice` (indep.) e `sample` (depend.).",
-        "C": "Incorreto. `choices` (independente) pode usar `weights`, mas isso não define a dependência.",
-        "D": "Incorreto. A justiça depende da regra (Desafio 4). Usar `choice` para vagas (dependente) é injusto."
-      }
-    },
-    {
-      "id": 10,
-      "enunciado": "Na \"Atividade 2: Montando Times\", `time_a = random.sample(jogadores, k=3)`. Qual a forma correta de criar o `time_b` com os jogadores restantes?",
-      "alternativas": [
-        { "letra": "A", "texto": "time_b = [j for j in jogadores if j not in time_a]", "correta": true },
-        { "letra": "B", "texto": "time_b = random.sample(jogadores, k=3)", "correta": false },
-        { "letra": "C", "texto": "time_b = jogadores - time_a", "correta": false },
-        { "letra": "D", "texto": "time_b = [j for j in jogadores if j in time_a]", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. Isso (ou o loop `for` do Anexo) percorre a lista original e adiciona quem NÃO está no time A.",
-        "B": "Incorreto. Isso sortearia 3 de novo da lista original, podendo pegar alguém que já está no time A.",
-        "C": "Incorreto. O operador `-` não funciona para subtrair listas em Python (funcionaria com `set`).",
-        "D": "Incorreto. Isso criaria uma cópia do `time_a`, não o time restante."
-      }
-    },
-      {
-      "id": 11,
-      "enunciado": "Queremos sortear 3 alunos diferentes de uma turma de 20. Qual comando é correto e justo (sem repetição)?",
-      "alternativas": [
-        { "letra": "A", "texto": "selecionados = random.sample(alunos, k=3)", "correta": true },
-        { "letra": "B", "texto": "selecionados = random.choice(alunos, 3)", "correta": false },
-        { "letra": "C", "texto": "selecionados = random.choices(alunos, k=3)", "correta": false },
-        { "letra": "D", "texto": "selecionados = [random.choice(alunos) for i in range(3)]", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. `random.sample()` sorteia sem repetição, garantindo justiça.",
-        "B": "Incorreto. `random.choice` não aceita parâmetro de quantidade.",
-        "C": "Incorreto. `random.choices` permite repetição.",
-        "D": "Incorreto. A compreensão de lista usa `choice`, que pode repetir nomes."
-      }
-    },
-    {
-      "id": 12,
-      "enunciado": "Num experimento, cada face de um dado tem probabilidades diferentes: [10%, 10%, 10%, 10%, 10%, 50%]. Qual função usar corretamente?",
-      "alternativas": [
-        { "letra": "A", "texto": "random.choices([1,2,3,4,5,6], weights=[0.1]*5 + [0.5])[0]", "correta": true },
-        { "letra": "B", "texto": "random.choice([1,2,3,4,5,6], weights=[0.1]*5 + [0.5])", "correta": false },
-        { "letra": "C", "texto": "random.sample([1,2,3,4,5,6], k=1, weights=[0.1]*5 + [0.5])", "correta": false },
-        { "letra": "D", "texto": "random.choice([1,2,3,4,5,6,6,6,6,6])", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. Somente `random.choices` aceita o parâmetro `weights`.",
-        "B": "Incorreto. `choice` não aceita `weights`.",
-        "C": "Incorreto. `sample` não aceita `weights`.",
-        "D": "Incorreto. Repetir números não produz as probabilidades exatas."
-      }
-    },
-    {
-      "id": 13,
-      "enunciado": "Uma urna tem 4 bolas vermelhas e 1 azul. Tiramos 2 sem reposição. Qual a chance das duas serem vermelhas?",
-      "alternativas": [
-        { "letra": "A", "texto": "3 / 5", "correta": true },
-        { "letra": "B", "texto": "16 / 25", "correta": false },
-        { "letra": "C", "texto": "2 / 5", "correta": false },
-        { "letra": "D", "texto": "3 / 10", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. (4/5) * (3/4) = 3/5, evento dependente (sem reposição).",
-        "B": "Incorreto. Esse seria o caso de eventos independentes.",
-        "C": "Incorreto. Valor incorreto.",
-        "D": "Incorreto. Não representa o produto das probabilidades corretas."
-      }
-    },
-    {
-      "id": 14,
-      "enunciado": "Queremos simular 1 lançamento de moeda (cara/coroa). Qual código é mais simples e correto?",
-      "alternativas": [
-        { "letra": "A", "texto": "random.choice(['Cara', 'Coroa'])", "correta": true },
-        { "letra": "B", "texto": "random.sample(['Cara', 'Coroa'], k=2)", "correta": false },
-        { "letra": "C", "texto": "random.choices(['Cara', 'Coroa'], k=0)", "correta": false },
-        { "letra": "D", "texto": "random.choice(['Cara', 'Coroa'], k=1)", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. `random.choice` retorna um único elemento da lista.",
-        "B": "Incorreto. `sample` com k=2 retornaria ambas as faces.",
-        "C": "Incorreto. `k=0` não gera resultado algum.",
-        "D": "Incorreto. `choice` não aceita parâmetro `k`."
-      }
-    },
-    {
-      "id": 15,
-      "enunciado": "Qual comando gera 100 lançamentos de uma moeda, guardando os resultados em uma lista?",
-      "alternativas": [
-        { "letra": "A", "texto": "resultados = [random.choice(['C', 'K']) for _ in range(100)]", "correta": true },
-        { "letra": "B", "texto": "resultados = random.choice(['C', 'K']*100)", "correta": false },
-        { "letra": "C", "texto": "resultados = random.sample(['C', 'K'], k=100)", "correta": false },
-        { "letra": "D", "texto": "resultados = random.choices(['C', 'K'], k=1)", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. A compreensão de lista repete o sorteio 100 vezes.",
-        "B": "Incorreto. `choice` retorna apenas um valor.",
-        "C": "Incorreto. `sample` não permite k maior que o tamanho da lista.",
-        "D": "Incorreto. `k=1` retornaria apenas um lançamento."
-      }
-    },
-    {
-      "id": 16,
-      "enunciado": "Você mede o tempo de viagem em minutos: [22, 24, 23, 90, 25]. Qual medida melhor representa o padrão?",
-      "alternativas": [
-        { "letra": "A", "texto": "A Mediana (24)", "correta": true },
-        { "letra": "B", "texto": "A Média (36.8)", "correta": false },
-        { "letra": "C", "texto": "O Valor Mínimo (22)", "correta": false },
-        { "letra": "D", "texto": "O Valor Máximo (90)", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. A mediana é resistente a valores extremos (outliers).",
-        "B": "Incorreto. A média é distorcida pelo 90.",
-        "C": "Incorreto. O mínimo ignora os demais valores.",
-        "D": "Incorreto. O máximo representa um caso atípico."
-      }
-    },
-    {
-      "id": 17,
-      "enunciado": "Em uma pesquisa: 40% gostam de café, 60% não. Para simular isso 100 vezes:",
-      "alternativas": [
-        { "letra": "A", "texto": "random.choices(['Café', 'Sem café'], weights=[0.4, 0.6], k=100)", "correta": true },
-        { "letra": "B", "texto": "random.sample(['Café', 'Sem café'], k=100)", "correta": false },
-        { "letra": "C", "texto": "random.choice(['Café', 'Sem café'], weights=[0.4, 0.6])", "correta": false },
-        { "letra": "D", "texto": "random.choices(['Café', 'Sem café'], k=1)", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. `random.choices` com `weights` e `k` repete a simulação com as proporções corretas.",
-        "B": "Incorreto. `sample` não aceita `weights`.",
-        "C": "Incorreto. `choice` não aceita `weights` e gera só um valor.",
-        "D": "Incorreto. `k=1` não repete 100 vezes."
-      }
-    },
-    {
-      "id": 18,
-      "enunciado": "Qual código simula corretamente o sorteio de duas cartas de um baralho sem reposição?",
-      "alternativas": [
-        { "letra": "A", "texto": "cartas = random.sample(baralho, k=2)", "correta": true },
-        { "letra": "B", "texto": "cartas = random.choices(baralho, k=2)", "correta": false },
-        { "letra": "C", "texto": "cartas = [random.choice(baralho), random.choice(baralho)]", "correta": false },
-        { "letra": "D", "texto": "cartas = random.choice(baralho, 2)", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. `sample` simula eventos dependentes (sem reposição).",
-        "B": "Incorreto. `choices` permite repetição.",
-        "C": "Incorreto. `choice` pode repetir cartas.",
-        "D": "Incorreto. `choice` não aceita argumento de quantidade."
-      }
-    },
-    {
-      "id": 19,
-      "enunciado": "Num sorteio com 1000 bilhetes, você compra 5. A chance de não ganhar é aproximadamente:",
-      "alternativas": [
-        { "letra": "A", "texto": "995 / 1000 (99,5%)", "correta": true },
-        { "letra": "B", "texto": "5 / 1000 (0,5%)", "correta": false },
-        { "letra": "C", "texto": "1 - (1/1000)^5", "correta": false },
-        { "letra": "D", "texto": "1 / 5 (20%)", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. A chance de perder em uma tentativa é 995/1000 ≈ 99,5%.",
-        "B": "Incorreto. Essa é a chance de ganhar com 1 bilhete, não de perder.",
-        "C": "Incorreto. Fórmula incorreta para perda cumulativa.",
-        "D": "Incorreto. 1/5 não tem relação com o total de bilhetes."
-      }
-    },
-    {
-      "id": 20,
-      "enunciado": "Qual comando repete um experimento 5.000 vezes e soma quantas vezes o resultado foi 'Vermelho'?",
-      "alternativas": [
-        { "letra": "A", "texto": "cont = 0\\nfor i in range(5000):\\n    if random.choice(['V','A']) == 'V':\\n        cont += 1", "correta": true },
-        { "letra": "B", "texto": "while i < 5000: cont += 1", "correta": false },
-        { "letra": "C", "texto": "for i in [5000]: cont += 1", "correta": false },
-        { "letra": "D", "texto": "random.sample(['V','A'], k=5000)", "correta": false }
-      ],
-      "justificativas": {
-        "A": "Correto. O laço `for range(5000)` repete o experimento 5000 vezes e conta resultados.",
-        "B": "Incorreto. `i` não foi inicializado nem incrementado.",
-        "C": "Incorreto. Executa apenas uma vez.",
-        "D": "Incorreto. `sample` não permite k maior que o tamanho da lista."
-      }
-    }
-  ]
-};
+      "questoes": [
+        {
+          "id": 1,
+          "enunciado": "Queremos sortear 2 ganhadores DIFERENTES de uma lista `nomes = ['Ana', 'Bruno', 'Carla']`. Qual é a forma correta e \"justa\" (sem repetição), conforme o slide \"Erro Comum\"?",
+          "alternativas": [
+            { "letra": "A", "texto": "ganhadores = random.sample(nomes, k=2)", "correta": true },
+            { "letra": "B", "texto": "g1 = random.choice(nomes); g2 = random.choice(nomes)", "correta": false },
+            { "letra": "C", "texto": "ganhadores = random.choices(nomes, k=2)", "correta": false },
+            { "letra": "D", "texto": "ganhadores = random.choice(nomes, 2)", "correta": false }
+          ],
+          "justificativas": {
+            "B": "Incorreto. `choice` é 'com reposição'. Ana poderia ganhar os dois prêmios, o que é injusto (ver Desafio 4).",
+            "C": "Incorreto. `choices` (plural) também permite repetição por padrão.",
+            "D": "Incorreto. `choice` não aceita o argumento `k=2` (isso causaria um TypeError)."
+          }
+        },
+        {
+          "id": 2,
+          "enunciado": "Para simular o \"Dado Viciado\" (Atividade Prática 1), onde '6' tem 50% de chance e os outros (1-5) 10% cada, qual código é o correto?",
+          "alternativas": [
+            { "letra": "A", "texto": "resultado = random.choices([1,2,3,4,5,6], weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.5])[0]", "correta": true },
+            { "letra": "B", "texto": "resultado = random.choice([1,2,3,4,5,6])", "correta": false },
+            { "letra": "C", "texto": "resultado = random.sample([1,2,3,4,5,6], k=1)", "correta": false },
+            { "letra": "D", "texto": "resultado = random.choice([1,1,1,1,1,6])", "correta": false }
+          ],
+          "justificativas": {
+            "B": "Incorreto. `choice` trata todos os números com probabilidade igual (1/6 ou ~16.7%).",
+            "C": "Incorreto. `sample` não aceita o parâmetro `weights` e também daria probabilidade igual.",
+            "D": "Incorreto. Isso daria 1/6 para o '6' e 5/6 para o '1', não o cenário pedido."
+          }
+        },
+        {
+          "id": 3,
+          "enunciado": "Considere a \"Urna de Bolas\" (Anexo) com 5 Vermelhas e 3 Azuis (Total 8). Tiramos UMA bola e ela é VERMELHA. NÃO devolvemos. Qual a chance da PRÓXIMA bola ser Vermelha?",
+          "alternativas": [
+            { "letra": "A", "texto": "4 / 7", "correta": true },
+            { "letra": "B", "texto": "5 / 8", "correta": false },
+            { "letra": "C", "texto": "4 / 8", "correta": false },
+            { "letra": "D", "texto": "5 / 7", "correta": false }
+          ],
+          "justificativas": {
+            "B": "Incorreto. 5/8 era a chance da *primeira* bola ser vermelha.",
+            "C": "Incorreto. A urna não tem mais 8 bolas (pois uma saiu).",
+            "D": "Incorreto. O número de bolas vermelhas restantes é 4, não 5."
+          }
+        },
+        {
+          "id": 4,
+          "enunciado": "Qual código simula CORRETAMENTE 1 sorteio de duas bolas SEM reposição (evento dependente) da urna `urna = ['V', 'V', 'A']`?",
+          "alternativas": [
+            { "letra": "A", "texto": "sorteio = random.sample(urna, k=2)", "correta": true },
+            { "letra": "B", "texto": "sorteio = [random.choice(urna), random.choice(urna)]", "correta": false },
+            { "letra": "C", "texto": "sorteio = random.choices(urna, k=2)", "correta": false },
+            { "letra": "D", "texto": "sorteio = random.choice(urna) + random.choice(urna)", "correta": false }
+          ],
+          "justificativas": {
+            "B": "Incorreto. `choice` permite reposição. Poderia sortear ['A', 'A'], o que é impossível (só há uma 'A').",
+            "C": "Incorreto. `choices` também permite reposição.",
+            "D": "Incorreto. Isso tentaria somar strings (ex: 'V' + 'A' = 'VA'), não criar uma lista de sorteio."
+          }
+        },
+        {
+          "id": 5,
+          "enunciado": "No slide \"Analisando uma Simulação: Urna de Bolas\", qual `for` é usado para repetir o experimento 10.000 vezes?",
+          "alternativas": [
+            { "letra": "A", "texto": "for i in range(10000):", "correta": true },
+            { "letra": "B", "texto": "for i in range(1, 10000):", "correta": false },
+            { "letra": "C", "texto": "for i in [10000]:", "correta": false },
+            { "letra": "D", "texto": "while i < 10000:", "correta": false }
+          ],
+          "justificativas": {
+            "B": "Incorreto. `range(1, 10000)` vai de 1 até 9999, executando apenas 9.999 vezes.",
+            "C": "Incorreto. Isso executa o laço 1 vez, com `i` valendo 10000.",
+            "D": "Incorreto. `while` é válido, mas o slide usa `for`, e este `while` está incompleto (falta `i=0` e `i+=1`)."
+          }
+        },
+        {
+          "id": 6,
+          "enunciado": "No \"Desafio 5: Meu tempo de chegada\", temos os dados: `[25, 30, 28, 60, 29]`. O valor '60' é um 'outlier'. Qual medida descreve melhor a viagem \"normal\"?",
+          "alternativas": [
+            { "letra": "A", "texto": "A Mediana (o valor do meio: 29)", "correta": true },
+            { "letra": "B", "texto": "A Média (a soma dividida por 5: 34.4)", "correta": false },
+            { "letra": "C", "texto": "O Valor Máximo (60)", "correta": false },
+            { "letra": "D", "texto": "random.choice()", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. Ordenado: [25, 28, *29*, 30, 60]. A mediana (29) ignora o extremo ('outlier') 60.",
+            "B": "Incorreto. A Média (34.4) é \"puxada\" para cima pelo 60 e não representa bem a rotina (25-30)."
+          }
+        },
+        {
+          "id": 7,
+          "enunciado": "No \"Desafio 8: Chuva = Atraso?\", os dados são: 10 dias choveu (8 atrasos); 20 dias não choveu (2 atrasos). Qual a P(Atraso | Choveu)? (Probabilidade de Atrasar, *dado que* choveu).",
+          "alternativas": [
+            { "letra": "A", "texto": "8 / 10 (80%)", "correta": true },
+            { "letra": "B", "texto": "8 / 30 (Total de dias)", "correta": false },
+            { "letra": "C", "texto": "10 / 30 (Total de dias de chuva)", "correta": false },
+            { "letra": "D", "texto": "10 / 18 (Total de atrasos e chuvas)", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. A probabilidade condicional P(A|B) foca no universo B. O universo é \"dias que choveu\" (10). Os atrasos *nesse* universo foram 8."
+          }
+        },
+        {
+          "id": 8,
+          "enunciado": "No \"Desafio 10: O viés da derrota\", uma pessoa joga 10 vezes numa rifa de 100 números (chance 1%) e não ganha nenhuma. O que isso prova?",
+          "alternativas": [
+            { "letra": "A", "texto": "Que 10 tentativas é uma amostra pequena e não ganhar é estatisticamente normal.", "correta": true },
+            { "letra": "B", "texto": "Que a rifa é viciada.", "correta": false },
+            { "letra": "C", "texto": "Que a chance de 1% está errada.", "correta": false },
+            { "letra": "D", "texto": "Que `random.sample` está quebrado.", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. Probabilidade não é garantia em poucas tentativas (variação amostral).",
+            "B": "Incorreto. Não se pode provar isso com uma amostra tão pequena.",
+            "C": "Incorreto. 1% é a chance teórica; o resultado empírico (0/10) não a invalida."
+          }
+        },
+        {
+          "id": 9,
+          "enunciado": "Qual a diferença principal entre Eventos Independentes (Lançar Moeda) e Dependentes (Tirar Carta sem devolver), segundo o Anexo?",
+          "alternativas": [
+            { "letra": "A", "texto": "Independentes (choice): as opções não mudam. Dependentes (sample): as opções diminuem.", "correta": true },
+            { "letra": "B", "texto": "Independentes (sample): as opções não mudam. Dependentes (choice): as opções diminuem.", "correta": false },
+            { "letra": "C", "texto": "Independentes usam `weights`, Dependentes não.", "correta": false },
+            { "letra": "D", "texto": "Eventos independentes são justos, dependentes são injustos.", "correta": false }
+          ],
+          "justificativas": {
+            "B": "Incorreto. As funções estão trocadas. `choice` (indep.) e `sample` (depend.).",
+            "C": "Incorreto. `choices` (independente) pode usar `weights`, mas isso não define a dependência.",
+            "D": "Incorreto. A justiça depende da regra (Desafio 4). Usar `choice` para vagas (dependente) é injusto."
+          }
+        },
+        {
+          "id": 10,
+          "enunciado": "Na \"Atividade 2: Montando Times\", `time_a = random.sample(jogadores, k=3)`. Qual a forma correta de criar o `time_b` com os jogadores restantes?",
+          "alternativas": [
+            { "letra": "A", "texto": "time_b = [j for j in jogadores if j not in time_a]", "correta": true },
+            { "letra": "B", "texto": "time_b = random.sample(jogadores, k=3)", "correta": false },
+            { "letra": "C", "texto": "time_b = jogadores - time_a", "correta": false },
+            { "letra": "D", "texto": "time_b = [j for j in jogadores if j in time_a]", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. Isso (ou o loop `for` do Anexo) percorre a lista original e adiciona quem NÃO está no time A.",
+            "B": "Incorreto. Isso sortearia 3 de novo da lista original, podendo pegar alguém que já está no time A.",
+            "C": "Incorreto. O operador `-` não funciona para subtrair listas em Python (funcionaria com `set`).",
+            "D": "Incorreto. Isso criaria uma cópia do `time_a`, não o time restante."
+          }
+        },
+        {
+          "id": 11,
+          "enunciado": "Queremos sortear 3 alunos diferentes de uma turma de 20. Qual comando é correto e justo (sem repetição)?",
+          "alternativas": [
+            { "letra": "A", "texto": "selecionados = random.sample(alunos, k=3)", "correta": true },
+            { "letra": "B", "texto": "selecionados = random.choice(alunos, 3)", "correta": false },
+            { "letra": "C", "texto": "selecionados = random.choices(alunos, k=3)", "correta": false },
+            { "letra": "D", "texto": "selecionados = [random.choice(alunos) for i in range(3)]", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. `random.sample()` sorteia sem repetição, garantindo justiça.",
+            "B": "Incorreto. `random.choice` não aceita parâmetro de quantidade.",
+            "C": "Incorreto. `random.choices` permite repetição.",
+            "D": "Incorreto. A compreensão de lista usa `choice`, que pode repetir nomes."
+          }
+        },
+        {
+          "id": 12,
+          "enunciado": "Num experimento, cada face de um dado tem probabilidades diferentes: [10%, 10%, 10%, 10%, 10%, 50%]. Qual função usar corretamente?",
+          "alternativas": [
+            { "letra": "A", "texto": "random.choices([1,2,3,4,5,6], weights=[0.1]*5 + [0.5])[0]", "correta": true },
+            { "letra": "B", "texto": "random.choice([1,2,3,4,5,6], weights=[0.1]*5 + [0.5])", "correta": false },
+            { "letra": "C", "texto": "random.sample([1,2,3,4,5,6], k=1, weights=[0.1]*5 + [0.5])", "correta": false },
+            { "letra": "D", "texto": "random.choice([1,2,3,4,5,6,6,6,6,6])", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. Somente `random.choices` aceita o parâmetro `weights`.",
+            "B": "Incorreto. `choice` não aceita `weights`.",
+            "C": "Incorreto. `sample` não aceita `weights`.",
+            "D": "Incorreto. Repetir números não produz as probabilidades exatas."
+          }
+        },
+        {
+          "id": 13,
+          "enunciado": "Uma urna tem 4 bolas vermelhas e 1 azul. Tiramos 2 sem reposição. Qual a chance das duas serem vermelhas?",
+          "alternativas": [
+            { "letra": "A", "texto": "3 / 5", "correta": true },
+            { "letra": "B", "texto": "16 / 25", "correta": false },
+            { "letra": "C", "texto": "2 / 5", "correta": false },
+            { "letra": "D", "texto": "3 / 10", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. (4/5) * (3/4) = 3/5, evento dependente (sem reposição).",
+            "B": "Incorreto. Esse seria o caso de eventos independentes.",
+            "C": "Incorreto. Valor incorreto.",
+            "D": "Incorreto. Não representa o produto das probabilidades corretas."
+          }
+        },
+        {
+          "id": 14,
+          "enunciado": "Queremos simular 1 lançamento de moeda (cara/coroa). Qual código é mais simples e correto?",
+          "alternativas": [
+            { "letra": "A", "texto": "random.choice(['Cara', 'Coroa'])", "correta": true },
+            { "letra": "B", "texto": "random.sample(['Cara', 'Coroa'], k=2)", "correta": false },
+            { "letra": "C", "texto": "random.choices(['Cara', 'Coroa'], k=0)", "correta": false },
+            { "letra": "D", "texto": "random.choice(['Cara', 'Coroa'], k=1)", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. `random.choice` retorna um único elemento da lista.",
+            "B": "Incorreto. `sample` com k=2 retornaria ambas as faces.",
+            "C": "Incorreto. `k=0` não gera resultado algum.",
+            "D": "Incorreto. `choice` não aceita parâmetro `k`."
+          }
+        },
+        {
+          "id": 15,
+          "enunciado": "Qual comando gera 100 lançamentos de uma moeda, guardando os resultados em uma lista?",
+          "alternativas": [
+            { "letra": "A", "texto": "resultados = [random.choice(['C', 'K']) for _ in range(100)]", "correta": true },
+            { "letra": "B", "texto": "resultados = random.choice(['C', 'K']*100)", "correta": false },
+            { "letra": "C", "texto": "resultados = random.sample(['C', 'K'], k=100)", "correta": false },
+            { "letra": "D", "texto": "resultados = random.choices(['C', 'K'], k=1)", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. A compreensão de lista repete o sorteio 100 vezes.",
+            "B": "Incorreto. `choice` retorna apenas um valor.",
+            "C": "Incorreto. `sample` não permite k maior que o tamanho da lista.",
+            "D": "Incorreto. `k=1` retornaria apenas um lançamento."
+          }
+        },
+        {
+          "id": 16,
+          "enunciado": "Você mede o tempo de viagem em minutos: [22, 24, 23, 90, 25]. Qual medida melhor representa o padrão?",
+          "alternativas": [
+            { "letra": "A", "texto": "A Mediana (24)", "correta": true },
+            { "letra": "B", "texto": "A Média (36.8)", "correta": false },
+            { "letra": "C", "texto": "O Valor Mínimo (22)", "correta": false },
+            { "letra": "D", "texto": "O Valor Máximo (90)", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. A mediana é resistente a valores extremos (outliers).",
+            "B": "Incorreto. A média é distorcida pelo 90.",
+            "C": "Incorreto. O mínimo ignora os demais valores.",
+            "D": "Incorreto. O máximo representa um caso atípico."
+          }
+        },
+        {
+          "id": 17,
+          "enunciado": "Em uma pesquisa: 40% gostam de café, 60% não. Para simular isso 100 vezes:",
+          "alternativas": [
+            { "letra": "A", "texto": "random.choices(['Café', 'Sem café'], weights=[0.4, 0.6], k=100)", "correta": true },
+            { "letra": "B", "texto": "random.sample(['Café', 'Sem café'], k=100)", "correta": false },
+            { "letra": "C", "texto": "random.choice(['Café', 'Sem café'], weights=[0.4, 0.6])", "correta": false },
+            { "letra": "D", "texto": "random.choices(['Café', 'Sem café'], k=1)", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. `random.choices` com `weights` e `k` repete a simulação com as proporções corretas.",
+            "B": "Incorreto. `sample` não aceita `weights`.",
+            "C": "Incorreto. `choice` não aceita `weights` e gera só um valor.",
+            "D": "Incorreto. `k=1` não repete 100 vezes."
+          }
+        },
+        {
+          "id": 18,
+          "enunciado": "Qual código simula corretamente o sorteio de duas cartas de um baralho sem reposição?",
+          "alternativas": [
+            { "letra": "A", "texto": "cartas = random.sample(baralho, k=2)", "correta": true },
+            { "letra": "B", "texto": "cartas = random.choices(baralho, k=2)", "correta": false },
+            { "letra": "C", "texto": "cartas = [random.choice(baralho), random.choice(baralho)]", "correta": false },
+            { "letra": "D", "texto": "cartas = random.choice(baralho, 2)", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. `sample` simula eventos dependentes (sem reposição).",
+            "B": "Incorreto. `choices` permite repetição.",
+            "C": "Incorreto. `choice` pode repetir cartas.",
+            "D": "Incorreto. `choice` não aceita argumento de quantidade."
+          }
+        },
+        {
+          "id": 19,
+          "enunciado": "Num sorteio com 1000 bilhetes, você compra 5. A chance de não ganhar é aproximadamente:",
+          "alternativas": [
+            { "letra": "A", "texto": "995 / 1000 (99,5%)", "correta": true },
+            { "letra": "B", "texto": "5 / 1000 (0,5%)", "correta": false },
+            { "letra": "C", "texto": "1 - (1/1000)^5", "correta": false },
+            { "letra": "D", "texto": "1 / 5 (20%)", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. A chance de perder em uma tentativa é 995/1000 ≈ 99,5%.",
+            "B": "Incorreto. Essa é a chance de ganhar com 1 bilhete, não de perder.",
+            "C": "Incorreto. Fórmula incorreta para perda cumulativa.",
+            "D": "Incorreto. 1/5 não tem relação com o total de bilhetes."
+          }
+        },
+        {
+          "id": 20,
+          "enunciado": "Qual comando repete um experimento 5.000 vezes e soma quantas vezes o resultado foi 'Vermelho'?",
+          "alternativas": [
+            { "letra": "A", "texto": "cont = 0\\nfor i in range(5000):\\n    if random.choice(['V','A']) == 'V':\\n        cont += 1", "correta": true },
+            { "letra": "B", "texto": "while i < 5000: cont += 1", "correta": false },
+            { "letra": "C", "texto": "for i in [5000]: cont += 1", "correta": false },
+            { "letra": "D", "texto": "random.sample(['V','A'], k=5000)", "correta": false }
+          ],
+          "justificativas": {
+            "A": "Correto. O laço `for range(5000)` repete o experimento 5000 vezes e conta resultados.",
+            "B": "Incorreto. `i` não foi inicializado nem incrementado.",
+            "C": "Incorreto. Executa apenas uma vez.",
+            "D": "Incorreto. `sample` não permite k maior que o tamanho da lista."
+          }
+        }
+      ]
+    };
     let acertosCount = 0;
     const questoesRespondidas = {};
 
@@ -471,7 +476,7 @@
       }
     }
 
-    $(document).on('click', '.alternativa', function() {
+    $(document).on('click', '.alternativa', function () {
       const btn = $(this);
       const questaoId = btn.data('questao-id');
       const correta = btn.data('correta');
@@ -499,16 +504,17 @@
       } else {
         btn.addClass('bg-red-100 border-red-500');
         btn.find('.icon-alternativa').text('cancel').removeClass('text-gray-400').addClass('text-red-500');
-        
+
         const justificativa = questao.justificativas[letra];
         questaoCard.find('.justificativa-texto').text(justificativa);
         questaoCard.find('.justificativa-container').removeClass('hidden');
       }
     });
 
-    $(document).ready(function() {
+    $(document).ready(function () {
       renderizarQuestoes();
     });
   </script>
 </body>
+
 </html>
