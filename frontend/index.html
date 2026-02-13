@@ -607,6 +607,91 @@
       });
     }
 
+    function renderJsonActivity(data) {
+      const frame = document.getElementById('activityContentFrame');
+      frame.innerHTML = ''; // Clear existing content
+      // Clean white background, no outer padding constraint
+      frame.className = 'w-full flex-1 min-h-[250px] bg-white rounded-md overflow-y-auto p-4 md:p-8 custom-scrollbar';
+
+      // Header Section (Simplified, centered)
+      const header = document.createElement('div');
+      header.className = 'mb-8 md:mb-12 text-center max-w-3xl mx-auto';
+
+      const title = document.createElement('h1');
+      title.className = 'text-2xl md:text-3xl font-bold text-gray-800 mb-3';
+      title.textContent = data.meta?.title || data.title || 'Atividade';
+      header.appendChild(title);
+
+      if (data.meta?.description || data.description) {
+        const desc = document.createElement('p');
+        desc.className = 'text-gray-500 text-base md:text-lg';
+        desc.textContent = data.meta?.description || data.description;
+        header.appendChild(desc);
+      }
+      frame.appendChild(header);
+
+      // Questions Container
+      const contentArea = document.createElement('div');
+      contentArea.className = 'space-y-5 max-w-4xl mx-auto';
+
+      if (!data.questions || data.questions.length === 0) {
+        contentArea.innerHTML = `
+          <div class="text-center py-10">
+            <span class="material-icons text-gray-300 text-5xl mb-4">description</span>
+            <p class="text-gray-500 italic">Nenhuma questão encontrada nesta atividade.</p>
+          </div>`;
+      } else {
+        data.questions.forEach((q, index) => {
+          // Question Card
+          const qCard = document.createElement('div');
+          qCard.className = 'p-2 md:p-4 border border-gray-200 rounded-2xl bg-white hover:border-indigo-200 hover:shadow-lg transition-all duration-300 relative group';
+
+          // Badge
+          const badge = document.createElement('span');
+          badge.className = 'absolute -top-3 -left-3 bg-indigo-600 text-white text-sm font-bold w-8 h-8 flex items-center justify-center rounded-lg shadow-md group-hover:scale-110 transition-transform';
+          badge.textContent = `${index + 1}`;
+          qCard.appendChild(badge);
+
+          // Title (Optional)
+          if (q.title && q.title !== `Questão ${index + 1}`) {
+            const qTitle = document.createElement('h4');
+            qTitle.className = 'text-lg font-bold text-gray-800 ml-1';
+            qTitle.textContent = q.title;
+            qCard.appendChild(qTitle);
+          }
+
+          // Content
+          const content = document.createElement('div');
+          content.className = 'text-gray-700 text-base md:text-lg leading-relaxed prose prose-indigo max-w-none';
+          content.style.whiteSpace = 'pre-wrap';
+          content.innerHTML = q.content.replace(/\n/g, '<br>');
+          qCard.appendChild(content);
+
+          // Options
+          if (q.options && q.options.length > 0) {
+            const optionsList = document.createElement('div');
+            optionsList.className = 'grid grid-cols-1 gap-3';
+
+            q.options.forEach((opt, optIndex) => {
+              const label = String.fromCharCode(65 + optIndex);
+              const optItem = document.createElement('div');
+              optItem.className = 'flex items-center p-3 rounded-xl border border-gray-100 hover:bg-indigo-50 hover:border-indigo-200 cursor-pointer transition-colors';
+              optItem.innerHTML = `
+                <span class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-700 font-bold mr-4 text-sm">${label}</span>
+                <span class="text-gray-700 font-medium">${opt.text}</span>
+              `;
+              optionsList.appendChild(optItem);
+            });
+            qCard.appendChild(optionsList);
+          }
+
+          contentArea.appendChild(qCard);
+        });
+      }
+
+      frame.appendChild(contentArea);
+    }
+
     function showActivityModal(atividade) {
       currentActivityId = atividade.id;
       document.getElementById('alunoNome').value = localStorage.getItem('alunoNome') || '';
@@ -614,7 +699,19 @@
       document.getElementById('activityModalTitle').textContent = atividade.titulo;
       const frame = document.getElementById('activityContentFrame');
 
-      if (atividade.caminho) {
+      // Reset Styles
+      frame.className = 'w-full flex-1 min-h-[250px] bg-white rounded-md overflow-hidden';
+      frame.innerHTML = '';
+
+      if (atividade.json_data) {
+        try {
+          const data = JSON.parse(atividade.json_data);
+          renderJsonActivity(data);
+        } catch (e) {
+          console.error("Erro ao parsear JSON da atividade", e);
+          frame.innerHTML = `<div class="p-4 text-center text-red-500">Erro ao carregar formato da atividade.</div>`;
+        }
+      } else if (atividade.caminho) {
         frame.innerHTML = `<iframe src="${atividade.caminho + "?nocache=" + Date.now()}" class="w-full h-full border-0 rounded-md"></iframe>`;
       } else {
         frame.innerHTML = `<div class="p-4 text-center text-gray-500 flex items-center justify-center h-full">Nenhum conteúdo de apoio.</div>`;
