@@ -19,10 +19,12 @@ CREATE TABLE IF NOT EXISTS turmas (
     cor VARCHAR(50),
     icone VARCHAR(50),
     senha VARCHAR(255),
-    descricao TEXT, -- Added from 20260211120004
     criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ensure description exists (idempotent addition)
+ALTER TABLE turmas ADD COLUMN IF NOT EXISTS descricao TEXT;
 
 CREATE TABLE IF NOT EXISTS aulas (
     id SERIAL PRIMARY KEY,
@@ -32,10 +34,13 @@ CREATE TABLE IF NOT EXISTS aulas (
     icone VARCHAR(50),
     descricao TEXT,
     ordem INTEGER DEFAULT 0,
-    conteudo_md TEXT, -- Added from 20260213120000
     criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ensure columns exist
+ALTER TABLE aulas ADD COLUMN IF NOT EXISTS conteudo_md TEXT;
+ALTER TABLE aulas ADD COLUMN IF NOT EXISTS ordem INTEGER DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS atividades (
     id SERIAL PRIMARY KEY,
@@ -45,14 +50,16 @@ CREATE TABLE IF NOT EXISTS atividades (
     descricao TEXT,
     caminho VARCHAR(255) NOT NULL,
     icone VARCHAR(50),
-    json_data TEXT, -- Added from 20260213000000
-    tipo TEXT DEFAULT 'normal', -- Added from 20260213000000
-    senha TEXT, -- Added from 20260213000000
-    allow_password BOOLEAN DEFAULT FALSE, -- Added from 20260213000000
-    ordem INTEGER DEFAULT 0, -- Added from 20260213150000
     criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ensure columns exist
+ALTER TABLE atividades ADD COLUMN IF NOT EXISTS json_data TEXT;
+ALTER TABLE atividades ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'normal';
+ALTER TABLE atividades ADD COLUMN IF NOT EXISTS senha TEXT;
+ALTER TABLE atividades ADD COLUMN IF NOT EXISTS allow_password BOOLEAN DEFAULT FALSE;
+ALTER TABLE atividades ADD COLUMN IF NOT EXISTS ordem INTEGER DEFAULT 0;
 
 -- Triggers
 
