@@ -57,6 +57,7 @@ pub struct Aula {
     pub icone: Option<String>,
     pub descricao: Option<String>,
     pub ordem: i32,
+    pub conteudo_md: Option<String>,
     pub criado_em: Option<DateTime<Utc>>,
     pub atualizado_em: Option<DateTime<Utc>>,
 }
@@ -69,6 +70,7 @@ pub struct NewAula {
     pub icone: Option<String>,
     pub descricao: Option<String>,
     pub ordem: i32,
+    pub conteudo_md: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -80,6 +82,11 @@ pub struct Atividade {
     pub descricao: Option<String>,
     pub caminho: String,
     pub icone: Option<String>,
+    pub json_data: Option<String>,
+    pub tipo: Option<String>,
+    pub senha: Option<String>,
+    pub allow_password: Option<bool>,
+    pub ordem: Option<i32>,
     pub criado_em: Option<DateTime<Utc>>,
     pub atualizado_em: Option<DateTime<Utc>>,
 }
@@ -92,6 +99,11 @@ pub struct NewAtividade {
     pub descricao: Option<String>,
     pub caminho: String,
     pub icone: Option<String>,
+    pub json_data: Option<String>,
+    pub tipo: Option<String>,
+    pub senha: Option<String>,
+    pub allow_password: Option<bool>,
+    pub ordem: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

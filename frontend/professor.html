@@ -212,14 +212,14 @@
     </div>
 
     <!-- Metadata Inputs -->
-    <div class="grid grid-cols-12 gap-4 p-4 border-b border-gray-200 bg-white">
-      <div class="col-span-8">
+    <div class="grid grid-cols-12 border-b border-gray-200 bg-white">
+      <div class="col-span-6">
         <input type="text" id="marpTitulo" placeholder="Título da Aula"
-          class="w-full text-xl font-bold placeholder-gray-300 border-none focus:ring-0 text-gray-800 outline-none">
+          class="w-full text-xl font-bold placeholder-gray-400 border  focus:border-indigo-500 px-4 py-2 text-gray-800 outline-none transition">
       </div>
-      <div class="col-span-4">
-        <input type="text" id="marpDescricao" placeholder="Breve descrição (opcional)"
-          class="w-full text-sm text-gray-600 border-none focus:ring-0 outline-none">
+      <div class="col-span-6">
+        <input type="text" id="marpDescricao" placeholder="Descrição"
+          class="w-full text-lg text-gray-700 placeholder-gray-400 border focus:border-indigo-500 px-4 py-2 outline-none transition">
       </div>
     </div>
 
@@ -283,6 +283,7 @@
   <script type="module">
     import { apiClient } from './global/api-client.js';
     import { showSuccessModal, showErrorModal, showConfirmModal, showLoadingModal, hideLoadingModal } from './global/alert-modals.js';
+    import { ActivityEditor } from './global/json-activity-editor.js';
     import { Marp } from "https://esm.sh/@marp-team/marp-core@3";
 
     let currentTurma = null;
@@ -293,6 +294,7 @@
     let marpTimeout = null;
     let editingAulaId = null;
     let editingAulaData = null;
+    let activityEditor = null;
 
     // --- Auth ---
     async function checkAuth() {
@@ -342,7 +344,10 @@
       $('#viewTurmaDesc').text(t.descricao || 'Sem descrição.');
 
       const full = await apiClient.get(`/turmas/${id}`);
-      if (full.success) loadContent(id, full.data.senha);
+      if (full.success) {
+        currentTurma = full.data;
+        loadContent(id, full.data.senha);
+      }
     };
 
     // --- Aulas/Atividades ---
@@ -382,7 +387,8 @@
     // --- Ordenação ---
     function updateVisualNumbers(containerId) {
       $(`#${containerId} > div`).each((i, el) => {
-        const num = i.toString().padStart(2, '0');
+        // Simple sequential number: 1, 2, 3...
+        const num = (i + 1).toString();
         $(el).find('.icon-label').text(num);
       });
     }
@@ -436,7 +442,15 @@
 
       hideLoadingModal();
       await showSuccessModal('Ordem salva com sucesso!');
-      location.reload();
+      if (currentTurma) {
+        await loadContent(currentTurma.id, currentTurma.senha);
+        // Reset UI state
+        $('#btnSaveOrder').hide();
+        $('#btnEditOrder').show();
+        isEditingOrder = false;
+      } else {
+        location.reload();
+      }
     });
 
     // --- CRUD Modals ---
@@ -459,7 +473,29 @@
         e.preventDefault();
         const data = {};
         fields.forEach(f => data[f.name] = $(`#f_${f.name}`).val());
-        if (await onSubmit(data)) location.reload();
+        if (await onSubmit(data)) {
+          $('#formModal').hide();
+          // Se estivermos dentro de uma turma e não for edição da própria turma (ou se for e quisermos atualizar o cabeçalho, mas simplificando)
+          // Se for edição de aula/atividade, refresh content
+          // Se for edição de Turma, talvez reload seja melhor ou atualizar cabeçalho?
+          // O modal genérico é usado para Turma e Atividade.
+          if (currentTurma && $('#detalhesView').is(':visible')) {
+            // Se editou a turma atual, atualiza título
+            if ($('#modalTitle').text().includes('Turma')) {
+              // Recarrega tudo para garantir
+              const t = await apiClient.get(`/turmas/${currentTurma.id}`);
+              if (t.success) {
+                currentTurma = t.data;
+                $('#viewTurmaNome').text(t.data.nome);
+                $('#viewTurmaDesc').text(t.data.descricao || 'Sem descrição.');
+              }
+            }
+            // Refresh nas listas
+            await loadContent(currentTurma.id, currentTurma.senha);
+          } else {
+            location.reload();
+          }
+        }
       });
       $('#formModal').css('display', 'flex').show();
     }
@@ -472,7 +508,7 @@
       $('#marpTitulo').val(existing ? existing.titulo : '');
       $('#marpDescricao').val(existing ? existing.descricao : '');
 
-      // Default content
+      // Default content or existing markdown
       const defaultMarp = `---
 marp: true
 theme: default
@@ -491,7 +527,7 @@ Comece a editar aqui...
 - Tópico 2
 `;
 
-      $('#marpEditor').val(defaultMarp);
+      $('#marpEditor').val(existing && existing.conteudo_md ? existing.conteudo_md : defaultMarp);
       $('#marpModal').addClass('active');
 
       if (!marpInstance) {
@@ -525,7 +561,8 @@ Comece a editar aqui...
         ordem = editingAulaData.ordem;
       } else {
         const currentCount = $('#aulasList > div[data-id]').length;
-        icone = currentCount.toString().padStart(2, '0');
+        // Simple sequential number for new items too
+        icone = (currentCount + 1).toString();
         ordem = currentCount;
       }
 
@@ -551,9 +588,15 @@ Comece a editar aqui...
         hideLoadingModal();
 
         if (result && result.success) {
-          await showSuccessModal("Aula salva com sucesso!");
           closeMarpModal();
-          location.reload();
+          await showSuccessModal("Aula salva com sucesso!");
+          // Atualiza o conteúdo da turma sem recarregar a página
+          if (currentTurma) {
+            await loadContent(currentTurma.id, currentTurma.senha);
+          } else {
+            location.reload(); // Fallback
+          }
+
         } else {
           showErrorModal("Erro ao salvar aula: " + (result?.message || "Erro desconhecido"));
         }
@@ -640,14 +683,32 @@ Comece a editar aqui...
     };
 
     window.openAtvModal = async (existing = null) => {
-      openModal(existing ? 'Editar Atividade' : 'Nova Atividade', [
-        { name: 'titulo', label: 'Título', value: existing?.titulo, required: true },
-        { name: 'caminho', label: 'Caminho', value: existing?.caminho, required: true },
-        { name: 'descricao', label: 'Descrição', value: existing?.descricao, type: 'textarea' }
-      ], async (data) => {
-        const payload = { ...data, turma_id: currentTurma.id, icone: existing?.icone || '00', external_id: existing?.external_id || '', ordem: 0 };
-        return (existing ? await apiClient.put(`/atividades/${existing.id}`, payload) : await apiClient.post('/atividades', payload)).success;
-      });
+      if (!activityEditor) {
+        activityEditor = new ActivityEditor(async (id, data) => {
+          showLoadingModal("Salvando atividade...");
+          const payload = { ...data, turma_id: currentTurma.id, icone: existing?.icone || ($('#atividadesList > div').length + 1).toString(), external_id: existing?.external_id || '', ordem: existing?.ordem || 0 };
+
+          try {
+            const res = id
+              ? await apiClient.put(`/atividades/${id}`, payload, { silent: true })
+              : await apiClient.post('/atividades', payload, { silent: true });
+
+            hideLoadingModal();
+
+            if (res.success) {
+              await showSuccessModal("Atividade salva com sucesso!");
+              if (currentTurma) await loadContent(currentTurma.id, currentTurma.senha);
+              else location.reload();
+            } else {
+              showErrorModal("Erro: " + res.message);
+            }
+          } catch (err) {
+            hideLoadingModal();
+            showErrorModal("Erro ao salvar: " + err.message);
+          }
+        });
+      }
+      activityEditor.open(existing);
     };
 
     window.editItem = async (listId, id) => {
@@ -658,7 +719,13 @@ Comece a editar aqui...
 
     window.deleteItem = async (type, id) => {
       if (await showConfirmModal('Excluir permanentemente?')) {
-        if ((await apiClient.delete(`/${type}/${id}`)).success) location.reload();
+        if ((await apiClient.delete(`/${type}/${id}`)).success) {
+          if (currentTurma && type !== 'turmas') {
+            await loadContent(currentTurma.id, currentTurma.senha);
+          } else {
+            location.reload();
+          }
+        }
       }
     };
 

@@ -40,19 +40,66 @@ pub async fn list_atividades(
     }
 }
 
+#[derive(Deserialize)]
+pub struct GetAtividadeQuery {
+    pub senha: Option<String>,
+}
+
 pub async fn get_atividade(
     Path(id): Path<i32>,
+    Query(query): Query<GetAtividadeQuery>,
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
 ) -> impl IntoResponse {
     let pg = match &state.pg_db {
         Some(pg) => pg,
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "Postgres not initialized").into_response(),
     };
 
-    match pg.get_atividade(id).await {
-        Ok(Some(atv)) => Json(atv).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "Atividade not found").into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response(),
+    // 1. Fetch Atividade
+    let mut atv = match pg.get_atividade(id).await {
+        Ok(Some(a)) => a,
+        Ok(None) => return (StatusCode::NOT_FOUND, "Atividade not found").into_response(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response(),
+    };
+
+    // 2. Professor Auth Bypass
+    let prof_pass = std::env::var("PROFESSOR_PASSWORD").unwrap_or_else(|_| "admin123".to_string());
+    if let Some(header_pass) = headers.get("X-Professor-Password") {
+        if let Ok(p) = header_pass.to_str() {
+            if p == prof_pass {
+                return Json(atv).into_response(); // Professor has full access
+            }
+        }
+    }
+
+    // 3. Fetch Turma for context
+    let turma = match pg.get_turma(atv.turma_id).await {
+        Ok(Some(t)) => t,
+        Ok(None) => return (StatusCode::INTERNAL_SERVER_ERROR, "Turma not found for activity").into_response(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response(),
+    };
+
+    // 4. Student Auth Logic
+    let input_senha = query.senha.as_deref().unwrap_or("");
+    let turma_senha = turma.senha.as_deref().unwrap_or("");
+    let atv_senha = atv.senha.as_deref().unwrap_or("");
+    let is_protected = atv.allow_password.unwrap_or(false);
+
+    if input_senha == atv_senha && is_protected {
+        // Authenticated with specific Activity Password -> Full Access
+        return Json(atv).into_response();
+    } else if input_senha == turma_senha {
+        // Authenticated with Class Password
+        if is_protected {
+            // Protected activity -> Return Metadata ONLY (Redact JSON)
+            atv.json_data = None;
+            // Optionally redact other sensitive fields if any
+        }
+        return Json(atv).into_response();
+    } else {
+         // Invalid password
+         return (StatusCode::UNAUTHORIZED, "Senha incorreta").into_response();
     }
 }
 

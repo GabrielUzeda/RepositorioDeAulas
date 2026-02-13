@@ -28,7 +28,7 @@ class ApiClient {
     getProfessorPassword() {
         const auth = sessionStorage.getItem('professor_auth');
         if (!auth) return null;
-        
+
         try {
             const { password, expiry } = JSON.parse(auth);
             if (Date.now() > expiry) {
@@ -36,7 +36,7 @@ class ApiClient {
                 return null;
             }
             return password;
-        } catch(e) {
+        } catch (e) {
             return null;
         }
     }
@@ -76,15 +76,15 @@ class ApiClient {
             }
 
             if (!response.ok) {
-                const errorMessage = (typeof result === 'object' && result.message) 
-                    ? result.message 
+                const errorMessage = (typeof result === 'object' && result.message)
+                    ? result.message
                     : (typeof result === 'string' && result.length < 100 ? result : `Erro ${response.status}`);
-                
+
                 // Tenta usar o modal global se disponível e aguarda interação
                 if (!options.silent && window.showErrorModal) {
                     await window.showErrorModal(errorMessage);
                 }
-                
+
                 return { success: false, message: errorMessage, status: response.status };
             }
 
