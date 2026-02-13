@@ -1,1 +1,0 @@
-ALTER TABLE atividades ADD COLUMN ordem INTEGER DEFAULT 0;
