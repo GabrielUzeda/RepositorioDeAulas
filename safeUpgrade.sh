@@ -19,7 +19,9 @@ echo -e "${GREEN}=== Iniciando Processo de Deploy Seguro ===${NC}"
 
 # 1. Carregar variáveis de ambiente (se existirem)
 if [ -f .env ]; then
-    export $(cat .env | xargs)
+    set -a
+    source .env
+    set +a
     echo -e "${GREEN}[OK]${NC} Variáveis de ambiente carregadas."
 else
     echo -e "${RED}[ERROR]${NC} Arquivo .env não encontrado. Abortando deploy."
