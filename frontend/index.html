@@ -230,13 +230,13 @@
       </div>
 
       <!-- Content -->
-      <div class="p-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1">
+      <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0 overflow-hidden">
         <!-- Left Column -->
-        <div class="h-full flex flex-col min-h-[350px] min-w-[280px]">
+        <div class="h-full flex flex-col min-h-[350px] min-w-[280px] overflow-hidden">
           <!-- Activity Content -->
-          <div id="activityContent" class="rounded-lg flex-1 flex flex-col">
+          <div id="activityContent" class="rounded-lg flex-1 flex flex-col overflow-hidden">
 
-            <div id="activityContentFrame" class="w-full flex-1 min-h-[250px]  bg-white rounded-md overflow-hidden">
+            <div id="activityContentFrame" class="w-full flex-1 bg-white rounded-md overflow-y-auto custom-scrollbar">
               <!-- Content will be loaded here -->
             </div>
           </div>
@@ -610,8 +610,10 @@
     function renderJsonActivity(data) {
       const frame = document.getElementById('activityContentFrame');
       frame.innerHTML = ''; // Clear existing content
-      // Clean white background, no outer padding constraint
-      frame.className = 'w-full flex-1 min-h-[250px] bg-white rounded-md overflow-y-auto p-4 md:p-8 custom-scrollbar';
+      // Clean white background, ensuring scroll. 
+      // Important: Using flex-1 and overflow-y-auto in the HTML structure now.
+      // We just ensure the classes are correct here.
+      frame.className = 'w-full flex-1 bg-white rounded-md overflow-y-auto p-4 md:p-8 custom-scrollbar';
 
       // Header Section (Simplified, centered)
       const header = document.createElement('div');
@@ -644,7 +646,7 @@
         data.questions.forEach((q, index) => {
           // Question Card
           const qCard = document.createElement('div');
-          qCard.className = 'p-2 md:p-4 border border-gray-200 rounded-2xl bg-white hover:border-indigo-200 hover:shadow-lg transition-all duration-300 relative group';
+          qCard.className = 'p-4 md:p-6 border border-gray-200 rounded-2xl bg-white hover:border-indigo-200 hover:shadow-lg transition-all duration-300 relative group';
 
           // Badge
           const badge = document.createElement('span');
@@ -655,7 +657,7 @@
           // Title (Optional)
           if (q.title && q.title !== `Questão ${index + 1}`) {
             const qTitle = document.createElement('h4');
-            qTitle.className = 'text-lg font-bold text-gray-800 ml-1';
+            qTitle.className = 'text-lg font-bold text-gray-800 ml-1 mb-2';
             qTitle.textContent = q.title;
             qCard.appendChild(qTitle);
           }
@@ -663,14 +665,20 @@
           // Content
           const content = document.createElement('div');
           content.className = 'text-gray-700 text-base md:text-lg leading-relaxed prose prose-indigo max-w-none';
+          // Fix: Allow HTML rendering and handle newlines via CSS primarily, but replace newlines with <br> if needed for plain text fallback
+          // 'pre-wrap' handles \n. innerHTML handles tags.
+          // However, to robustly support both:
+          // If we use innerHTML, we must be careful.
+          // To support "<b>Bold</b>\nLine2", we can replace \n with <br> ONLY if it's not inside HTML structure, but simpler is:
+          // utilize prose and pre-wrap.
           content.style.whiteSpace = 'pre-wrap';
-          content.innerHTML = q.content.replace(/\n/g, '<br>');
+          content.innerHTML = q.content; // Direct HTML injection as requested
           qCard.appendChild(content);
 
           // Options
           if (q.options && q.options.length > 0) {
             const optionsList = document.createElement('div');
-            optionsList.className = 'grid grid-cols-1 gap-3';
+            optionsList.className = 'grid grid-cols-1 gap-3 mt-4';
 
             q.options.forEach((opt, optIndex) => {
               const label = String.fromCharCode(65 + optIndex);
@@ -699,7 +707,7 @@
       document.getElementById('activityModalTitle').textContent = atividade.titulo;
       const frame = document.getElementById('activityContentFrame');
 
-      // Reset Styles
+      // Default: Assume overflow hidden for iframe/empty, but renderJsonActivity will override if needed
       frame.className = 'w-full flex-1 min-h-[250px] bg-white rounded-md overflow-hidden';
       frame.innerHTML = '';
 
@@ -707,6 +715,7 @@
         try {
           const data = JSON.parse(atividade.json_data);
           renderJsonActivity(data);
+          // NOTE: renderJsonActivity sets its own className with overflow-y-auto
         } catch (e) {
           console.error("Erro ao parsear JSON da atividade", e);
           frame.innerHTML = `<div class="p-4 text-center text-red-500">Erro ao carregar formato da atividade.</div>`;

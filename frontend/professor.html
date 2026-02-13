@@ -301,12 +301,36 @@
       if (apiClient.getProfessorPassword()) {
         $('#loginModal').hide();
         loadTurmas();
+      } else {
+        $('#loginModal').show();
       }
     }
-    $('#loginForm').on('submit', (e) => {
+
+    $('#loginForm').on('submit', async (e) => {
       e.preventDefault();
-      apiClient.setProfessorPassword($('#adminPassword').val());
-      location.reload();
+      const pwd = $('#adminPassword').val();
+      
+      // Validação simples local antes de chamar API
+      if (!pwd) return;
+
+      // Chama endpoint protegido para validar senha
+      const testClient = new apiClient.constructor(); // Clone ou use instância, mas precisa setar senha temp
+      // Hack: setamos temporariamente para testar
+      apiClient.setProfessorPassword(pwd);
+
+      try {
+        const check = await apiClient.get('/check-auth');
+        if (check.success) {
+          location.reload();
+        } else {
+           sessionStorage.removeItem('professor_auth');
+           alert("Senha incorreta!");
+           $('#adminPassword').val('').focus();
+        }
+      } catch (err) {
+        sessionStorage.removeItem('professor_auth');
+        alert("Erro ao validar senha: " + err.message);
+      }
     });
 
     // --- Turmas ---

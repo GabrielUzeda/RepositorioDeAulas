@@ -24,3 +24,7 @@ pub async fn professor_auth(
 
     Err(StatusCode::UNAUTHORIZED)
 }
+
+pub async fn check_auth() -> StatusCode {
+    StatusCode::OK
+}

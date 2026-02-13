@@ -21,6 +21,7 @@ pub fn create_router(state: AppState) -> Router {
 
     // Rotas protegidas (Apenas Professor)
     let admin_routes = Router::new()
+        .route("/check-auth", get(auth::check_auth))
         .route("/turmas", post(turmas::create_turma))
         .route("/turmas/:id", post(turmas::update_turma).delete(turmas::delete_turma)) // Usando POST para update em alguns casos ou PUT
         .route("/turmas/:id", axum::routing::put(turmas::update_turma))

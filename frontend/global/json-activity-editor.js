@@ -291,10 +291,15 @@ export class ActivityEditor {
         modal.classList.remove('flex');
     }
 
-    async save() {
+    getJsonPayload(includePasswords = false) {
         const title = document.getElementById('actTitle').value;
         const type = document.getElementById('actType').value;
-        if (!title) return alert("Título é obrigatório");
+        const desc = document.getElementById('actDesc').value;
+
+        if (!title) {
+            alert("Título é obrigatório");
+            return null;
+        }
 
         const questions = [];
         document.querySelectorAll('#questionsList > div').forEach(el => {
@@ -325,25 +330,32 @@ export class ActivityEditor {
         const jsonPayload = {
             meta: {
                 title: title,
-                description: document.getElementById('actDesc').value,
+                description: desc,
                 type: type
             },
             questions: questions
         };
 
-        const slug = this.generateSlug(title);
         const allowPwd = (type === 'prova' || type === 'roleta');
-        const pwd = allowPwd ? document.getElementById('actPassword').value : null;
+        const pwd = (allowPwd || includePasswords) ? document.getElementById('actPassword').value : null;
 
+        // Backend Payload Structure
         const payload = {
             titulo: title,
-            descricao: document.getElementById('actDesc').value,
-            caminho: slug,
+            descricao: desc,
+            caminho: this.generateSlug(title),
             tipo: type,
             json_data: JSON.stringify(jsonPayload),
             allow_password: allowPwd && !!pwd,
             senha: pwd || null
         };
+
+        return payload;
+    }
+
+    async save() {
+        const payload = this.getJsonPayload();
+        if (!payload) return;
 
         if (this.saveCallback) {
             await this.saveCallback(this.currentData?.id, payload);
@@ -352,17 +364,65 @@ export class ActivityEditor {
     }
 
     exportJson() {
-        // ... (reuse logic, construct JSON from UI)
-        // For brevity reusing logic partially
-        const title = document.getElementById('actTitle').value;
-        // Construct json same as save... behavior
-        // To avoid code duplication, could split 'buildJson' method.
-        // Doing minimal implementation here to satisfy request
-        alert("Export not implemented in this refactor (implied TODO)");
+        const payload = this.getJsonPayload(true); // Include password in export for backup purposes
+        if (!payload) return;
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `atividade_${payload.caminho}_${Date.now()}.json`);
+        document.body.appendChild(downloadAnchorNode); // required for firefox
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
     }
 
     handleImport(event) {
-        // ... same logic
-        alert("Import not implemented in this refactor (implied TODO)");
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedData = JSON.parse(e.target.result);
+
+                // Validate minimal structure
+                if (!importedData.titulo || !importedData.tipo) {
+                    throw new Error("Formato de arquivo inválido. Campos 'titulo' e 'tipo' são obrigatórios.");
+                }
+
+                // Populate UI
+                document.getElementById('actTitle').value = importedData.titulo || '';
+                document.getElementById('actDesc').value = importedData.descricao || '';
+                document.getElementById('actType').value = importedData.tipo || 'normal';
+                document.getElementById('actPassword').value = importedData.senha || '';
+
+                // Update UI visibility based on type
+                this.updateUIByType(true); // Clear existing questions first
+
+                // Re-populate password field (updateUI clears it if hidden, so we set it again after update if valid)
+                if (importedData.tipo === 'prova' || importedData.tipo === 'roleta') {
+                    document.getElementById('actPassword').value = importedData.senha || '';
+                }
+
+                // Parse questions from json_data
+                let json = {};
+                try {
+                    json = typeof importedData.json_data === 'string' ? JSON.parse(importedData.json_data) : importedData.json_data;
+                } catch (e) { console.error("Error parsing interior JSON", e); }
+
+                if (json.questions && Array.isArray(json.questions)) {
+                    json.questions.forEach(q => this.addQuestionUI(q));
+                }
+
+                alert("Atividade importada com sucesso!");
+
+            } catch (error) {
+                console.error("Erro na importação:", error);
+                alert("Erro ao importar arquivo: " + error.message);
+            }
+            // Reset input
+            event.target.value = '';
+        };
+        reader.readAsText(file);
     }
 }
