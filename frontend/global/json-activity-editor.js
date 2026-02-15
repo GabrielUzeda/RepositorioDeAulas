@@ -149,6 +149,7 @@ export class ActivityEditor {
         let showJustification = false;
         let showCorrectAnswer = false;
         let showOptions = false;
+        let showOptionFeedback = false;
 
         if (type === 'normal' || type === 'prova') {
             allowedTypes = ['text']; // Removed 'code'
@@ -163,7 +164,13 @@ export class ActivityEditor {
             defaultType = 'choice';
             showOptions = true;
             showCorrectAnswer = true;
-            showJustification = true;
+
+            if (type === 'roleta') {
+                showJustification = true;
+            } else if (type === 'reforco') {
+                showOptionFeedback = true; // Feedback per option for Reforço
+                showJustification = false; // Redundant since we have per-option feedback
+            }
         }
 
         // Build Type Select Options
@@ -231,12 +238,25 @@ export class ActivityEditor {
             const addOptBtn = el.querySelector('.js-add-option');
 
             const addOption = (optData = null) => {
-                const optId = Date.now().toString();
+                const optId = Date.now().toString() + Math.random().toString(36).substring(2);
+
+                let feedbackHtml = '';
+                if (showOptionFeedback) {
+                    feedbackHtml = `
+                        <div class="mt-2 ml-6">
+                            <input type="text" class="js-opt-feedback w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-600 outline-none focus:border-indigo-500 bg-gray-50" placeholder="Feedback se escolher esta opção (Opcional)" value="${optData?.feedback || ''}">
+                        </div>
+                     `;
+                }
+
                 const optHtml = `
-                    <div class="flex items-center space-x-2">
-                        <input type="radio" name="radio_${id}" class="js-opt-correct w-4 h-4 text-indigo-600 focus:ring-indigo-500" ${optData?.correct ? 'checked' : ''}>
-                        <input type="text" class="js-opt-text flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-indigo-500" placeholder="Texto da opção" value="${optData?.text || ''}">
-                        <button type="button" class="text-gray-400 hover:text-red-500" onclick="this.parentElement.remove()"><span class="material-icons text-sm">close</span></button>
+                    <div class="border border-gray-100 rounded-lg p-2 mb-2 bg-white">
+                        <div class="flex items-center space-x-2">
+                            <input type="radio" name="radio_${id}" class="js-opt-correct w-4 h-4 text-indigo-600 focus:ring-indigo-500" ${optData?.correct ? 'checked' : ''}>
+                            <input type="text" class="js-opt-text flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-indigo-500" placeholder="Texto da opção" value="${optData?.text || ''}">
+                            <button type="button" class="text-gray-400 hover:text-red-500" onclick="this.closest('.border').remove()"><span class="material-icons text-sm">close</span></button>
+                        </div>
+                        ${feedbackHtml}
                     </div>
                 `;
                 optList.insertAdjacentHTML('beforeend', optHtml);
@@ -317,10 +337,13 @@ export class ActivityEditor {
             const optsList = el.querySelector('.js-options-list');
             if (optsList) {
                 q.options = [];
-                optsList.querySelectorAll('div.flex').forEach(optEl => {
+                // Selector updated to match new structure (div.border > div.flex)
+                // We iterate the container divs
+                optsList.querySelectorAll('.js-options-list > div').forEach(optEl => {
                     q.options.push({
                         text: optEl.querySelector('.js-opt-text').value,
-                        correct: optEl.querySelector('.js-opt-correct').checked
+                        correct: optEl.querySelector('.js-opt-correct').checked,
+                        feedback: optEl.closest('.border').querySelector('.js-opt-feedback')?.value || '' // Capture feedback
                     });
                 });
             }

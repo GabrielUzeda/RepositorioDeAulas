@@ -384,16 +384,32 @@
       renderList('atividadesList', atvs.data || []);
     }
 
+    function getTypeStyles(type) {
+      switch (type) {
+        case 'prova': return { bg: 'bg-amber-100', text: 'text-amber-600' };
+        case 'game': return { bg: 'bg-purple-100', text: 'text-purple-600' };
+        case 'roleta': return { bg: 'bg-pink-100', text: 'text-pink-600' };
+        case 'reforco': return { bg: 'bg-green-100', text: 'text-green-600' };
+        default: return { bg: 'bg-indigo-50', text: 'text-indigo-600' };
+      }
+    }
+
     function renderList(containerId, items) {
       const $el = $(`#${containerId}`).empty();
-      if (!items.length) return $el.append('<p class="text-gray-400 text-center py-4 empty-msg">Vazio.</p>');
+      if (!items.length) {
+        $el.append('<p class="text-gray-400 text-center py-4 empty-msg">Vazio.</p>');
+        return;
+      }
 
       items.forEach(item => {
+        // Aulas don't have 'tipo', default to blue/indigo. Atividades have 'tipo'.
+        const styles = getTypeStyles(item.tipo);
+
         const row = `
           <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg group transition border border-transparent" data-id="${item.id}">
             <div class="flex items-center flex-1 min-w-0 mr-4">
               <span class="drag-handle material-icons text-gray-300 mr-2 hidden">drag_indicator</span>
-              <span class="w-8 h-8 flex items-center justify-center bg-indigo-50 rounded-full text-xs font-bold text-indigo-600 mr-3 shrink-0 icon-label">${item.icone || '00'}</span>
+              <span class="w-8 h-8 flex items-center justify-center ${styles.bg} rounded-full text-xs font-bold ${styles.text} mr-3 shrink-0 icon-label">${item.icone || '00'}</span>
               <div class="truncate">
                 <p class="font-medium text-gray-700 truncate">${item.titulo}</p>
                 <p class="text-xs text-gray-400 truncate">${item.caminho}</p>
