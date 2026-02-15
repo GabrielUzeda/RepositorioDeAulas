@@ -377,9 +377,13 @@
     import EmailSender from './global/mailer.js';
 
     let turmasData = [];
+    let currentAtividadesList = [];
     let currentTurmaId = null;
     let currentTurmaSenha = null;
     let currentActivityId = null;
+    let unlockedActivities = new Set(); // Track unlocked IDs locally
+    let passwordPromptType = 'turma'; // 'turma' or 'atividade'
+    let pendingActivity = null;
     let quill = null;
     let emailSender = null;
 
@@ -436,8 +440,24 @@
     }
 
     function showPasswordModal(turma) {
+      passwordPromptType = 'turma';
       currentTurmaId = turma.id;
       modalTurmaName.textContent = turma.nome;
+      document.querySelector('#passwordModal h3').textContent = 'Acesso à Turma';
+
+      openPasswordModalUI();
+    }
+
+    function showActivityPasswordModal(atividade) {
+      passwordPromptType = 'atividade';
+      pendingActivity = atividade;
+      modalTurmaName.textContent = atividade.titulo; // Reuse this element for activity title
+      document.querySelector('#passwordModal h3').textContent = 'Atividade Protegida';
+
+      openPasswordModalUI();
+    }
+
+    function openPasswordModalUI() {
       passwordModal.classList.remove('hidden');
       passwordModal.classList.add('flex');
       const modalContent = passwordModal.querySelector('.modal-content');
@@ -459,8 +479,18 @@
       }, 300);
     }
 
-    async function enterTurma() {
+    async function handlePasswordSubmit() {
       const senha = passwordInput.value;
+
+      if (passwordPromptType === 'turma') {
+        await enterTurma(senha);
+      } else if (passwordPromptType === 'atividade') {
+        unlockActivity(senha);
+      }
+    }
+
+    async function enterTurma(senha) {
+      // const senha = passwordInput.value; // Passed as arg now
       const turma = turmasData.find(t => t.id === currentTurmaId);
 
       // Validar senha tentando carregar as aulas (silent mode)
@@ -478,6 +508,26 @@
         showErrorModal(response.message || 'Erro ao validar acesso');
       }
     }
+    function unlockActivity(inputPassword) {
+      if (!pendingActivity) return;
+
+      // Simple local check since the data is loaded (or we could fetch again if we wanted to be secure, but client-side logic requested)
+      // Note: The 'senha' field should be present in the object if returned by backend.
+      // If backend filters it out for security, we'd need a verification endpoint.
+      // Assuming 'senha' is available in the object for now based on 'SELECT *'.
+
+      if (pendingActivity.senha === inputPassword) {
+        unlockedActivities.add(pendingActivity.id);
+        hidePasswordModal();
+        renderAtividades(currentAtividadesList); // Re-render to update lock icon
+        showActivityModal(pendingActivity);
+        pendingActivity = null;
+      } else {
+        errorMessage.classList.remove('hidden');
+        passwordInput.classList.add('border-red-500');
+        setTimeout(() => passwordInput.classList.remove('border-red-500'), 2000);
+      }
+    }
 
     async function showAulasView(turma, aulas) {
       turmasView.classList.add('hidden');
@@ -490,6 +540,7 @@
       // Carregar atividades da turma
       const atvResponse = await apiClient.get(`/atividades?turma_id=${turma.id}&senha=${currentTurmaSenha}`, { silent: true });
       if (atvResponse.success) {
+        currentAtividadesList = atvResponse.data; // Store globally for re-rendering
         renderAtividades(atvResponse.data);
         if (atvResponse.data.length > 0) {
           document.getElementById('showAtividadesBtn').classList.remove('hidden');
@@ -547,6 +598,16 @@
       });
     }
 
+    function getTypeStyles(type) {
+      switch (type) {
+        case 'prova': return { bg: 'bg-amber-100', text: 'text-amber-600' };
+        case 'game': return { bg: 'bg-purple-100', text: 'text-purple-600' };
+        case 'roleta': return { bg: 'bg-pink-100', text: 'text-pink-600' };
+        case 'reforco': return { bg: 'bg-green-100', text: 'text-green-600' };
+        default: return { bg: 'bg-blue-100', text: 'text-blue-600' };
+      }
+    }
+
     function renderAtividades(atividades) {
       atividadesList.innerHTML = '';
       atividadesList.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
@@ -559,19 +620,45 @@
       atividades.forEach((atividade) => {
         const card = document.createElement('div');
         card.className = 'bg-white rounded-2xl p-6 shadow-md cursor-pointer card-hover relative';
-        card.onclick = () => showActivityModal(atividade);
-        const icon = atividade.icone || 'assignment';
+
+        const isLocked = atividade.allow_password && !unlockedActivities.has(atividade.id);
+        const styles = getTypeStyles(atividade.tipo);
+
+        const iconBg = styles.bg;
+        const iconColor = styles.text;
+
+        // Logic: specific click handler
+        card.onclick = () => {
+          if (isLocked) {
+            showActivityPasswordModal(atividade);
+          } else {
+            showActivityModal(atividade);
+          }
+        };
+
+        let icon = atividade.icone || 'assignment';
+        if (isLocked) icon = 'lock'; // Show lock if locked
+
         card.innerHTML = `
-          <div class="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/4 ml-2">
-            <div class="bg-blue-100 p-3 rounded-full max-h-12 flex-shrink-0">
-              <b class=" text-blue-600">${icon}</b>
+ 
+          <!-- Note: using 'b' tag for original icon text (e.g. "01") but material icon for lock. 
+               The original code used <b>${icon}</b>. Let's adapt. 
+               If it's NOT locked, show the number/text icon. If locked, show material icon lock.
+           -->
+           <div class="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/4 ml-2">
+            <div class="${iconBg} p-3 rounded-full w-12 h-12 flex items-center justify-center shadow-sm">
+                ${isLocked
+            ? `<span class="material-icons ${iconColor}">lock</span>`
+            : `<span class="${iconColor} font-bold text-lg">${atividade.icone || '00'}</span>`
+          }
             </div>
           </div>
-          <div class="flex items-start justify-between">
+
+          <div class="flex items-start justify-between mt-4">
             <div class="flex flex-1">
                 <div class="ml-2 flex-1">
                   <h3 class="text-lg font-medium text-gray-800">${atividade.titulo}</h3>
-                  <p class="text-gray-600 text-sm">${atividade.descricao || ''}</p>
+                  <p class="text-gray-600 text-sm">${isLocked ? 'Conteúdo protegido por senha.' : (atividade.descricao || '')}</p>
               </div>
             <span class="material-icons text-gray-400">open_in_new</span>
           </div>
@@ -588,6 +675,14 @@
       currentTurmaId = null;
       currentTurmaSenha = null;
     }
+
+    // Initialize event listeners
+    confirmBtn.addEventListener('click', handlePasswordSubmit);
+    passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handlePasswordSubmit();
+    });
+
+    cancelBtn.addEventListener('click', hidePasswordModal);
 
     function initializeQuill() {
       if (quill) return;
