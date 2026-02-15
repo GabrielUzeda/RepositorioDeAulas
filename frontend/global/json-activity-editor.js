@@ -358,7 +358,7 @@ export class ActivityEditor {
         if (!payload) return;
 
         if (this.saveCallback) {
-            await this.saveCallback(this.currentData?.id, payload);
+            await this.saveCallback(this.currentData, payload);
         }
         this.close();
     }

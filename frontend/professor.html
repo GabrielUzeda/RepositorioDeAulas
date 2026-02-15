@@ -243,7 +243,7 @@
   </div>
 
   <!-- Alertas -->
-  <div id="successModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[110]">
+  <div id="successModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[160]">
     <div class="bg-white rounded-2xl p-8 max-w-sm text-center">
       <span class="material-icons text-green-500 text-6xl mb-4">check_circle</span>
       <h3 id="successModalTitle" class="text-xl font-bold mb-2">Sucesso!</h3>
@@ -252,7 +252,7 @@
     </div>
   </div>
 
-  <div id="errorModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[110]">
+  <div id="errorModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[160]">
     <div class="bg-white rounded-2xl p-8 max-w-sm text-center">
       <span class="material-icons text-red-500 text-6xl mb-4">error</span>
       <h3 class="text-xl font-bold mb-2">Erro!</h3>
@@ -261,7 +261,7 @@
     </div>
   </div>
 
-  <div id="confirmModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[110]">
+  <div id="confirmModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[160]">
     <div class="bg-white rounded-2xl p-8 max-w-sm text-center">
       <span class="material-icons text-amber-500 text-6xl mb-4">help_outline</span>
       <h3 class="text-xl font-bold mb-2">Confirmar</h3>
@@ -309,7 +309,7 @@
     $('#loginForm').on('submit', async (e) => {
       e.preventDefault();
       const pwd = $('#adminPassword').val();
-      
+
       // Validação simples local antes de chamar API
       if (!pwd) return;
 
@@ -323,9 +323,9 @@
         if (check.success) {
           location.reload();
         } else {
-           sessionStorage.removeItem('professor_auth');
-           alert("Senha incorreta!");
-           $('#adminPassword').val('').focus();
+          sessionStorage.removeItem('professor_auth');
+          alert("Senha incorreta!");
+          $('#adminPassword').val('').focus();
         }
       } catch (err) {
         sessionStorage.removeItem('professor_auth');
@@ -411,8 +411,8 @@
     // --- Ordenação ---
     function updateVisualNumbers(containerId) {
       $(`#${containerId} > div`).each((i, el) => {
-        // Simple sequential number: 1, 2, 3...
-        const num = (i + 1).toString();
+        // Fix: Use 0-based padded numbering: 00, 01, 02...
+        const num = i.toString().padStart(2, '0');
         $(el).find('.icon-label').text(num);
       });
     }
@@ -586,7 +586,8 @@ Comece a editar aqui...
       } else {
         const currentCount = $('#aulasList > div[data-id]').length;
         // Simple sequential number for new items too
-        icone = (currentCount + 1).toString();
+        // Fix: Use 0-based numbering for initial creation to match reorder logic
+        icone = currentCount.toString().padStart(2, '0');
         ordem = currentCount;
       }
 
@@ -708,9 +709,17 @@ Comece a editar aqui...
 
     window.openAtvModal = async (existing = null) => {
       if (!activityEditor) {
-        activityEditor = new ActivityEditor(async (id, data) => {
+        activityEditor = new ActivityEditor(async (existingData, data) => {
           showLoadingModal("Salvando atividade...");
-          const payload = { ...data, turma_id: currentTurma.id, icone: existing?.icone || ($('#atividadesList > div').length + 1).toString(), external_id: existing?.external_id || '', ordem: existing?.ordem || 0 };
+          const id = existingData?.id;
+          const currentCount = $('#atividadesList > div').length;
+          const payload = {
+            ...data,
+            turma_id: currentTurma.id,
+            icone: existingData?.icone || currentCount.toString().padStart(2, '0'),
+            external_id: existingData?.external_id || '',
+            ordem: existingData?.ordem !== undefined ? existingData.ordem : currentCount
+          };
 
           try {
             const res = id

@@ -90,8 +90,14 @@ pub async fn create_aula(
     let mut final_caminho = payload.caminho.clone().unwrap_or_default();
     let conteudo_md = payload.markdown.clone();
 
+    let turma_slug = match pg.get_turma(payload.turma_id).await {
+        Ok(Some(turma)) => turma.slug,
+        Ok(None) => return (StatusCode::NOT_FOUND, "Turma not found".to_string()).into_response(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response(),
+    };
+
     if let Some(md_content) = &payload.markdown {
-        match process_marp_content(&payload.titulo, md_content) {
+        match process_marp_content(&turma_slug, &payload.titulo, md_content) {
             Ok(caminho) => final_caminho = caminho,
             Err(e) => return e.into_response(),
         }
@@ -113,11 +119,11 @@ pub async fn create_aula(
     }
 }
 
-fn process_marp_content(titulo: &str, md_content: &str) -> Result<String, (StatusCode, String)> {
+fn process_marp_content(turma_slug: &str, titulo: &str, md_content: &str) -> Result<String, (StatusCode, String)> {
     let slug = slugify(titulo);
-    let base_dir = "/app/frontend_static/turmas/aulas";
+    let base_dir = format!("/app/frontend_static/turmas/{}/aulas", turma_slug);
     
-    if let Err(e) = fs::create_dir_all(base_dir) {
+    if let Err(e) = fs::create_dir_all(&base_dir) {
          return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e)));
     }
 
@@ -158,7 +164,7 @@ fn process_marp_content(titulo: &str, md_content: &str) -> Result<String, (Statu
         }
     }
 
-    Ok(format!("turmas/aulas/{}.html", slug))
+    Ok(format!("turmas/{}/aulas/{}.html", turma_slug, slug))
 }
 
 pub async fn update_aula(
@@ -174,8 +180,14 @@ pub async fn update_aula(
     let mut final_caminho = payload.caminho.clone().unwrap_or_default();
     let conteudo_md = payload.markdown.clone();
 
+    let turma_slug = match pg.get_turma(payload.turma_id).await {
+        Ok(Some(turma)) => turma.slug,
+        Ok(None) => return (StatusCode::NOT_FOUND, "Turma not found".to_string()).into_response(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("Error: {}", e)).into_response(),
+    };
+
     if let Some(md_content) = &payload.markdown {
-        match process_marp_content(&payload.titulo, md_content) {
+        match process_marp_content(&turma_slug, &payload.titulo, md_content) {
             Ok(caminho) => final_caminho = caminho,
             Err(e) => return e.into_response(),
         }
