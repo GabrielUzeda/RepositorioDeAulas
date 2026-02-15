@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
   <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
   <style>
@@ -155,6 +157,61 @@
       background-color: white;
       color: #333;
     }
+
+    /* Custom Animations for Reforço */
+    @keyframes shake {
+
+      0%,
+      100% {
+        transform: translateX(0);
+      }
+
+      10%,
+      30%,
+      50%,
+      70%,
+      90% {
+        transform: translateX(-4px);
+      }
+
+      20%,
+      40%,
+      60%,
+      80% {
+        transform: translateX(4px);
+      }
+    }
+
+    .animate-shake {
+      animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+    }
+
+    @keyframes pulse-green {
+      0% {
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+        transform: scale(1);
+      }
+
+      70% {
+        box-shadow: 0 0 0 10px rgba(74, 222, 128, 0);
+        transform: scale(1.02);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+        transform: scale(1);
+      }
+    }
+
+    .animate-pulse-green {
+      animation: pulse-green 0.5s ease-out;
+    }
+
+    /* Disable hover for disabled/answered buttons */
+    button.pointer-events-none:hover {
+      border-color: inherit;
+      background-color: inherit;
+    }
   </style>
 </head>
 
@@ -246,6 +303,12 @@
         <div class="h-full flex flex-col min-h-[350px] min-w-[260px] overflow-y-auto">
           <div class="bg-white p-2 rounded-xl shadow flex-1 flex flex-col mb-2">
             <h3 class="text-lg font-semibold text-gray-800 mb-1">Enviar Atividade</h3>
+            <div id="readOnlyFooter" class="hidden flex-1 flex flex-col justify-end">
+              <button id="closeActivityBtnOnly" type="button"
+                class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium">
+                Concluir
+              </button>
+            </div>
             <form id="atividadeForm" class="flex-1 flex flex-col space-y-3">
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-0">Seu Nome</label>
@@ -292,6 +355,22 @@
     </div>
   </div>
 
+
+  <!-- Toast de Vitória (Celebration) -->
+  <div id="toast-vitoria"
+    class="hidden fixed top-4 right-4 z-[70] bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-xl shadow-2xl max-w-md transform transition-all duration-500">
+    <div class="flex items-center gap-4">
+      <span class="material-icons text-4xl">emoji_events</span>
+      <div>
+        <h3 class="font-bold text-lg">🎉 Parabéns!</h3>
+        <p class="text-sm text-green-50">Você completou a atividade!</p>
+      </div>
+      <button onclick="document.getElementById('toast-vitoria').classList.add('hidden')"
+        class="ml-4 hover:bg-white/20 rounded-full p-1">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+  </div>
 
   <!-- Password Modal -->
   <div id="passwordModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
@@ -348,6 +427,35 @@
         <h3 class="text-xl font-medium text-gray-800 mb-2">Erro!</h3>
         <p id="errorModalMessage" class="text-gray-600 mb-6">Ocorreu um erro inesperado.</p>
         <button id="errorOkBtn" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Reforço Modal (Zen Mode) -->
+  <div id="reforcoModal"
+    class="fixed inset-0 hidden z-[60] flex items-center justify-center p-4 bg-black/50 transition-opacity duration-300">
+    <div
+      class="bg-white w-full max-w-4xl h-[85vh] rounded-lg shadow-2xl flex flex-col overflow-hidden transform scale-95 opacity-0 transition-all duration-300"
+      id="reforcoContentContainer">
+
+      <!-- Header -->
+      <div class="bg-white px-8 py-5 flex justify-between items-center border-b border-gray-200 shadow-sm z-10">
+        <div class="flex items-center space-x-3">
+          <div class="bg-gray-100 p-2 rounded-full text-indigo-600">
+            <span class="material-icons">school</span>
+          </div>
+          <div>
+            <h3 id="reforcoTitle" class="text-xl font-bold text-gray-800 tracking-wide">Atividade de Reforço</h3>
+          </div>
+        </div>
+        <button id="closeReforcoBtn" class="hover:bg-gray-100 p-2 rounded-full transition-colors text-gray-500">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+
+      <!-- Content Area -->
+      <div id="reforcoBody" class="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 custom-scrollbar bg-gray-50">
+        <!-- Dyn Content -->
       </div>
     </div>
   </div>
@@ -775,14 +883,41 @@
             const optionsList = document.createElement('div');
             optionsList.className = 'grid grid-cols-1 gap-3 mt-4';
 
+            // Container for feedback (one per question usually, or per option? Let's do per option click)
+            // Actually, if clicking an option shows feedback, maybe show it below that option?
+            // Or a general feedback area? 
+            // Let's create a feedback container for the Question, updated on click.
+            const feedbackContainer = document.createElement('div');
+            feedbackContainer.className = 'hidden mt-4';
+
             q.options.forEach((opt, optIndex) => {
               const label = String.fromCharCode(65 + optIndex);
               const optItem = document.createElement('div');
-              optItem.className = 'flex items-center p-3 rounded-xl border border-gray-100 hover:bg-indigo-50 hover:border-indigo-200 cursor-pointer transition-colors';
-              optItem.innerHTML = `
+              optItem.className = 'flex flex-col p-3 rounded-xl border border-gray-100 hover:bg-indigo-50 hover:border-indigo-200 cursor-pointer transition-colors';
+
+              // Inner layout for row
+              const rowDiv = document.createElement('div');
+              rowDiv.className = 'flex items-center';
+              rowDiv.innerHTML = `
                 <span class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-700 font-bold mr-4 text-sm">${label}</span>
                 <span class="text-gray-700 font-medium">${opt.text}</span>
               `;
+              optItem.appendChild(rowDiv);
+
+              // Local feedback container for this specific option (since Reforço is about specific feedback)
+              const optFeedback = document.createElement('div');
+              optFeedback.className = 'hidden mt-2 ml-12 text-sm';
+              optItem.appendChild(optFeedback);
+
+              if (data.meta?.type === 'reforco') {
+                optItem.onclick = (e) => {
+                  // Prevent toggling if already clicked? Or allow re-clicking?
+                  // Let's just run the logic.
+                  e.stopPropagation();
+                  handleReforcoClick(optItem, opt, q, optFeedback);
+                };
+              }
+
               optionsList.appendChild(optItem);
             });
             qCard.appendChild(optionsList);
@@ -793,9 +928,49 @@
       }
 
       frame.appendChild(contentArea);
+
+    }
+
+    // Helper to close modal without submission (for Reforço)
+    document.getElementById('closeActivityBtnOnly').addEventListener('click', closeActivityModal);
+
+    function handleReforcoClick(optItem, opt, questionData, feedbackEl) {
+      // Clear previous state for this question if we want single choice visual
+      // But allowing exploration is fine.
+
+      const isCorrect = opt.correct;
+
+      // Visual Feedback
+      if (isCorrect) {
+        optItem.classList.remove('border-gray-100', 'hover:bg-indigo-50', 'hover:border-indigo-200');
+        optItem.classList.add('bg-green-50', 'border-green-200');
+        optItem.querySelector('span:first-child').classList.replace('bg-indigo-100', 'bg-green-100');
+        optItem.querySelector('span:first-child').classList.replace('text-indigo-700', 'text-green-700');
+      } else {
+        optItem.classList.remove('border-gray-100', 'hover:bg-indigo-50', 'hover:border-indigo-200');
+        optItem.classList.add('bg-red-50', 'border-red-200');
+        optItem.querySelector('span:first-child').classList.replace('bg-indigo-100', 'bg-red-100');
+        optItem.querySelector('span:first-child').classList.replace('text-indigo-700', 'text-red-700');
+      }
+
+      // Show Feedback
+      let feedbackText = opt.feedback || questionData.justification || '';
+      if (isCorrect && !feedbackText) feedbackText = "Resposta Correta!";
+      if (!isCorrect && !feedbackText) feedbackText = "Resposta Incorreta.";
+
+      if (feedbackText) {
+        feedbackEl.innerHTML = feedbackText; // Allow HTML in feedback
+        feedbackEl.className = `mt-2 text-sm p-3 rounded-lg ${isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} animate-fade-in`;
+        feedbackEl.classList.remove('hidden');
+      }
     }
 
     function showActivityModal(atividade) {
+      if (atividade.tipo === 'reforco') {
+        openReforcoModal(atividade);
+        return;
+      }
+
       currentActivityId = atividade.id;
       document.getElementById('alunoNome').value = localStorage.getItem('alunoNome') || '';
       document.getElementById('alunoEmail').value = localStorage.getItem('alunoEmail') || '';
@@ -846,7 +1021,197 @@
       const modalContent = activityModal.querySelector('.modal-content');
       modalContent.classList.add('modal-enter');
       setTimeout(() => modalContent.classList.add('modal-enter-active'), 10);
+
+      // UI Adjustments based on Type
+      // For Reforço, we use the custom modal now, so we shouldn't even reach here in theory
+      // But if we do (fallback), we hide the form.
+      const isReforco = atividade.tipo === 'reforco';
+      if (isReforco) {
+        document.getElementById('atividadeForm').classList.add('hidden');
+        document.getElementById('readOnlyFooter').classList.remove('hidden');
+      } else {
+        document.getElementById('atividadeForm').classList.remove('hidden');
+        document.getElementById('readOnlyFooter').classList.add('hidden');
+      }
     }
+
+    // --- Custom Reforço Logic ---
+    const reforcoModal = document.getElementById('reforcoModal');
+    const closeReforcoBtn = document.getElementById('closeReforcoBtn');
+
+    // State for celebration
+    let reforcoState = {
+      total: 0,
+      answeredCorrectly: 0,
+      answeredIds: {} // Track which questions were answered correctly to avoid double counting
+    };
+
+    function openReforcoModal(atividade) {
+      currentActivityId = atividade.id;
+      document.getElementById('reforcoTitle').textContent = atividade.titulo || 'Atividade de Reforço';
+
+      reforcoModal.classList.remove('hidden');
+      reforcoModal.classList.add('flex');
+
+      // Hide global toast if open
+      document.getElementById('toast-vitoria').classList.add('hidden');
+
+      // Animate Enter
+      const container = document.getElementById('reforcoContentContainer');
+      requestAnimationFrame(() => {
+        container.classList.remove('opacity-0', 'scale-95');
+        container.classList.add('opacity-100', 'scale-100');
+      });
+
+      const body = document.getElementById('reforcoBody');
+      body.innerHTML = '';
+
+      if (atividade.json_data) {
+        try {
+          const data = JSON.parse(atividade.json_data);
+          if (data.questions) {
+            // Reset State
+            reforcoState = {
+              total: data.questions.length,
+              answeredCorrectly: 0,
+              answeredIds: {}
+            };
+            renderReforcoQuestions(data.questions, body);
+          }
+        } catch (e) {
+          console.error(e);
+          body.innerHTML = '<p class="text-center text-red-400">Erro ao carregar atividade.</p>';
+        }
+      }
+    }
+
+    function checkReforcoVictory() {
+      if (reforcoState.answeredCorrectly >= reforcoState.total) {
+        triggerConfetti();
+      }
+    }
+
+    function triggerConfetti() {
+      // Confetti logic from example
+      const duration = 3 * 1000;
+      const end = Date.now() + duration;
+
+      (function frame() {
+        confetti({
+          particleCount: 5, angle: 60, spread: 55, origin: { x: 0 },
+          colors: ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b']
+        });
+        confetti({
+          particleCount: 5, angle: 120, spread: 55, origin: { x: 1 },
+          colors: ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b']
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      }());
+
+      // Show Toast
+      const toast = document.getElementById('toast-vitoria');
+      toast.classList.remove('hidden');
+      toast.classList.add('animate-bounce');
+      setTimeout(() => toast.classList.remove('animate-bounce'), 1000);
+      setTimeout(() => toast.classList.add('hidden'), 5000); // Auto hide
+    }
+
+    function closeReforcoModal() {
+      const container = document.getElementById('reforcoContentContainer');
+      container.classList.remove('opacity-100', 'scale-100');
+      container.classList.add('opacity-0', 'scale-95');
+
+      setTimeout(() => {
+        reforcoModal.classList.add('hidden');
+        reforcoModal.classList.remove('flex');
+        document.getElementById('reforcoBody').innerHTML = '';
+        currentActivityId = null;
+      }, 300);
+    }
+
+    function renderReforcoQuestions(questions, container) {
+      questions.forEach((q, idx) => {
+        const card = document.createElement('div');
+        card.className = 'bg-white p-6 md:p-8 rounded-lg shadow-sm border border-gray-200 relative';
+
+        // Question Number - Changed to Indigo to match header
+        const num = document.createElement('div');
+        num.className = 'absolute -left-3 top-6 bg-indigo-600 text-white w-8 h-8 flex items-center justify-center rounded font-bold shadow-sm';
+        num.textContent = idx + 1;
+        card.appendChild(num);
+
+        // Content
+        const content = document.createElement('div');
+        content.className = 'text-gray-800 text-lg md:text-xl font-medium mb-6 pl-6';
+        content.innerHTML = q.content;
+        card.appendChild(content);
+
+        // Options Grid
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-1 gap-4 pl-6';
+
+        if (q.options) {
+          q.options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'w-full text-left p-4 rounded-md border border-gray-200 hover:border-green-500 hover:bg-gray-50 transition-all duration-200 group relative';
+
+            btn.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600 font-medium group-hover:text-green-700 transition-colors">${opt.text}</span>
+                            <span class="material-icons opacity-0 group-hover:opacity-100 text-green-500 transition-opacity">check_circle_outline</span>
+                        </div>
+                        <div class="feedback-area hidden mt-3 pt-3 border-t border-gray-100 text-sm"></div>
+                    `;
+
+            btn.onclick = () => {
+              // Interactive Logic
+              const isCorrect = opt.correct;
+              const fbArea = btn.querySelector('.feedback-area');
+
+              // Disable this button and siblings? Or just visual feedback on this one?
+              // "o hover esta inconsistente" -> Remove hover after click
+              btn.classList.add('pointer-events-none');
+
+              if (isCorrect) {
+                btn.classList.replace('border-gray-200', 'border-green-500');
+                btn.classList.add('bg-green-100', 'animate-pulse-green');
+                btn.querySelector('.material-icons').textContent = 'check_circle';
+                btn.querySelector('.material-icons').classList.replace('text-green-500', 'text-green-600');
+                btn.querySelector('.material-icons').classList.remove('opacity-0');
+
+                // Update Progress
+                if (!reforcoState.answeredIds[idx]) {
+                  reforcoState.answeredIds[idx] = true;
+                  reforcoState.answeredCorrectly++;
+                  checkReforcoVictory();
+                }
+
+              } else {
+                btn.classList.replace('border-gray-200', 'border-red-500');
+                btn.classList.add('bg-red-100', 'animate-shake');
+                btn.querySelector('.material-icons').textContent = 'highlight_off';
+                btn.querySelector('.material-icons').classList.replace('text-green-500', 'text-red-600');
+                btn.querySelector('.material-icons').classList.remove('opacity-0');
+              }
+
+              // Feedback Text
+              let txt = opt.feedback || q.justification || (isCorrect ? "Correto! Muito bem." : "Incorreto. Tente novamente.");
+              fbArea.innerHTML = txt;
+              fbArea.className = `feedback-area mt-3 pt-3 border-t border-black/5 text-sm ${isCorrect ? 'text-green-700' : 'text-red-600'} block animate-fade-in`;
+            };
+
+            grid.appendChild(btn);
+          });
+        }
+        card.appendChild(grid);
+        container.appendChild(card);
+      });
+    }
+
+    // Removed updateReforcoProgress since footer is gone
 
     function closeActivityModal() {
       const modalContent = activityModal.querySelector('.modal-content');
@@ -859,6 +1224,10 @@
         if (quill) { quill.off('text-change'); quill.root.innerHTML = ''; }
         atividadeForm.reset();
         currentActivityId = null;
+
+        // Reset UI state for next open
+        document.getElementById('atividadeForm').classList.remove('hidden');
+        document.getElementById('readOnlyFooter').classList.add('hidden');
       }, 300);
     }
 
@@ -922,6 +1291,9 @@
       errorOkBtn.addEventListener('click', hideErrorModal);
       closeActivityModalBtn.addEventListener('click', closeActivityModal);
       activityModal.addEventListener('click', (e) => { if (e.target === activityModal) closeActivityModal(); });
+
+      closeReforcoBtn.addEventListener('click', closeReforcoModal);
+      reforcoModal.addEventListener('click', (e) => { if (e.target === reforcoModal) closeReforcoModal(); });
 
       exportBtn.addEventListener('click', exportActivity);
       importBtn.addEventListener('click', () => importFile.click());
