@@ -305,7 +305,7 @@
             <h3 class="text-lg font-semibold text-gray-800 mb-1">Enviar Atividade</h3>
             <div id="readOnlyFooter" class="hidden flex-1 flex flex-col justify-end">
               <button id="closeActivityBtnOnly" type="button"
-                class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium">
+                class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium flex items-center justify-center">
                 Concluir
               </button>
             </div>
@@ -460,6 +460,20 @@
     </div>
   </div>
 
+  <!-- Roleta Modal -->
+  <div id="roletaModal"
+    class="fixed inset-0 hidden z-[60] bg-black/80 flex items-center justify-center transition-opacity duration-300">
+    <div class="relative w-full h-full max-w-7xl mx-auto flex flex-col">
+      <!-- Close Button (Floating) -->
+      <button id="closeRoletaBtn"
+        class="absolute top-4 right-4 z-[80] bg-white text-gray-900 p-2 transition-all transform hover:scale-110">
+        <span class="material-icons text-3xl">close</span>
+      </button>
+
+      <div id="roletaContent" class="w-full h-full"></div>
+    </div>
+  </div>
+
   <!-- Loading Modal -->
   <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md modal-content">
@@ -483,6 +497,7 @@
     } from './global/alert-modals.js';
     import { apiClient } from './global/api-client.js';
     import EmailSender from './global/mailer.js';
+    import { RoletaPlayer } from './global/roleta-player.js';
 
     let turmasData = [];
     let currentAtividadesList = [];
@@ -931,8 +946,7 @@
 
     }
 
-    // Helper to close modal without submission (for Reforço)
-    document.getElementById('closeActivityBtnOnly').addEventListener('click', closeActivityModal);
+    // Helper functions for activity modals...
 
     function handleReforcoClick(optItem, opt, questionData, feedbackEl) {
       // Clear previous state for this question if we want single choice visual
@@ -968,6 +982,11 @@
     function showActivityModal(atividade) {
       if (atividade.tipo === 'reforco') {
         openReforcoModal(atividade);
+        return;
+      }
+
+      if (atividade.tipo === 'roleta') {
+        openRoletaModal(atividade);
         return;
       }
 
@@ -1283,9 +1302,9 @@
 
     function setupEventListeners() {
       backBtn.addEventListener('click', goBackToTurmas);
-      passwordInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') enterTurma(); });
+      passwordInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') handlePasswordSubmit(); });
       cancelBtn.addEventListener('click', hidePasswordModal);
-      confirmBtn.addEventListener('click', enterTurma);
+      confirmBtn.addEventListener('click', handlePasswordSubmit);
       passwordModal.addEventListener('click', (e) => { if (e.target === passwordModal) hidePasswordModal(); });
       successOkBtn.addEventListener('click', hideSuccessModal);
       errorOkBtn.addEventListener('click', hideErrorModal);
@@ -1294,6 +1313,7 @@
 
       closeReforcoBtn.addEventListener('click', closeReforcoModal);
       reforcoModal.addEventListener('click', (e) => { if (e.target === reforcoModal) closeReforcoModal(); });
+      document.getElementById('closeActivityBtnOnly').addEventListener('click', closeActivityModal);
 
       exportBtn.addEventListener('click', exportActivity);
       importBtn.addEventListener('click', () => importFile.click());
@@ -1353,6 +1373,25 @@
         }
       });
     }
+
+    // --- Roleta Integration ---
+    // (Import moved to top)
+
+    window.openRoletaModal = function (atividade) {
+      document.getElementById('roletaModal').classList.remove('hidden');
+      const player = new RoletaPlayer(atividade, () => {
+        triggerConfetti(); // Reuse global confetti
+      });
+      player.mount('roletaContent');
+
+      // Hide global toast if open
+      document.getElementById('toast-vitoria').classList.add('hidden');
+    }
+
+    document.getElementById('closeRoletaBtn').addEventListener('click', () => {
+      document.getElementById('roletaModal').classList.add('hidden');
+      document.getElementById('roletaContent').innerHTML = ''; // Clean up
+    });
 
     async function main() {
       emailSender = new EmailSender();

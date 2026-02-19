@@ -164,13 +164,8 @@ export class ActivityEditor {
             defaultType = 'choice';
             showOptions = true;
             showCorrectAnswer = true;
-
-            if (type === 'roleta') {
-                showJustification = true;
-            } else if (type === 'reforco') {
-                showOptionFeedback = true; // Feedback per option for Reforço
-                showJustification = false; // Redundant since we have per-option feedback
-            }
+            showOptionFeedback = true; // Feedback per option for both
+            showJustification = false; // Disable global justification in favor of per-option
         }
 
         // Build Type Select Options
