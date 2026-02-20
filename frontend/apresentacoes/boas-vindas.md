@@ -19,7 +19,7 @@ A seguir, veja como cada ferramenta pode te ajudar a evoluir e fixar o conhecime
 
 ---
 
-## 🚪 Atividade Normal (Raciocínio Profundo)
+## 🚪 Atividades Discursivas 
 
 A Atividade Normal foca na **articulação de ideias**. Nela, você utiliza um editor para redigir respostas dissertativas, o que estimula o pensamento crítico, a argumentação e a estruturação lógica de conceitos complexos.
 
@@ -27,7 +27,7 @@ A Atividade Normal foca na **articulação de ideias**. Nela, você utiliza um e
 
 ---
 
-## 📝 Avaliação Diagnóstica (Aferição de Conhecimento)
+## 📝 Avaliação Diagnóstica 
 
 As Provas são ambientes controlados focados na **validação do aprendizado**. Protegidas por senha, elas ajudam o professor (e você mesmo) a medir e comprovar o real entendimento do conteúdo em um momento de imersão e foco total.
 
@@ -35,23 +35,23 @@ As Provas são ambientes controlados focados na **validação do aprendizado**. 
 
 ---
 
-## 🚀 Gamificação: Minigame (Reflexos e Engajamento)
+## 🚀 Gamificação: Minigame 
 
-O Minigame de Simulação Tática foi desenhado para testar a **agilidade mental** e a **tomada de decisão sob pressão**. Ao associar o conteúdo teórico com uma mecânica de jogo, o engajamento aumenta e a memorização ocorre com muito mais fluidez.
+O Minigame de Simulação Tática foi desenhado para testar a **agilidade mental**, ao associar o conteúdo teórico com uma mecânica de jogo, o engajamento aumenta e a memorização ocorre com muito mais fluidez.
 
 ![bg right:60% 80%](minigame.webp)
 
 ---
 
-## 🎡 Roleta do Conhecimento (Micro-aprendizado)
+## 🎡 Roleta do Conhecimento 
 
-A Roleta propõe **testes aleatórios dinâmicos**. Por meio de perguntas sorteadas, ela não apenas checa a intuição, mas explica imediatamente *o porquê* de cada alternativa estar certa ou errada através de feedbacks teóricos. Ela transforma a curiosidade (e o erro) em aprendizado.
+A Roleta propõe **testes dinâmicos**. Por meio de perguntas sorteadas, ela não apenas checa a intuição, mas explica imediatamente *o porquê* de cada alternativa estar certa ou errada através de feedbacks teóricos. Ela transforma a curiosidade (e o erro) em aprendizado.
 
 ![bg right:60% 80%](roleta.webp)
 
 ---
 
-## ✅ Atividade de Reforço (Fixação Rápida)
+## ✅ Atividade de Reforço 
 
 O formato ágil de Verdadeiro ou Falso é a ferramenta ideal para a **checagem rápida de fixação**. Identificadores visuais que reagem na hora aos cliques forçam o aluno a separar o que é de fato real e o que é falso na matéria recém-estudada.
 
