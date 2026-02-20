@@ -242,4 +242,28 @@ impl PostgresManager {
             .await?;
         Ok(())
     }
+
+    // --- Ranking CRUD ---
+
+    pub async fn create_ranking(&self, new_ranking: crate::database::models::NewRanking) -> Result<crate::database::models::Ranking> {
+        let ranking = sqlx::query_as::<_, crate::database::models::Ranking>(
+            "INSERT INTO ranking (atividade_id, nome_jogador, pontuacao) VALUES ($1, $2, $3) RETURNING *"
+        )
+        .bind(new_ranking.atividade_id)
+        .bind(new_ranking.nome_jogador)
+        .bind(new_ranking.pontuacao)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(ranking)
+    }
+
+    pub async fn list_ranking(&self, atividade_id: i32) -> Result<Vec<crate::database::models::Ranking>> {
+        let rankings = sqlx::query_as::<_, crate::database::models::Ranking>(
+            "SELECT * FROM ranking WHERE atividade_id = $1 ORDER BY pontuacao DESC LIMIT 50"
+        )
+        .bind(atividade_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rankings)
+    }
 }

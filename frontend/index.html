@@ -244,7 +244,7 @@
       <div class="flex justify-between items-center mb-8">
         <div>
           <h2 id="turmaNome" class="text-3xl font-light text-gray-800 mb-2"></h2>
-          <p class="text-gray-600">Materiais de aula disponíveis</p>
+          <p id="turmaDesc" class="text-gray-600">Materiais de aula disponíveis</p>
         </div>
         <div class="flex flex-wrap justify-end space-x-4">
           <button id="showAulasBtn"
@@ -474,6 +474,21 @@
     </div>
   </div>
 
+  <!-- Minigame Modal -->
+  <div id="minigameModal"
+    class="fixed inset-0 hidden z-[60] bg-black/90 flex items-center justify-center transition-opacity duration-300">
+    <div class="relative w-full h-full max-w-7xl mx-auto flex flex-col p-4">
+      <!-- Close Button (Floating) -->
+      <button id="closeMinigameBtn"
+        class="absolute top-4 right-4 z-[80] bg-white text-gray-900 p-2 rounded-full shadow-2xl hover:bg-gray-100 transition-all transform hover:scale-110">
+        <span class="material-icons text-3xl">close</span>
+      </button>
+
+      <div id="minigameContent" class="w-full h-full rounded-xl overflow-hidden shadow-2xl border border-gray-800">
+      </div>
+    </div>
+  </div>
+
   <!-- Loading Modal -->
   <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-8 mx-4 w-full max-w-md modal-content">
@@ -498,6 +513,7 @@
     import { apiClient } from './global/api-client.js';
     import EmailSender from './global/mailer.js';
     import { RoletaPlayer } from './global/roleta-player.js';
+    import { MinigamePlayer } from './global/minigame-player.js';
 
     let turmasData = [];
     let currentAtividadesList = [];
@@ -549,13 +565,19 @@
       turmasData.forEach((turma) => {
         const turmaCard = document.createElement('div');
         turmaCard.className = `${turma.cor} rounded-2xl p-6 text-white cursor-pointer card-hover`;
+
+        let descHtml = 'Acesse o conteúdo da turma';
+        if (turma.descricao) {
+          descHtml = turma.descricao.replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+        }
+
         turmaCard.innerHTML = `
           <div class="flex items-center justify-between mb-4">
             <span class="material-icons text-3xl">${turma.icone}</span>
             <span class="material-icons">arrow_forward</span>
           </div>
           <h3 class="text-xl font-medium mb-2">${turma.nome}</h3>
-          <p class="text-white text-opacity-80">Acesse o conteúdo da turma</p>
+          <p class="text-white text-opacity-90 text-sm line-clamp-3 leading-relaxed" title="${(turma.descricao || '').replace(/"/g, '&quot;')}">${descHtml}</p>
         `;
         turmaCard.addEventListener('click', () => showPasswordModal(turma));
         turmasGrid.appendChild(turmaCard);
@@ -657,6 +679,10 @@
       aulasView.classList.remove('hidden');
       backBtn.classList.remove('hidden');
       turmaNome.textContent = turma.nome;
+      const turmaDesc = document.getElementById('turmaDesc');
+      if (turmaDesc) {
+        turmaDesc.innerHTML = turma.descricao ? turma.descricao.replace(/\\n/g, '<br>').replace(/\n/g, '<br>') : 'Materiais de aula disponíveis';
+      }
 
       renderAulas(aulas);
 
@@ -724,7 +750,9 @@
     function getTypeStyles(type) {
       switch (type) {
         case 'prova': return { bg: 'bg-amber-100', text: 'text-amber-600' };
-        case 'game': return { bg: 'bg-purple-100', text: 'text-purple-600' };
+        case 'prova': return { bg: 'bg-amber-100', text: 'text-amber-600' };
+        case 'game':
+        case 'minigame': return { bg: 'bg-purple-100', text: 'text-purple-600' };
         case 'roleta': return { bg: 'bg-pink-100', text: 'text-pink-600' };
         case 'reforco': return { bg: 'bg-green-100', text: 'text-green-600' };
         default: return { bg: 'bg-blue-100', text: 'text-blue-600' };
@@ -733,6 +761,19 @@
 
     function renderAtividades(atividades) {
       atividadesList.innerHTML = '';
+
+      // Legend
+      const legendHtml = `
+        <div class="col-span-1 md:col-span-2 lg:col-span-3 flex flex-wrap gap-4 mb-4 justify-center md:justify-end text-sm text-gray-600">
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-blue-100 border border-blue-200 mr-2"></span>Atividade Normal</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-amber-100 border border-amber-200 mr-2"></span>Prova</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-purple-100 border border-purple-200 mr-2"></span>Minigame</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-pink-100 border border-pink-200 mr-2"></span>Roleta</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-100 border border-green-200 mr-2"></span>Reforço</div>
+        </div>
+      `;
+      atividadesList.innerHTML = legendHtml;
+
       atividadesList.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
 
       if (atividades.length === 0) {
@@ -759,15 +800,13 @@
           }
         };
 
-        let icon = atividade.icone || 'assignment';
-        if (isLocked) icon = 'lock'; // Show lock if locked
+        let icon = atividade.icone || 'assignment'; // Default icon
+
+        if (isLocked) icon = 'lock'; // Override with lock if locked
 
         card.innerHTML = `
  
-          <!-- Note: using 'b' tag for original icon text (e.g. "01") but material icon for lock. 
-               The original code used <b>${icon}</b>. Let's adapt. 
-               If it's NOT locked, show the number/text icon. If locked, show material icon lock.
-           -->
+           <!-- Note: using 'b' tag for original icon text (e.g. "01") but material icon for lock/game. -->
            <div class="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/4 ml-2">
             <div class="${iconBg} p-3 rounded-full w-12 h-12 flex items-center justify-center shadow-sm">
                 ${isLocked
@@ -980,6 +1019,7 @@
     }
 
     function showActivityModal(atividade) {
+      console.log('Opening activity:', atividade, 'Type:', atividade.tipo);
       if (atividade.tipo === 'reforco') {
         openReforcoModal(atividade);
         return;
@@ -987,6 +1027,11 @@
 
       if (atividade.tipo === 'roleta') {
         openRoletaModal(atividade);
+        return;
+      }
+
+      if (atividade.tipo === 'minigame' || atividade.tipo === 'game') {
+        openMinigameModal(atividade);
         return;
       }
 
@@ -1392,6 +1437,31 @@
       document.getElementById('roletaModal').classList.add('hidden');
       document.getElementById('roletaContent').innerHTML = ''; // Clean up
     });
+
+    // --- Minigame Implementation ---
+    let currentMinigamePlayer = null;
+
+    function openMinigameModal(atividade) {
+      const modal = document.getElementById('minigameModal');
+      modal.classList.remove('hidden');
+
+      currentMinigamePlayer = new MinigamePlayer(atividade, () => {
+        closeMinigameModal();
+      });
+      currentMinigamePlayer.mount('minigameContent');
+    }
+
+    function closeMinigameModal() {
+      const modal = document.getElementById('minigameModal');
+      modal.classList.add('hidden');
+      if (currentMinigamePlayer) {
+        currentMinigamePlayer.destroy();
+        currentMinigamePlayer = null;
+      }
+      document.getElementById('minigameContent').innerHTML = '';
+    }
+
+    document.getElementById('closeMinigameBtn').addEventListener('click', closeMinigameModal);
 
     async function main() {
       emailSender = new EmailSender();

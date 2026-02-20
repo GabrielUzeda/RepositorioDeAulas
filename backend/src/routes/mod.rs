@@ -11,6 +11,7 @@ use crate::auth;
 pub mod turmas;
 pub mod aulas;
 pub mod atividades;
+pub mod ranking;
 
 pub fn create_router(state: AppState) -> Router {
     // Configurar CORS para permitir requisições do navegador
@@ -37,6 +38,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/send-mail", post(mailer::send_mail))
         .route("/db-test", get(test_db))
         
+        // Rotas de Ranking
+        .route("/ranking", post(ranking::create_ranking))
+        .route("/ranking/:atividade_id", get(ranking::list_ranking))
+
         // Rotas Públicas de Turmas
         .route("/turmas", get(turmas::list_turmas))
         .route("/turmas/:id", get(turmas::get_turma))

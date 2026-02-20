@@ -116,3 +116,19 @@ pub struct Usuario {
     pub criado_em: Option<DateTime<Utc>>,
     pub atualizado_em: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Ranking {
+    pub id: i32,
+    pub atividade_id: i32,
+    pub nome_jogador: String,
+    pub pontuacao: i32,
+    pub data_envio: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewRanking {
+    pub atividade_id: i32,
+    pub nome_jogador: String,
+    pub pontuacao: i32,
+}

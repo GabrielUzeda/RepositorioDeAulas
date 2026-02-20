@@ -76,7 +76,7 @@ http {
             try_files $uri $uri/ /efg/index.html;
         }
 
-        location ~ ^/(api|send-mail|auth|turmas|aulas|atividades) {
+        location ~ ^/(api|send-mail|auth|turmas|aulas|atividades|ranking) {
             proxy_pass http://rust-server:8080;
             proxy_http_version 1.1;
             proxy_set_header Host $host;

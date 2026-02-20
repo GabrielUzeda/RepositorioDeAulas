@@ -50,7 +50,7 @@ export class ActivityEditor {
                             <select id="actType" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
                                 <option value="normal">Normal</option>
                                 <option value="prova">Prova</option>
-                                <option value="game">Minigame</option>
+                                <option value="minigame">Minigame</option>
                                 <option value="roleta">Roleta</option>
                                 <option value="reforco">Reforço</option>
                             </select>
@@ -154,7 +154,7 @@ export class ActivityEditor {
         if (type === 'normal' || type === 'prova') {
             allowedTypes = ['text']; // Removed 'code'
             defaultType = data?.type || 'text';
-        } else if (type === 'game') {
+        } else if (type === 'minigame') {
             allowedTypes = ['choice'];
             defaultType = 'choice';
             showOptions = true;
@@ -411,7 +411,11 @@ export class ActivityEditor {
                 // Populate UI
                 document.getElementById('actTitle').value = importedData.titulo || '';
                 document.getElementById('actDesc').value = importedData.descricao || '';
-                document.getElementById('actType').value = importedData.tipo || 'normal';
+
+                // Legacy support for 'game' -> 'minigame'
+                const safeType = importedData.tipo === 'game' ? 'minigame' : (importedData.tipo || 'normal');
+                document.getElementById('actType').value = safeType;
+
                 document.getElementById('actPassword').value = importedData.senha || '';
 
                 // Update UI visibility based on type
