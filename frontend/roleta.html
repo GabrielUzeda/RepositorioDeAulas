@@ -1,408 +1,417 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roleta de Perguntas</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <style>
-        .card-active {
-            transform: scale(1.15);
-            box-shadow: 0 0 30px rgba(59, 130, 246, 0.8);
-            border: 3px solid #3b82f6;
-        }
-        .wheel-item {
-            transition: all 0.15s ease;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roleta de Perguntas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    .card-active {
+      transform: scale(1.15);
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.8);
+      border: 3px solid #3b82f6;
+    }
+
+    .wheel-item {
+      transition: all 0.15s ease;
+    }
+  </style>
 </head>
-<body class="bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 min-h-screen flex items-center justify-center p-4">
-    <div class="container max-w-4xl">
-        <!-- Header -->
-        <div class="text-center mb-8">
-            <h1 class="text-5xl font-bold text-white mb-2 flex items-center justify-center gap-3">
-                <span class="material-icons text-6xl">casino</span>
-                Roleta de Perguntas
-            </h1>
-            <p class="text-white text-lg">Gere uma pergunta aleatória e teste seus conhecimentos!</p>
-        </div>
 
-        <!-- Score Board -->
-        <div class="bg-white rounded-2xl shadow-2xl p-6 mb-6">
-            <div class="flex justify-around items-center">
-                <div class="text-center">
-                    <span class="material-icons text-green-500 text-4xl">check_circle</span>
-                    <p class="text-2xl font-bold text-gray-800" id="correct-count">0</p>
-                    <p class="text-gray-600">Corretas</p>
-                </div>
-                <div class="text-center">
-                    <span class="material-icons text-blue-500 text-4xl">help</span>
-                    <p class="text-2xl font-bold text-gray-800" id="remaining-count">0</p>
-                    <p class="text-gray-600">Restantes</p>
-                </div>
-                <div class="text-center">
-                    <span class="material-icons text-red-500 text-4xl">cancel</span>
-                    <p class="text-2xl font-bold text-gray-800" id="wrong-count">0</p>
-                    <p class="text-gray-600">Erradas</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Wheel Container -->
-        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
-            <div id="wheel-container" class="relative">
-                <!-- Wheel -->
-                <div id="wheel" class="grid grid-cols-3 gap-4 mb-6">
-                    <!-- Perguntas serão inseridas aqui -->
-                </div>
-
-                <!-- Spin Button -->
-                <button id="spin-btn" class="w-full bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 text-white font-bold py-4 px-8 rounded-xl text-xl flex items-center justify-center gap-3 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                    <span class="material-icons text-3xl">auto_awesome</span>
-                    <span id="btn-text">GERAR PERGUNTA</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Question Modal -->
-        <div id="question-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-3">
-                    <span class="material-icons text-blue-500 text-3xl">quiz</span>
-                    Pergunta Selecionada
-                </h2>
-                <p id="question-text" class="text-xl text-gray-700 mb-6"></p>
-                
-                <div id="answers-container" class="space-y-3 mb-6">
-                    <!-- Respostas serão inseridas aqui -->
-                </div>
-
-                <div id="result-message" class="hidden mb-4 p-4 rounded-lg"></div>
-
-                <div class="flex gap-3">
-                    <button id="confirm-btn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <span class="material-icons">check</span>
-                        Confirmar
-                    </button>
-                    <button id="close-btn" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2">
-                        <span class="material-icons">close</span>
-                        Fechar
-                    </button>
-                </div>
-            </div>
-        </div>
+<body
+  class="bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 min-h-screen flex items-center justify-center p-4">
+  <div class="container max-w-4xl">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <h1 class="text-5xl font-bold text-white mb-2 flex items-center justify-center gap-3">
+        <span class="material-icons text-6xl">casino</span>
+        Roleta de Perguntas
+      </h1>
+      <p class="text-white text-lg">Gere uma pergunta aleatória e teste seus conhecimentos!</p>
     </div>
 
-    <script>
-        // JSON com as perguntas
-        const questionsData = {
-  "perguntas": [
-    {
-      "id": 1,
-      "pergunta": "Na 'Analogia do Restaurante' usada para explicar APIs, quem ou o que representa a API?",
-      "opcoes": [
-        "O Cliente (você)",
-        "A Cozinha (o servidor)",
-        "O Garçom (a interface)",
-        "O Cardápio (a documentação)"
-      ],
-      "resposta_correta": "O Garçom (a interface)"
-    },
-    {
-      "id": 2,
-      "pergunta": "O que significa a sigla API?",
-      "opcoes": [
-        "Aplicação de Interface Padrão",
-        "Interface de Programação de Aplicações",
-        "Interface de Processamento Automatizado",
-        "Aplicação de Protocolo Interno"
-      ],
-      "resposta_correta": "Interface de Programação de Aplicações"
-    },
-    {
-      "id": 3,
-      "pergunta": "Quais são os dois componentes fundamentais do fluxo básico de comunicação de uma API?",
-      "opcoes": [
-        "JSON e XML",
-        "Requisição (Request) e Resposta (Response)",
-        "Cliente e Servidor",
-        "Endpoint e Chave de API"
-      ],
-      "resposta_correta": "Requisição (Request) e Resposta (Response)"
-    },
-    {
-      "id": 4,
-      "pergunta": "No contexto de APIs, o que é um 'Endpoint'?",
-      "opcoes": [
-        "O formato dos dados (como JSON)",
-        "A chave de segurança para o acesso",
-        "O 'endereço' específico para fazer um pedido",
-        "O erro retornado pelo servidor"
-      ],
-      "resposta_correta": "O 'endereço' específico para fazer um pedido"
-    },
-    {
-      "id": 5,
-      "pergunta": "Qual é o formato de texto leve, baseado em 'pares chave-valor', comumente usado pelas APIs para enviar e receber dados?",
-      "opcoes": ["HTML", "JSON", "XML", "CSS"],
-      "resposta_correta": "JSON"
-    },
-    {
-      "id": 6,
-      "pergunta": "Se você faz uma requisição para uma API e recebe um erro 404, o que isso provavelmente significa?",
-      "opcoes": [
-        "Você não tem permissão (chave inválida)",
-        "O servidor está muito ocupado",
-        "O 'endereço' (endpoint) que você tentou acessar não existe",
-        "Os dados que você enviou estão em formato errado"
-      ],
-      "resposta_correta": "O 'endereço' (endpoint) que você tentou acessar não existe"
-    },
-    {
-      "id": 7,
-      "pergunta": "Qual erro de API é análogo a 'Sua reserva não foi encontrada para esta área VIP', indicando um problema com sua chave de acesso?",
-      "opcoes": [
-        "Erro 404 (Não Encontrado)",
-        "Erro 400 (Requisição Inválida)",
-        "Erro 401/403 (Não Autorizado)",
-        "Erro 500 (Erro Interno do Servidor)"
-      ],
-      "resposta_correta": "Erro 401/403 (Não Autorizado)"
-    },
-    {
-      "id": 8,
-      "pergunta": "No estudo de caso do aplicativo de transporte (como Uber), qual tipo de API seria responsável por mostrar o mapa e calcular a rota?",
-      "opcoes": [
-        "API de Pagamento",
-        "API de Mapas",
-        "API de Notificação",
-        "API de Clima"
-      ],
-      "resposta_correta": "API de Mapas"
-    },
-    {
-      "id": 9,
-      "pergunta": "Qual das seguintes é um exemplo de API pública mencionada na aula, usada para obter dados de clima?",
-      "opcoes": [
-        "GitHub API",
-        "OpenWeatherMap",
-        "NASA APIs",
-        "Stripe API"
-      ],
-      "resposta_correta": "OpenWeatherMap"
-    },
-    {
-      "id": 10,
-      "pergunta": "Qual é a função principal de uma API, como descrito na aula?",
-      "opcoes": [
-        "Armazenar dados com segurança no servidor",
-        "Permitir que aplicativos diferentes conversem e troquem dados",
-        "Criar a interface visual que o usuário vê (botões e telas)",
-        "Acelerar a velocidade da internet do usuário"
-      ],
-      "resposta_correta": "Permitir que aplicativos diferentes conversem e troquem dados"
-    },
-    {
-      "id": 11,
-      "pergunta": "Na 'Analogia do Restaurante', o que representa o Cardápio?",
-      "opcoes": [
-        "O aplicativo",
-        "O servidor",
-        "A API (o garçom)",
-        "A Documentação (o que você pode pedir)"
-      ],
-      "resposta_correta": "A Documentação (o que você pode pedir)"
-    },
-    {
-      "id": 12,
-      "pergunta": "Um erro 400 (Requisição Inválida) significa que:",
-      "opcoes": [
-        "O servidor não foi encontrado",
-        "Você não tem permissão de acesso",
-        "Você enviou os dados em um formato errado (ex: XML em vez de JSON)",
-        "O endpoint não existe"
-      ],
-      "resposta_correta": "Você enviou os dados em um formato errado (ex: XML em vez de JSON)"
+    <!-- Score Board -->
+    <div class="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+      <div class="flex justify-around items-center">
+        <div class="text-center">
+          <span class="material-icons text-green-500 text-4xl">check_circle</span>
+          <p class="text-2xl font-bold text-gray-800" id="correct-count">0</p>
+          <p class="text-gray-600">Corretas</p>
+        </div>
+        <div class="text-center">
+          <span class="material-icons text-blue-500 text-4xl">help</span>
+          <p class="text-2xl font-bold text-gray-800" id="remaining-count">0</p>
+          <p class="text-gray-600">Restantes</p>
+        </div>
+        <div class="text-center">
+          <span class="material-icons text-red-500 text-4xl">cancel</span>
+          <p class="text-2xl font-bold text-gray-800" id="wrong-count">0</p>
+          <p class="text-gray-600">Erradas</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wheel Container -->
+    <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+      <div id="wheel-container" class="relative">
+        <!-- Wheel -->
+        <div id="wheel" class="grid grid-cols-3 gap-4 mb-6">
+          <!-- Perguntas serão inseridas aqui -->
+        </div>
+
+        <!-- Spin Button -->
+        <button id="spin-btn"
+          class="w-full bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 text-white font-bold py-4 px-8 rounded-xl text-xl flex items-center justify-center gap-3 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+          <span class="material-icons text-3xl">auto_awesome</span>
+          <span id="btn-text">GERAR PERGUNTA</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Question Modal -->
+    <div id="question-modal"
+      class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-3">
+          <span class="material-icons text-blue-500 text-3xl">quiz</span>
+          Pergunta Selecionada
+        </h2>
+        <p id="question-text" class="text-xl text-gray-700 mb-6"></p>
+
+        <div id="answers-container" class="space-y-3 mb-6">
+          <!-- Respostas serão inseridas aqui -->
+        </div>
+
+        <div id="result-message" class="hidden mb-4 p-4 rounded-lg"></div>
+
+        <div class="flex gap-3">
+          <button id="confirm-btn"
+            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span class="material-icons">check</span>
+            Confirmar
+          </button>
+          <button id="close-btn"
+            class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2">
+            <span class="material-icons">close</span>
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // JSON com as perguntas
+    const questionsData = {
+      "perguntas": [
+        {
+          "id": 1,
+          "pergunta": "Na 'Analogia do Restaurante' usada para explicar APIs, quem ou o que representa a API?",
+          "opcoes": [
+            "O Cliente (você)",
+            "A Cozinha (o servidor)",
+            "O Garçom (a interface)",
+            "O Cardápio (a documentação)"
+          ],
+          "resposta_correta": "O Garçom (a interface)"
+        },
+        {
+          "id": 2,
+          "pergunta": "O que significa a sigla API?",
+          "opcoes": [
+            "Aplicação de Interface Padrão",
+            "Interface de Programação de Aplicações",
+            "Interface de Processamento Automatizado",
+            "Aplicação de Protocolo Interno"
+          ],
+          "resposta_correta": "Interface de Programação de Aplicações"
+        },
+        {
+          "id": 3,
+          "pergunta": "Quais são os dois componentes fundamentais do fluxo básico de comunicação de uma API?",
+          "opcoes": [
+            "JSON e XML",
+            "Requisição (Request) e Resposta (Response)",
+            "Cliente e Servidor",
+            "Endpoint e Chave de API"
+          ],
+          "resposta_correta": "Requisição (Request) e Resposta (Response)"
+        },
+        {
+          "id": 4,
+          "pergunta": "No contexto de APIs, o que é um 'Endpoint'?",
+          "opcoes": [
+            "O formato dos dados (como JSON)",
+            "A chave de segurança para o acesso",
+            "O 'endereço' específico para fazer um pedido",
+            "O erro retornado pelo servidor"
+          ],
+          "resposta_correta": "O 'endereço' específico para fazer um pedido"
+        },
+        {
+          "id": 5,
+          "pergunta": "Qual é o formato de texto leve, baseado em 'pares chave-valor', comumente usado pelas APIs para enviar e receber dados?",
+          "opcoes": ["HTML", "JSON", "XML", "CSS"],
+          "resposta_correta": "JSON"
+        },
+        {
+          "id": 6,
+          "pergunta": "Se você faz uma requisição para uma API e recebe um erro 404, o que isso provavelmente significa?",
+          "opcoes": [
+            "Você não tem permissão (chave inválida)",
+            "O servidor está muito ocupado",
+            "O 'endereço' (endpoint) que você tentou acessar não existe",
+            "Os dados que você enviou estão em formato errado"
+          ],
+          "resposta_correta": "O 'endereço' (endpoint) que você tentou acessar não existe"
+        },
+        {
+          "id": 7,
+          "pergunta": "Qual erro de API é análogo a 'Sua reserva não foi encontrada para esta área VIP', indicando um problema com sua chave de acesso?",
+          "opcoes": [
+            "Erro 404 (Não Encontrado)",
+            "Erro 400 (Requisição Inválida)",
+            "Erro 401/403 (Não Autorizado)",
+            "Erro 500 (Erro Interno do Servidor)"
+          ],
+          "resposta_correta": "Erro 401/403 (Não Autorizado)"
+        },
+        {
+          "id": 8,
+          "pergunta": "No estudo de caso do aplicativo de transporte (como Uber), qual tipo de API seria responsável por mostrar o mapa e calcular a rota?",
+          "opcoes": [
+            "API de Pagamento",
+            "API de Mapas",
+            "API de Notificação",
+            "API de Clima"
+          ],
+          "resposta_correta": "API de Mapas"
+        },
+        {
+          "id": 9,
+          "pergunta": "Qual das seguintes é um exemplo de API pública mencionada na aula, usada para obter dados de clima?",
+          "opcoes": [
+            "GitHub API",
+            "OpenWeatherMap",
+            "NASA APIs",
+            "Stripe API"
+          ],
+          "resposta_correta": "OpenWeatherMap"
+        },
+        {
+          "id": 10,
+          "pergunta": "Qual é a função principal de uma API, como descrito na aula?",
+          "opcoes": [
+            "Armazenar dados com segurança no servidor",
+            "Permitir que aplicativos diferentes conversem e troquem dados",
+            "Criar a interface visual que o usuário vê (botões e telas)",
+            "Acelerar a velocidade da internet do usuário"
+          ],
+          "resposta_correta": "Permitir que aplicativos diferentes conversem e troquem dados"
+        },
+        {
+          "id": 11,
+          "pergunta": "Na 'Analogia do Restaurante', o que representa o Cardápio?",
+          "opcoes": [
+            "O aplicativo",
+            "O servidor",
+            "A API (o garçom)",
+            "A Documentação (o que você pode pedir)"
+          ],
+          "resposta_correta": "A Documentação (o que você pode pedir)"
+        },
+        {
+          "id": 12,
+          "pergunta": "Um erro 400 (Requisição Inválida) significa que:",
+          "opcoes": [
+            "O servidor não foi encontrado",
+            "Você não tem permissão de acesso",
+            "Você enviou os dados em um formato errado (ex: XML em vez de JSON)",
+            "O endpoint não existe"
+          ],
+          "resposta_correta": "Você enviou os dados em um formato errado (ex: XML em vez de JSON)"
+        }
+      ]
     }
-  ]
-}
 
-        let availableQuestions = [...questionsData.perguntas];
-        let currentQuestion = null;
-        let selectedAnswer = null;
-        let correctCount = 0;
-        let wrongCount = 0;
-        let isAnimating = false;
+    let availableQuestions = [...questionsData.perguntas];
+    let currentQuestion = null;
+    let selectedAnswer = null;
+    let correctCount = 0;
+    let wrongCount = 0;
+    let isAnimating = false;
 
-        function renderWheel() {
-            const wheel = document.getElementById('wheel');
-            wheel.innerHTML = '';
-            
-            availableQuestions.forEach((q, index) => {
-                const item = document.createElement('div');
-                item.className = 'wheel-item bg-gradient-to-br from-yellow-400 to-orange-500 p-6 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg';
-                item.innerHTML = `<span class="material-icons text-5xl">help_outline</span>`;
-                item.dataset.index = index;
-                item.id = `card-${index}`;
-                wheel.appendChild(item);
-            });
+    function renderWheel() {
+      const wheel = document.getElementById('wheel');
+      wheel.innerHTML = '';
 
-            updateStats();
+      availableQuestions.forEach((q, index) => {
+        const item = document.createElement('div');
+        item.className = 'wheel-item bg-gradient-to-br from-yellow-400 to-orange-500 p-6 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg';
+        item.innerHTML = `<span class="material-icons text-5xl">help_outline</span>`;
+        item.dataset.index = index;
+        item.id = `card-${index}`;
+        wheel.appendChild(item);
+      });
+
+      updateStats();
+    }
+
+    function updateStats() {
+      document.getElementById('correct-count').textContent = correctCount;
+      document.getElementById('remaining-count').textContent = availableQuestions.length;
+      document.getElementById('wrong-count').textContent = wrongCount;
+    }
+
+    async function animateSelection() {
+      if (availableQuestions.length === 0) {
+        window.showSuccessModal ? window.showSuccessModal('Parabéns! Você completou todas as perguntas! 🎉') : alert('Parabéns! Você completou todas as perguntas! 🎉');
+        return;
+      }
+
+      if (isAnimating) return;
+
+      isAnimating = true;
+      const spinBtn = document.getElementById('spin-btn');
+      spinBtn.disabled = true;
+
+      const totalCards = availableQuestions.length;
+      const finalIndex = Math.floor(Math.random() * totalCards);
+
+      // Parâmetros da animação
+      let currentIndex = 0;
+      let delay = 50; // Velocidade inicial (ms)
+      const maxDelay = 400; // Velocidade final (mais lento)
+      const acceleration = 1.12; // Fator de desaceleração
+
+      // Número mínimo de iterações (pelo menos 2 voltas completas)
+      const minIterations = totalCards * 2 + finalIndex;
+      let iterations = 0;
+
+      function highlightNext() {
+        // Remove highlight anterior
+        document.querySelectorAll('.wheel-item').forEach(card => {
+          card.classList.remove('card-active');
+        });
+
+        // Adiciona highlight no card atual
+        const currentCard = document.getElementById(`card-${currentIndex}`);
+        if (currentCard) {
+          currentCard.classList.add('card-active');
         }
 
-        function updateStats() {
-            document.getElementById('correct-count').textContent = correctCount;
-            document.getElementById('remaining-count').textContent = availableQuestions.length;
-            document.getElementById('wrong-count').textContent = wrongCount;
+        iterations++;
+        currentIndex = (currentIndex + 1) % totalCards;
+
+        // Continua animando ou para
+        if (iterations < minIterations || delay < maxDelay) {
+          delay = Math.min(delay * acceleration, maxDelay);
+          setTimeout(highlightNext, delay);
+        } else {
+          // Para no card final
+          setTimeout(() => {
+            currentQuestion = availableQuestions[finalIndex];
+            showQuestion();
+
+            // Remove highlight após um momento
+            setTimeout(() => {
+              document.querySelectorAll('.wheel-item').forEach(card => {
+                card.classList.remove('card-active');
+              });
+              isAnimating = false;
+              spinBtn.disabled = false;
+            }, 500);
+          }, 300);
         }
+      }
 
-        async function animateSelection() {
-            if (availableQuestions.length === 0) {
-                alert('Parabéns! Você completou todas as perguntas! 🎉');
-                return;
-            }
+      highlightNext();
+    }
 
-            if (isAnimating) return;
-            
-            isAnimating = true;
-            const spinBtn = document.getElementById('spin-btn');
-            spinBtn.disabled = true;
+    function showQuestion() {
+      const modal = document.getElementById('question-modal');
+      const questionText = document.getElementById('question-text');
+      const answersContainer = document.getElementById('answers-container');
+      const resultMessage = document.getElementById('result-message');
+      const confirmBtn = document.getElementById('confirm-btn');
 
-            const totalCards = availableQuestions.length;
-            const finalIndex = Math.floor(Math.random() * totalCards);
-            
-            // Parâmetros da animação
-            let currentIndex = 0;
-            let delay = 50; // Velocidade inicial (ms)
-            const maxDelay = 400; // Velocidade final (mais lento)
-            const acceleration = 1.12; // Fator de desaceleração
-            
-            // Número mínimo de iterações (pelo menos 2 voltas completas)
-            const minIterations = totalCards * 2 + finalIndex;
-            let iterations = 0;
+      questionText.textContent = currentQuestion.pergunta;
+      answersContainer.innerHTML = '';
+      resultMessage.classList.add('hidden');
+      selectedAnswer = null;
+      confirmBtn.disabled = false;
 
-            function highlightNext() {
-                // Remove highlight anterior
-                document.querySelectorAll('.wheel-item').forEach(card => {
-                    card.classList.remove('card-active');
-                });
+      currentQuestion.opcoes.forEach(opcao => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left p-4 rounded-lg border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all';
+        btn.textContent = opcao;
+        btn.onclick = () => selectAnswer(opcao, btn);
+        answersContainer.appendChild(btn);
+      });
 
-                // Adiciona highlight no card atual
-                const currentCard = document.getElementById(`card-${currentIndex}`);
-                if (currentCard) {
-                    currentCard.classList.add('card-active');
-                }
+      modal.classList.remove('hidden');
+    }
 
-                iterations++;
-                currentIndex = (currentIndex + 1) % totalCards;
+    function selectAnswer(answer, btn) {
+      selectedAnswer = answer;
+      document.querySelectorAll('#answers-container button').forEach(b => {
+        b.classList.remove('border-blue-500', 'bg-blue-50', 'border-4');
+        b.classList.add('border-2', 'border-gray-300');
+      });
+      btn.classList.remove('border-2', 'border-gray-300');
+      btn.classList.add('border-4', 'border-blue-500', 'bg-blue-50');
+    }
 
-                // Continua animando ou para
-                if (iterations < minIterations || delay < maxDelay) {
-                    delay = Math.min(delay * acceleration, maxDelay);
-                    setTimeout(highlightNext, delay);
-                } else {
-                    // Para no card final
-                    setTimeout(() => {
-                        currentQuestion = availableQuestions[finalIndex];
-                        showQuestion();
-                        
-                        // Remove highlight após um momento
-                        setTimeout(() => {
-                            document.querySelectorAll('.wheel-item').forEach(card => {
-                                card.classList.remove('card-active');
-                            });
-                            isAnimating = false;
-                            spinBtn.disabled = false;
-                        }, 500);
-                    }, 300);
-                }
-            }
+    function checkAnswer() {
+      if (!selectedAnswer) {
+        window.showErrorModal ? window.showErrorModal('Por favor, selecione uma resposta!') : alert('Por favor, selecione uma resposta!');
+        return;
+      }
 
-            highlightNext();
-        }
+      const resultMessage = document.getElementById('result-message');
+      const confirmBtn = document.getElementById('confirm-btn');
+      const isCorrect = selectedAnswer === currentQuestion.resposta_correta;
 
-        function showQuestion() {
-            const modal = document.getElementById('question-modal');
-            const questionText = document.getElementById('question-text');
-            const answersContainer = document.getElementById('answers-container');
-            const resultMessage = document.getElementById('result-message');
-            const confirmBtn = document.getElementById('confirm-btn');
+      confirmBtn.disabled = true;
+      resultMessage.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
 
-            questionText.textContent = currentQuestion.pergunta;
-            answersContainer.innerHTML = '';
-            resultMessage.classList.add('hidden');
-            selectedAnswer = null;
-            confirmBtn.disabled = false;
-
-            currentQuestion.opcoes.forEach(opcao => {
-                const btn = document.createElement('button');
-                btn.className = 'w-full text-left p-4 rounded-lg border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all';
-                btn.textContent = opcao;
-                btn.onclick = () => selectAnswer(opcao, btn);
-                answersContainer.appendChild(btn);
-            });
-
-            modal.classList.remove('hidden');
-        }
-
-        function selectAnswer(answer, btn) {
-            selectedAnswer = answer;
-            document.querySelectorAll('#answers-container button').forEach(b => {
-                b.classList.remove('border-blue-500', 'bg-blue-50', 'border-4');
-                b.classList.add('border-2', 'border-gray-300');
-            });
-            btn.classList.remove('border-2', 'border-gray-300');
-            btn.classList.add('border-4', 'border-blue-500', 'bg-blue-50');
-        }
-
-        function checkAnswer() {
-            if (!selectedAnswer) {
-                alert('Por favor, selecione uma resposta!');
-                return;
-            }
-
-            const resultMessage = document.getElementById('result-message');
-            const confirmBtn = document.getElementById('confirm-btn');
-            const isCorrect = selectedAnswer === currentQuestion.resposta_correta;
-
-            confirmBtn.disabled = true;
-            resultMessage.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
-
-            if (isCorrect) {
-                resultMessage.classList.add('bg-green-100', 'text-green-800');
-                resultMessage.innerHTML = '<div class="flex items-center gap-2"><span class="material-icons">check_circle</span><span>Correto! Parabéns! 🎉</span></div>';
-                correctCount++;
-                availableQuestions = availableQuestions.filter(q => q.id !== currentQuestion.id);
-                renderWheel();
-                
-                setTimeout(() => {
-                    closeModal();
-                }, 2000);
-            } else {
-                resultMessage.classList.add('bg-red-100', 'text-red-800');
-                resultMessage.innerHTML = '<div class="flex items-center gap-2"><span class="material-icons">cancel</span><span>Resposta incorreta! Tente novamente.</span></div>';
-                wrongCount++;
-                updateStats();
-                
-                setTimeout(() => {
-                    resultMessage.classList.add('hidden');
-                    confirmBtn.disabled = false;
-                }, 2000);
-            }
-        }
-
-        function closeModal() {
-            document.getElementById('question-modal').classList.add('hidden');
-        }
-
-        // Event Listeners
-        document.getElementById('spin-btn').addEventListener('click', animateSelection);
-        document.getElementById('confirm-btn').addEventListener('click', checkAnswer);
-        document.getElementById('close-btn').addEventListener('click', closeModal);
-
-        // Inicializar
+      if (isCorrect) {
+        resultMessage.classList.add('bg-green-100', 'text-green-800');
+        resultMessage.innerHTML = '<div class="flex items-center gap-2"><span class="material-icons">check_circle</span><span>Correto! Parabéns! 🎉</span></div>';
+        correctCount++;
+        availableQuestions = availableQuestions.filter(q => q.id !== currentQuestion.id);
         renderWheel();
-    </script>
+
+        setTimeout(() => {
+          closeModal();
+        }, 2000);
+      } else {
+        resultMessage.classList.add('bg-red-100', 'text-red-800');
+        resultMessage.innerHTML = '<div class="flex items-center gap-2"><span class="material-icons">cancel</span><span>Resposta incorreta! Tente novamente.</span></div>';
+        wrongCount++;
+        updateStats();
+
+        setTimeout(() => {
+          resultMessage.classList.add('hidden');
+          confirmBtn.disabled = false;
+        }, 2000);
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('question-modal').classList.add('hidden');
+    }
+
+    // Event Listeners
+    document.getElementById('spin-btn').addEventListener('click', animateSelection);
+    document.getElementById('confirm-btn').addEventListener('click', checkAnswer);
+    document.getElementById('close-btn').addEventListener('click', closeModal);
+
+    // Inicializar
+    renderWheel();
+  </script>
 </body>
+
 </html>

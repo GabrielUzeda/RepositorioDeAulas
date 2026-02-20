@@ -319,17 +319,17 @@
       apiClient.setProfessorPassword(pwd);
 
       try {
-        const check = await apiClient.get('/check-auth');
+        const check = await apiClient.get('/check-auth', { silent: true });
         if (check.success) {
           location.reload();
         } else {
           sessionStorage.removeItem('professor_auth');
-          alert("Senha incorreta!");
+          showErrorModal("Senha incorreta!");
           $('#adminPassword').val('').focus();
         }
       } catch (err) {
         sessionStorage.removeItem('professor_auth');
-        alert("Erro ao validar senha: " + err.message);
+        showErrorModal("Erro ao validar senha: " + err.message);
       }
     });
 
@@ -387,7 +387,8 @@
     function getTypeStyles(type) {
       switch (type) {
         case 'prova': return { bg: 'bg-amber-100', text: 'text-amber-600' };
-        case 'game': return { bg: 'bg-purple-100', text: 'text-purple-600' };
+        case 'game':
+        case 'minigame': return { bg: 'bg-purple-100', text: 'text-purple-600' };
         case 'roleta': return { bg: 'bg-pink-100', text: 'text-pink-600' };
         case 'reforco': return { bg: 'bg-green-100', text: 'text-green-600' };
         default: return { bg: 'bg-indigo-50', text: 'text-indigo-600' };

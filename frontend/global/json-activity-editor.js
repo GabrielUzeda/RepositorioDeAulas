@@ -312,7 +312,7 @@ export class ActivityEditor {
         const desc = document.getElementById('actDesc').value;
 
         if (!title) {
-            alert("Título é obrigatório");
+            window.showErrorModal ? window.showErrorModal("Título é obrigatório") : alert("Título é obrigatório");
             return null;
         }
 
@@ -436,11 +436,11 @@ export class ActivityEditor {
                     json.questions.forEach(q => this.addQuestionUI(q));
                 }
 
-                alert("Atividade importada com sucesso!");
+                window.showSuccessModal ? window.showSuccessModal("Atividade importada com sucesso!") : alert("Atividade importada com sucesso!");
 
             } catch (error) {
                 console.error("Erro na importação:", error);
-                alert("Erro ao importar arquivo: " + error.message);
+                window.showErrorModal ? window.showErrorModal("Erro ao importar arquivo: " + error.message) : alert("Erro ao importar arquivo: " + error.message);
             }
             // Reset input
             event.target.value = '';
