@@ -221,19 +221,18 @@ export class RoletaPlayer {
         spinBtn.classList.add('opacity-75');
 
         const totalItems = this.availableQuestions.length;
-        const finalIndex = Math.floor(Math.random() * totalItems);
 
-        let currentIndex = 0;
+        let currentIndex = Math.floor(Math.random() * totalItems); // Start at a random position
         let delay = 50;
-        const maxDelay = 300;
-        const acceleration = 1.15;
-        const minIterations = Math.max(20, totalItems * 2 + finalIndex);
+        const maxDelay = 500;
+        const acceleration = 1.08;
+        const minIterations = Math.max(30, totalItems * 3);
         let iterations = 0;
 
         const loop = () => {
             // Remove highlight from all
             document.querySelectorAll('.roleta-wheel-item').forEach(el => {
-                el.classList.remove('border-pink-500', 'bg-pink-50', 'text-pink-600', 'scale-105', 'shadow-md', 'z-10');
+                el.classList.remove('border-pink-500', 'bg-pink-50', 'text-pink-600', 'scale-105', 'shadow-md', 'z-10', 'transition-colors', 'duration-1000');
                 el.classList.add('border-indigo-100', 'bg-white', 'text-indigo-300');
                 // Reset icon
                 el.innerHTML = `<span class="material-icons text-2xl">help_outline</span>`;
@@ -248,18 +247,19 @@ export class RoletaPlayer {
             }
 
             iterations++;
-            currentIndex = (currentIndex + 1) % totalItems;
 
             if (iterations < minIterations || delay < maxDelay) {
+                currentIndex = (currentIndex + 1) % totalItems;
                 delay = Math.min(delay * acceleration, maxDelay);
                 setTimeout(loop, delay);
             } else {
-                // Done - Highlight final
+                // Done - Highlight final with dramatic pause
                 setTimeout(() => {
-                    this.currentQuestion = this.availableQuestions[finalIndex];
-                    // Flash effect
-                    const finalCard = document.getElementById(`roleta-card-${finalIndex}`);
+                    this.currentQuestion = this.availableQuestions[currentIndex];
+                    // Flash effect (Slower transition)
+                    const finalCard = document.getElementById(`roleta-card-${currentIndex}`);
                     if (finalCard) {
+                        finalCard.classList.add('transition-colors', 'duration-1000');
                         finalCard.classList.remove('border-pink-500', 'bg-pink-50', 'text-pink-600');
                         finalCard.classList.add('border-green-500', 'bg-green-50', 'text-green-600', 'ring-2', 'ring-green-200');
                     }
@@ -271,8 +271,8 @@ export class RoletaPlayer {
                         spinBtn.classList.remove('opacity-75');
                         // Clean up wheel highlight
                         this.renderWheel();
-                    }, 800);
-                }, 200);
+                    }, 1500);
+                }, 600);
             }
         };
 
