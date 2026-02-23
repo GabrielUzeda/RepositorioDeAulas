@@ -35,3 +35,7 @@ frontend/turmas/
 # Allow binary tracking
 !bin/rust-app
 
+
+# Database Backups
+backups/*.sql
+init-db/*.sql
