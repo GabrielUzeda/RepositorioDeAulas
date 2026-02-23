@@ -42,8 +42,9 @@ pub async fn get_turma(
 
 pub async fn create_turma(
     State(state): State<AppState>,
-    Json(payload): Json<NewTurma>,
+    Json(mut payload): Json<NewTurma>,
 ) -> impl IntoResponse {
+    payload.slug = crate::utils::sanitize_slug(&payload.slug);
     let pg = match &state.pg_db {
         Some(pg) => pg,
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "Postgres not initialized").into_response(),
@@ -58,8 +59,9 @@ pub async fn create_turma(
 pub async fn update_turma(
     Path(id): Path<i32>,
     State(state): State<AppState>,
-    Json(payload): Json<NewTurma>,
+    Json(mut payload): Json<NewTurma>,
 ) -> impl IntoResponse {
+    payload.slug = crate::utils::sanitize_slug(&payload.slug);
     let pg = match &state.pg_db {
         Some(pg) => pg,
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "Postgres not initialized").into_response(),

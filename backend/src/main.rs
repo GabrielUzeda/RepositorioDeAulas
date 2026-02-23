@@ -3,6 +3,7 @@ mod database;
 mod startup;
 mod routes;
 mod auth;
+pub mod utils;
 
 #[tokio::main]
 async fn main() {

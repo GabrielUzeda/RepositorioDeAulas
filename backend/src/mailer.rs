@@ -112,6 +112,12 @@ async fn process_mail(req: MailRequest) -> anyhow::Result<()> {
     let mail_from = env::var("MAIL_FROM")?;
 
     let template_name = req.template.unwrap_or_else(|| "default.txt".to_string());
+    
+    // Security check to prevent path traversal
+    if template_name.contains('/') || template_name.contains('\\') || template_name.contains("..") {
+        return Err(anyhow::anyhow!("Invalid template name"));
+    }
+
     let template_path = format!("/app/templates/{}", template_name);
 
     let mut body = fs::read_to_string(&template_path)?;

@@ -29,12 +29,7 @@ pub struct CreateAulaRequest {
     pub markdown: Option<String>,
 }
 
-fn slugify(s: &str) -> String {
-    s.to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '_' })
-        .collect()
-}
+// Removed local slugify in favor of crate::utils::sanitize_slug
 
 pub async fn list_aulas(
     Query(query): Query<AulaQuery>,
@@ -87,7 +82,7 @@ pub async fn create_aula(
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "Postgres not initialized".to_string()).into_response(),
     };
 
-    let mut final_caminho = payload.caminho.clone().unwrap_or_default();
+    let mut final_caminho = crate::utils::sanitize_path_or_url(&payload.caminho.clone().unwrap_or_default());
     let conteudo_md = payload.markdown.clone();
 
     let turma_slug = match pg.get_turma(payload.turma_id).await {
@@ -120,7 +115,7 @@ pub async fn create_aula(
 }
 
 fn process_marp_content(turma_slug: &str, titulo: &str, md_content: &str) -> Result<String, (StatusCode, String)> {
-    let slug = slugify(titulo);
+    let slug = crate::utils::sanitize_slug(titulo);
     let base_dir = format!("/app/frontend_static/turmas/{}/aulas", turma_slug);
     
     if let Err(e) = fs::create_dir_all(&base_dir) {
@@ -177,7 +172,7 @@ pub async fn update_aula(
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "Postgres not initialized".to_string()).into_response(),
     };
 
-    let mut final_caminho = payload.caminho.clone().unwrap_or_default();
+    let mut final_caminho = crate::utils::sanitize_path_or_url(&payload.caminho.clone().unwrap_or_default());
     let conteudo_md = payload.markdown.clone();
 
     let turma_slug = match pg.get_turma(payload.turma_id).await {

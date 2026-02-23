@@ -105,8 +105,13 @@ pub async fn get_atividade(
 
 pub async fn create_atividade(
     State(state): State<AppState>,
-    Json(payload): Json<NewAtividade>,
+    Json(mut payload): Json<NewAtividade>,
 ) -> impl IntoResponse {
+    if let Some(ext_id) = &payload.external_id {
+        payload.external_id = Some(crate::utils::sanitize_slug(ext_id));
+    }
+    payload.caminho = crate::utils::sanitize_path_or_url(&payload.caminho);
+
     let pg = match &state.pg_db {
         Some(pg) => pg,
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "Postgres not initialized").into_response(),
@@ -121,8 +126,13 @@ pub async fn create_atividade(
 pub async fn update_atividade(
     Path(id): Path<i32>,
     State(state): State<AppState>,
-    Json(payload): Json<NewAtividade>,
+    Json(mut payload): Json<NewAtividade>,
 ) -> impl IntoResponse {
+    if let Some(ext_id) = &payload.external_id {
+        payload.external_id = Some(crate::utils::sanitize_slug(ext_id));
+    }
+    payload.caminho = crate::utils::sanitize_path_or_url(&payload.caminho);
+
     let pg = match &state.pg_db {
         Some(pg) => pg,
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "Postgres not initialized").into_response(),
