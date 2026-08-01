@@ -572,7 +572,19 @@ Comece a editar aqui...
       $('#marpModal').addClass('active');
 
       if (!marpInstance) {
-        marpInstance = new Marp({ html: true });
+        marpInstance = new Marp({ html: true, sourceMap: true });
+        marpInstance.markdown.options.sourceMap = true; // Extra guarantee
+
+        // Add line mapping plugin to marp's markdown-it
+        marpInstance.markdown.use((md) => {
+          md.core.ruler.push('marp_line_mapping', (state) => {
+            state.tokens.forEach((token) => {
+              if (token.map) {
+                token.attrSet('data-line', token.map[0].toString());
+              }
+            });
+          });
+        });
       }
 
       updateMarpPreview();
@@ -688,7 +700,18 @@ Comece a editar aqui...
                   import "https://esm.sh/@marp-team/marp-core@3/browser";
                   import mermaid from "https://esm.sh/mermaid@10";
                   mermaid.initialize({ startOnLoad: true, theme: 'default' });
-                  window.addEventListener('load', () => mermaid.run());
+                  window.addEventListener('load', () => {
+                    mermaid.run();
+                  });
+
+                  // Click Sync Handler
+                  document.addEventListener('click', (e) => {
+                    const target = e.target.closest('[data-line]');
+                    if (target) {
+                      const line = target.getAttribute('data-line');
+                      window.parent.postMessage({ type: 'marp-click-sync', line: parseInt(line, 10) }, '*');
+                    }
+                  });
                 <\/script>
               </body>
             </html>
@@ -701,6 +724,28 @@ Comece a editar aqui...
     $('#marpEditor').on('input', () => {
       clearTimeout(marpTimeout);
       marpTimeout = setTimeout(updateMarpPreview, 300);
+    });
+
+    // Handle Click Sync message from iframe
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'marp-click-sync') {
+        const line = event.data.line;
+        const textarea = document.getElementById('marpEditor');
+        const text = textarea.value;
+        const lines = text.split('\n');
+        
+        let offset = 0;
+        for (let i = 0; i < line && i < lines.length; i++) {
+          offset += lines[i].length + 1; // +1 for \n
+        }
+
+        textarea.focus();
+        textarea.setSelectionRange(offset, offset);
+        
+        // Scroll textarea to the line
+        const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
+        textarea.scrollTop = line * lineHeight - (textarea.clientHeight / 2);
+      }
     });
 
     window.openTurmaModal = (id = null) => {
