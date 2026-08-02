@@ -9,11 +9,6 @@ data/
 .env.local
 .env.production
 
-# Secrets
-secret.json
-secrets.json
-example.secret.json
-
 # IDE and editor files
 .vscode/
 .idea/

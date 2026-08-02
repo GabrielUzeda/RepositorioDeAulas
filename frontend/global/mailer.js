@@ -44,7 +44,7 @@ class EmailJSFallback {
     }
 
     /**
-     * Carrega configuração do email (settings.json + secret.json)
+     * Carrega configuração do email (settings.json)
      */
     async _loadEmailConfig() {
         let emailConfig = {};
@@ -58,19 +58,6 @@ class EmailJSFallback {
             }
         } catch (error) {
             console.warn('Could not load settings.json:', error.message);
-        }
-
-        // Tenta mesclar com secret.json local (prioridade)
-        try {
-            const secretResp = await fetch('/secret.json');
-            if (secretResp.ok) {
-                const secrets = await secretResp.json();
-                if (secrets.emailjs) {
-                    emailConfig = Object.assign({}, emailConfig, secrets.emailjs);
-                }
-            }
-        } catch (err) {
-            console.warn('No secret.json found, using available config only:', err.message);
         }
 
         return emailConfig;

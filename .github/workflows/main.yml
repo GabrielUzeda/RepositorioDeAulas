@@ -16,26 +16,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Criar secret.json
-        run: |
-          cat <<EOF > secret.json
-          {
-            "email": {
-              "service_id": "${{ secrets.SERVICE_ID }}",
-              "template_id": "${{ secrets.TEMPLATE_ID }}",
-              "public_key": "${{ secrets.PUBLIC_KEY }}",
-              "to_email": "uzeda.dev@gmail.com"
-            },
-            "turmas": {
-              "estatistica": { "senha": "${{ secrets.SENHA_EST }}" },
-              "terceirao": { "senha": "${{ secrets.SENHA_TERCEIRAO }}" },
-              "logica": { "senha": "${{ secrets.SENHA_LOGICA }}" },
-              "visualizacao_dados": { "senha": "${{ secrets.SENHA_VISUALIZACAO_DADOS }}" },
-              "sistemas_aplicados": { "senha": "${{ secrets.SENHA_SISTEMAS_APLICADOS }}" }
-            }
-          }
-          EOF
-
       - name: Listar arquivos no diretório
         run: ls -la ./
 
