@@ -92,7 +92,7 @@ function seedDemoData() {
   insertAula.run(
     turmaId,
     'Boas-vindas ao Sistema',
-    '/apresentacoes/boas-vindas.html',
+    '/static/boas-vindas.html',
     '00',
     'Comece por aqui: Entenda como navegar e usar o sistema.',
     1,

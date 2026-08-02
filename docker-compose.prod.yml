@@ -28,8 +28,8 @@ services:
     env_file:
       - .env                          # injeta SERVER_NAME para o script
     volumes:
-      - ./conf/nginx.conf.template:/etc/nginx/nginx.conf.template:ro
-      - ./conf/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./frontend/nginx/nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+      - ./frontend/nginx/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ${frontDir}:/usr/share/nginx/html/:ro
       - ${verificationDir}:/var/www/certbot
       - ${sslDir}:/etc/letsencrypt

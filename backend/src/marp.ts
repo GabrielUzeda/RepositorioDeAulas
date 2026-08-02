@@ -6,7 +6,7 @@ import { sanitizeSlug } from './utils';
 function resolveFrontendDir(): string {
   if (process.env.FRONTEND_STATIC_DIR) return process.env.FRONTEND_STATIC_DIR;
   if (existsSync('/app/frontend_static')) return '/app/frontend_static';
-  return path.join(import.meta.dir, '..', '..', 'frontend');
+  return path.join(import.meta.dir, '..', '..', 'frontend', 'src');
 }
 
 function resolveMarp(): { cmd: string; args: string[] } {

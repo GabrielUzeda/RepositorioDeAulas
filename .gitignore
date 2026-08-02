@@ -28,7 +28,7 @@ build/
 database/data/
 backend/database/data/
 backend/data/
-frontend/turmas/
+frontend/src/turmas/
 
 # Database Backups
 backups/*.sql

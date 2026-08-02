@@ -24,10 +24,10 @@ function resolveTemplatesDir(): string {
   if (templatesDirCache) return templatesDirCache;
   if (process.env.TEMPLATES_DIR) {
     templatesDirCache = process.env.TEMPLATES_DIR;
-  } else if (existsSync('/app/templates')) {
-    templatesDirCache = '/app/templates';
+  } else if (existsSync('/app/src/templates')) {
+    templatesDirCache = '/app/src/templates';
   } else {
-    templatesDirCache = path.join(import.meta.dir, '..', 'templates');
+    templatesDirCache = path.join(import.meta.dir, 'templates');
   }
   return templatesDirCache;
 }
