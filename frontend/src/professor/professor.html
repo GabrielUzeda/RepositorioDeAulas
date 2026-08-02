@@ -165,11 +165,17 @@
         <p class="text-gray-500">Insira a senha do professor</p>
       </div>
       <form id="loginForm" class="space-y-4">
+        <input type="email" id="adminEmail"
+          class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+          placeholder="Email" required>
         <input type="password" id="adminPassword"
           class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
           placeholder="Senha" required>
         <button type="submit"
           class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg">Entrar</button>
+        <div class="text-center pt-2">
+          <a href="../aluno/" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition">← Voltar para Área do Aluno</a>
+        </div>
       </form>
     </div>
   </div>
@@ -296,11 +302,16 @@
     let editingAulaData = null;
     let activityEditor = null;
 
-    // --- Auth ---
     async function checkAuth() {
-      if (apiClient.getProfessorPassword()) {
-        $('#loginModal').hide();
-        loadTurmas();
+      if (apiClient.getProfessorToken()) {
+        const check = await apiClient.get('/check-auth', { silent: true });
+        if (check.success) {
+          $('#loginModal').hide();
+          loadTurmas();
+        } else {
+          apiClient.clearProfessorAuth();
+          $('#loginModal').show();
+        }
       } else {
         $('#loginModal').show();
       }
@@ -308,28 +319,23 @@
 
     $('#loginForm').on('submit', async (e) => {
       e.preventDefault();
+      const email = $('#adminEmail').val();
       const pwd = $('#adminPassword').val();
-
-      // Validação simples local antes de chamar API
-      if (!pwd) return;
-
-      // Chama endpoint protegido para validar senha
-      const testClient = new apiClient.constructor(); // Clone ou use instância, mas precisa setar senha temp
-      // Hack: setamos temporariamente para testar
-      apiClient.setProfessorPassword(pwd);
+      if (!email || !pwd) return;
 
       try {
-        const check = await apiClient.get('/check-auth', { silent: true });
-        if (check.success) {
+        const resp = await apiClient.post('/auth/login', { email, password: pwd }, { silent: true });
+        if (resp.success && resp.data.token) {
+          apiClient.setProfessorToken(resp.data.token);
           location.reload();
         } else {
-          sessionStorage.removeItem('professor_auth');
-          showErrorModal("Senha incorreta!");
+          apiClient.clearProfessorAuth();
+          showErrorModal("Credenciais inválidas!");
           $('#adminPassword').val('').focus();
         }
       } catch (err) {
-        sessionStorage.removeItem('professor_auth');
-        showErrorModal("Erro ao validar senha: " + err.message);
+        apiClient.clearProfessorAuth();
+        showErrorModal("Erro ao fazer login: " + err.message);
       }
     });
 
@@ -337,7 +343,7 @@
     async function loadTurmas() {
       const resp = await apiClient.get('/turmas');
       if (resp.success) { turmas = resp.data; renderTurmas(); }
-      else if (resp.status === 401) { sessionStorage.removeItem('professor_auth'); $('#loginModal').show(); }
+      else if (resp.status === 401) { apiClient.clearProfessorAuth(); $('#loginModal').show(); }
     }
 
     function renderTurmas() {
@@ -405,12 +411,14 @@
       items.forEach(item => {
         // Aulas don't have 'tipo', default to blue/indigo. Atividades have 'tipo'.
         const styles = getTypeStyles(item.tipo);
+        const isMatIcon = item.icone && (isNaN(Number(item.icone)) || item.icone.length > 2);
+        const iconDisplay = isMatIcon ? `<span class="material-icons text-base">${item.icone}</span>` : (item.icone || '00');
 
         const row = `
           <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg group transition border border-transparent" data-id="${item.id}">
             <div class="flex items-center flex-1 min-w-0 mr-4">
               <span class="drag-handle material-icons text-gray-300 mr-2 hidden">drag_indicator</span>
-              <span class="w-8 h-8 flex items-center justify-center ${styles.bg} rounded-full text-xs font-bold ${styles.text} mr-3 shrink-0 icon-label">${item.icone || '00'}</span>
+              <span class="w-8 h-8 flex items-center justify-center ${styles.bg} rounded-full text-xs font-bold ${styles.text} mr-3 shrink-0 icon-label">${iconDisplay}</span>
               <div class="truncate">
                 <p class="font-medium text-gray-700 truncate">${item.titulo}</p>
                 <p class="text-xs text-gray-400 truncate">${item.caminho}</p>
@@ -495,35 +503,112 @@
     });
 
     // --- CRUD Modals ---
-    window.closeFormModal = () => $('#formModal').hide();
+    const COLOR_OPTIONS = [
+      { name: 'Índigo', class: 'bg-indigo-600' },
+      { name: 'Azul', class: 'bg-blue-600' },
+      { name: 'Ciano', class: 'bg-cyan-600' },
+      { name: 'Esmeralda', class: 'bg-emerald-600' },
+      { name: 'Âmbar', class: 'bg-amber-500' },
+      { name: 'Rosa', class: 'bg-rose-600' },
+      { name: 'Roxo', class: 'bg-purple-600' },
+      { name: 'Grafite', class: 'bg-slate-700' }
+    ];
+
+    const ICON_OPTIONS = [
+      { id: 'group', label: 'Turma' },
+      { id: 'school', label: 'Escola' },
+      { id: 'menu_book', label: 'Aulas' },
+      { id: 'computer', label: 'Computação' },
+      { id: 'terminal', label: 'Código' },
+      { id: 'science', label: 'Ciências' },
+      { id: 'calculate', label: 'Matemática' },
+      { id: 'psychology', label: 'Lógica' },
+      { id: 'palette', label: 'Artes' },
+      { id: 'auto_stories', label: 'Leitura' },
+      { id: 'sports_esports', label: 'Jogos' },
+      { id: 'quiz', label: 'Provas' },
+      { id: 'emoji_events', label: 'Conquistas' },
+      { id: 'forum', label: 'Debate' },
+      { id: 'military_tech', label: 'Tática' },
+      { id: 'gavel', label: 'Direito' }
+    ];
 
     function openModal(title, fields, onSubmit) {
       $('#modalTitle').text(title);
       const $container = $('#formFields').empty();
       fields.forEach(f => {
-        $container.append(`
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">${f.label}</label>
-            ${f.type === 'textarea' ?
-            `<textarea id="f_${f.name}" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" rows="3">${f.value || ''}</textarea>` :
-            `<input type="${f.type || 'text'}" id="f_${f.name}" value="${f.value || ''}" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" ${f.required ? 'required' : ''} placeholder="${f.placeholder || ''}">`
-          }
-          </div>`);
+        if (f.type === 'textarea') {
+          $container.append(`
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">${f.label}</label>
+              <textarea id="f_${f.name}" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" rows="3">${f.value || ''}</textarea>
+            </div>`);
+        } else if (f.type === 'color-picker') {
+          const selectedColor = f.value || 'bg-indigo-600';
+          const swatches = COLOR_OPTIONS.map(c => `
+            <button type="button" data-color="${c.class}" title="${c.name}"
+              class="color-btn w-9 h-9 rounded-full ${c.class} flex items-center justify-center text-white transition-all transform hover:scale-110 shadow-sm ${selectedColor === c.class ? 'ring-2 ring-offset-2 ring-gray-800 scale-110 opacity-100' : 'opacity-80 hover:opacity-100'}">
+              <span class="material-icons text-sm check-icon ${selectedColor === c.class ? '' : 'hidden'}">check</span>
+            </button>
+          `).join('');
+          $container.append(`
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">${f.label}</label>
+              <input type="hidden" id="f_${f.name}" value="${selectedColor}">
+              <div class="flex flex-wrap gap-3 py-1" id="colorPickerGrid">${swatches}</div>
+            </div>`);
+        } else if (f.type === 'icon-picker') {
+          const selectedIcon = f.value || 'group';
+          const grid = ICON_OPTIONS.map(i => `
+            <button type="button" data-icon="${i.id}" title="${i.label}"
+              class="icon-btn p-2 rounded-xl border flex flex-col items-center justify-center transition-all ${selectedIcon === i.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200' : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'}">
+              <span class="material-icons text-xl">${i.id}</span>
+              <span class="text-[10px] mt-0.5 truncate max-w-[50px]">${i.label}</span>
+            </button>
+          `).join('');
+          $container.append(`
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">${f.label}</label>
+              <input type="hidden" id="f_${f.name}" value="${selectedIcon}">
+              <div class="grid grid-cols-4 sm:grid-cols-8 gap-2 max-h-48 overflow-y-auto p-1 border border-gray-100 rounded-xl bg-gray-50/50">${grid}</div>
+            </div>`);
+        } else {
+          $container.append(`
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">${f.label}</label>
+              <input type="${f.type || 'text'}" id="f_${f.name}" value="${f.value || ''}" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" ${f.required ? 'required' : ''} placeholder="${f.placeholder || ''}">
+            </div>`);
+        }
       });
+
+      // Bind color swatch clicks
+      $container.find('.color-btn').on('click', function () {
+        const chosen = $(this).data('color');
+        const hiddenInput = $(this).closest('div').find('input[type="hidden"]');
+        hiddenInput.val(chosen);
+        $(this).parent().find('.color-btn').removeClass('ring-2 ring-offset-2 ring-gray-800 scale-110 opacity-100').addClass('opacity-80');
+        $(this).parent().find('.check-icon').addClass('hidden');
+        $(this).removeClass('opacity-80').addClass('ring-2 ring-offset-2 ring-gray-800 scale-110 opacity-100');
+        $(this).find('.check-icon').removeClass('hidden');
+      });
+
+      // Bind icon button clicks
+      $container.find('.icon-btn').on('click', function () {
+        const chosen = $(this).data('icon');
+        const hiddenInput = $(this).closest('div').find('input[type="hidden"]');
+        hiddenInput.val(chosen);
+        $(this).parent().find('.icon-btn').removeClass('border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200').addClass('border-gray-200 text-gray-600 bg-white');
+        $(this).removeClass('border-gray-200 text-gray-600 bg-white').addClass('border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200');
+      });
+
       $('#genericForm').off('submit').on('submit', async (e) => {
         e.preventDefault();
         const data = {};
         fields.forEach(f => data[f.name] = $(`#f_${f.name}`).val());
         if (await onSubmit(data)) {
           $('#formModal').hide();
-          // Se estivermos dentro de uma turma e não for edição da própria turma (ou se for e quisermos atualizar o cabeçalho, mas simplificando)
-          // Se for edição de aula/atividade, refresh content
-          // Se for edição de Turma, talvez reload seja melhor ou atualizar cabeçalho?
-          // O modal genérico é usado para Turma e Atividade.
           if (currentTurma && $('#detalhesView').is(':visible')) {
-            // Se editou a turma atual, atualiza título
             if ($('#modalTitle').text().includes('Turma')) {
-              // Recarrega tudo para garantir
               const t = await apiClient.get(`/turmas/${currentTurma.id}`);
               if (t.success) {
                 currentTurma = t.data;
@@ -531,7 +616,6 @@
                 $('#viewTurmaDesc').text(t.data.descricao || 'Sem descrição.');
               }
             }
-            // Refresh nas listas
             await loadContent(currentTurma.id, currentTurma.senha);
           } else {
             location.reload();
@@ -751,11 +835,11 @@ Comece a editar aqui...
     window.openTurmaModal = (id = null) => {
       const t = turmas.find(x => x.id === id);
       openModal(t ? 'Editar Turma' : 'Nova Turma', [
-        { name: 'nome', label: 'Nome', value: t?.nome, required: true },
+        { name: 'nome', label: 'Nome da Turma', value: t?.nome, required: true },
         { name: 'descricao', label: 'Descrição', value: t?.descricao, type: 'textarea' },
-        { name: 'cor', label: 'Cor (ex: bg-blue-500)', value: t?.cor || 'bg-indigo-500' },
-        { name: 'icone', label: 'Ícone (Material Icon)', value: t?.icone || 'group' },
-        { name: 'senha', label: 'Senha Alunos', placeholder: t ? 'Deixe vazio para manter' : 'Obrigatória', required: !t }
+        { name: 'cor', label: 'Cor da Turma', value: t?.cor || 'bg-indigo-600', type: 'color-picker' },
+        { name: 'icone', label: 'Ícone da Turma', value: t?.icone || 'group', type: 'icon-picker' },
+        { name: 'senha', label: 'Senha para Alunos', placeholder: t ? 'Deixe vazio para manter' : 'Obrigatória', required: !t }
       ], async (data) => {
         // Auto-generate slug from name if creating new or if name changed (simplified logic: always regen on create)
         if (!t) {
@@ -823,6 +907,20 @@ Comece a editar aqui...
         }
       }
     };
+
+    $('#formModal').on('click', function (e) {
+      if (e.target === this) closeFormModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if ($('#formModal').is(':visible')) closeFormModal();
+        else if ($('#marpModal').hasClass('active')) closeMarpModal();
+        else if ($('#activityEditorModal').is(':visible') && activityEditor) {
+          activityEditor.close();
+        }
+      }
+    });
 
     $('#backBtn').on('click', () => location.href = 'professor.html');
     checkAuth();

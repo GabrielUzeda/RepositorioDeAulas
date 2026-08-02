@@ -728,10 +728,13 @@
       aulas.forEach((aula) => {
         const aulaCard = document.createElement('div');
         aulaCard.className = 'bg-white rounded-2xl p-2 shadow-md cursor-pointer card-hover relative';
+        const isMatIcon = aula.icone && (isNaN(Number(aula.icone)) || aula.icone.length > 2);
         aulaCard.innerHTML = `
          <div class="absolute top-0 left-0 transform -translate-x-1/4 -translate-y-1/4">
-            <div class="bg-blue-100 p-3 rounded-full max-h-12 flex-shrink-0">
-              <b class="text-blue-600">${aula.icone}</b>
+            <div class="bg-blue-100 p-3 rounded-full w-12 h-12 flex items-center justify-center shadow-sm flex-shrink-0">
+              ${isMatIcon
+                ? `<span class="material-icons text-blue-600">${aula.icone}</span>`
+                : `<b class="text-blue-600">${aula.icone || '00'}</b>`}
             </div>
           </div>
           <div class="flex items-start justify-between p-4">
@@ -749,7 +752,6 @@
 
     function getTypeStyles(type) {
       switch (type) {
-        case 'prova': return { bg: 'bg-amber-100', text: 'text-amber-600' };
         case 'prova': return { bg: 'bg-amber-100', text: 'text-amber-600' };
         case 'game':
         case 'minigame': return { bg: 'bg-purple-100', text: 'text-purple-600' };
@@ -804,13 +806,15 @@
 
         if (isLocked) icon = 'lock'; // Override with lock if locked
 
+        const isMatIcon = atividade.icone && (isNaN(Number(atividade.icone)) || atividade.icone.length > 2);
+
         card.innerHTML = `
- 
-           <!-- Note: using 'b' tag for original icon text (e.g. "01") but material icon for lock/game. -->
-           <div class="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/4 ml-2">
+           <div class="absolute top-0 left-0 transform -translate-x-1/4 -translate-y-1/4">
             <div class="${iconBg} p-3 rounded-full w-12 h-12 flex items-center justify-center shadow-sm">
                 ${isLocked
             ? `<span class="material-icons ${iconColor}">lock</span>`
+            : isMatIcon
+            ? `<span class="material-icons ${iconColor}">${atividade.icone}</span>`
             : `<span class="${iconColor} font-bold text-lg">${atividade.icone || '00'}</span>`
           }
             </div>
@@ -1356,8 +1360,34 @@
       closeActivityModalBtn.addEventListener('click', closeActivityModal);
       activityModal.addEventListener('click', (e) => { if (e.target === activityModal) closeActivityModal(); });
 
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (!passwordModal.classList.contains('hidden')) hidePasswordModal();
+          else if (!activityModal.classList.contains('hidden')) closeActivityModal();
+          else if (!reforcoModal.classList.contains('hidden')) closeReforcoModal();
+          else if (!document.getElementById('roletaModal').classList.contains('hidden')) {
+            document.getElementById('roletaModal').classList.add('hidden');
+            document.getElementById('roletaContent').innerHTML = '';
+          }
+          else if (!document.getElementById('minigameModal').classList.contains('hidden')) {
+            closeMinigameModal();
+          }
+        }
+      });
+
       closeReforcoBtn.addEventListener('click', closeReforcoModal);
       reforcoModal.addEventListener('click', (e) => { if (e.target === reforcoModal) closeReforcoModal(); });
+      document.getElementById('roletaModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('roletaModal')) {
+          document.getElementById('roletaModal').classList.add('hidden');
+          document.getElementById('roletaContent').innerHTML = '';
+        }
+      });
+      document.getElementById('minigameModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('minigameModal')) {
+          closeMinigameModal();
+        }
+      });
       document.getElementById('closeActivityBtnOnly').addEventListener('click', closeActivityModal);
 
       exportBtn.addEventListener('click', exportActivity);

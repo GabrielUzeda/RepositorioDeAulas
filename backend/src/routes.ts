@@ -2,13 +2,13 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { db } from './db';
 import { sanitizeSlug, sanitizePathOrUrl } from './utils';
-import { professorAuth } from './auth';
+import { professorAuth, hashPassword, verifyPassword, signJwt } from './auth';
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent } from './marp';
 
 const app = new Hono();
 
-app.use('*', cors({ origin: '*', allowHeaders: ['Content-Type', 'X-Professor-Password'], allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
+app.use('*', cors({ origin: '*', allowHeaders: ['Content-Type', 'Authorization'], allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
 
 const dbq = (sql: string) => db.query<Record<string, any>, any[]>(sql);
 
@@ -37,60 +37,103 @@ function normalizeJsonData(value: any): string | null {
   return String(value);
 }
 
+function getProfessor(c: any): { id: number; role: string } | null {
+  const id = c.get('professorId');
+  const role = c.get('professorRole');
+  if (!id) return null;
+  return { id: Number(id), role };
+}
+
+// ---------- Auth routes ----------
+
+app.post('/auth/login', async (c) => {
+  const body = await parseBody(c);
+  if (!body?.email || !body?.password) return c.text('', 400);
+  const prof = dbq('SELECT * FROM professores WHERE email = ?').get(body.email) as any;
+  if (!prof) return c.text('Invalid credentials', 401);
+  const ok = await verifyPassword(body.password, prof.senha_hash, prof.salt);
+  if (!ok) return c.text('Invalid credentials', 401);
+  const token = await signJwt({ sub: String(prof.id), role: prof.role, email: prof.email });
+  return c.json({ token, professor: { id: prof.id, email: prof.email, nome: prof.nome, role: prof.role } });
+});
+
+app.post('/auth/register', async (c) => {
+  const body = await parseBody(c);
+  if (!body?.email || !body?.password || !body?.nome) return c.text('', 400);
+  const existing = dbq('SELECT id FROM professores WHERE email = ?').get(body.email);
+  if (existing) return c.text('Email already registered', 409);
+  const { hash, salt } = await hashPassword(body.password);
+  const r = dbq('INSERT INTO professores (email, nome, senha_hash, salt, role) VALUES (?, ?, ?, ?, ?) RETURNING id, email, nome, role')
+    .get(body.email, body.nome, hash, salt, 'professor');
+  const token = await signJwt({ sub: String((r as any).id), role: 'professor', email: body.email });
+  return c.json({ token, professor: r }, 201);
+});
+
+app.get('/check-auth', professorAuth, (c) => {
+  const prof = getProfessor(c);
+  return c.json({ id: prof?.id, role: prof?.role });
+});
+
 // ---------- Admin handlers ----------
 
 async function createTurma(c: any) {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
   const slug = sanitizeSlug(body.slug ?? '');
+  const professorId = prof.role === 'admin' ? (body.professor_id ?? prof.id) : prof.id;
   const r = db
     .query(
-      `INSERT INTO turmas (slug, nome, cor, icone, senha, descricao)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO turmas (professor_id, slug, nome, cor, icone, senha, descricao)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        RETURNING *`
     )
-    .get(slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null);
+    .get(professorId, slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null);
   return c.json(r, 201);
 }
 
 async function updateTurma(c: any) {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
   const slug = sanitizeSlug(body.slug ?? '');
+  const scope = prof.role === 'admin' ? '' : ' AND professor_id = ?';
+  const params: any[] = [slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null, id];
+  if (prof.role !== 'admin') params.push(prof.id);
   const r = db
     .query(
       `UPDATE turmas
        SET slug = ?, nome = ?, cor = ?, icone = ?, senha = COALESCE(?, senha), descricao = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
-       WHERE id = ?
+       WHERE id = ?${scope}
        RETURNING *`
     )
-    .get(slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null, id);
-  if (!r) return c.text('Error: no rows returned by a query that expected to return at least one row', 500);
+    .get(...params);
+  if (!r) return c.text('Turma not found or access denied', 404);
   return c.json(r, 200);
 }
 
 async function createAula(c: any) {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-
   const turmaId = parseId(String(body.turma_id));
   if (turmaId === null) return c.text('', 400);
-
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
+  if (!turma) return c.text('Turma not found', 404);
+  if (prof.role !== 'admin' && turma.professor_id !== prof.id) return c.text('Access denied', 403);
   const markdown = body.markdown ?? body.conteudo_md ?? null;
   let finalCaminho = sanitizePathOrUrl(body.caminho ?? '');
-
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId);
-  if (!turma) return c.text('Turma not found', 404);
-
   if (markdown !== null && markdown !== undefined) {
     const res = processMarpContent(turma.slug, body.titulo ?? '', markdown);
     if (res.error) return c.text(res.error, 500);
     finalCaminho = res.caminho!;
   }
-
   const r = db
     .query(
       `INSERT INTO aulas (turma_id, titulo, caminho, icone, descricao, ordem, conteudo_md)
@@ -102,26 +145,24 @@ async function createAula(c: any) {
 }
 
 async function updateAula(c: any) {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-
   const turmaId = parseId(String(body.turma_id));
   if (turmaId === null) return c.text('', 400);
-
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
+  if (!turma) return c.text('Turma not found', 404);
+  if (prof.role !== 'admin' && turma.professor_id !== prof.id) return c.text('Access denied', 403);
   const markdown = body.markdown ?? body.conteudo_md ?? null;
   let finalCaminho = sanitizePathOrUrl(body.caminho ?? '');
-
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId);
-  if (!turma) return c.text('Turma not found', 404);
-
   if (markdown !== null && markdown !== undefined) {
     const res = processMarpContent(turma.slug, body.titulo ?? '', markdown);
     if (res.error) return c.text(res.error, 500);
     finalCaminho = res.caminho!;
   }
-
   const r = db
     .query(
       `UPDATE aulas
@@ -131,20 +172,22 @@ async function updateAula(c: any) {
        RETURNING *`
     )
     .get(turmaId, body.titulo ?? '', finalCaminho, body.icone ?? null, body.descricao ?? null, body.ordem ?? 0, markdown, id);
-  if (!r) return c.text('Error: no rows returned by a query that expected to return at least one row', 500);
+  if (!r) return c.text('Aula not found', 404);
   return c.json(r, 200);
 }
 
 async function createAtividade(c: any) {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-
   const turmaId = parseId(String(body.turma_id));
   if (turmaId === null) return c.text('', 400);
-
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
+  if (!turma) return c.text('Turma not found', 404);
+  if (prof.role !== 'admin' && turma.professor_id !== prof.id) return c.text('Access denied', 403);
   const externalId = body.external_id != null ? sanitizeSlug(body.external_id) : null;
   const caminho = sanitizePathOrUrl(body.caminho ?? '');
-
   const r = db
     .query(
       `INSERT INTO atividades (turma_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem)
@@ -168,17 +211,19 @@ async function createAtividade(c: any) {
 }
 
 async function updateAtividade(c: any) {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-
   const turmaId = parseId(String(body.turma_id));
   if (turmaId === null) return c.text('', 400);
-
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
+  if (!turma) return c.text('Turma not found', 404);
+  if (prof.role !== 'admin' && turma.professor_id !== prof.id) return c.text('Access denied', 403);
   const externalId = body.external_id != null ? sanitizeSlug(body.external_id) : null;
   const caminho = sanitizePathOrUrl(body.caminho ?? '');
-
   const r = db
     .query(
       `UPDATE atividades
@@ -202,20 +247,24 @@ async function updateAtividade(c: any) {
       body.ordem ?? 0,
       id
     );
-  if (!r) return c.text('Error: no rows returned by a query that expected to return at least one row', 500);
+  if (!r) return c.text('Atividade not found', 404);
   return c.json(mapAtividade(r), 200);
 }
 
 // ---------- Route registration ----------
 
-app.get('/check-auth', professorAuth, (c) => c.body(null, 200));
-
 app.post('/turmas', professorAuth, createTurma);
 app.put('/turmas/:id', professorAuth, updateTurma);
 app.post('/turmas/:id', professorAuth, updateTurma);
 app.delete('/turmas/:id', professorAuth, (c) => {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
+  if (prof.role !== 'admin') {
+    const turma = dbq('SELECT professor_id FROM turmas WHERE id = ?').get(id) as any;
+    if (!turma || turma.professor_id !== prof.id) return c.text('Access denied', 403);
+  }
   dbq('DELETE FROM turmas WHERE id = ?').run(id);
   return c.body(null, 204);
 });
@@ -223,8 +272,16 @@ app.delete('/turmas/:id', professorAuth, (c) => {
 app.post('/aulas', professorAuth, createAula);
 app.put('/aulas/:id', professorAuth, updateAula);
 app.delete('/aulas/:id', professorAuth, (c) => {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
+  if (prof.role !== 'admin') {
+    const aula = dbq('SELECT turma_id FROM aulas WHERE id = ?').get(id) as any;
+    if (!aula) return c.text('Aula not found', 404);
+    const turma = dbq('SELECT professor_id FROM turmas WHERE id = ?').get(aula.turma_id) as any;
+    if (!turma || turma.professor_id !== prof.id) return c.text('Access denied', 403);
+  }
   dbq('DELETE FROM aulas WHERE id = ?').run(id);
   return c.body(null, 204);
 });
@@ -232,15 +289,34 @@ app.delete('/aulas/:id', professorAuth, (c) => {
 app.post('/atividades', professorAuth, createAtividade);
 app.put('/atividades/:id', professorAuth, updateAtividade);
 app.delete('/atividades/:id', professorAuth, (c) => {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
+  if (prof.role !== 'admin') {
+    const atv = dbq('SELECT turma_id FROM atividades WHERE id = ?').get(id) as any;
+    if (!atv) return c.text('Atividade not found', 404);
+    const turma = dbq('SELECT professor_id FROM turmas WHERE id = ?').get(atv.turma_id) as any;
+    if (!turma || turma.professor_id !== prof.id) return c.text('Access denied', 403);
+  }
   dbq('DELETE FROM atividades WHERE id = ?').run(id);
   return c.body(null, 204);
 });
 
 // ---------- Public routes ----------
 
-app.get('/turmas', (c) => {
+app.get('/turmas', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const { verifyJwt } = await import('./auth');
+    const payload = await verifyJwt(authHeader.slice(7));
+    if (payload?.sub) {
+      if (payload.role === 'admin') {
+        return c.json(dbq('SELECT * FROM turmas ORDER BY nome').all());
+      }
+      return c.json(dbq('SELECT * FROM turmas WHERE professor_id = ? ORDER BY nome').all(Number(payload.sub)));
+    }
+  }
   const rows = dbq('SELECT id, slug, nome, cor, icone, descricao FROM turmas ORDER BY nome').all();
   return c.json(rows);
 });
@@ -248,20 +324,32 @@ app.get('/turmas', (c) => {
 app.get('/turmas/:id', (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const r = dbq('SELECT * FROM turmas WHERE id = ?').get(id);
+  const r = dbq('SELECT id, slug, nome, cor, icone, descricao FROM turmas WHERE id = ?').get(id);
   if (!r) return c.text('Turma not found', 404);
   return c.json(r);
 });
 
-app.get('/aulas', (c) => {
+app.get('/aulas', async (c) => {
   const turmaId = parseId(c.req.query('turma_id'));
   if (turmaId === null) return c.text('', 400);
-  const senha = c.req.query('senha') ?? null;
-
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId);
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
   if (!turma) return c.text('Turma não encontrada', 404);
-  if ((turma.senha ?? null) !== senha) return c.text('Senha da turma incorreta', 401);
 
+  const authHeader = c.req.header('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const { verifyJwt } = await import('./auth');
+    const payload = await verifyJwt(authHeader.slice(7));
+    if (payload?.sub) {
+      const profId = Number(payload.sub);
+      if (payload.role === 'admin' || turma.professor_id === profId) {
+        const rows = dbq('SELECT * FROM aulas WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
+        return c.json(rows);
+      }
+    }
+  }
+
+  const senha = c.req.query('senha') ?? null;
+  if ((turma.senha ?? null) !== senha) return c.text('Senha da turma incorreta', 401);
   const rows = dbq('SELECT * FROM aulas WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
   return c.json(rows);
 });
@@ -274,36 +362,53 @@ app.get('/aulas/:id', (c) => {
   return c.json(r);
 });
 
-app.get('/atividades', (c) => {
+app.get('/atividades', async (c) => {
   const turmaId = parseId(c.req.query('turma_id'));
   if (turmaId === null) return c.text('', 400);
-  const senha = c.req.query('senha') ?? null;
-
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId);
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
   if (!turma) return c.text('Turma não encontrada', 404);
-  if ((turma.senha ?? null) !== senha) return c.text('Senha da turma incorreta', 401);
 
+  const authHeader = c.req.header('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const { verifyJwt } = await import('./auth');
+    const payload = await verifyJwt(authHeader.slice(7));
+    if (payload?.sub) {
+      const profId = Number(payload.sub);
+      if (payload.role === 'admin' || turma.professor_id === profId) {
+        const rows = dbq('SELECT * FROM atividades WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
+        return c.json(rows.map(mapAtividade));
+      }
+    }
+  }
+
+  const senha = c.req.query('senha') ?? null;
+  if ((turma.senha ?? null) !== senha) return c.text('Senha da turma incorreta', 401);
   const rows = dbq('SELECT * FROM atividades WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
   return c.json(rows.map(mapAtividade));
 });
 
-app.get('/atividades/:id', (c) => {
+app.get('/atividades/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-
-  const atv = dbq('SELECT * FROM atividades WHERE id = ?').get(id);
+  const atv = dbq('SELECT * FROM atividades WHERE id = ?').get(id) as any;
   if (!atv) return c.text('Atividade not found', 404);
   atv.allow_password = atv.allow_password == null ? null : !!atv.allow_password;
 
-  const professorPassword = process.env.PROFESSOR_PASSWORD || 'admin123';
-  const headerPass = c.req.header('X-Professor-Password');
-  if (headerPass === professorPassword) {
-    return c.json(atv);
+  const authHeader = c.req.header('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const { verifyJwt } = await import('./auth');
+    const payload = await verifyJwt(authHeader.slice(7));
+    if (payload?.sub) {
+      const profId = Number(payload.sub);
+      const turma = dbq('SELECT professor_id FROM turmas WHERE id = ?').get(atv.turma_id) as any;
+      if (turma && (payload.role === 'admin' || turma.professor_id === profId)) {
+        return c.json(atv);
+      }
+    }
   }
 
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(atv.turma_id);
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(atv.turma_id) as any;
   if (!turma) return c.text('Turma not found for activity', 500);
-
   const inputSenha = c.req.query('senha') ?? '';
   const turmaSenha = turma.senha ?? '';
   const atvSenha = atv.senha ?? '';
@@ -312,9 +417,7 @@ app.get('/atividades/:id', (c) => {
   if (inputSenha === atvSenha && isProtected) {
     return c.json(atv);
   } else if (inputSenha === turmaSenha) {
-    if (isProtected) {
-      atv.json_data = null;
-    }
+    if (isProtected) atv.json_data = null;
     return c.json(atv);
   } else {
     return c.text('Senha incorreta', 401);

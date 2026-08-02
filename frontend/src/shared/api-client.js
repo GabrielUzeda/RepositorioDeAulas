@@ -20,25 +20,28 @@ class ApiClient {
         this.defaultTimeout = 30000;
     }
 
-    setProfessorPassword(password) {
-        const expiry = Date.now() + (60 * 60 * 1000); // 1 hora
-        sessionStorage.setItem('professor_auth', JSON.stringify({ password, expiry }));
+    setProfessorToken(token) {
+        const expiry = Date.now() + (23 * 60 * 60 * 1000);
+        sessionStorage.setItem('professor_auth', JSON.stringify({ token, expiry }));
     }
 
-    getProfessorPassword() {
+    getProfessorToken() {
         const auth = sessionStorage.getItem('professor_auth');
         if (!auth) return null;
-
         try {
-            const { password, expiry } = JSON.parse(auth);
+            const { token, expiry } = JSON.parse(auth);
             if (Date.now() > expiry) {
                 sessionStorage.removeItem('professor_auth');
                 return null;
             }
-            return password;
+            return token;
         } catch (e) {
             return null;
         }
+    }
+
+    clearProfessorAuth() {
+        sessionStorage.removeItem('professor_auth');
     }
 
     _createTimeoutSignal(timeoutMs) {
@@ -53,9 +56,9 @@ class ApiClient {
         const { signal, timeoutId } = this._createTimeoutSignal(timeout);
 
         const headers = { ...this.defaultHeaders, ...options.headers };
-        const profPass = this.getProfessorPassword();
-        if (profPass) {
-            headers['X-Professor-Password'] = profPass;
+        const token = this.getProfessorToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
         }
 
         const config = { method, headers, signal };

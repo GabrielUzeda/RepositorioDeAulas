@@ -12,16 +12,28 @@ db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS professores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  nome TEXT NOT NULL,
+  senha_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'professor',
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+
 CREATE TABLE IF NOT EXISTS turmas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  slug TEXT NOT NULL UNIQUE,
+  professor_id INTEGER NOT NULL REFERENCES professores(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL,
   nome TEXT NOT NULL,
   cor TEXT,
   icone TEXT,
   senha TEXT,
   descricao TEXT,
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+  UNIQUE(slug, professor_id)
 );
 
 CREATE TABLE IF NOT EXISTS aulas (
@@ -63,26 +75,56 @@ CREATE TABLE IF NOT EXISTS ranking (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ranking_atividade_pontuacao ON ranking(atividade_id, pontuacao DESC);
+CREATE INDEX IF NOT EXISTS idx_turmas_professor ON turmas(professor_id);
 `;
 
 db.exec(SCHEMA);
-seedDemoData();
 
-function seedDemoData() {
-  const seed = db.transaction(() => {
-  const existing = db.query('SELECT id FROM turmas WHERE slug = ?').get('demo-class');
+const PBKDF2_ITERATIONS = 100000;
+const SALT_LENGTH = 16;
+
+function b64url(data: Uint8Array): string {
+  let binary = '';
+  for (const byte of data) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function seedHashPassword(password: string): Promise<{ hash: string; salt: string }> {
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+  const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const derivedBits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, baseKey, 256);
+  const key = await crypto.subtle.importKey('raw', derivedBits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(password));
+  return { hash: b64url(new Uint8Array(signature)), salt: b64url(salt) };
+}
+
+async function seedDemoData() {
+  const existing = db.query('SELECT id FROM professores LIMIT 1').get();
   if (existing) return;
 
+  const email = process.env.PROFESSOR_EMAIL || 'admin@local';
+  const password = process.env.PROFESSOR_PASSWORD || 'admin123';
+  const { hash, salt } = await seedHashPassword(password);
+
+  const insertProf = db.query(
+    `INSERT INTO professores (email, nome, senha_hash, salt, role) VALUES (?, ?, ?, ?, 'admin')`
+  );
+  insertProf.run(email, 'Administrador', hash, salt);
+
+  const admin = db.query('SELECT id FROM professores WHERE email = ?').get(email) as any;
+  const adminId = Number(admin.id);
+
   const insertTurma = db.query(
-    `INSERT INTO turmas (slug, nome, cor, icone, senha, descricao) VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO turmas (professor_id, slug, nome, cor, icone, senha, descricao) VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
   const turmaResult = insertTurma.run(
+    adminId,
     'demo-class',
     'Turma de Demonstração',
     'bg-indigo-600',
     'school',
     'asdf1234',
-    'Clique aqui para entrar na turma. A senha de acesso é "asdf1234".\n\n\n\nEsta turma contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)'
+    'Clique aqui para entrar na turma. A senha de acesso é "asdf1234".\nEsta turma contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)'
   );
   const turmaId = Number(turmaResult.lastInsertRowid);
 
@@ -96,7 +138,7 @@ function seedDemoData() {
     '00',
     'Comece por aqui: Entenda como navegar e usar o sistema.',
     1,
-    '# Bem-vindo ao Repositório de Aulas!\n\nEste sistema foi desenvolvido para facilitar o acesso a materiais didáticos e atividades interativas.\n\n### Como usar:\n1. Navegue pelas guias "Aulas" e "Atividades".\n2. Clique nos cards para abrir o conteúdo.\n3. Acompanhe seu progresso e divirta-se aprendendo!'
+    '# Bem-vindo ao Repositório de Aulas!\nEste sistema foi desenvolvido para facilitar o acesso a materiais didáticos e atividades interativas.\n### Como usar:\n1. Navegue pelas guias "Aulas" e "Atividades".\n2. Clique nos cards para abrir o conteúdo.\n3. Acompanhe seu progresso e divirta-se aprendendo!'
   );
 
   const insertAtividade = db.query(
@@ -126,7 +168,7 @@ function seedDemoData() {
       senha: null,
       allow_password: 0,
       json_data:
-        '{"questions":[{"title":"Conceitos Básicos","content":"O que é um algoritmo?","options":[{"text":"Sequência de passos lógicos","correct":true,"feedback":"Correto! Um algoritmo é uma receita para resolver problemas passo a passo."},{"text":"Uma peça de hardware","correct":false,"feedback":"Incorreto. O hardware é a parte física (como teclado e monitor). Um algoritmo é lógico/software."}]},{"title":"Hardware","content":"Cite 3 componentes de entrada.","options":[{"text":"Teclado, Mouse, Microfone","correct":true,"feedback":"Excelente! Esses são exemplos clássicos de hardware de entrada de dados."},{"text":"Monitor, Caixa de Som","correct":false,"feedback":"Incorreto. Monitor e caixa de som são exemplos de dispositivos de SAÍDA de dados."}]},{"title":"Software","content":"Qual a diferença entre SO e Aplicativo?","options":[{"text":"O SO gerencia tudo, o aplicativo faz tarefas específicas.","correct":true,"feedback":"Isso mesmo! O Sistema Operacional controla o computador, e o aplicativo atende ao usuário."},{"text":"Ambos são a mesma coisa fisicamente","correct":false,"feedback":"Incorreto. Ambos são softwares e servem a propósitos distindos (gerenciamento vs tarefas específicas)."}]},{"title":"Redes","content":"Qual a utilidade do IP?","options":[{"text":"Identificar uma máquina na rede","correct":true,"feedback":"Exatamente! O IP é como o endereço residencial de um computador na rede."},{"text":"Proteger contra vírus","correct":false,"feedback":"Incorreto. A proteção contra vírus é feita por antivírus e firewalls, não pelo protocolo IP."}]},{"title":"Segurança","content":"O que é Phishing?","options":[{"text":"Um tipo de ataque de engenharia social","correct":true,"feedback":"Correto! É quando tentam enganar você para que forneça dados sensíveis."},{"text":"Um programa de edição de imagem","correct":false,"feedback":"Incorreto. Programas de edição de imagem nada têm a ver com Phishing."}]},{"title":"Geral","content":"O que significa WWW?","options":[{"text":"World Wide Web","correct":true,"feedback":"Exatamente! Essa é a grande rede mundial de computadores."},{"text":"Wild World Web","correct":false,"feedback":"Incorreto. Apesar do trocadilho divertido, o correto é World Wide Web."}]}]}',
+        '{"questions":[{"title":"Conceitos Básicos","content":"O que é um algoritmo?","options":[{"text":"Sequência de passos lógicos","correct":true,"feedback":"Correto! Um algoritmo é uma receita para resolver problemas passo a passo."},{"text":"Uma peça de hardware","correct":false,"feedback":"Incorreto. O hardware é a parte física (como teclado e monitor). Um algoritmo é lógico/software."}]},{"title":"Hardware","content":"Cite 3 componentes de entrada.","options":[{"text":"Teclado, Mouse, Microfone","correct":true,"feedback":"Excelente! Esses são exemplos clássicos de hardware de entrada de dados."},{"text":"Monitor, Caixa de Som","correct":false,"feedback":"Incorreto. Monitor e caixa de som são exemplos de dispositivos de SAÍDA de dados."}]},{"title":"Software","content":"Qual a diferença entre SO e Aplicativo?","options":[{"text":"O SO gerencia tudo, o aplicativo faz tarefas específicas.","correct":true,"feedback":"Isso mesmo! O Sistema Operacional controla o computador, e o aplicativo atende ao usuário."},{"text":"Ambos são a mesma coisa fisicamente","correct":false,"feedback":"Incorreto. Ambos são softwares e servem a propósitos distindos (gerenciamento vs tarefas específicas)."}]},{"title":"Redes","content":"Qual a utilidade do IP?","options":[{"text":"Identificar uma máquina na rede","correct":true,"feedback":"Exatamente! O IP é como o endereço residencial de um computador na rede."},{"text":"Proteger contra vírus","correct":false,"feedback":"Incorreto. A proteção contra vírus é feita por antivírus e firewalls, não pelo protocolo IP."}]},{"title":"Segurança","content":"O que é Phishing?","options":[{"text":"Um tipo de ataque de engenharia social","correct":true,"feedback":"Correto! É quando tentam enganar você para que forneça dados sensíveis."},{"text":"Um programa de edição de imagem","correct":false,"feedback":"Incorreto. Programas de edição de imagem nada têm a ver com Phishing."}]},{"title":"Geral","content":"O que significa WWW?","options":[{"text":"World Wide Web","correct":true,"feedback":"Correto! A grande teia de alcance mundial."},{"text":"World Wire Web","correct":false,"feedback":"Incorreto. Não existe \"Wire\" no termo."}]}]}',
     },
     {
       external_id: 'demo-prova',
@@ -181,6 +223,7 @@ function seedDemoData() {
       atv.json_data
     );
   }
-  });
-  seed();
 }
+
+await seedDemoData().catch((e) => console.error('seed failed:', e));
+
