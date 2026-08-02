@@ -5,6 +5,7 @@ import { useTurmaStore } from '@/stores/turma';
 import { apiClient } from '@/api/client';
 import TurmaFormModal from '@/components/TurmaFormModal.vue';
 import MarpEditorModal from '@/components/MarpEditorModal.vue';
+import JsonActivityEditorModal from '@/components/JsonActivityEditorModal.vue';
 import type { Turma, Aula, Atividade } from '@/types';
 
 const authStore = useAuthStore();
@@ -22,6 +23,9 @@ const editingTurma = ref<Turma | null>(null);
 
 const showMarpModal = ref(false);
 const editingAula = ref<Aula | null>(null);
+
+const showActivityEditorModal = ref(false);
+const editingActivity = ref<Atividade | null>(null);
 
 onMounted(async () => {
   const ok = await authStore.checkAuth();
@@ -92,6 +96,30 @@ async function handleSaveMarpAula(payload: { titulo: string; descricao: string; 
   }
 
   showMarpModal.value = false;
+  await turmaStore.loadTurmaContent(selectedTurma.value.id);
+}
+
+function handleOpenActivityEditor(atividade?: Atividade) {
+  editingActivity.value = atividade || null;
+  showActivityEditorModal.value = true;
+}
+
+async function handleSaveActivity(payload: Partial<Atividade>) {
+  if (!selectedTurma.value) return;
+
+  const data = {
+    ...payload,
+    turma_id: selectedTurma.value.id,
+    ordem: turmaStore.atividades.length + 1
+  };
+
+  if (editingActivity.value) {
+    await apiClient.put(`/atividades/${editingActivity.value.id}`, data);
+  } else {
+    await apiClient.post('/atividades', data);
+  }
+
+  showActivityEditorModal.value = false;
   await turmaStore.loadTurmaContent(selectedTurma.value.id);
 }
 
@@ -254,6 +282,10 @@ async function handleDeleteAtividade(atividadeId: number) {
 
           <div class="flex justify-between items-center pt-6 border-t border-slate-800">
             <h3 class="text-xl font-bold text-slate-200">Atividades Cadastradas ({{ turmaStore.atividades.length }})</h3>
+            <button @click="handleOpenActivityEditor()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md flex items-center space-x-2">
+              <span class="material-icons text-sm">add</span>
+              <span>Criar Atividade</span>
+            </button>
           </div>
 
           <div class="space-y-3">
@@ -266,6 +298,9 @@ async function handleDeleteAtividade(atividadeId: number) {
                 <p class="text-xs text-slate-400 mt-1">{{ atv.descricao }}</p>
               </div>
               <div class="flex space-x-1">
+                <button @click="handleOpenActivityEditor(atv)" class="p-2 text-indigo-400 hover:bg-slate-700 rounded-lg" title="Editar Atividade">
+                  <span class="material-icons text-sm">edit</span>
+                </button>
                 <button @click="handleDeleteAtividade(atv.id)" class="p-2 text-rose-400 hover:bg-slate-700 rounded-lg" title="Excluir Atividade">
                   <span class="material-icons text-sm">delete</span>
                 </button>
@@ -278,6 +313,7 @@ async function handleDeleteAtividade(atividadeId: number) {
       <!-- Modals -->
       <TurmaFormModal :show="showTurmaModal" :turma="editingTurma" @close="showTurmaModal = false" @submit="handleSaveTurma" />
       <MarpEditorModal :show="showMarpModal" :titulo="editingAula?.titulo" :descricao="editingAula?.descricao" :markdown="editingAula?.marp_markdown" @close="showMarpModal = false" @save="handleSaveMarpAula" />
+      <JsonActivityEditorModal :show="showActivityEditorModal" :atividade="editingActivity" @close="showActivityEditorModal = false" @save="handleSaveActivity" />
     </div>
   </div>
 </template>
