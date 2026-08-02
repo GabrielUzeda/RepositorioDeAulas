@@ -1,9 +1,0 @@
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_USERNAME=logimsmtp@gmail.com
-SMTP_PASSWORD=xxxx xxxx xxxx xxxx
-MAIL_FROM=youremail@gmail.com
-frontDir=/var/www/html
-backDir=/var/www/html/efg/backend
-sslDir=/var/www/ssl
-verificationDir=/var/www/validation

@@ -1,6 +1,3 @@
-# Secrets
-secret.json
-
 # Keys
 id_ed25519
 *.pem
@@ -30,4 +27,8 @@ build/
 # Keep workflow and code by default; we only ignore secrets and local artifacts
 database/data/
 backend/database/data/
+backend/data/
+frontend/src/turmas/
 
+# Database Backups
+backups/*.sql

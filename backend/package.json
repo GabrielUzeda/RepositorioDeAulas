@@ -1,0 +1,19 @@
+{
+  "name": "repositorio-de-aulas-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@marp-team/marp-cli": "^4.0.4",
+    "hono": "^4.6.14",
+    "nodemailer": "^6.9.16"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/nodemailer": "^6.4.17"
+  }
+}
