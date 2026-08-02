@@ -5,13 +5,11 @@ if [ -f .env ]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
-# Configuration using env vars with defaults from .env
-CONTAINER_NAME="postgres-db"
-DB_USER=${POSTGRES_USER:-"postgres"}
-DB_NAME=${POSTGRES_DB:-"postgres"}
+# SQLite database path
+DB_FILE="./backend/data/app.db"
 
 if [ -z "$1" ]; then
-    echo "❌ Uso: $0 <arquivo_backup.sql>"
+    echo "❌ Uso: $0 <arquivo_backup.db>"
     exit 1
 fi
 
@@ -22,13 +20,22 @@ if [ ! -f "$BACKUP_FILE" ]; then
     exit 1
 fi
 
+# Se o backend estiver rodando, o arquivo pode estar travado; recomendamos parar o serviço antes.
+if pgrep -f "bun run src/index.ts" >/dev/null 2>&1 || pgrep -f "bun src/index.ts" >/dev/null 2>&1; then
+    echo "⚠️  O backend parece estar em execução. Pare-o antes de restaurar para evitar perda de dados."
+    read -p "Deseja continuar mesmo assim? (s/N): " confirm
+    if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
+        echo "❌ Restauração cancelada."
+        exit 1
+    fi
+fi
+
+mkdir -p "$(dirname "$DB_FILE")"
+
 echo "🚀 Restaurando backup: $BACKUP_FILE..."
-
-# Stream the backup file into the container's psql
-cat "$BACKUP_FILE" | docker exec -i "$CONTAINER_NAME" psql -U "$DB_USER" -d "$DB_NAME"
-
-if [ $? -eq 0 ]; then
+if cp "$BACKUP_FILE" "$DB_FILE"; then
     echo "✅ Restauração concluída com sucesso!"
+    echo "Reinicie o backend para aplicar: docker compose restart bun-server (ou docker compose -f docker-compose.prod.yml restart bun-server)"
 else
     echo "❌ Erro ao restaurar o banco de dados."
     exit 1

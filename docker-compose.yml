@@ -1,15 +1,14 @@
 services:
-  rust-server:
-    image: rust:alpine
-    container_name: rust-server
+  bun-server:
+    image: oven/bun:1
+    container_name: bun-server
     env_file:
       - .env
     volumes:
       - ./backend/:/app
-      - backend_target:/app/target
       - ./frontend/:/app/frontend_static
     working_dir: /app
-    command: sh -c "apk add --no-cache build-base musl-dev pkgconfig openssl-dev openssl-libs-static nodejs npm && npm install -g @marp-team/marp-cli && cargo build --release && ./target/release/rust-app"
+    command: sh -c "bun install && bun run src/index.ts"
     expose:
       - "8080"
     ports:
@@ -17,8 +16,6 @@ services:
     networks:
       - web-network
     restart: unless-stopped
-    depends_on:
-      - db
   nginx:
     image: nginx
     ports:
@@ -30,27 +27,8 @@ services:
     networks:
       - web-network
     depends_on:
-      - rust-server
-  db:
-    image: postgres:alpine
-    container_name: postgres-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
-    networks:
-      - web-network
+      - bun-server
 
 networks:
   web-network:
     driver: bridge
-
-volumes:
-  postgres_data:
-  backend_target:

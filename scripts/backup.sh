@@ -5,32 +5,32 @@ if [ -f .env ]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
-# Configuration using env vars with defaults from .env
-CONTAINER_NAME="postgres-db"
-DB_USER=${POSTGRES_USER:-"postgres"}
-DB_NAME=${POSTGRES_DB:-"postgres"}
+# SQLite database path
+DB_FILE="./backend/data/app.db"
 BACKUP_DIR="./backups"
-INIT_DB_DIR="./init-db"
 
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
-mkdir -p "$INIT_DB_DIR"
 
 # Timestamp for filename
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/backup_$TIMESTAMP.sql"
+BACKUP_FILE="$BACKUP_DIR/backup_$TIMESTAMP.db"
 
-echo "🚀 Iniciando backup do banco de dados..."
+if ! command -v sqlite3 >/dev/null 2>&1; then
+    echo "❌ sqlite3 não instalado. Instale com: sudo apt install sqlite3 (ou nix shell nixpkgs#sqlite)"
+    exit 1
+fi
 
-# Run pg_dump inside the container
-docker exec "$CONTAINER_NAME" pg_dump -U "$DB_USER" "$DB_NAME" > "$BACKUP_FILE"
+if [ ! -f "$DB_FILE" ]; then
+    echo "❌ Banco de dados não encontrado em $DB_FILE. O backend precisa ter sido iniciado ao menos uma vez."
+    exit 1
+fi
 
-if [ $? -eq 0 ]; then
+echo "🚀 Iniciando backup do banco SQLite..."
+
+# Hot backup seguro mesmo com WAL ativo
+if sqlite3 "$DB_FILE" ".backup '$BACKUP_FILE'"; then
     echo "✅ Backup concluído com sucesso: $BACKUP_FILE"
-    
-    # Copy to init-db for automatic restoration on next fresh start
-    cp "$BACKUP_FILE" "$INIT_DB_DIR/01_latest_backup.sql"
-    echo "📌 Cópia preparada em $INIT_DB_DIR/01_latest_backup.sql para restauração automática."
 else
     echo "❌ Erro ao realizar o backup."
     exit 1

@@ -1,6 +1,18 @@
-# Rust build artifacts
-target/
-Cargo.lock
+# Dependencies
+node_modules/
+
+# Runtime data (SQLite)
+data/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Secrets
+secret.json
+secrets.json
+example.secret.json
 
 # IDE and editor files
 .vscode/
@@ -18,52 +30,21 @@ Cargo.lock
 ehthumbs.db
 Thumbs.db
 
-# Environment files
-.env
-.env.local
-.env.production
-
 # Log files
 *.log
 
 # Temporary files
 *.tmp
 *.temp
-
-# Backup files
 *.bak
 *.backup
 
-# Database files (if using local SQLite or similar)
+# Database files
 *.db
 *.sqlite
 *.sqlite3
 
-# Coverage reports
+# Build artifacts
+dist/
+build/
 coverage/
-*.profraw
-
-# Documentation builds
-book/
-
-# Cargo registry and git caches
-.cargo/
-.registry/
-.git/
-
-# Rustfmt and Clippy
-rustfmt.toml
-
-# WASM builds
-pkg/
-wasm-pack.log
-
-# Benchmark results
-criterion/
-
-# Test coverage
-tarpaulin-report.html
-
-# Local development files
-secrets.json
-example.secret.json
