@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useTurmaStore } from '@/stores/turma';
+import { apiClient } from '@/api/client';
 import TurmaCard from '@/components/TurmaCard.vue';
 import AulaCard from '@/components/AulaCard.vue';
 import AtividadeCard from '@/components/AtividadeCard.vue';
@@ -43,7 +44,18 @@ async function handleSelectTurma(turma: Turma) {
 }
 
 async function handlePasswordSubmit(password: string) {
-  if (selectedTurma.value) {
+  if (pendingActivity.value) {
+    const res = await apiClient.get<Atividade>(`/atividades/${pendingActivity.value.id}?senha=${encodeURIComponent(password)}`);
+    if (res.success && res.data && res.data.json_data) {
+      turmaStore.unlockActivity(pendingActivity.value.id);
+      showPasswordModal.value = false;
+      const unlockedAtv = res.data;
+      pendingActivity.value = null;
+      handleOpenAtividade(unlockedAtv);
+    } else {
+      alert('Senha da atividade incorreta!');
+    }
+  } else if (selectedTurma.value) {
     const success = await turmaStore.loadTurmaContent(selectedTurma.value.id, password);
     if (success) {
       showPasswordModal.value = false;

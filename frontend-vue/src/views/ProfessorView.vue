@@ -94,6 +94,24 @@ async function handleSaveMarpAula(payload: { titulo: string; descricao: string; 
   showMarpModal.value = false;
   await turmaStore.loadTurmaContent(selectedTurma.value.id);
 }
+
+async function handleDeleteAula(aulaId: number) {
+  if (confirm('Tem certeza que deseja excluir esta aula?')) {
+    await apiClient.delete(`/aulas/${aulaId}`);
+    if (selectedTurma.value) {
+      await turmaStore.loadTurmaContent(selectedTurma.value.id);
+    }
+  }
+}
+
+async function handleDeleteAtividade(atividadeId: number) {
+  if (confirm('Tem certeza que deseja excluir esta atividade?')) {
+    await apiClient.delete(`/atividades/${atividadeId}`);
+    if (selectedTurma.value) {
+      await turmaStore.loadTurmaContent(selectedTurma.value.id);
+    }
+  }
+}
 </script>
 
 <template>
@@ -210,7 +228,7 @@ async function handleSaveMarpAula(payload: { titulo: string; descricao: string; 
           </div>
 
           <div class="flex justify-between items-center">
-            <h3 class="text-xl font-bold text-slate-200">Aulas Cadastradas</h3>
+            <h3 class="text-xl font-bold text-slate-200">Aulas Cadastradas ({{ turmaStore.aulas.length }})</h3>
             <button @click="handleOpenMarpModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md flex items-center space-x-2">
               <span class="material-icons text-sm">add</span>
               <span>Criar Aula (Marp)</span>
@@ -223,9 +241,35 @@ async function handleSaveMarpAula(payload: { titulo: string; descricao: string; 
                 <p class="font-bold text-white">{{ aula.titulo }}</p>
                 <p class="text-xs text-slate-400">{{ aula.descricao }}</p>
               </div>
-              <button @click="handleOpenMarpModal(aula)" class="p-2 text-indigo-400 hover:bg-slate-700 rounded-lg">
-                <span class="material-icons text-sm">edit</span>
-              </button>
+              <div class="flex space-x-1">
+                <button @click="handleOpenMarpModal(aula)" class="p-2 text-indigo-400 hover:bg-slate-700 rounded-lg" title="Editar Aula">
+                  <span class="material-icons text-sm">edit</span>
+                </button>
+                <button @click="handleDeleteAula(aula.id)" class="p-2 text-rose-400 hover:bg-slate-700 rounded-lg" title="Excluir Aula">
+                  <span class="material-icons text-sm">delete</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center pt-6 border-t border-slate-800">
+            <h3 class="text-xl font-bold text-slate-200">Atividades Cadastradas ({{ turmaStore.atividades.length }})</h3>
+          </div>
+
+          <div class="space-y-3">
+            <div v-for="atv in turmaStore.atividades" :key="atv.id" class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center">
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="px-2.5 py-0.5 bg-slate-700 text-indigo-300 text-xs font-bold rounded-md uppercase">{{ atv.tipo }}</span>
+                  <p class="font-bold text-white">{{ atv.titulo }}</p>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">{{ atv.descricao }}</p>
+              </div>
+              <div class="flex space-x-1">
+                <button @click="handleDeleteAtividade(atv.id)" class="p-2 text-rose-400 hover:bg-slate-700 rounded-lg" title="Excluir Atividade">
+                  <span class="material-icons text-sm">delete</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
