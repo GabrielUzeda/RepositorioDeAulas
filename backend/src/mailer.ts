@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 export interface MailRequest {
@@ -17,11 +17,40 @@ interface MailJob {
 const MAX_QUEUE = 100;
 let queue: MailJob[] = [];
 let running = false;
+let templatesDirCache: string | null = null;
+let transporterCache: nodemailer.Transporter | null = null;
 
 function resolveTemplatesDir(): string {
-  if (process.env.TEMPLATES_DIR) return process.env.TEMPLATES_DIR;
-  if (existsSync('/app/templates')) return '/app/templates';
-  return path.join(import.meta.dir, '..', 'templates');
+  if (templatesDirCache) return templatesDirCache;
+  if (process.env.TEMPLATES_DIR) {
+    templatesDirCache = process.env.TEMPLATES_DIR;
+  } else if (existsSync('/app/templates')) {
+    templatesDirCache = '/app/templates';
+  } else {
+    templatesDirCache = path.join(import.meta.dir, '..', 'templates');
+  }
+  return templatesDirCache;
+}
+
+function getTransporter(): nodemailer.Transporter {
+  if (transporterCache) return transporterCache;
+
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT);
+  const user = process.env.SMTP_USERNAME;
+  const pass = process.env.SMTP_PASSWORD;
+
+  if (!host || !port || !user || !pass) {
+    throw new Error('SMTP não configurado');
+  }
+
+  transporterCache = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+  return transporterCache;
 }
 
 export function initMailer() {
@@ -37,58 +66,66 @@ export async function sendMail(req: MailRequest): Promise<{ success: boolean; me
     queue.push({ req, resolve });
     if (!running) {
       running = true;
-      void drain();
+      void drain().catch((err) => {
+        console.error('Fatal queue drain error:', err);
+        running = false;
+      });
     }
   });
 }
 
 async function drain() {
-  while (queue.length > 0) {
-    const job = queue.shift()!;
-    try {
-      await processMail(job.req);
-      job.resolve({ success: true, message: 'Email enviado com sucesso' });
-    } catch (err: any) {
-      console.error(`Erro ao enviar email: ${err?.message}`);
-      job.resolve({ success: false, message: `Erro ao enviar email: ${err?.message}` });
+  try {
+    while (queue.length > 0) {
+      const job = queue.shift()!;
+      try {
+        await processMail(job.req);
+        job.resolve({ success: true, message: 'Email enviado com sucesso' });
+      } catch (err: any) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(`Erro ao enviar email: ${errMsg}`);
+        job.resolve({ success: false, message: `Erro ao enviar email: ${errMsg}` });
+      }
+      if (queue.length > 0) {
+        const delay = 1200 + Math.floor(Math.random() * 801);
+        await Bun.sleep(delay);
+      }
     }
-    const delay = 1200 + Math.floor(Math.random() * 801);
-    await Bun.sleep(delay);
+  } finally {
+    running = false;
   }
-  running = false;
 }
 
 async function processMail(req: MailRequest): Promise<void> {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT);
-  const user = process.env.SMTP_USERNAME;
-  const pass = process.env.SMTP_PASSWORD;
   const mailFrom = process.env.MAIL_FROM;
-
-  if (!host || !port || !user || !pass || !mailFrom) {
+  if (!mailFrom) {
     throw new Error('SMTP não configurado');
   }
 
   const templateName = req.template || 'default.txt';
-  if (templateName.includes('/') || templateName.includes('\\') || templateName.includes('..')) {
+  if (
+    templateName.includes('..') ||
+    templateName.includes('/') ||
+    templateName.includes('\\') ||
+    path.basename(templateName) !== templateName
+  ) {
     throw new Error('Invalid template name');
   }
 
   const templatePath = path.join(resolveTemplatesDir(), templateName);
-  let body = readFileSync(templatePath, 'utf8');
+  const file = Bun.file(templatePath);
+  if (!(await file.exists())) {
+    throw new Error('Template file not found');
+  }
+  let body = await file.text();
 
   if (req.variables) {
     for (const [k, v] of Object.entries(req.variables)) {
-      body = body.replaceAll(`{{${k}}}`, v);
+      body = body.replaceAll(`{{${k}}}`, () => v);
     }
   }
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-  });
+  const transporter = getTransporter();
 
   const message: Record<string, string> = {
     from: mailFrom,

@@ -28,6 +28,9 @@ export function processMarpContent(
   mdContent: string
 ): { caminho?: string; error?: string } {
   const slug = sanitizeSlug(titulo);
+  if (turmaSlug.includes('/') || turmaSlug.includes('\\') || turmaSlug.includes('..')) {
+    return { error: 'Invalid turma slug' };
+  }
   const baseDir = path.join(resolveFrontendDir(), 'turmas', turmaSlug, 'aulas');
   mkdirSync(baseDir, { recursive: true });
 
@@ -39,7 +42,7 @@ export function processMarpContent(
     content +=
       '\n\n<script type="module">\n  import mermaid from "https://esm.sh/mermaid@10";\n  mermaid.initialize({ startOnLoad: true, theme: \'default\' });\n</script>';
   }
-  content = content.replace(/```mermaid\s*([\s\S]*?)```/g, '<div class="mermaid">$1</div>');
+  content = content.replace(/```mermaid\s*([\s\S]*?)```/g, (_, code) => `<div class="mermaid">${code}</div>`);
 
   try {
     writeFileSync(mdPath, content);
@@ -52,6 +55,7 @@ export function processMarpContent(
     const { cmd, args } = resolveMarp();
     output = spawnSync(cmd, [...args, mdPath, '--html', '-o', htmlPath], {
       encoding: 'utf8',
+      timeout: 30000,
     });
   } catch (e: any) {
     return { error: `Failed to execute marp: ${e.message}` };
@@ -61,7 +65,11 @@ export function processMarpContent(
     return { error: `Failed to execute marp: ${output.error.message}` };
   }
   if (output.status !== 0) {
-    return { error: `Marp failed: ${output.stderr}` };
+    const detail = output.stderr || (output.signal ? `Terminated by signal ${output.signal}` : 'Unknown process error');
+    return { error: `Marp failed: ${detail}` };
+  }
+  if (!existsSync(htmlPath)) {
+    return { error: 'Marp completed but HTML output file was not created.' };
   }
 
   return { caminho: `turmas/${turmaSlug}/aulas/${slug}.html` };

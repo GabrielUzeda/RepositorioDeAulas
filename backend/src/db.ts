@@ -69,6 +69,7 @@ db.exec(SCHEMA);
 seedDemoData();
 
 function seedDemoData() {
+  const seed = db.transaction(() => {
   const existing = db.query('SELECT id FROM turmas WHERE slug = ?').get('demo-class');
   if (existing) return;
 
@@ -180,4 +181,6 @@ function seedDemoData() {
       atv.json_data
     );
   }
+  });
+  seed();
 }

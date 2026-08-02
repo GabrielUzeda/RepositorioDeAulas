@@ -10,6 +10,8 @@ const app = new Hono();
 
 app.use('*', cors({ origin: '*', allowHeaders: ['Content-Type', 'X-Professor-Password'], allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
 
+const dbq = (sql: string) => db.query<Record<string, any>, any[]>(sql);
+
 function mapAtividade(row: any) {
   if (row == null) return row;
   return { ...row, allow_password: row.allow_password == null ? null : !!row.allow_password };
@@ -27,6 +29,12 @@ async function parseBody(c: any): Promise<Record<string, any> | null> {
   } catch {
     return null;
   }
+}
+
+function normalizeJsonData(value: any): string | null {
+  if (value == null) return null;
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 }
 
 // ---------- Admin handlers ----------
@@ -74,7 +82,7 @@ async function createAula(c: any) {
   const markdown = body.markdown ?? body.conteudo_md ?? null;
   let finalCaminho = sanitizePathOrUrl(body.caminho ?? '');
 
-  const turma = db.query('SELECT * FROM turmas WHERE id = ?').get(turmaId);
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId);
   if (!turma) return c.text('Turma not found', 404);
 
   if (markdown !== null && markdown !== undefined) {
@@ -105,7 +113,7 @@ async function updateAula(c: any) {
   const markdown = body.markdown ?? body.conteudo_md ?? null;
   let finalCaminho = sanitizePathOrUrl(body.caminho ?? '');
 
-  const turma = db.query('SELECT * FROM turmas WHERE id = ?').get(turmaId);
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId);
   if (!turma) return c.text('Turma not found', 404);
 
   if (markdown !== null && markdown !== undefined) {
@@ -150,7 +158,7 @@ async function createAtividade(c: any) {
       body.descricao ?? null,
       caminho,
       body.icone ?? null,
-      body.json_data ?? null,
+      normalizeJsonData(body.json_data),
       body.tipo ?? null,
       body.senha ?? null,
       body.allow_password == null ? null : body.allow_password ? 1 : 0,
@@ -187,7 +195,7 @@ async function updateAtividade(c: any) {
       body.descricao ?? null,
       caminho,
       body.icone ?? null,
-      body.json_data ?? null,
+      normalizeJsonData(body.json_data),
       body.tipo ?? null,
       body.senha ?? null,
       body.allow_password == null ? null : body.allow_password ? 1 : 0,
@@ -208,7 +216,7 @@ app.post('/turmas/:id', professorAuth, updateTurma);
 app.delete('/turmas/:id', professorAuth, (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  db.query('DELETE FROM turmas WHERE id = ?').run(id);
+  dbq('DELETE FROM turmas WHERE id = ?').run(id);
   return c.body(null, 204);
 });
 
@@ -217,7 +225,7 @@ app.put('/aulas/:id', professorAuth, updateAula);
 app.delete('/aulas/:id', professorAuth, (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  db.query('DELETE FROM aulas WHERE id = ?').run(id);
+  dbq('DELETE FROM aulas WHERE id = ?').run(id);
   return c.body(null, 204);
 });
 
@@ -226,21 +234,21 @@ app.put('/atividades/:id', professorAuth, updateAtividade);
 app.delete('/atividades/:id', professorAuth, (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  db.query('DELETE FROM atividades WHERE id = ?').run(id);
+  dbq('DELETE FROM atividades WHERE id = ?').run(id);
   return c.body(null, 204);
 });
 
 // ---------- Public routes ----------
 
 app.get('/turmas', (c) => {
-  const rows = db.query('SELECT id, slug, nome, cor, icone, descricao FROM turmas ORDER BY nome').all();
+  const rows = dbq('SELECT id, slug, nome, cor, icone, descricao FROM turmas ORDER BY nome').all();
   return c.json(rows);
 });
 
 app.get('/turmas/:id', (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const r = db.query('SELECT * FROM turmas WHERE id = ?').get(id);
+  const r = dbq('SELECT * FROM turmas WHERE id = ?').get(id);
   if (!r) return c.text('Turma not found', 404);
   return c.json(r);
 });
@@ -250,18 +258,18 @@ app.get('/aulas', (c) => {
   if (turmaId === null) return c.text('', 400);
   const senha = c.req.query('senha') ?? null;
 
-  const turma = db.query('SELECT * FROM turmas WHERE id = ?').get(turmaId);
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId);
   if (!turma) return c.text('Turma não encontrada', 404);
   if ((turma.senha ?? null) !== senha) return c.text('Senha da turma incorreta', 401);
 
-  const rows = db.query('SELECT * FROM aulas WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
+  const rows = dbq('SELECT * FROM aulas WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
   return c.json(rows);
 });
 
 app.get('/aulas/:id', (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const r = db.query('SELECT * FROM aulas WHERE id = ?').get(id);
+  const r = dbq('SELECT * FROM aulas WHERE id = ?').get(id);
   if (!r) return c.text('Aula not found', 404);
   return c.json(r);
 });
@@ -271,11 +279,11 @@ app.get('/atividades', (c) => {
   if (turmaId === null) return c.text('', 400);
   const senha = c.req.query('senha') ?? null;
 
-  const turma = db.query('SELECT * FROM turmas WHERE id = ?').get(turmaId);
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId);
   if (!turma) return c.text('Turma não encontrada', 404);
   if ((turma.senha ?? null) !== senha) return c.text('Senha da turma incorreta', 401);
 
-  const rows = db.query('SELECT * FROM atividades WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
+  const rows = dbq('SELECT * FROM atividades WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
   return c.json(rows.map(mapAtividade));
 });
 
@@ -283,7 +291,7 @@ app.get('/atividades/:id', (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
 
-  const atv = db.query('SELECT * FROM atividades WHERE id = ?').get(id);
+  const atv = dbq('SELECT * FROM atividades WHERE id = ?').get(id);
   if (!atv) return c.text('Atividade not found', 404);
   atv.allow_password = atv.allow_password == null ? null : !!atv.allow_password;
 
@@ -293,7 +301,7 @@ app.get('/atividades/:id', (c) => {
     return c.json(atv);
   }
 
-  const turma = db.query('SELECT * FROM turmas WHERE id = ?').get(atv.turma_id);
+  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(atv.turma_id);
   if (!turma) return c.text('Turma not found for activity', 500);
 
   const inputSenha = c.req.query('senha') ?? '';
@@ -330,7 +338,7 @@ app.get('/ranking/:atividade_id', (c) => {
   const id = parseId(c.req.param('atividade_id'));
   if (id === null) return c.text('', 400);
   try {
-    const rows = db.query('SELECT * FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(id);
+    const rows = dbq('SELECT * FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(id);
     return c.json(rows);
   } catch (e: any) {
     return c.text(`Erro ao listar ranking: ${e?.message}`, 500);
@@ -352,7 +360,7 @@ app.post('/send-mail', async (c) => {
 
 app.get('/db-test', (c) => {
   try {
-    db.query('SELECT 1').get();
+    dbq('SELECT 1').get();
     return c.json({ success: true, message: 'Conexão com Postgres OK!' });
   } catch (e: any) {
     return c.json({ success: false, message: `Erro na conexão: ${e?.message}` });

@@ -1,5 +1,6 @@
 export function sanitizeSlug(s: string): string {
-  const deunicoded = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const input = String(s ?? '');
+  const deunicoded = input.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return deunicoded
     .toLowerCase()
     .split('')
@@ -11,7 +12,8 @@ export function sanitizeSlug(s: string): string {
 }
 
 export function sanitizePathOrUrl(s: string): string {
-  const deunicoded = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const input = String(s ?? '');
+  const deunicoded = input.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return deunicoded
     .toLowerCase()
     .split('')
