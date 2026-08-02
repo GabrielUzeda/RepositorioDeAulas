@@ -1,8 +1,7 @@
 /**
- * Email Sender - Cliente JavaScript para API Rust Mailer
+ * Email Sender - Cliente JavaScript para a API de email do backend
  * Uso sem bibliotecas adicionais - Vanilla JavaScript
  *
- * @author Sistema de Email Rust
  * @version 1.0.0
  */
 
@@ -149,7 +148,7 @@ class EmailSender {
             throw new Error('Assunto (subject) é obrigatório');
         }
 
-        // Tentar primeiro o serviço principal (Rust) com timeout
+        // Tentar primeiro o serviço principal (backend) com timeout
         try {
             const result = await this._tryPrimaryService(options);
             return result;
@@ -188,7 +187,7 @@ class EmailSender {
     }
 
     /**
-     * Tenta enviar email usando o serviço principal (Rust) com timeout
+     * Tenta enviar email usando o serviço principal (backend) com timeout
      */
     async _tryPrimaryService(options = {}) {
         // Usar AbortController para timeout mais confiável
@@ -231,7 +230,7 @@ class EmailSender {
                 success: true,
                 message: result.message,
                 data: result,
-                service: 'rust'
+                service: 'backend'
             };
 
         } catch (error) {

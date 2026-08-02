@@ -1,5 +1,5 @@
 /**
- * API Client - Modular Request Handler for Rust Backend
+ * API Client - Modular Request Handler for the backend
  */
 class ApiClient {
     constructor(baseUrl = null) {

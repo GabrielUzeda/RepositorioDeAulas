@@ -361,7 +361,7 @@ app.post('/send-mail', async (c) => {
 app.get('/db-test', (c) => {
   try {
     dbq('SELECT 1').get();
-    return c.json({ success: true, message: 'Conexão com Postgres OK!' });
+    return c.json({ success: true, message: 'Conexão com SQLite OK!' });
   } catch (e: any) {
     return c.json({ success: false, message: `Erro na conexão: ${e?.message}` });
   }
