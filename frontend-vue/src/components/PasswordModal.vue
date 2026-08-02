@@ -1,0 +1,43 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const props = defineProps<{
+  show: boolean;
+  title?: string;
+}>();
+
+const emit = defineEmits<{
+  (e: 'close'): void;
+  (e: 'submit', password: string): void;
+}>();
+
+const passwordInput = ref('');
+
+function handleSubmit() {
+  if (passwordInput.value) {
+    emit('submit', passwordInput.value);
+    passwordInput.value = '';
+  }
+}
+</script>
+
+<template>
+  <div v-if="props.show" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-fade-in" @click.stop>
+      <h3 class="text-xl font-semibold text-gray-800">Acesso Restrito</h3>
+      <p class="text-sm text-gray-600">Esta atividade exige senha de acesso definida pelo professor.</p>
+      <input
+        v-model="passwordInput"
+        type="password"
+        @keyup.enter="handleSubmit"
+        placeholder="Digite a senha"
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+        autofocus
+      />
+      <div class="flex justify-end space-x-3 pt-2">
+        <button @click="emit('close')" type="button" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium">Cancelar</button>
+        <button @click="handleSubmit" type="button" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-md">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</template>
