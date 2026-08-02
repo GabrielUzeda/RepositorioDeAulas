@@ -139,4 +139,35 @@ describe('Auth Module & Multi-Professor System', () => {
     });
     expect(listAtividadesRes.status).toBe(200);
   });
+
+  test('Security Headers present on responses', async () => {
+    const res = await app.request('/turmas', { method: 'GET' });
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('x-frame-options')).toBeDefined();
+  });
+
+  test('Input validation rejects invalid emails', async () => {
+    const res = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'invalid-email-without-at', password: '123' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('Rate Limiter blocks excessive login requests', async () => {
+    for (let i = 0; i < 10; i++) {
+      await app.request('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '192.168.1.99' },
+        body: JSON.stringify({ email: 'fake@local', password: '123' }),
+      });
+    }
+    const blockedRes = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '192.168.1.99' },
+      body: JSON.stringify({ email: 'fake@local', password: '123' }),
+    });
+    expect(blockedRes.status).toBe(429);
+  });
 });

@@ -1,14 +1,19 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import { db } from './db';
 import { sanitizeSlug, sanitizePathOrUrl } from './utils';
-import { professorAuth, hashPassword, verifyPassword, signJwt } from './auth';
+import { professorAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter } from './auth';
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent } from './marp';
 
 const app = new Hono();
 
+app.use('*', secureHeaders());
 app.use('*', cors({ origin: '*', allowHeaders: ['Content-Type', 'Authorization'], allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
+
+const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10, message: 'Muitas tentativas de login. Aguarde 1 minuto.' });
+const registerLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, message: 'Muitas tentativas de registro. Aguarde 10 minutos.' });
 
 const dbq = (sql: string) => db.query<Record<string, any>, any[]>(sql);
 
@@ -46,9 +51,9 @@ function getProfessor(c: any): { id: number; role: string } | null {
 
 // ---------- Auth routes ----------
 
-app.post('/auth/login', async (c) => {
+app.post('/auth/login', loginLimiter, async (c) => {
   const body = await parseBody(c);
-  if (!body?.email || !body?.password) return c.text('', 400);
+  if (!body?.email || !body?.password || !isValidEmail(body.email)) return c.text('Invalid credentials', 400);
   const prof = dbq('SELECT * FROM professores WHERE email = ?').get(body.email) as any;
   if (!prof) return c.text('Invalid credentials', 401);
   const ok = await verifyPassword(body.password, prof.senha_hash, prof.salt);
@@ -57,9 +62,9 @@ app.post('/auth/login', async (c) => {
   return c.json({ token, professor: { id: prof.id, email: prof.email, nome: prof.nome, role: prof.role } });
 });
 
-app.post('/auth/register', async (c) => {
+app.post('/auth/register', registerLimiter, async (c) => {
   const body = await parseBody(c);
-  if (!body?.email || !body?.password || !body?.nome) return c.text('', 400);
+  if (!body?.email || !body?.password || !body?.nome || !isValidEmail(body.email)) return c.text('Dados inválidos', 400);
   const existing = dbq('SELECT id FROM professores WHERE email = ?').get(body.email);
   if (existing) return c.text('Email already registered', 409);
   const { hash, salt } = await hashPassword(body.password);
@@ -308,7 +313,6 @@ app.delete('/atividades/:id', professorAuth, (c) => {
 app.get('/turmas', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
-    const { verifyJwt } = await import('./auth');
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       if (payload.role === 'admin') {
@@ -337,7 +341,6 @@ app.get('/aulas', async (c) => {
 
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
-    const { verifyJwt } = await import('./auth');
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);
@@ -370,7 +373,6 @@ app.get('/atividades', async (c) => {
 
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
-    const { verifyJwt } = await import('./auth');
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);
@@ -396,7 +398,6 @@ app.get('/atividades/:id', async (c) => {
 
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
-    const { verifyJwt } = await import('./auth');
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);

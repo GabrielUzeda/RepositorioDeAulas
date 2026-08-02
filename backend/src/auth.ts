@@ -101,3 +101,38 @@ export async function professorAuth(c: Context, next: Next) {
   c.set('professorRole', payload.role ?? 'professor');
   return next();
 }
+
+export function isValidEmail(email: string): boolean {
+  if (typeof email !== 'string' || email.length > 255) return false;
+  return /^[^\s@]+@[^\s@]+(?:\.[^\s@]+)?$/.test(email);
+}
+
+interface RateLimitOptions {
+  windowMs: number;
+  max: number;
+  message?: string;
+}
+
+export function createRateLimiter(options: RateLimitOptions) {
+  const store = new Map<string, { count: number; resetTime: number }>();
+
+  return async (c: Context, next: Next) => {
+    const ip = c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || '127.0.0.1';
+    const now = Date.now();
+    let record = store.get(ip);
+
+    if (!record || now > record.resetTime) {
+      record = { count: 1, resetTime: now + options.windowMs };
+      store.set(ip, record);
+    } else {
+      record.count++;
+    }
+
+    if (record.count > options.max) {
+      c.header('Retry-After', String(Math.ceil((record.resetTime - now) / 1000)));
+      return c.text(options.message || 'Muitas requisições. Tente novamente mais tarde.', 429);
+    }
+
+    return next();
+  };
+}
