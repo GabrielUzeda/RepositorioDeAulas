@@ -15,7 +15,15 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        rewrite: (p) => p.replace(/^\/api/, '')
+      }
+    }
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        aluno: path.resolve(__dirname, 'index.html'),
+        professor: path.resolve(__dirname, 'professor/index.html')
       }
     }
   }
