@@ -14,15 +14,15 @@ const emit = defineEmits<{
 const typeStyles = computed(() => {
   switch (props.atividade.tipo) {
     case 'prova':
-      return { bg: 'bg-amber-100', text: 'text-amber-600' };
+      return { bg: 'bg-amber-100', text: 'text-amber-600', cover: '/static/prova.webp' };
     case 'minigame':
-      return { bg: 'bg-purple-100', text: 'text-purple-600' };
+      return { bg: 'bg-purple-100', text: 'text-purple-600', cover: '/static/minigame.webp' };
     case 'roleta':
-      return { bg: 'bg-pink-100', text: 'text-pink-600' };
+      return { bg: 'bg-pink-100', text: 'text-pink-600', cover: '/static/roleta.webp' };
     case 'reforco':
-      return { bg: 'bg-green-100', text: 'text-green-600' };
+      return { bg: 'bg-green-100', text: 'text-green-600', cover: '/static/reforco.webp' };
     default:
-      return { bg: 'bg-blue-100', text: 'text-blue-600' };
+      return { bg: 'bg-blue-100', text: 'text-blue-600', cover: '/static/normal.webp' };
   }
 });
 
@@ -35,26 +35,38 @@ const isMatIcon = computed(() => {
 <template>
   <div
     @click="emit('click', props.atividade)"
-    class="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl cursor-pointer card-hover relative border border-slate-100"
+    class="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl cursor-pointer card-hover relative border border-slate-100 flex flex-col justify-between"
   >
-    <div class="absolute top-0 left-0 transform -translate-x-1/4 -translate-y-1/4">
-      <div :class="[typeStyles.bg, 'p-3 rounded-full w-12 h-12 flex items-center justify-center shadow-sm']">
-        <span v-if="props.isLocked" :class="['material-icons', typeStyles.text]">lock</span>
-        <span v-else-if="isMatIcon" :class="['material-icons', typeStyles.text]">{{ props.atividade.icone }}</span>
-        <span v-else :class="[typeStyles.text, 'font-bold text-lg']">{{ props.atividade.icone || '00' }}</span>
+    <!-- Cover Header -->
+    <div class="h-28 bg-slate-100 relative overflow-hidden">
+      <img
+        :src="typeStyles.cover"
+        :alt="props.atividade.titulo"
+        class="w-full h-full object-cover opacity-90 hover:scale-105 transition-transform duration-500"
+        @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
+      />
+      <div class="absolute top-3 left-3">
+        <div :class="[typeStyles.bg, 'p-2 rounded-xl shadow-md flex items-center justify-center']">
+          <span v-if="props.isLocked" :class="['material-icons text-sm', typeStyles.text]">lock</span>
+          <span v-else-if="isMatIcon" :class="['material-icons text-sm', typeStyles.text]">{{ props.atividade.icone }}</span>
+          <span v-else :class="[typeStyles.text, 'font-bold text-xs']">{{ props.atividade.icone || '00' }}</span>
+        </div>
       </div>
     </div>
 
-    <div class="flex items-start justify-between mt-4">
-      <div class="flex flex-1">
-        <div class="ml-2 flex-1">
-          <h3 class="text-lg font-medium text-gray-800">{{ props.atividade.titulo }}</h3>
-          <p class="text-gray-600 text-sm mt-1">
-            {{ props.isLocked ? 'Conteúdo protegido por senha.' : (props.atividade.descricao || '') }}
-          </p>
-        </div>
+    <!-- Content Area -->
+    <div class="p-5 space-y-2 flex-1 flex flex-col justify-between">
+      <div>
+        <h3 class="text-base font-bold text-slate-800 line-clamp-1">{{ props.atividade.titulo }}</h3>
+        <p class="text-slate-500 text-xs mt-1 line-clamp-2">
+          {{ props.isLocked ? 'Conteúdo protegido por senha.' : (props.atividade.descricao || 'Atividade interativa.') }}
+        </p>
       </div>
-      <span class="material-icons text-gray-400">open_in_new</span>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-100 text-xs font-semibold text-indigo-600">
+        <span>Acessar Atividade</span>
+        <span class="material-icons text-sm">arrow_forward</span>
+      </div>
     </div>
   </div>
 </template>
