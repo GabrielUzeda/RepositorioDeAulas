@@ -1,0 +1,48 @@
+# Stack isolado para testes E2E (Playwright).
+# Usa portas e DB separados para não interferir no stack de desenvolvimento.
+services:
+  bun-server:
+    image: oven/bun:1
+    container_name: e2e-bun-server
+    env_file:
+      - .env
+    environment:
+      DB_PATH: /app/data/e2e-test.db
+    volumes:
+      - ./backend/:/app
+      - backend_node_modules:/app/node_modules
+      - ./frontend-vue/dist/:/app/frontend_static
+    working_dir: /app
+    command: sh -c "bun install && bun run src/index.ts"
+    expose:
+      - "8080"
+    ports:
+      - "18080:8080"
+    networks:
+      - e2e-network
+    restart: unless-stopped
+  vite:
+    image: oven/bun:1
+    container_name: e2e-vite
+    environment:
+      VITE_PROXY_TARGET: http://bun-server:8080
+    volumes:
+      - ./frontend-vue/:/app
+      - vite_node_modules:/app/node_modules
+    working_dir: /app
+    command: sh -c "bun install && bun run dev --host 0.0.0.0"
+    ports:
+      - "15173:5173"
+    networks:
+      - e2e-network
+    depends_on:
+      - bun-server
+    restart: unless-stopped
+
+networks:
+  e2e-network:
+    driver: bridge
+
+volumes:
+  backend_node_modules:
+  vite_node_modules:

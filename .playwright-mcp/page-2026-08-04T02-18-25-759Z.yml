@@ -1,0 +1,15 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]: admin_panel_settings
+    - heading "Painel de Acesso" [level=2] [ref=e7]
+    - paragraph [ref=e8]: Digite suas credenciais para acessar o painel do professor ou do administrador.
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - generic [ref=e11]: E-mail
+      - textbox "professor@local" [ref=e12]
+    - generic [ref=e13]:
+      - generic [ref=e14]: Senha
+      - textbox "••••••••" [ref=e15]
+    - button "Entrar" [ref=e16] [cursor=pointer]
+  - link "← Voltar para Área do Aluno" [ref=e18] [cursor=pointer]:
+    - /url: /

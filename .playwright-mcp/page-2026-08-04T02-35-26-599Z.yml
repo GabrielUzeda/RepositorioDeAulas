@@ -1,0 +1,45 @@
+- generic [ref=f1e4]:
+  - banner [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]:
+        - generic [ref=f1e8]: dashboard
+        - generic [ref=f1e9]:
+          - heading "Painel de Gestão" [level=1] [ref=f1e10]
+          - paragraph [ref=f1e11]: "Professor: Autenticado"
+      - generic [ref=f1e12]:
+        - link "Ver Área do Aluno" [ref=f1e13] [cursor=pointer]:
+          - /url: /
+        - button "Sair" [ref=f1e14] [cursor=pointer]
+  - main [ref=f1e15]:
+    - generic [ref=f1e151]:
+      - generic [ref=f1e152]:
+        - button "arrow_back" [ref=f1e153] [cursor=pointer]
+        - generic [ref=f1e155]:
+          - heading "Materia MCP Teste" [level=2] [ref=f1e156]
+          - paragraph [ref=f1e157]: Materia criada via MCP
+      - generic [ref=f1e158]:
+        - heading "Aulas Cadastradas (1)" [level=3] [ref=f1e186]
+        - button "add Criar Aula (Marp)" [ref=f1e160] [cursor=pointer]:
+          - generic [ref=f1e161]: add
+          - generic [ref=f1e162]: Criar Aula (Marp)
+      - generic [ref=f1e188]:
+        - generic [ref=f1e189]:
+          - paragraph [ref=f1e190]: Aula MCP Teste
+          - paragraph [ref=f1e191]: Aula criada via MCP
+        - generic [ref=f1e192]:
+          - button "edit" [ref=f1e193] [cursor=pointer]
+          - button "delete" [ref=f1e195] [cursor=pointer]
+      - generic [ref=f1e163]:
+        - heading "Atividades Cadastradas (1)" [level=3] [ref=f1e266]
+        - button "add Criar Atividade" [ref=f1e165] [cursor=pointer]:
+          - generic [ref=f1e166]: add
+          - generic [ref=f1e167]: Criar Atividade
+      - generic [ref=f1e268]:
+        - generic [ref=f1e269]:
+          - generic [ref=f1e270]:
+            - generic [ref=f1e271]: normal
+            - paragraph [ref=f1e272]: Atividade MCP Teste
+          - paragraph [ref=f1e273]: Atividade criada via MCP
+        - generic [ref=f1e274]:
+          - button "edit" [ref=f1e275] [cursor=pointer]
+          - button "delete" [ref=f1e277] [cursor=pointer]

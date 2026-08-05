@@ -1,0 +1,78 @@
+- generic [ref=f1e4]:
+  - banner [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]:
+        - generic [ref=f1e8]: dashboard
+        - generic [ref=f1e9]:
+          - heading "Painel de Gestão" [level=1] [ref=f1e10]
+          - paragraph [ref=f1e11]: "Professor: Autenticado"
+      - generic [ref=f1e12]:
+        - link "Ver Área do Aluno" [ref=f1e13] [cursor=pointer]:
+          - /url: /
+        - button "Sair" [ref=f1e14] [cursor=pointer]
+  - main [ref=f1e15]:
+    - generic [ref=f1e151]:
+      - generic [ref=f1e152]:
+        - button "arrow_back" [ref=f1e153] [cursor=pointer]
+        - generic [ref=f1e155]:
+          - heading "Materia MCP Teste" [level=2] [ref=f1e156]
+          - paragraph [ref=f1e157]: Materia criada via MCP
+      - generic [ref=f1e158]:
+        - heading "Aulas Cadastradas (1)" [level=3] [ref=f1e186]
+        - button "add Criar Aula (Marp)" [ref=f1e160] [cursor=pointer]:
+          - generic [ref=f1e161]: add
+          - generic [ref=f1e162]: Criar Aula (Marp)
+      - generic [ref=f1e188]:
+        - generic [ref=f1e189]:
+          - paragraph [ref=f1e190]: Aula MCP Teste
+          - paragraph [ref=f1e191]: Aula criada via MCP
+        - generic [ref=f1e192]:
+          - button "edit" [ref=f1e193] [cursor=pointer]
+          - button "delete" [ref=f1e195] [cursor=pointer]
+      - generic [ref=f1e163]:
+        - heading "Atividades Cadastradas (0)" [level=3] [ref=f1e164]
+        - button "add Criar Atividade" [active] [ref=f1e165] [cursor=pointer]:
+          - generic [ref=f1e166]: add
+          - generic [ref=f1e167]: Criar Atividade
+  - generic [ref=f1e197]:
+    - generic [ref=f1e198]:
+      - generic [ref=f1e199]:
+        - generic [ref=f1e200]: quiz
+        - heading "Nova Atividade Interativa" [level=2] [ref=f1e201]
+      - generic [ref=f1e202]:
+        - generic [ref=f1e203] [cursor=pointer]:
+          - generic [ref=f1e204]: upload_file
+          - generic [ref=f1e205]: Importar JSON
+        - button "download Exportar JSON" [ref=f1e206] [cursor=pointer]:
+          - generic [ref=f1e207]: download
+          - generic [ref=f1e208]: Exportar JSON
+        - button "Cancelar" [ref=f1e209] [cursor=pointer]
+        - button "Salvar Atividade" [ref=f1e210] [cursor=pointer]
+    - generic [ref=f1e212]:
+      - generic [ref=f1e213]:
+        - heading "Informações Básicas" [level=3] [ref=f1e214]
+        - generic [ref=f1e215]:
+          - generic [ref=f1e216]:
+            - generic [ref=f1e217]: Título da Atividade *
+            - 'textbox "Ex: Avaliação de Algoritmos" [ref=f1e218]'
+          - generic [ref=f1e219]:
+            - generic [ref=f1e220]: Tipo de Atividade
+            - combobox [ref=f1e221]:
+              - option "Normal" [selected]
+              - option "Prova"
+              - option "Minigame Tático"
+              - option "Roleta do Conhecimento"
+              - option "Reforço (Modo Zen)"
+          - generic [ref=f1e222]:
+            - generic [ref=f1e223]: Descrição
+            - textbox "Breve resumo da atividade..." [ref=f1e224]
+          - generic [ref=f1e225]:
+            - checkbox "Exigir senha individual de acesso para os alunos" [ref=f1e226]
+            - generic [ref=f1e227] [cursor=pointer]: Exigir senha individual de acesso para os alunos
+      - generic [ref=f1e228]:
+        - generic [ref=f1e229]:
+          - heading "Perguntas (0)" [level=3] [ref=f1e230]
+          - button "add Adicionar Pergunta" [ref=f1e231] [cursor=pointer]:
+            - generic [ref=f1e232]: add
+            - generic [ref=f1e233]: Adicionar Pergunta
+        - generic [ref=f1e234]: Nenhuma pergunta adicionada. Clique em "Adicionar Pergunta" para começar.
