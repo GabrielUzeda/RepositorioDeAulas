@@ -707,8 +707,8 @@ app.get('/db-test', (c) => {
   try {
     dbq('SELECT 1').get();
     return c.json({ success: true, message: 'Conexão com SQLite OK!' });
-  } catch (e: any) {
-    return c.json({ success: false, message: `Erro na conexão: ${e?.message}` });
+  } catch {
+    return c.json({ success: false, message: 'Erro na conexão com o banco de dados.' });
   }
 });
 
