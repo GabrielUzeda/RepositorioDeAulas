@@ -3,6 +3,8 @@ import { hashPassword, verifyPassword, signJwt, verifyJwt } from './auth';
 import { db } from './db';
 import app from './routes';
 
+const ADMIN_SEED_PASSWORD = process.env.PROFESSOR_PASSWORD || 'senhasecreta';
+
 describe('Auth Module & Multi-Professor System', () => {
   test('Password Hashing & Verification', async () => {
     const password = 'SecretPassword123!';
@@ -34,7 +36,7 @@ describe('Auth Module & Multi-Professor System', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: 'admin@local',
-        password: process.env.PROFESSOR_PASSWORD || 'ProfessorUzeda!',
+        password: ADMIN_SEED_PASSWORD,
       }),
     });
 
@@ -50,7 +52,7 @@ describe('Auth Module & Multi-Professor System', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: 'admin@local',
-        password: process.env.PROFESSOR_PASSWORD || 'ProfessorUzeda!',
+        password: ADMIN_SEED_PASSWORD,
       }),
     });
     const loginBody = await loginRes.json();
@@ -90,7 +92,7 @@ describe('Auth Module & Multi-Professor System', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: 'admin@local',
-        password: process.env.PROFESSOR_PASSWORD || 'ProfessorUzeda!',
+        password: ADMIN_SEED_PASSWORD,
       }),
     });
     const adminBody = await adminLogin.json();
@@ -235,7 +237,7 @@ describe('Auth Module & Multi-Professor System', () => {
     const adminLogin = await app.request('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '10.0.0.2' },
-      body: JSON.stringify({ email: 'admin@local', password: process.env.PROFESSOR_PASSWORD || 'ProfessorUzeda!' }),
+      body: JSON.stringify({ email: 'admin@local', password: ADMIN_SEED_PASSWORD }),
     });
     const { token } = await adminLogin.json();
 

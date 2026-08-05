@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 export const E2E_FRONTEND_URL = process.env.E2E_FRONTEND_URL || 'http://localhost:15173';
 export const E2E_BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://localhost:18080';
 export const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@local';
-export const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'ProfessorUzeda!';
+export const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || process.env.PROFESSOR_PASSWORD || 'ProfessorUzeda!';
 
 export default defineConfig({
   testDir: './tests',

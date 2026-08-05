@@ -14,6 +14,11 @@ const app = new Hono();
 app.use('*', secureHeaders());
 app.use('*', cors({ origin: '*', allowHeaders: ['Content-Type', 'Authorization'], allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
 
+app.onError((err, c) => {
+  console.error('[HTTP Server Error]:', err);
+  return c.text('Internal Server Error', 500);
+});
+
 const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 100, message: 'Muitas tentativas de login. Aguarde 1 minuto.' });
 const registerLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, message: 'Muitas tentativas de registro. Aguarde 10 minutos.' });
 const submissionLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 20, message: 'Muitas submissões de resposta. Aguarde 1 minuto.' });
@@ -492,11 +497,29 @@ app.get('/aulas', async (c) => {
   return c.json(rows);
 });
 
-app.get('/aulas/:id', (c) => {
+app.get('/aulas/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const r = dbq('SELECT * FROM aulas WHERE id = ?').get(id);
+  const r = dbq('SELECT * FROM aulas WHERE id = ?').get(id) as any;
   if (!r) return c.text('Aula not found', 404);
+
+  const materia = dbq('SELECT * FROM materias WHERE id = ?').get(r.materia_id) as any;
+  if (materia && materia.senha) {
+    const authHeader = c.req.header('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const payload = await verifyJwt(authHeader.slice(7));
+      if (payload?.sub) {
+        const profId = Number(payload.sub);
+        if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, materia.curso_id)) {
+          return c.json(r);
+        }
+      }
+    }
+
+    const senha = c.req.query('senha') ?? null;
+    if ((materia.senha ?? null) !== senha) return c.text('Senha da materia incorreta', 401);
+  }
+
   return c.json(r);
 });
 
@@ -566,7 +589,7 @@ function formatPublicName(fullName: string): string {
   return `${parts[0]} ${parts[1][0].toUpperCase()}.`;
 }
 
-app.post('/ranking', async (c) => {
+app.post('/ranking', submissionLimiter, async (c) => {
   const body = await parseBody(c);
   if (!body) return c.text('Dados inválidos', 400);
   const atividadeId = parseId(String(body.atividade_id));
@@ -628,8 +651,8 @@ app.post('/submeter-resposta', submissionLimiter, async (c) => {
   }
 });
 
-// Direitos do Titular (Art. 18 LGPD) - Consulta de respostas próprias do aluno por e-mail
-app.get('/aluno/minhas-respostas', async (c) => {
+// Direitos do Titular (Art. 18 LGPD) - Consulta de respostas próprias do aluno por e-mail (com rate limiter)
+app.get('/aluno/minhas-respostas', submissionLimiter, async (c) => {
   const email = c.req.query('email');
   if (!email || !isValidEmail(email)) {
     return c.text('Informe um e-mail válido.', 400);
