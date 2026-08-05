@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { hashPassword, verifyPassword, signJwt, verifyJwt } from './auth';
+import { db } from './db';
 import app from './routes';
 
 describe('Auth Module & Multi-Professor System', () => {
@@ -211,5 +212,45 @@ describe('Auth Module & Multi-Professor System', () => {
       body: JSON.stringify({ email: 'fake@local', password: '123' }),
     });
     expect(blockedRes.status).toBe(429);
+  });
+
+  test('Submeter, listar e excluir respostas de alunos (LGPD)', async () => {
+    const atv = db.query('SELECT id FROM atividades LIMIT 1').get() as any;
+    const targetAtvId = atv ? atv.id : 1;
+
+    const submitRes = await app.request('/submeter-resposta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '10.0.0.2' },
+      body: JSON.stringify({
+        atividade_id: targetAtvId,
+        aluno_nome: 'João Silva',
+        aluno_email: 'joao.silva@exemplo.com',
+        respostas: 'Resposta 1: A\nResposta 2: B',
+      }),
+    });
+    expect(submitRes.status).toBe(201);
+    const createdResp = await submitRes.json();
+    expect(createdResp.aluno_nome).toBe('João Silva');
+
+    const adminLogin = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '10.0.0.2' },
+      body: JSON.stringify({ email: 'admin@local', password: process.env.PROFESSOR_PASSWORD || 'ProfessorUzeda!' }),
+    });
+    const { token } = await adminLogin.json();
+
+    const listRes = await app.request(`/atividades/${targetAtvId}/respostas`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(listRes.status).toBe(200);
+    const listData = await listRes.json();
+    expect(listData.some((r: any) => r.id === createdResp.id)).toBeTruthy();
+
+    const delRes = await app.request(`/respostas/${createdResp.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(delRes.status).toBe(204);
   });
 });

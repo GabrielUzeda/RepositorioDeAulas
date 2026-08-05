@@ -7,6 +7,7 @@ import { apiClient } from '@/shared/api/client';
 import MateriaFormModal from '@/professor/components/MateriaFormModal.vue';
 import MarpEditorModal from '@/professor/components/MarpEditorModal.vue';
 import JsonActivityEditorModal from '@/professor/components/JsonActivityEditorModal.vue';
+import RespostasModal from '@/professor/components/RespostasModal.vue';
 import type { Curso, Materia, Aula, Atividade } from '@/shared/types';
 
 const router = useRouter();
@@ -25,6 +26,9 @@ const editingAula = ref<Aula | null>(null);
 
 const showActivityEditorModal = ref(false);
 const editingActivity = ref<Atividade | null>(null);
+
+const showRespostasModal = ref(false);
+const selectedRespostasAtividade = ref<Atividade | null>(null);
 
 onMounted(async () => {
   await cursoStore.fetchCursos();
@@ -154,6 +158,11 @@ async function handleDeleteAtividade(atividadeId: number) {
       await cursoStore.loadMateriaContent(selectedMateria.value.id);
     }
   }
+}
+
+function handleOpenRespostasModal(atv: Atividade) {
+  selectedRespostasAtividade.value = atv;
+  showRespostasModal.value = true;
 }
 </script>
 
@@ -327,6 +336,9 @@ async function handleDeleteAtividade(atividadeId: number) {
                 <p class="text-xs text-slate-400 mt-1">{{ atv.descricao }}</p>
               </div>
               <div class="flex space-x-1">
+                <button @click="handleOpenRespostasModal(atv)" class="p-2 text-emerald-400 hover:bg-slate-700 rounded-lg" title="Ver Respostas dos Alunos (LGPD)">
+                  <span class="material-icons text-sm">assignment</span>
+                </button>
                 <button @click="handleOpenActivityEditor(atv)" class="p-2 text-indigo-400 hover:bg-slate-700 rounded-lg" title="Editar Atividade">
                   <span class="material-icons text-sm">edit</span>
                 </button>
@@ -343,6 +355,7 @@ async function handleDeleteAtividade(atividadeId: number) {
       <MateriaFormModal :show="showMateriaModal" :materia="editingMateria" @close="showMateriaModal = false" @submit="handleSaveMateria" />
       <MarpEditorModal :show="showMarpModal" :titulo="editingAula?.titulo" :descricao="editingAula?.descricao" :markdown="editingAula?.marp_markdown" @close="showMarpModal = false" @save="handleSaveMarpAula" />
       <JsonActivityEditorModal :show="showActivityEditorModal" :atividade="editingActivity" @close="showActivityEditorModal = false" @save="handleSaveActivity" />
+      <RespostasModal :show="showRespostasModal" :atividade="selectedRespostasAtividade" @close="showRespostasModal = false" />
     </div>
   </div>
 </template>

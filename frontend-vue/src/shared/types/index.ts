@@ -70,6 +70,15 @@ export interface Atividade {
   json_data?: string | { questions: Question[] } | null;
 }
 
+export interface RespostaAluno {
+  id: number;
+  atividade_id: number;
+  aluno_nome: string;
+  aluno_email: string;
+  respostas: string;
+  criado_em: string;
+}
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;

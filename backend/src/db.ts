@@ -91,7 +91,17 @@ CREATE TABLE IF NOT EXISTS ranking (
   data_envio TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 
+CREATE TABLE IF NOT EXISTS respostas_alunos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  atividade_id INTEGER NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
+  aluno_nome TEXT NOT NULL,
+  aluno_email TEXT NOT NULL,
+  respostas TEXT NOT NULL,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_ranking_atividade_pontuacao ON ranking(atividade_id, pontuacao DESC);
+CREATE INDEX IF NOT EXISTS idx_respostas_atividade ON respostas_alunos(atividade_id);
 CREATE INDEX IF NOT EXISTS idx_materias_curso ON materias(curso_id);
 CREATE INDEX IF NOT EXISTS idx_curso_professores_professor ON curso_professores(professor_id);
 `;

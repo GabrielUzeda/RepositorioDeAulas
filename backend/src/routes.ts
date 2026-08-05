@@ -16,6 +16,7 @@ app.use('*', cors({ origin: '*', allowHeaders: ['Content-Type', 'Authorization']
 
 const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 100, message: 'Muitas tentativas de login. Aguarde 1 minuto.' });
 const registerLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, message: 'Muitas tentativas de registro. Aguarde 10 minutos.' });
+const submissionLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 20, message: 'Muitas submissões de resposta. Aguarde 1 minuto.' });
 
 const dbq = (sql: string) => db.query<Record<string, any>, any[]>(sql);
 
@@ -581,6 +582,55 @@ app.get('/ranking/:atividade_id', (c) => {
   } catch (e: any) {
     return c.text(`Erro ao listar ranking: ${e?.message}`, 500);
   }
+});
+
+// ---------- Submissões de Respostas de Alunos ----------
+
+app.post('/submeter-resposta', submissionLimiter, async (c) => {
+  const body = await parseBody(c);
+  if (!body) return c.text('Dados inválidos', 400);
+  const atividadeId = parseId(String(body.atividade_id));
+  if (atividadeId === null) return c.text('ID de atividade inválido', 400);
+  if (!body.aluno_nome || !body.aluno_email || !isValidEmail(body.aluno_email) || !body.respostas) {
+    return c.text('Informe nome, e-mail válido e respostas.', 400);
+  }
+  const atv = dbq('SELECT id FROM atividades WHERE id = ?').get(atividadeId);
+  if (!atv) return c.text('Atividade não encontrada', 404);
+
+  try {
+    const r = db
+      .query(
+        `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, respostas)
+         VALUES (?, ?, ?, ?) RETURNING *`
+      )
+      .get(atividadeId, String(body.aluno_nome).trim(), String(body.aluno_email).trim(), String(body.respostas).trim());
+    return c.json(r, 201);
+  } catch (e: any) {
+    return c.text(`Erro ao salvar resposta: ${e?.message}`, 500);
+  }
+});
+
+app.get('/atividades/:id/respostas', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('ID inválido', 400);
+  const atv = dbq('SELECT materia_id FROM atividades WHERE id = ?').get(id) as any;
+  if (!atv) return c.text('Atividade não encontrada', 404);
+  if (!(await canManageMateria(c, atv.materia_id))) return c.text('Access denied', 403);
+
+  const rows = dbq('SELECT * FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em DESC').all(id);
+  return c.json(rows);
+});
+
+app.delete('/respostas/:id', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('ID inválido', 400);
+  const resp = dbq('SELECT atividade_id FROM respostas_alunos WHERE id = ?').get(id) as any;
+  if (!resp) return c.text('Resposta não encontrada', 404);
+  const atv = dbq('SELECT materia_id FROM atividades WHERE id = ?').get(resp.atividade_id) as any;
+  if (atv && !(await canManageMateria(c, atv.materia_id))) return c.text('Access denied', 403);
+
+  dbq('DELETE FROM respostas_alunos WHERE id = ?').run(id);
+  return c.body(null, 204);
 });
 
 app.post('/send-mail', async (c) => {
