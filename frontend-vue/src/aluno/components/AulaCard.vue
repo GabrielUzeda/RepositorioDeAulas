@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Aula } from '@/types';
+import type { Aula } from '@/shared/types';
 
 const props = defineProps<{
   aula: Aula;

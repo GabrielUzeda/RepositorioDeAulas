@@ -4,6 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [vue()],
+  publicDir: 'src/public',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
@@ -13,17 +14,17 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, '')
-      }
-    }
-  },
-  build: {
-    rollupOptions: {
-      input: {
-        aluno: path.resolve(__dirname, 'index.html'),
-        professor: path.resolve(__dirname, 'professor/index.html')
+      },
+      '/cursos': {
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8080',
+        changeOrigin: true
+      },
+      '/materias': {
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8080',
+        changeOrigin: true
       }
     }
   }

@@ -6,6 +6,7 @@ services:
       - .env
     volumes:
       - ./backend/:/app
+      - backend_node_modules:/app/node_modules
       - ${frontDir}:/app/frontend_static
     working_dir: /app
     command: sh -c "bun install --production && bun run src/index.ts"
@@ -58,3 +59,6 @@ services:
 networks:
   web-network:
     driver: bridge
+
+volumes:
+  backend_node_modules:

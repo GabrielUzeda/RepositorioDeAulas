@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import type { Atividade, Question, Option } from '@/types';
+import type { Atividade, Question, Option } from '@/shared/types';
 
 const props = defineProps<{
   show: boolean;

@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@/types';
+import type { ApiResponse } from '@/shared/types';
 
 export class ApiClient {
   private baseUrl: string;

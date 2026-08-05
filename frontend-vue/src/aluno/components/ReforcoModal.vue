@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import type { Question } from '@/types';
+import type { Question } from '@/shared/types';
 
 const props = defineProps<{
   show: boolean;
@@ -63,6 +63,8 @@ function nextQuestion() {
     selectedOptionIndex.value = null;
     feedback.value = null;
     isCorrect.value = null;
+  } else {
+    emit('close');
   }
 }
 
@@ -148,10 +150,9 @@ function prevQuestion() {
         </button>
         <button
           @click="nextQuestion"
-          :disabled="currentIndex === props.questions.length - 1"
-          class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 shadow-md disabled:opacity-40"
+          class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 shadow-md"
         >
-          Próxima
+          {{ currentIndex === props.questions.length - 1 ? 'Finalizar' : 'Próxima' }}
         </button>
       </div>
     </div>

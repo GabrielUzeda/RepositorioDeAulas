@@ -22,9 +22,26 @@ CREATE TABLE IF NOT EXISTS professores (
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 
-CREATE TABLE IF NOT EXISTS turmas (
+CREATE TABLE IF NOT EXISTS cursos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  nome TEXT NOT NULL,
+  cor TEXT,
+  icone TEXT,
+  descricao TEXT,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS curso_professores (
+  curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
   professor_id INTEGER NOT NULL REFERENCES professores(id) ON DELETE CASCADE,
+  PRIMARY KEY (curso_id, professor_id)
+);
+
+CREATE TABLE IF NOT EXISTS materias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
   slug TEXT NOT NULL,
   nome TEXT NOT NULL,
   cor TEXT,
@@ -33,12 +50,12 @@ CREATE TABLE IF NOT EXISTS turmas (
   descricao TEXT,
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
   atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-  UNIQUE(slug, professor_id)
+  UNIQUE(slug, curso_id)
 );
 
 CREATE TABLE IF NOT EXISTS aulas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  turma_id INTEGER REFERENCES turmas(id) ON DELETE CASCADE,
+  materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE,
   titulo TEXT NOT NULL,
   caminho TEXT NOT NULL,
   icone TEXT,
@@ -51,7 +68,7 @@ CREATE TABLE IF NOT EXISTS aulas (
 
 CREATE TABLE IF NOT EXISTS atividades (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  turma_id INTEGER REFERENCES turmas(id) ON DELETE CASCADE,
+  materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE,
   external_id TEXT,
   titulo TEXT NOT NULL,
   descricao TEXT,
@@ -75,9 +92,117 @@ CREATE TABLE IF NOT EXISTS ranking (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ranking_atividade_pontuacao ON ranking(atividade_id, pontuacao DESC);
-CREATE INDEX IF NOT EXISTS idx_turmas_professor ON turmas(professor_id);
+CREATE INDEX IF NOT EXISTS idx_materias_curso ON materias(curso_id);
+CREATE INDEX IF NOT EXISTS idx_curso_professores_professor ON curso_professores(professor_id);
 `;
 
+function migrateOldSchema() {
+  const hasTurmas = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='turmas'").get();
+  if (!hasTurmas) return;
+
+  db.exec('PRAGMA foreign_keys = OFF;');
+  try {
+    db.exec('BEGIN');
+    db.exec(`CREATE TABLE IF NOT EXISTS cursos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT NOT NULL UNIQUE,
+      nome TEXT NOT NULL,
+      cor TEXT,
+      icone TEXT,
+      descricao TEXT,
+      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS curso_professores (
+      curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+      professor_id INTEGER NOT NULL REFERENCES professores(id) ON DELETE CASCADE,
+      PRIMARY KEY (curso_id, professor_id)
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS materias (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+      slug TEXT NOT NULL,
+      nome TEXT NOT NULL,
+      cor TEXT,
+      icone TEXT,
+      senha TEXT,
+      descricao TEXT,
+      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      UNIQUE(slug, curso_id)
+    )`);
+
+    const insertCurso = db.query('INSERT INTO cursos (slug, nome, cor, icone, descricao) VALUES (?, ?, ?, ?, ?)');
+    const cursoRes = insertCurso.run('curso_demo', 'Curso de Demonstração', 'bg-indigo-600', 'school', 'Curso criado automaticamente durante a migração.');
+    const cursoId = Number(cursoRes.lastInsertRowid);
+
+    const turmas = db.query('SELECT id, slug, nome, cor, icone, senha, descricao, criado_em, atualizado_em FROM turmas ORDER BY id').all();
+    const insertMateriaMig = db.query(
+      `INSERT INTO materias (id, curso_id, slug, nome, cor, icone, senha, descricao, criado_em, atualizado_em)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    const usedSlugs = new Set<string>();
+    for (const t of turmas) {
+      let slug = t.slug;
+      if (usedSlugs.has(slug)) {
+        let n = 2;
+        while (usedSlugs.has(`${slug}-${n}`)) n++;
+        slug = `${slug}-${n}`;
+      }
+      usedSlugs.add(slug);
+      insertMateriaMig.run(t.id, cursoId, slug, t.nome, t.cor, t.icone, t.senha, t.descricao, t.criado_em, t.atualizado_em);
+    }
+
+    db.query(`INSERT OR IGNORE INTO curso_professores (curso_id, professor_id)
+      SELECT ?, professor_id FROM turmas GROUP BY professor_id`).run(cursoId);
+
+    db.exec(`CREATE TABLE aulas_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE,
+      titulo TEXT NOT NULL,
+      caminho TEXT NOT NULL,
+      icone TEXT,
+      descricao TEXT,
+      ordem INTEGER DEFAULT 0,
+      conteudo_md TEXT,
+      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    )`);
+    db.query(`INSERT INTO aulas_new (id, materia_id, titulo, caminho, icone, descricao, ordem, conteudo_md, criado_em, atualizado_em)
+      SELECT id, turma_id, titulo, caminho, icone, descricao, ordem, conteudo_md, criado_em, atualizado_em FROM aulas`).run();
+    db.exec('DROP TABLE aulas; ALTER TABLE aulas_new RENAME TO aulas;');
+
+    db.exec(`CREATE TABLE atividades_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE,
+      external_id TEXT,
+      titulo TEXT NOT NULL,
+      descricao TEXT,
+      caminho TEXT NOT NULL,
+      icone TEXT,
+      json_data TEXT,
+      tipo TEXT DEFAULT 'normal',
+      senha TEXT,
+      allow_password INTEGER DEFAULT 0,
+      ordem INTEGER DEFAULT 0,
+      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    )`);
+    db.query(`INSERT INTO atividades_new (id, materia_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem, criado_em, atualizado_em)
+      SELECT id, turma_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem, criado_em, atualizado_em FROM atividades`).run();
+    db.exec('DROP TABLE atividades; ALTER TABLE atividades_new RENAME TO atividades;');
+
+    db.exec('DROP TABLE turmas;');
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON;');
+  }
+}
+
+migrateOldSchema();
 db.exec(SCHEMA);
 
 const PBKDF2_ITERATIONS = 100000;
@@ -114,25 +239,39 @@ async function seedDemoData() {
   const admin = db.query('SELECT id FROM professores WHERE email = ?').get(email) as any;
   const adminId = Number(admin.id);
 
-  const insertTurma = db.query(
-    `INSERT INTO turmas (professor_id, slug, nome, cor, icone, senha, descricao) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  const insertCurso = db.query(
+    `INSERT INTO cursos (slug, nome, cor, icone, descricao) VALUES (?, ?, ?, ?, ?)`
   );
-  const turmaResult = insertTurma.run(
-    adminId,
+  const cursoResult = insertCurso.run(
+    'demo-course',
+    'Curso de Demonstração',
+    'bg-indigo-600',
+    'school',
+    'Curso de exemplo com matérias variadas.\n- Web Mobile 2026\n- Web Mobile 2025\nA senha das matérias de acesso é "asdf1234".\nEste curso contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)'
+  );
+  const cursoId = Number(cursoResult.lastInsertRowid);
+
+  db.query('INSERT INTO curso_professores (curso_id, professor_id) VALUES (?, ?)').run(cursoId, adminId);
+
+  const insertMateria = db.query(
+    `INSERT INTO materias (curso_id, slug, nome, cor, icone, senha, descricao) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  );
+  const materiaResult = insertMateria.run(
+    cursoId,
     'demo-class',
-    'Turma de Demonstração',
+    'Matéria de Demonstração',
     'bg-indigo-600',
     'school',
     'asdf1234',
-    'Clique aqui para entrar na turma. A senha de acesso é "asdf1234".\nEsta turma contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)'
+    'Clique aqui para entrar na matéria. A senha de acesso é "asdf1234".\nEsta matéria contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)'
   );
-  const turmaId = Number(turmaResult.lastInsertRowid);
+  const materiaId = Number(materiaResult.lastInsertRowid);
 
   const insertAula = db.query(
-    `INSERT INTO aulas (turma_id, titulo, caminho, icone, descricao, ordem, conteudo_md) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO aulas (materia_id, titulo, caminho, icone, descricao, ordem, conteudo_md) VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
   insertAula.run(
-    turmaId,
+    materiaId,
     'Boas-vindas ao Sistema',
     '/static/boas-vindas.html',
     '00',
@@ -142,7 +281,7 @@ async function seedDemoData() {
   );
 
   const insertAtividade = db.query(
-    `INSERT INTO atividades (turma_id, external_id, titulo, descricao, caminho, icone, tipo, ordem, senha, allow_password, json_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO atividades (materia_id, external_id, titulo, descricao, caminho, icone, tipo, ordem, senha, allow_password, json_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const atividades = [
@@ -168,7 +307,7 @@ async function seedDemoData() {
       senha: null,
       allow_password: 0,
       json_data:
-        '{"questions":[{"title":"Conceitos Básicos","content":"O que é um algoritmo?","options":[{"text":"Sequência de passos lógicos","correct":true,"feedback":"Correto! Um algoritmo é uma receita para resolver problemas passo a passo."},{"text":"Uma peça de hardware","correct":false,"feedback":"Incorreto. O hardware é a parte física (como teclado e monitor). Um algoritmo é lógico/software."}]},{"title":"Hardware","content":"Cite 3 componentes de entrada.","options":[{"text":"Teclado, Mouse, Microfone","correct":true,"feedback":"Excelente! Esses são exemplos clássicos de hardware de entrada de dados."},{"text":"Monitor, Caixa de Som","correct":false,"feedback":"Incorreto. Monitor e caixa de som são exemplos de dispositivos de SAÍDA de dados."}]},{"title":"Software","content":"Qual a diferença entre SO e Aplicativo?","options":[{"text":"O SO gerencia tudo, o aplicativo faz tarefas específicas.","correct":true,"feedback":"Isso mesmo! O Sistema Operacional controla o computador, e o aplicativo atende ao usuário."},{"text":"Ambos são a mesma coisa fisicamente","correct":false,"feedback":"Incorreto. Ambos são softwares e servem a propósitos distindos (gerenciamento vs tarefas específicas)."}]},{"title":"Redes","content":"Qual a utilidade do IP?","options":[{"text":"Identificar uma máquina na rede","correct":true,"feedback":"Exatamente! O IP é como o endereço residencial de um computador na rede."},{"text":"Proteger contra vírus","correct":false,"feedback":"Incorreto. A proteção contra vírus é feita por antivírus e firewalls, não pelo protocolo IP."}]},{"title":"Segurança","content":"O que é Phishing?","options":[{"text":"Um tipo de ataque de engenharia social","correct":true,"feedback":"Correto! É quando tentam enganar você para que forneça dados sensíveis."},{"text":"Um programa de edição de imagem","correct":false,"feedback":"Incorreto. Programas de edição de imagem nada têm a ver com Phishing."}]},{"title":"Geral","content":"O que significa WWW?","options":[{"text":"World Wide Web","correct":true,"feedback":"Correto! A grande teia de alcance mundial."},{"text":"World Wire Web","correct":false,"feedback":"Incorreto. Não existe \"Wire\" no termo."}]}]}',
+        '{"questions":[{"title":"Conceitos Básicos","content":"O que é um algoritmo?","options":[{"text":"Sequência de passos lógicos","correct":true,"feedback":"Correto! Um algoritmo é uma receita para resolver problemas passo a passo."},{"text":"Uma peça de hardware","correct":false,"feedback":"Incorreto. O hardware é a parte física (como teclado e monitor). Um algoritmo é lógico/software."}]},{"title":"Hardware","content":"Cite 3 componentes de entrada.","options":[{"text":"Teclado, Mouse, Microfone","correct":true,"feedback":"Excelente! Esses são exemplos clássicos de hardware de entrada de dados."},{"text":"Monitor, Caixa de Som","correct":false,"feedback":"Incorreto. Monitor e caixa de som são exemplos de dispositivos de SAÍDA de dados."}]},{"title":"Software","content":"Qual a diferença entre SO e Aplicativo?","options":[{"text":"O SO gerencia tudo, o aplicativo faz tarefas específicas.","correct":true,"feedback":"Isso mesmo! O Sistema Operacional controla o computador, e o aplicativo atende ao usuário."},{"text":"Ambos são a mesma coisa fisicamente","correct":false,"feedback":"Incorreto. Ambos são softwares e servem a propósitos distindos (gerenciamento vs tarefas específicas)."}]},{"title":"Redes","content":"Qual a utilidade do IP?","options":[{"text":"Identificar uma máquina na rede","correct":true,"feedback":"Exatamente! O IP é como o endereço residencial de um computador na rede."},{"text":"Proteger contra vírus","correct":false,"feedback":"Incorreto. A proteção contra vírus é feita por antivírus e firewalls, não pelo protocolo IP."}]},{"title":"Segurança","content":"O que é Phishing?","options":[{"text":"Um tipo de ataque de engenharia social","correct":true,"feedback":"Correto! É quando tentam enganar você para que forneça dados sensíveis."},{"text":"Um programa de edição de imagem","correct":false,"feedback":"Incorreto. Programas de edição de imagem nada têm a ver com Phishing."}]},{"title":"Geral","content":"O que significa WWW?","options":[{"text":"World Wide Web","correct":true,"feedback":"Correto! WWW é a sigla para World Wide Web, a rede mundial de computadores."},{"text":"Wide Web Window","correct":false,"feedback":"Incorreto. WWW significa World Wide Web."}]}]}',
     },
     {
       external_id: 'demo-prova',
@@ -210,7 +349,7 @@ async function seedDemoData() {
 
   for (const atv of atividades) {
     insertAtividade.run(
-      turmaId,
+      materiaId,
       atv.external_id,
       atv.titulo,
       atv.descricao,

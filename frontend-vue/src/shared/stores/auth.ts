@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { apiClient } from '@/api/client';
-import type { Professor } from '@/types';
+import { apiClient } from '@/shared/api/client';
+import type { Professor } from '@/shared/types';
 
 export const useAuthStore = defineStore('auth', () => {
   const professor = ref<Professor | null>(null);

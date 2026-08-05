@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import type { Atividade, Question } from '@/types';
+import type { Atividade, Question } from '@/shared/types';
 
 const props = defineProps<{
   show: boolean;
@@ -85,18 +85,18 @@ function handleSubmit() {
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Seu Nome *</label>
-            <input v-model="alunoNome" @input="handleSaveDraft" required type="text" placeholder="Nome Completo" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
+            <label for="aluno-nome" class="block text-sm font-medium text-slate-700 mb-1">Seu Nome *</label>
+            <input id="aluno-nome" v-model="alunoNome" @input="handleSaveDraft" required type="text" placeholder="Nome Completo" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Seu E-mail *</label>
-            <input v-model="alunoEmail" @input="handleSaveDraft" required type="email" placeholder="seu.email@exemplo.com" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
+            <label for="aluno-email" class="block text-sm font-medium text-slate-700 mb-1">Seu E-mail *</label>
+            <input id="aluno-email" v-model="alunoEmail" @input="handleSaveDraft" required type="email" placeholder="seu.email@exemplo.com" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Suas Respostas *</label>
-          <textarea v-model="respostaText" @input="handleSaveDraft" required rows="5" placeholder="Escreva aqui suas respostas..." class="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-sans text-sm"></textarea>
+          <label for="aluno-respostas" class="block text-sm font-medium text-slate-700 mb-1">Suas Respostas *</label>
+          <textarea id="aluno-respostas" v-model="respostaText" @input="handleSaveDraft" required rows="5" placeholder="Escreva aqui suas respostas..." class="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-sans text-sm"></textarea>
           <p class="text-xs text-slate-400 mt-1">Seu rascunho é salvo automaticamente no navegador.</p>
         </div>
 

@@ -102,6 +102,18 @@ export async function professorAuth(c: Context, next: Next) {
   return next();
 }
 
+export async function adminAuth(c: Context, next: Next) {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return c.body(null, 401);
+  const token = authHeader.slice(7);
+  const payload = await verifyJwt(token);
+  if (!payload || !payload.sub) return c.body(null, 401);
+  if ((payload.role ?? 'professor') !== 'admin') return c.text('Access denied', 403);
+  c.set('professorId', payload.sub);
+  c.set('professorRole', 'admin');
+  return next();
+}
+
 export function isValidEmail(email: string): boolean {
   if (typeof email !== 'string' || email.length > 255) return false;
   return /^[^\s@]+@[^\s@]+(?:\.[^\s@]+)?$/.test(email);

@@ -5,8 +5,22 @@ export interface Professor {
   role: string;
 }
 
-export interface Turma {
+export interface Curso {
   id: number;
+  slug: string;
+  nome: string;
+  cor: string;
+  icone: string;
+  descricao?: string;
+  criado_em?: string;
+  atualizado_em?: string;
+  total_materias?: number;
+  total_professores?: number;
+}
+
+export interface Materia {
+  id: number;
+  curso_id: number;
   slug: string;
   nome: string;
   cor: string;
@@ -19,7 +33,7 @@ export interface Turma {
 
 export interface Aula {
   id: number;
-  turma_id: number;
+  materia_id: number;
   slug: string;
   titulo: string;
   caminho: string;
@@ -43,7 +57,7 @@ export interface Question {
 
 export interface Atividade {
   id: number;
-  turma_id: number;
+  materia_id: number;
   slug: string;
   tipo: 'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco';
   titulo: string;

@@ -65,7 +65,7 @@ describe('Auth Module & Multi-Professor System', () => {
     expect(authBody.role).toBe('admin');
   });
 
-  test('POST /auth/register and isolated professor turmas', async () => {
+  test('POST /auth/register and isolated professor materias', async () => {
     const uniqueEmail = `prof_${Date.now()}@local`;
     const regRes = await app.request('/auth/register', {
       method: 'POST',
@@ -81,59 +81,100 @@ describe('Auth Module & Multi-Professor System', () => {
     const regBody = await regRes.json();
     expect(regBody.token).toBeDefined();
     const token = regBody.token;
+    const profId = regBody.professor.id;
 
-    // Register turma as prof2
-    const createTurmaRes = await app.request('/turmas', {
+    // Admin cria um curso e atribui o professor 2 a ele
+    const adminLogin = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'admin@local',
+        password: process.env.PROFESSOR_PASSWORD || 'ProfessorUzeda!',
+      }),
+    });
+    const adminBody = await adminLogin.json();
+    const adminToken = adminBody.token;
+
+    const createCursoRes = await app.request('/cursos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        slug: 'curso-prof2',
+        nome: 'Curso do Professor 2',
+        cor: 'bg-blue-500',
+        icone: 'school',
+      }),
+    });
+    expect(createCursoRes.status).toBe(201);
+    const createdCurso = await createCursoRes.json();
+
+    const assignRes = await app.request(`/cursos/${createdCurso.id}/professores`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ professor_ids: [profId] }),
+    });
+    expect(assignRes.status).toBe(200);
+
+    // Register materia as prof2 no curso atribuído
+    const createMateriaRes = await app.request('/materias', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        slug: 'turma-prof2',
-        nome: 'Turma do Professor 2',
+        curso_id: createdCurso.id,
+        slug: 'materia-prof2',
+        nome: 'Materia do Professor 2',
         cor: 'bg-blue-500',
         icone: 'school',
       }),
     });
-    expect(createTurmaRes.status).toBe(201);
-    const createdTurma = await createTurmaRes.json();
+    expect(createMateriaRes.status).toBe(201);
+    const createdMateria = await createMateriaRes.json();
 
-    // Get turmas as prof2 (should see only own turma)
-    const listTurmasRes = await app.request('/turmas', {
+    // Listar cursos autenticado como prof2 (deve ver apenas o atribuído)
+    const listCursosRes = await app.request('/cursos', {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}` },
     });
-    const listBody = await listTurmasRes.json();
+    const listBody = await listCursosRes.json();
     expect(listBody.length).toBe(1);
-    expect(listBody[0].slug).toBe('turma_prof2');
+    expect(listBody[0].slug).toBe('curso_prof2');
 
-    // Test updateTurma (verify parameter order bug fix)
-    const turmaId = createdTurma.id;
-    const updateTurmaRes = await app.request(`/turmas/${turmaId}`, {
+    // Test updateMateria (verify parameter order bug fix)
+    const materiaId = createdMateria.id;
+    const updateMateriaRes = await app.request(`/materias/${materiaId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        slug: 'turma-prof2-mod',
-        nome: 'Turma Modificada',
+        curso_id: createdCurso.id,
+        slug: 'materia-prof2-mod',
+        nome: 'Materia Modificada',
       }),
     });
-    expect(updateTurmaRes.status).toBe(200);
-    const updateBody = await updateTurmaRes.json();
-    expect(updateBody.nome).toBe('Turma Modificada');
+    expect(updateMateriaRes.status).toBe(200);
+    const updateBody = await updateMateriaRes.json();
+    expect(updateBody.nome).toBe('Materia Modificada');
 
-    // Test GET /aulas with Bearer token for protected turma
-    const listAulasRes = await app.request(`/aulas?turma_id=${turmaId}`, {
+    // Test GET /aulas with Bearer token for protected materia
+    const listAulasRes = await app.request(`/aulas?materia_id=${materiaId}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(listAulasRes.status).toBe(200);
 
-    // Test GET /atividades with Bearer token for protected turma
-    const listAtividadesRes = await app.request(`/atividades?turma_id=${turmaId}`, {
+    // Test GET /atividades with Bearer token for protected materia
+    const listAtividadesRes = await app.request(`/atividades?materia_id=${materiaId}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -141,7 +182,7 @@ describe('Auth Module & Multi-Professor System', () => {
   });
 
   test('Security Headers present on responses', async () => {
-    const res = await app.request('/turmas', { method: 'GET' });
+    const res = await app.request('/cursos', { method: 'GET' });
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     expect(res.headers.get('x-frame-options')).toBeDefined();
   });

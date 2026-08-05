@@ -2,16 +2,16 @@
 import { ref, watch } from 'vue';
 import ColorPicker from './ColorPicker.vue';
 import IconPicker from './IconPicker.vue';
-import type { Turma } from '@/types';
+import type { Materia } from '@/shared/types';
 
 const props = defineProps<{
   show: boolean;
-  turma?: Turma | null;
+  materia?: Materia | null;
 }>();
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'submit', data: Partial<Turma>): void;
+  (e: 'submit', data: Partial<Materia>): void;
 }>();
 
 const nome = ref('');
@@ -24,11 +24,11 @@ watch(
   () => props.show,
   (val) => {
     if (val) {
-      if (props.turma) {
-        nome.value = props.turma.nome || '';
-        descricao.value = props.turma.descricao || '';
-        cor.value = props.turma.cor || 'bg-indigo-600';
-        icone.value = props.turma.icone || 'group';
+      if (props.materia) {
+        nome.value = props.materia.nome || '';
+        descricao.value = props.materia.descricao || '';
+        cor.value = props.materia.cor || 'bg-indigo-600';
+        icone.value = props.materia.icone || 'group';
         senha.value = '';
       } else {
         nome.value = '';
@@ -49,7 +49,7 @@ function handleSubmit() {
     icone: icone.value
   };
 
-  if (!props.turma) {
+  if (!props.materia) {
     payload.slug = nome.value.toLowerCase().replace(/\s+/g, '_');
     payload.senha = senha.value;
   } else if (senha.value) {
@@ -67,37 +67,37 @@ function handleSubmit() {
         <span class="material-icons">close</span>
       </button>
 
-      <h3 class="text-xl font-bold text-slate-800">{{ props.turma ? 'Editar Turma' : 'Nova Turma' }}</h3>
+      <h3 class="text-xl font-bold text-slate-800">{{ props.materia ? 'Editar Materia' : 'Nova Materia' }}</h3>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Nome da Turma *</label>
-          <input v-model="nome" required type="text" placeholder="Ex: Sistemas Aplicados" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
+          <label for="materia-nome" class="block text-sm font-medium text-slate-700 mb-1">Nome da Materia *</label>
+          <input id="materia-nome" v-model="nome" required type="text" placeholder="Ex: Web Mobile 2026" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-          <textarea v-model="descricao" rows="3" placeholder="Descrição da turma para os alunos..." class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+          <label for="materia-desc" class="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
+          <textarea id="materia-desc" v-model="descricao" rows="3" placeholder="Descrição da materia para os alunos..." class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-2">Cor da Turma</label>
+          <label class="block text-sm font-medium text-slate-700 mb-2">Cor da Materia</label>
           <ColorPicker v-model="cor" />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-2">Ícone da Turma</label>
+          <label class="block text-sm font-medium text-slate-700 mb-2">Ícone da Materia</label>
           <IconPicker v-model="icone" />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Senha de Acesso para Alunos</label>
-          <input v-model="senha" :required="!props.turma" type="password" :placeholder="props.turma ? 'Deixe em branco para manter a atual' : 'Defina a senha da turma'" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
+          <label for="materia-senha" class="block text-sm font-medium text-slate-700 mb-1">Senha de Acesso para Alunos</label>
+          <input id="materia-senha" v-model="senha" :required="!props.materia" type="password" :placeholder="props.materia ? 'Deixe em branco para manter a atual' : 'Defina a senha da materia'" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
 
         <div class="flex justify-end space-x-3 pt-4 border-t">
           <button @click="emit('close')" type="button" class="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium">Cancelar</button>
-          <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-md">Salvar Turma</button>
+          <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-md">Salvar Materia</button>
         </div>
       </form>
     </div>

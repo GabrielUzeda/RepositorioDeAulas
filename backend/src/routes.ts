@@ -1,18 +1,20 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
+import { existsSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { db } from './db';
 import { sanitizeSlug, sanitizePathOrUrl } from './utils';
-import { professorAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter } from './auth';
+import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter } from './auth';
 import { sendMail, type MailRequest } from './mailer';
-import { processMarpContent } from './marp';
+import { processMarpContent, resolveFrontendDir } from './marp';
 
 const app = new Hono();
 
 app.use('*', secureHeaders());
 app.use('*', cors({ origin: '*', allowHeaders: ['Content-Type', 'Authorization'], allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
 
-const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10, message: 'Muitas tentativas de login. Aguarde 1 minuto.' });
+const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 100, message: 'Muitas tentativas de login. Aguarde 1 minuto.' });
 const registerLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, message: 'Muitas tentativas de registro. Aguarde 10 minutos.' });
 
 const dbq = (sql: string) => db.query<Record<string, any>, any[]>(sql);
@@ -49,6 +51,24 @@ function getProfessor(c: any): { id: number; role: string } | null {
   return { id: Number(id), role };
 }
 
+function canManageCurso(prof: { id: number; role: string }, cursoId: number): boolean {
+  if (prof.role === 'admin') return true;
+  return !!dbq('SELECT 1 FROM curso_professores WHERE curso_id = ? AND professor_id = ?').get(cursoId, prof.id);
+}
+
+function getMateriaCursoId(materiaId: number): number | null {
+  const m = dbq('SELECT curso_id FROM materias WHERE id = ?').get(materiaId) as any;
+  return m ? Number(m.curso_id) : null;
+}
+
+async function canManageMateria(c: any, materiaId: number): Promise<boolean> {
+  const prof = getProfessor(c);
+  if (!prof) return false;
+  const cursoId = getMateriaCursoId(materiaId);
+  if (cursoId === null) return false;
+  return canManageCurso(prof, cursoId);
+}
+
 // ---------- Auth routes ----------
 
 app.post('/auth/login', loginLimiter, async (c) => {
@@ -79,46 +99,86 @@ app.get('/check-auth', professorAuth, (c) => {
   return c.json({ id: prof?.id, role: prof?.role });
 });
 
-// ---------- Admin handlers ----------
+// ---------- Curso handlers (admin) ----------
 
-async function createTurma(c: any) {
-  const prof = getProfessor(c);
-  if (!prof) return c.body(null, 401);
+async function createCurso(c: any) {
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-  const slug = sanitizeSlug(body.slug ?? '');
-  const professorId = prof.role === 'admin' ? (body.professor_id ?? prof.id) : prof.id;
+  const slug = sanitizeSlug(body.slug ?? body.nome ?? '');
+  if (!slug) return c.text('Informe um nome válido para o curso.', 400);
   const r = db
     .query(
-      `INSERT INTO turmas (professor_id, slug, nome, cor, icone, senha, descricao)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO cursos (slug, nome, cor, icone, descricao)
+       VALUES (?, ?, ?, ?, ?)
        RETURNING *`
     )
-    .get(professorId, slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null);
+    .get(slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.descricao ?? null);
   return c.json(r, 201);
 }
 
-async function updateTurma(c: any) {
-  const prof = getProfessor(c);
-  if (!prof) return c.body(null, 401);
+async function updateCurso(c: any) {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-  const slug = sanitizeSlug(body.slug ?? '');
-  const scope = prof.role === 'admin' ? '' : ' AND professor_id = ?';
-  const params: any[] = [slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null, id];
-  if (prof.role !== 'admin') params.push(prof.id);
+  const slug = sanitizeSlug(body.slug ?? body.nome ?? '');
+  if (!slug) return c.text('Informe um nome válido para o curso.', 400);
   const r = db
     .query(
-      `UPDATE turmas
-       SET slug = ?, nome = ?, cor = ?, icone = ?, senha = COALESCE(?, senha), descricao = ?,
+      `UPDATE cursos
+       SET slug = ?, nome = ?, cor = ?, icone = ?, descricao = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
-       WHERE id = ?${scope}
+       WHERE id = ?
        RETURNING *`
     )
-    .get(...params);
-  if (!r) return c.text('Turma not found or access denied', 404);
+    .get(slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.descricao ?? null, id);
+  if (!r) return c.text('Curso not found', 404);
+  return c.json(r, 200);
+}
+
+// ---------- Materia handlers ----------
+
+async function createMateria(c: any) {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
+  const body = await parseBody(c);
+  if (!body) return c.text('', 400);
+  const cursoId = parseId(String(body.curso_id));
+  if (cursoId === null) return c.text('', 400);
+  if (!canManageCurso(prof, cursoId)) return c.text('Access denied', 403);
+  const slug = sanitizeSlug(body.slug ?? '');
+  if (!slug) return c.text('Informe um nome válido para a materia.', 400);
+  const r = db
+    .query(
+      `INSERT INTO materias (curso_id, slug, nome, cor, icone, senha, descricao)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       RETURNING *`
+    )
+    .get(cursoId, slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null);
+  return c.json(r, 201);
+}
+
+async function updateMateria(c: any) {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  if (!(await canManageMateria(c, id))) return c.text('Materia not found or access denied', 404);
+  const body = await parseBody(c);
+  if (!body) return c.text('', 400);
+  const slug = sanitizeSlug(body.slug ?? body.nome ?? '');
+  const r = db
+    .query(
+      `UPDATE materias
+       SET slug = COALESCE(NULLIF(?, ''), slug), nome = COALESCE(NULLIF(?, ''), nome),
+           cor = COALESCE(?, cor), icone = COALESCE(?, icone),
+           senha = COALESCE(?, senha), descricao = COALESCE(?, descricao),
+           atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+       WHERE id = ?
+       RETURNING *`
+    )
+    .get(slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null, id);
+  if (!r) return c.text('Materia not found', 404);
   return c.json(r, 200);
 }
 
@@ -127,25 +187,24 @@ async function createAula(c: any) {
   if (!prof) return c.body(null, 401);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-  const turmaId = parseId(String(body.turma_id));
-  if (turmaId === null) return c.text('', 400);
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
-  if (!turma) return c.text('Turma not found', 404);
-  if (prof.role !== 'admin' && turma.professor_id !== prof.id) return c.text('Access denied', 403);
-  const markdown = body.markdown ?? body.conteudo_md ?? null;
+  const materiaId = parseId(String(body.materia_id));
+  if (materiaId === null) return c.text('', 400);
+  if (!(await canManageMateria(c, materiaId))) return c.text('Access denied', 403);
+  const materia = dbq('SELECT * FROM materias WHERE id = ?').get(materiaId) as any;
+  const markdown = body.markdown ?? body.marp_markdown ?? body.conteudo_md ?? null;
   let finalCaminho = sanitizePathOrUrl(body.caminho ?? '');
   if (markdown !== null && markdown !== undefined) {
-    const res = processMarpContent(turma.slug, body.titulo ?? '', markdown);
+    const res = processMarpContent(materia.slug, body.titulo ?? '', markdown);
     if (res.error) return c.text(res.error, 500);
     finalCaminho = res.caminho!;
   }
   const r = db
     .query(
-      `INSERT INTO aulas (turma_id, titulo, caminho, icone, descricao, ordem, conteudo_md)
+      `INSERT INTO aulas (materia_id, titulo, caminho, icone, descricao, ordem, conteudo_md)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        RETURNING *`
     )
-    .get(turmaId, body.titulo ?? '', finalCaminho, body.icone ?? null, body.descricao ?? null, body.ordem ?? 0, markdown);
+    .get(materiaId, body.titulo ?? '', finalCaminho, body.icone ?? null, body.descricao ?? null, body.ordem ?? 0, markdown);
   return c.json(r, 201);
 }
 
@@ -156,27 +215,26 @@ async function updateAula(c: any) {
   if (id === null) return c.text('', 400);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-  const turmaId = parseId(String(body.turma_id));
-  if (turmaId === null) return c.text('', 400);
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
-  if (!turma) return c.text('Turma not found', 404);
-  if (prof.role !== 'admin' && turma.professor_id !== prof.id) return c.text('Access denied', 403);
-  const markdown = body.markdown ?? body.conteudo_md ?? null;
+  const materiaId = parseId(String(body.materia_id));
+  if (materiaId === null) return c.text('', 400);
+  if (!(await canManageMateria(c, materiaId))) return c.text('Access denied', 403);
+  const materia = dbq('SELECT * FROM materias WHERE id = ?').get(materiaId) as any;
+  const markdown = body.markdown ?? body.marp_markdown ?? body.conteudo_md ?? null;
   let finalCaminho = sanitizePathOrUrl(body.caminho ?? '');
   if (markdown !== null && markdown !== undefined) {
-    const res = processMarpContent(turma.slug, body.titulo ?? '', markdown);
+    const res = processMarpContent(materia.slug, body.titulo ?? '', markdown);
     if (res.error) return c.text(res.error, 500);
     finalCaminho = res.caminho!;
   }
   const r = db
     .query(
       `UPDATE aulas
-       SET turma_id = ?, titulo = ?, caminho = ?, icone = ?, descricao = ?, ordem = ?, conteudo_md = ?,
+       SET materia_id = ?, titulo = ?, caminho = ?, icone = ?, descricao = ?, ordem = ?, conteudo_md = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
        WHERE id = ?
        RETURNING *`
     )
-    .get(turmaId, body.titulo ?? '', finalCaminho, body.icone ?? null, body.descricao ?? null, body.ordem ?? 0, markdown, id);
+    .get(materiaId, body.titulo ?? '', finalCaminho, body.icone ?? null, body.descricao ?? null, body.ordem ?? 0, markdown, id);
   if (!r) return c.text('Aula not found', 404);
   return c.json(r, 200);
 }
@@ -186,21 +244,19 @@ async function createAtividade(c: any) {
   if (!prof) return c.body(null, 401);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-  const turmaId = parseId(String(body.turma_id));
-  if (turmaId === null) return c.text('', 400);
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
-  if (!turma) return c.text('Turma not found', 404);
-  if (prof.role !== 'admin' && turma.professor_id !== prof.id) return c.text('Access denied', 403);
+  const materiaId = parseId(String(body.materia_id));
+  if (materiaId === null) return c.text('', 400);
+  if (!(await canManageMateria(c, materiaId))) return c.text('Access denied', 403);
   const externalId = body.external_id != null ? sanitizeSlug(body.external_id) : null;
   const caminho = sanitizePathOrUrl(body.caminho ?? '');
   const r = db
     .query(
-      `INSERT INTO atividades (turma_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem)
+      `INSERT INTO atividades (materia_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`
     )
     .get(
-      turmaId,
+      materiaId,
       externalId,
       body.titulo ?? '',
       body.descricao ?? null,
@@ -222,24 +278,22 @@ async function updateAtividade(c: any) {
   if (id === null) return c.text('', 400);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-  const turmaId = parseId(String(body.turma_id));
-  if (turmaId === null) return c.text('', 400);
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
-  if (!turma) return c.text('Turma not found', 404);
-  if (prof.role !== 'admin' && turma.professor_id !== prof.id) return c.text('Access denied', 403);
+  const materiaId = parseId(String(body.materia_id));
+  if (materiaId === null) return c.text('', 400);
+  if (!(await canManageMateria(c, materiaId))) return c.text('Access denied', 403);
   const externalId = body.external_id != null ? sanitizeSlug(body.external_id) : null;
   const caminho = sanitizePathOrUrl(body.caminho ?? '');
   const r = db
     .query(
       `UPDATE atividades
-       SET turma_id = ?, external_id = ?, titulo = ?, descricao = ?, caminho = ?, icone = ?,
+       SET materia_id = ?, external_id = ?, titulo = ?, descricao = ?, caminho = ?, icone = ?,
            json_data = ?, tipo = ?, senha = COALESCE(?, senha), allow_password = ?, ordem = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
        WHERE id = ?
        RETURNING *`
     )
     .get(
-      turmaId,
+      materiaId,
       externalId,
       body.titulo ?? '',
       body.descricao ?? null,
@@ -258,102 +312,182 @@ async function updateAtividade(c: any) {
 
 // ---------- Route registration ----------
 
-app.post('/turmas', professorAuth, createTurma);
-app.put('/turmas/:id', professorAuth, updateTurma);
-app.post('/turmas/:id', professorAuth, updateTurma);
-app.delete('/turmas/:id', professorAuth, (c) => {
+app.post('/cursos', adminAuth, createCurso);
+app.put('/cursos/:id', adminAuth, updateCurso);
+app.delete('/cursos/:id', adminAuth, (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  dbq('DELETE FROM cursos WHERE id = ?').run(id);
+  return c.body(null, 204);
+});
+
+app.get('/cursos/:id/professores', adminAuth, (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const rows = dbq(
+    `SELECT p.id, p.nome, p.email, p.role FROM curso_professores cp
+     JOIN professores p ON p.id = cp.professor_id
+     WHERE cp.curso_id = ? ORDER BY p.nome`
+  ).all(id);
+  return c.json(rows);
+});
+
+app.put('/cursos/:id/professores', adminAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const curso = dbq('SELECT id FROM cursos WHERE id = ?').get(id);
+  if (!curso) return c.text('Curso not found', 404);
+  const body = await parseBody(c);
+  if (!body) return c.text('', 400);
+  const professorIds = Array.isArray(body.professor_ids) ? body.professor_ids.map(Number).filter((n: number) => Number.isInteger(n)) : [];
+  dbq('DELETE FROM curso_professores WHERE curso_id = ?').run(id);
+  const ins = db.query('INSERT OR IGNORE INTO curso_professores (curso_id, professor_id) VALUES (?, ?)');
+  for (const pid of professorIds) {
+    if (dbq('SELECT id FROM professores WHERE id = ?').get(pid)) ins.run(id, pid);
+  }
+  const rows = dbq(
+    `SELECT p.id, p.nome, p.email, p.role FROM curso_professores cp
+     JOIN professores p ON p.id = cp.professor_id
+     WHERE cp.curso_id = ? ORDER BY p.nome`
+  ).all(id);
+  return c.json(rows);
+});
+
+app.post('/materias', professorAuth, createMateria);
+app.put('/materias/:id', professorAuth, updateMateria);
+app.post('/materias/:id', professorAuth, updateMateria);
+app.delete('/materias/:id', professorAuth, async (c) => {
   const prof = getProfessor(c);
   if (!prof) return c.body(null, 401);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  if (prof.role !== 'admin') {
-    const turma = dbq('SELECT professor_id FROM turmas WHERE id = ?').get(id) as any;
-    if (!turma || turma.professor_id !== prof.id) return c.text('Access denied', 403);
-  }
-  dbq('DELETE FROM turmas WHERE id = ?').run(id);
+  if (!(await canManageMateria(c, id))) return c.text('Materia not found or access denied', 404);
+  dbq('DELETE FROM materias WHERE id = ?').run(id);
   return c.body(null, 204);
 });
 
 app.post('/aulas', professorAuth, createAula);
 app.put('/aulas/:id', professorAuth, updateAula);
-app.delete('/aulas/:id', professorAuth, (c) => {
+app.delete('/aulas/:id', professorAuth, async (c) => {
   const prof = getProfessor(c);
   if (!prof) return c.body(null, 401);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  if (prof.role !== 'admin') {
-    const aula = dbq('SELECT turma_id FROM aulas WHERE id = ?').get(id) as any;
-    if (!aula) return c.text('Aula not found', 404);
-    const turma = dbq('SELECT professor_id FROM turmas WHERE id = ?').get(aula.turma_id) as any;
-    if (!turma || turma.professor_id !== prof.id) return c.text('Access denied', 403);
-  }
+  const aula = dbq('SELECT materia_id FROM aulas WHERE id = ?').get(id) as any;
+  if (!aula) return c.text('Aula not found', 404);
+  if (!(await canManageMateria(c, aula.materia_id))) return c.text('Access denied', 403);
   dbq('DELETE FROM aulas WHERE id = ?').run(id);
   return c.body(null, 204);
 });
 
 app.post('/atividades', professorAuth, createAtividade);
 app.put('/atividades/:id', professorAuth, updateAtividade);
-app.delete('/atividades/:id', professorAuth, (c) => {
+app.delete('/atividades/:id', professorAuth, async (c) => {
   const prof = getProfessor(c);
   if (!prof) return c.body(null, 401);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  if (prof.role !== 'admin') {
-    const atv = dbq('SELECT turma_id FROM atividades WHERE id = ?').get(id) as any;
-    if (!atv) return c.text('Atividade not found', 404);
-    const turma = dbq('SELECT professor_id FROM turmas WHERE id = ?').get(atv.turma_id) as any;
-    if (!turma || turma.professor_id !== prof.id) return c.text('Access denied', 403);
-  }
+  const atv = dbq('SELECT materia_id FROM atividades WHERE id = ?').get(id) as any;
+  if (!atv) return c.text('Atividade not found', 404);
+  if (!(await canManageMateria(c, atv.materia_id))) return c.text('Access denied', 403);
   dbq('DELETE FROM atividades WHERE id = ?').run(id);
   return c.body(null, 204);
 });
 
 // ---------- Public routes ----------
 
-app.get('/turmas', async (c) => {
+app.get('/cursos', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
+      const profId = Number(payload.sub);
       if (payload.role === 'admin') {
-        return c.json(dbq('SELECT * FROM turmas ORDER BY nome').all());
+        const rows = dbq(
+          `SELECT c.*,
+             (SELECT COUNT(*) FROM materias m WHERE m.curso_id = c.id) AS total_materias,
+             (SELECT COUNT(*) FROM curso_professores cp WHERE cp.curso_id = c.id) AS total_professores
+           FROM cursos c ORDER BY c.nome`
+        ).all();
+        return c.json(rows);
       }
-      return c.json(dbq('SELECT * FROM turmas WHERE professor_id = ? ORDER BY nome').all(Number(payload.sub)));
+      const rows = dbq(
+        `SELECT c.*,
+           (SELECT COUNT(*) FROM materias m WHERE m.curso_id = c.id) AS total_materias,
+           (SELECT COUNT(*) FROM curso_professores cp WHERE cp.curso_id = c.id) AS total_professores
+         FROM cursos c
+         WHERE c.id IN (SELECT curso_id FROM curso_professores WHERE professor_id = ?)
+         ORDER BY c.nome`
+      ).all(profId);
+      return c.json(rows);
     }
   }
-  const rows = dbq('SELECT id, slug, nome, cor, icone, descricao FROM turmas ORDER BY nome').all();
+  const rows = dbq(
+    `SELECT c.id, c.slug, c.nome, c.cor, c.icone, c.descricao,
+       (SELECT COUNT(*) FROM materias m WHERE m.curso_id = c.id) AS total_materias,
+       (SELECT COUNT(*) FROM curso_professores cp WHERE cp.curso_id = c.id) AS total_professores
+     FROM cursos c ORDER BY c.nome`
+  ).all();
   return c.json(rows);
 });
 
-app.get('/turmas/:id', (c) => {
+app.get('/cursos/:id', (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const r = dbq('SELECT id, slug, nome, cor, icone, descricao FROM turmas WHERE id = ?').get(id);
-  if (!r) return c.text('Turma not found', 404);
+  const r = dbq('SELECT id, slug, nome, cor, icone, descricao FROM cursos WHERE id = ?').get(id);
+  if (!r) return c.text('Curso not found', 404);
+  return c.json(r);
+});
+
+app.get('/cursos/:id/materias', async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const curso = dbq('SELECT id FROM cursos WHERE id = ?').get(id);
+  if (!curso) return c.text('Curso not found', 404);
+  const authHeader = c.req.header('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const payload = await verifyJwt(authHeader.slice(7));
+    if (payload?.sub) {
+      const profId = Number(payload.sub);
+      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, id)) {
+        const rows = dbq('SELECT * FROM materias WHERE curso_id = ? ORDER BY nome').all(id);
+        return c.json(rows);
+      }
+    }
+  }
+  const rows = dbq('SELECT id, slug, nome, cor, icone, descricao FROM materias WHERE curso_id = ? ORDER BY nome').all(id);
+  return c.json(rows);
+});
+
+app.get('/materias/:id', (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const r = dbq('SELECT id, curso_id, slug, nome, cor, icone, descricao FROM materias WHERE id = ?').get(id);
+  if (!r) return c.text('Materia not found', 404);
   return c.json(r);
 });
 
 app.get('/aulas', async (c) => {
-  const turmaId = parseId(c.req.query('turma_id'));
-  if (turmaId === null) return c.text('', 400);
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
-  if (!turma) return c.text('Turma não encontrada', 404);
+  const materiaId = parseId(c.req.query('materia_id'));
+  if (materiaId === null) return c.text('', 400);
+  const materia = dbq('SELECT * FROM materias WHERE id = ?').get(materiaId) as any;
+  if (!materia) return c.text('Materia não encontrada', 404);
 
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);
-      if (payload.role === 'admin' || turma.professor_id === profId) {
-        const rows = dbq('SELECT * FROM aulas WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
+      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, materia.curso_id)) {
+        const rows = dbq('SELECT * FROM aulas WHERE materia_id = ? ORDER BY ordem, titulo').all(materiaId);
         return c.json(rows);
       }
     }
   }
 
   const senha = c.req.query('senha') ?? null;
-  if ((turma.senha ?? null) !== senha) return c.text('Senha da turma incorreta', 401);
-  const rows = dbq('SELECT * FROM aulas WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
+  if ((materia.senha ?? null) !== senha) return c.text('Senha da materia incorreta', 401);
+  const rows = dbq('SELECT * FROM aulas WHERE materia_id = ? ORDER BY ordem, titulo').all(materiaId);
   return c.json(rows);
 });
 
@@ -366,26 +500,26 @@ app.get('/aulas/:id', (c) => {
 });
 
 app.get('/atividades', async (c) => {
-  const turmaId = parseId(c.req.query('turma_id'));
-  if (turmaId === null) return c.text('', 400);
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(turmaId) as any;
-  if (!turma) return c.text('Turma não encontrada', 404);
+  const materiaId = parseId(c.req.query('materia_id'));
+  if (materiaId === null) return c.text('', 400);
+  const materia = dbq('SELECT * FROM materias WHERE id = ?').get(materiaId) as any;
+  if (!materia) return c.text('Materia não encontrada', 404);
 
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);
-      if (payload.role === 'admin' || turma.professor_id === profId) {
-        const rows = dbq('SELECT * FROM atividades WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
+      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, materia.curso_id)) {
+        const rows = dbq('SELECT * FROM atividades WHERE materia_id = ? ORDER BY ordem, titulo').all(materiaId);
         return c.json(rows.map(mapAtividade));
       }
     }
   }
 
   const senha = c.req.query('senha') ?? null;
-  if ((turma.senha ?? null) !== senha) return c.text('Senha da turma incorreta', 401);
-  const rows = dbq('SELECT * FROM atividades WHERE turma_id = ? ORDER BY ordem, titulo').all(turmaId);
+  if ((materia.senha ?? null) !== senha) return c.text('Senha da materia incorreta', 401);
+  const rows = dbq('SELECT * FROM atividades WHERE materia_id = ? ORDER BY ordem, titulo').all(materiaId);
   return c.json(rows.map(mapAtividade));
 });
 
@@ -401,23 +535,23 @@ app.get('/atividades/:id', async (c) => {
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);
-      const turma = dbq('SELECT professor_id FROM turmas WHERE id = ?').get(atv.turma_id) as any;
-      if (turma && (payload.role === 'admin' || turma.professor_id === profId)) {
+      const materia = dbq('SELECT curso_id FROM materias WHERE id = ?').get(atv.materia_id) as any;
+      if (materia && (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, materia.curso_id))) {
         return c.json(atv);
       }
     }
   }
 
-  const turma = dbq('SELECT * FROM turmas WHERE id = ?').get(atv.turma_id) as any;
-  if (!turma) return c.text('Turma not found for activity', 500);
+  const materia = dbq('SELECT * FROM materias WHERE id = ?').get(atv.materia_id) as any;
+  if (!materia) return c.text('Materia not found for activity', 500);
   const inputSenha = c.req.query('senha') ?? '';
-  const turmaSenha = turma.senha ?? '';
+  const materiaSenha = materia.senha ?? '';
   const atvSenha = atv.senha ?? '';
   const isProtected = !!atv.allow_password;
 
   if (inputSenha === atvSenha && isProtected) {
     return c.json(atv);
-  } else if (inputSenha === turmaSenha) {
+  } else if (inputSenha === materiaSenha) {
     if (isProtected) atv.json_data = null;
     return c.json(atv);
   } else {
@@ -469,6 +603,86 @@ app.get('/db-test', (c) => {
   } catch (e: any) {
     return c.json({ success: false, message: `Erro na conexão: ${e?.message}` });
   }
+});
+
+// ---------- Admin: CRUD de professores ----------
+
+function mapProfessor(row: any) {
+  if (!row) return row;
+  return { id: row.id, nome: row.nome, email: row.email, role: row.role, criado_em: row.criado_em };
+}
+
+app.get('/professores', adminAuth, async (c) => {
+  const rows = dbq('SELECT id, nome, email, role, criado_em FROM professores ORDER BY nome').all();
+  return c.json(rows.map(mapProfessor));
+});
+
+app.post('/professores', adminAuth, async (c) => {
+  const body = await parseBody(c);
+  if (!body?.nome || !body?.email || !body?.password || !isValidEmail(body.email)) {
+    return c.text('Dados inválidos. Informe nome, email e senha válidos.', 400);
+  }
+  const existing = dbq('SELECT id FROM professores WHERE email = ?').get(body.email);
+  if (existing) return c.text('Email already registered', 409);
+  const role = body.role === 'admin' ? 'admin' : 'professor';
+  const { hash, salt } = await hashPassword(body.password);
+  const r = dbq('INSERT INTO professores (email, nome, senha_hash, salt, role) VALUES (?, ?, ?, ?, ?) RETURNING id, nome, email, role, criado_em')
+    .get(body.email, body.nome, hash, salt, role);
+  return c.json(mapProfessor(r), 201);
+});
+
+app.put('/professores/:id', adminAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const body = await parseBody(c);
+  if (!body) return c.text('', 400);
+  const existing = dbq('SELECT * FROM professores WHERE id = ?').get(id) as any;
+  if (!existing) return c.text('Professor not found', 404);
+
+  const nome = typeof body.nome === 'string' && body.nome.trim() ? body.nome.trim() : existing.nome;
+  let email = typeof body.email === 'string' && body.email.trim() ? body.email.trim() : existing.email;
+  if (email !== existing.email) {
+    if (!isValidEmail(email)) return c.text('Email inválido', 400);
+    const dup = dbq('SELECT id FROM professores WHERE email = ? AND id != ?').get(email, id);
+    if (dup) return c.text('Email already registered', 409);
+  }
+  const role = body.role === 'admin' ? 'admin' : body.role === 'professor' ? 'professor' : existing.role;
+
+  if (typeof body.password === 'string' && body.password) {
+    const { hash, salt } = await hashPassword(body.password);
+    dbq('UPDATE professores SET nome = ?, email = ?, senha_hash = ?, salt = ?, role = ? WHERE id = ?')
+      .run(nome, email, hash, salt, role, id);
+  } else {
+    dbq('UPDATE professores SET nome = ?, email = ?, role = ? WHERE id = ?').run(nome, email, role, id);
+  }
+
+  const r = dbq('SELECT id, nome, email, role, criado_em FROM professores WHERE id = ?').get(id);
+  return c.json(mapProfessor(r));
+});
+
+app.delete('/professores/:id', adminAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const existing = dbq('SELECT id FROM professores WHERE id = ?').get(id);
+  if (!existing) return c.text('Professor not found', 404);
+  dbq('DELETE FROM professores WHERE id = ?').run(id);
+  return c.body(null, 204);
+});
+
+app.get('/materias/*', async (c) => {
+  let rest: string;
+  try {
+    rest = decodeURIComponent(c.req.path.replace(/^\/materias\/?/, ''));
+  } catch {
+    return c.text('Bad request', 400);
+  }
+  const safe = rest
+    .split('/')
+    .map((seg) => seg.replace(/\.\./g, '').replace(/\\/g, ''))
+    .join('/');
+  const abs = path.join(resolveFrontendDir(), 'materias', safe);
+  if (!safe || !existsSync(abs) || !statSync(abs).isFile()) return c.text('Not found', 404);
+  return new Response(Bun.file(abs));
 });
 
 export default app;

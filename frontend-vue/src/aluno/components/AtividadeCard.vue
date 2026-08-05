@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Atividade } from '@/types';
+import type { Atividade } from '@/shared/types';
 
 const props = defineProps<{
   atividade: Atividade;

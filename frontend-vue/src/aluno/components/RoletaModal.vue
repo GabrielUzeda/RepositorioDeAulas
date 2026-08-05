@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import type { Question, Option } from '@/types';
+import type { Question, Option } from '@/shared/types';
 
 const props = defineProps<{
   show: boolean;
@@ -121,8 +121,8 @@ function handleNextQuestion() {
       <!-- Header -->
       <div class="flex justify-between items-center border-b border-slate-800 pb-4">
         <div class="flex items-center space-x-3">
-          <div class="p-3 bg-pink-500/20 text-pink-400 rounded-2xl">
-            <span class="material-icons">casino</span>
+          <div class="p-3 bg-pink-500/20 text-pink-400 rounded-2xl flex items-center justify-center">
+            <span class="material-icons leading-none">casino</span>
           </div>
           <div>
             <span class="px-3 py-1 bg-pink-900/60 text-pink-300 text-xs font-bold rounded-full uppercase tracking-wider">Roleta do Conhecimento</span>

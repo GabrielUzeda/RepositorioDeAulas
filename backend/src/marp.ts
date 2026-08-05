@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { sanitizeSlug } from './utils';
 
-function resolveFrontendDir(): string {
+export function resolveFrontendDir(): string {
   if (process.env.FRONTEND_STATIC_DIR) return process.env.FRONTEND_STATIC_DIR;
   if (existsSync('/app/frontend_static')) return '/app/frontend_static';
   return path.join(import.meta.dir, '..', '..', 'frontend', 'src');
@@ -23,15 +23,15 @@ function resolveMarp(): { cmd: string; args: string[] } {
 }
 
 export function processMarpContent(
-  turmaSlug: string,
+  materiaSlug: string,
   titulo: string,
   mdContent: string
 ): { caminho?: string; error?: string } {
   const slug = sanitizeSlug(titulo);
-  if (turmaSlug.includes('/') || turmaSlug.includes('\\') || turmaSlug.includes('..')) {
-    return { error: 'Invalid turma slug' };
+  if (materiaSlug.includes('/') || materiaSlug.includes('\\') || materiaSlug.includes('..')) {
+    return { error: 'Invalid materia slug' };
   }
-  const baseDir = path.join(resolveFrontendDir(), 'turmas', turmaSlug, 'aulas');
+  const baseDir = path.join(resolveFrontendDir(), 'materias', materiaSlug, 'aulas');
   mkdirSync(baseDir, { recursive: true });
 
   const mdPath = path.join(baseDir, `${slug}.md`);
@@ -72,5 +72,5 @@ export function processMarpContent(
     return { error: 'Marp completed but HTML output file was not created.' };
   }
 
-  return { caminho: `turmas/${turmaSlug}/aulas/${slug}.html` };
+  return { caminho: `materias/${materiaSlug}/aulas/${slug}.html` };
 }
