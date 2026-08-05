@@ -247,6 +247,14 @@ describe('Auth Module & Multi-Professor System', () => {
     const listData = await listRes.json();
     expect(listData.some((r: any) => r.id === createdResp.id)).toBeTruthy();
 
+    // Consulta do próprio aluno aos seus dados (Art. 18 LGPD)
+    const alunoSelfRes = await app.request('/aluno/minhas-respostas?email=joao.silva@exemplo.com', {
+      method: 'GET',
+    });
+    expect(alunoSelfRes.status).toBe(200);
+    const alunoSelfData = await alunoSelfRes.json();
+    expect(alunoSelfData.some((r: any) => r.id === createdResp.id)).toBeTruthy();
+
     const delRes = await app.request(`/respostas/${createdResp.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },

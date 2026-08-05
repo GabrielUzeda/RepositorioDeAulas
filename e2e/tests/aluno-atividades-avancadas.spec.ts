@@ -214,7 +214,7 @@ test.describe('Aluno — Atividades Avançadas & Modalidades Interativas', () =>
     expect(getRank.ok()).toBeTruthy();
     const rankList = await getRank.json();
     expect(rankList.length).toBeGreaterThan(0);
-    expect(rankList[0].nome_jogador).toBe('Jogador E2E');
+    expect(rankList[0].nome_jogador).toBe('Jogador E.');
     expect(rankList[0].pontuacao).toBe(9500);
 
     // Fecha o modal do minigame

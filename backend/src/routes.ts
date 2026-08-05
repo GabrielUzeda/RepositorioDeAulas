@@ -560,16 +560,34 @@ app.get('/atividades/:id', async (c) => {
   }
 });
 
+function formatPublicName(fullName: string): string {
+  const parts = String(fullName || '').trim().split(/\s+/);
+  if (parts.length <= 1) return parts[0] || 'Aluno';
+  return `${parts[0]} ${parts[1][0].toUpperCase()}.`;
+}
+
 app.post('/ranking', async (c) => {
   const body = await parseBody(c);
-  if (!body) return c.text('', 400);
+  if (!body) return c.text('Dados inválidos', 400);
+  const atividadeId = parseId(String(body.atividade_id));
+  const pontuacao = Number(body.pontuacao);
+  if (atividadeId === null || isNaN(pontuacao)) return c.text('Parâmetros inválidos', 400);
+  const atv = dbq('SELECT id FROM atividades WHERE id = ?').get(atividadeId);
+  if (!atv) return c.text('Atividade não encontrada', 404);
+
+  const rawNome = String(body.nome_jogador || 'Aluno').trim();
+  const nomePublico = formatPublicName(rawNome);
+
   try {
     const r = db
-      .query('INSERT INTO ranking (atividade_id, nome_jogador, pontuacao) VALUES (?, ?, ?) RETURNING *')
-      .get(body.atividade_id, body.nome_jogador ?? '', body.pontuacao ?? 0);
+      .query(
+        `INSERT INTO ranking (atividade_id, nome_jogador, pontuacao)
+         VALUES (?, ?, ?) RETURNING *`
+      )
+      .get(atividadeId, nomePublico, Math.floor(pontuacao));
     return c.json(r, 200);
   } catch (e: any) {
-    return c.text(`Erro ao criar ranking: ${e?.message}`, 500);
+    return c.text('Erro interno ao registrar ranking', 500);
   }
 });
 
@@ -577,10 +595,10 @@ app.get('/ranking/:atividade_id', (c) => {
   const id = parseId(c.req.param('atividade_id'));
   if (id === null) return c.text('', 400);
   try {
-    const rows = dbq('SELECT * FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(id);
+    const rows = dbq('SELECT id, atividade_id, nome_jogador, pontuacao, data_envio FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(id);
     return c.json(rows);
   } catch (e: any) {
-    return c.text(`Erro ao listar ranking: ${e?.message}`, 500);
+    return c.text('Erro interno ao listar ranking', 500);
   }
 });
 
@@ -606,8 +624,24 @@ app.post('/submeter-resposta', submissionLimiter, async (c) => {
       .get(atividadeId, String(body.aluno_nome).trim(), String(body.aluno_email).trim(), String(body.respostas).trim());
     return c.json(r, 201);
   } catch (e: any) {
-    return c.text(`Erro ao salvar resposta: ${e?.message}`, 500);
+    return c.text('Erro interno ao salvar resposta', 500);
   }
+});
+
+// Direitos do Titular (Art. 18 LGPD) - Consulta de respostas próprias do aluno por e-mail
+app.get('/aluno/minhas-respostas', async (c) => {
+  const email = c.req.query('email');
+  if (!email || !isValidEmail(email)) {
+    return c.text('Informe um e-mail válido.', 400);
+  }
+  const rows = dbq(
+    `SELECT r.id, r.atividade_id, r.aluno_nome, r.aluno_email, r.respostas, r.criado_em, a.titulo as atividade_titulo
+     FROM respostas_alunos r
+     JOIN atividades a ON r.atividade_id = a.id
+     WHERE r.aluno_email = ?
+     ORDER BY r.criado_em DESC`
+  ).all(email);
+  return c.json(rows);
 });
 
 app.get('/atividades/:id/respostas', professorAuth, async (c) => {
