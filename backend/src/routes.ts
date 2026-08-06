@@ -1070,7 +1070,7 @@ app.get('/materias/*', async (c) => {
   return served;
 });
 
-const frontendStaticDir = process.env.FRONTEND_STATIC_DIR || (existsSync('/app/frontend_static') ? '/app/frontend_static' : path.join(import.meta.dir, '..', '..', 'frontend-vue', 'dist'));
+const frontendStaticDir = process.env.FRONTEND_STATIC_DIR || (existsSync('/app/frontend_static') ? '/app/frontend_static' : path.join(import.meta.dir, '..', '..', 'frontend', 'dist'));
 
 app.use('*', async (c, next) => {
   await next();

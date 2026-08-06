@@ -7,7 +7,7 @@ services:
     volumes:
       - ./backend/:/app
       - backend_node_modules:/app/node_modules
-      - ./frontend-vue/dist/:/app/frontend_static
+      - ./frontend/dist/:/app/frontend_static
     working_dir: /app
     command: sh -c "bun install && bun run src/index.ts"
     expose:
@@ -23,7 +23,7 @@ services:
     environment:
       VITE_PROXY_TARGET: http://bun-server:8080
     volumes:
-      - ./frontend-vue/:/app
+      - ./frontend/:/app
       - vite_node_modules:/app/node_modules
     working_dir: /app
     command: sh -c "bun install && bun run dev --host 0.0.0.0"
