@@ -10,6 +10,7 @@ const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'app.db');
 export const db = new Database(DB_PATH, { create: true });
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
+db.exec('PRAGMA busy_timeout = 5000;');
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS professores (
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS professores (
   senha_hash TEXT NOT NULL,
   salt TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'professor',
+  status TEXT NOT NULL DEFAULT 'ativo',
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 
@@ -96,127 +98,37 @@ CREATE TABLE IF NOT EXISTS respostas_alunos (
   atividade_id INTEGER NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
   aluno_nome TEXT NOT NULL,
   aluno_email TEXT NOT NULL,
+  aluno_email_hash TEXT NOT NULL,
   respostas TEXT NOT NULL,
+  consulta_token_hash TEXT,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usuario_id INTEGER,
+  usuario_email TEXT,
+  acao TEXT NOT NULL,
+  recurso TEXT NOT NULL,
+  ip TEXT NOT NULL,
+  user_agent TEXT,
+  detalhes TEXT,
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_ranking_atividade_pontuacao ON ranking(atividade_id, pontuacao DESC);
 CREATE INDEX IF NOT EXISTS idx_respostas_atividade ON respostas_alunos(atividade_id);
+CREATE INDEX IF NOT EXISTS idx_respostas_aluno_email_hash ON respostas_alunos(aluno_email_hash);
 CREATE INDEX IF NOT EXISTS idx_materias_curso ON materias(curso_id);
 CREATE INDEX IF NOT EXISTS idx_curso_professores_professor ON curso_professores(professor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_criado_em ON audit_logs(criado_em);
 `;
 
-function migrateOldSchema() {
-  const hasTurmas = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='turmas'").get();
-  if (!hasTurmas) return;
-
-  db.exec('PRAGMA foreign_keys = OFF;');
-  try {
-    db.exec('BEGIN');
-    db.exec(`CREATE TABLE IF NOT EXISTS cursos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      slug TEXT NOT NULL UNIQUE,
-      nome TEXT NOT NULL,
-      cor TEXT,
-      icone TEXT,
-      descricao TEXT,
-      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-      atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-    )`);
-    db.exec(`CREATE TABLE IF NOT EXISTS curso_professores (
-      curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
-      professor_id INTEGER NOT NULL REFERENCES professores(id) ON DELETE CASCADE,
-      PRIMARY KEY (curso_id, professor_id)
-    )`);
-    db.exec(`CREATE TABLE IF NOT EXISTS materias (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
-      slug TEXT NOT NULL,
-      nome TEXT NOT NULL,
-      cor TEXT,
-      icone TEXT,
-      senha TEXT,
-      descricao TEXT,
-      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-      atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-      UNIQUE(slug, curso_id)
-    )`);
-
-    const insertCurso = db.query('INSERT INTO cursos (slug, nome, cor, icone, descricao) VALUES (?, ?, ?, ?, ?)');
-    const cursoRes = insertCurso.run('curso_demo', 'Curso de Demonstração', 'bg-indigo-600', 'school', 'Curso criado automaticamente durante a migração.');
-    const cursoId = Number(cursoRes.lastInsertRowid);
-
-    const turmas = db.query('SELECT id, slug, nome, cor, icone, senha, descricao, criado_em, atualizado_em FROM turmas ORDER BY id').all();
-    const insertMateriaMig = db.query(
-      `INSERT INTO materias (id, curso_id, slug, nome, cor, icone, senha, descricao, criado_em, atualizado_em)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    const usedSlugs = new Set<string>();
-    for (const t of turmas) {
-      let slug = t.slug;
-      if (usedSlugs.has(slug)) {
-        let n = 2;
-        while (usedSlugs.has(`${slug}-${n}`)) n++;
-        slug = `${slug}-${n}`;
-      }
-      usedSlugs.add(slug);
-      insertMateriaMig.run(t.id, cursoId, slug, t.nome, t.cor, t.icone, t.senha, t.descricao, t.criado_em, t.atualizado_em);
-    }
-
-    db.query(`INSERT OR IGNORE INTO curso_professores (curso_id, professor_id)
-      SELECT ?, professor_id FROM turmas GROUP BY professor_id`).run(cursoId);
-
-    db.exec(`CREATE TABLE aulas_new (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE,
-      titulo TEXT NOT NULL,
-      caminho TEXT NOT NULL,
-      icone TEXT,
-      descricao TEXT,
-      ordem INTEGER DEFAULT 0,
-      conteudo_md TEXT,
-      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-      atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-    )`);
-    db.query(`INSERT INTO aulas_new (id, materia_id, titulo, caminho, icone, descricao, ordem, conteudo_md, criado_em, atualizado_em)
-      SELECT id, turma_id, titulo, caminho, icone, descricao, ordem, conteudo_md, criado_em, atualizado_em FROM aulas`).run();
-    db.exec('DROP TABLE aulas; ALTER TABLE aulas_new RENAME TO aulas;');
-
-    db.exec(`CREATE TABLE atividades_new (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE,
-      external_id TEXT,
-      titulo TEXT NOT NULL,
-      descricao TEXT,
-      caminho TEXT NOT NULL,
-      icone TEXT,
-      json_data TEXT,
-      tipo TEXT DEFAULT 'normal',
-      senha TEXT,
-      allow_password INTEGER DEFAULT 0,
-      ordem INTEGER DEFAULT 0,
-      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-      atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-    )`);
-    db.query(`INSERT INTO atividades_new (id, materia_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem, criado_em, atualizado_em)
-      SELECT id, turma_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem, criado_em, atualizado_em FROM atividades`).run();
-    db.exec('DROP TABLE atividades; ALTER TABLE atividades_new RENAME TO atividades;');
-
-    db.exec('DROP TABLE turmas;');
-    db.exec('COMMIT');
-  } catch (e) {
-    db.exec('ROLLBACK');
-    throw e;
-  } finally {
-    db.exec('PRAGMA foreign_keys = ON;');
-  }
-}
-
-migrateOldSchema();
 db.exec(SCHEMA);
 
-const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_ITERATIONS = 600000;
 const SALT_LENGTH = 16;
+const HASH_PREFIX = 'pbkdf2_sha256';
 
 function b64url(data: Uint8Array): string {
   let binary = '';
@@ -230,7 +142,7 @@ async function seedHashPassword(password: string): Promise<{ hash: string; salt:
   const derivedBits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, baseKey, 256);
   const key = await crypto.subtle.importKey('raw', derivedBits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(password));
-  return { hash: b64url(new Uint8Array(signature)), salt: b64url(salt) };
+  return { hash: `${HASH_PREFIX}$${PBKDF2_ITERATIONS}$${b64url(new Uint8Array(signature))}`, salt: b64url(salt) };
 }
 
 async function seedDemoData() {
@@ -238,11 +150,14 @@ async function seedDemoData() {
   if (existing) return;
 
   const email = process.env.PROFESSOR_EMAIL || 'admin@local';
-  const password = process.env.PROFESSOR_PASSWORD || 'admin123';
+  const password = process.env.PROFESSOR_PASSWORD;
+  if (!password || password === 'admin123') {
+    throw new Error('PROFESSOR_PASSWORD é obrigatório e não pode ser o padrão "admin123". Defina um valor forte no .env antes de iniciar o backend.');
+  }
   const { hash, salt } = await seedHashPassword(password);
 
   const insertProf = db.query(
-    `INSERT INTO professores (email, nome, senha_hash, salt, role) VALUES (?, ?, ?, ?, 'admin')`
+    `INSERT INTO professores (email, nome, senha_hash, salt, role, status) VALUES (?, ?, ?, ?, 'admin', 'ativo')`
   );
   insertProf.run(email, 'Administrador', hash, salt);
 
@@ -375,4 +290,55 @@ async function seedDemoData() {
 }
 
 await seedDemoData().catch((e) => console.error('seed failed:', e));
+
+// [4.4] Retenção LGPD (Art. 15/16): purga de dados pessoais antigos.
+// Retenção configurável via env RETENTION_DAYS (default 365 = 1 ano letivo).
+// Executa DELETE em lote (LIMIT por iteração) para evitar "database is locked"
+// em tabelas grandes, parando quando uma iteração não apaga mais nada.
+// Só remove registros além do período de retenção — nunca dados recentes.
+export function runDataRetentionPurge(): { respostas: number; ranking: number } {
+  const result = { respostas: 0, ranking: 0 };
+  const raw = Number(process.env.RETENTION_DAYS);
+  const days = Number.isInteger(raw) && raw > 0 ? raw : 365;
+
+  try {
+    // Ponto de corte FIXO, calculado uma única vez (mesmo formato do criado_em: %Y-%m-%dT%H:%M:%SZ),
+    // para que o corte não avance entre iterações de um loop longo.
+    const cutoffRow = db
+      .query(`SELECT strftime('%Y-%m-%dT%H:%M:%SZ','now', ?) AS c`)
+      .get(`-${days} days`) as { c: string };
+    const cutoff = cutoffRow?.c;
+    if (!cutoff) return result;
+
+    const delRespostas = db.query(
+      `DELETE FROM respostas_alunos WHERE id IN (
+         SELECT id FROM respostas_alunos WHERE criado_em < ? LIMIT 500
+       )`
+    );
+    const delRanking = db.query(
+      `DELETE FROM ranking WHERE id IN (
+         SELECT id FROM ranking WHERE data_envio < ? LIMIT 500
+       )`
+    );
+
+    for (;;) {
+      const r = delRespostas.run(cutoff);
+      result.respostas += r.changes;
+      if (r.changes === 0) break;
+    }
+    for (;;) {
+      const r = delRanking.run(cutoff);
+      result.ranking += r.changes;
+      if (r.changes === 0) break;
+    }
+
+    if (result.respostas > 0 || result.ranking > 0) {
+      console.log(`🧹 [Retenção LGPD] Purga (${days} dias): ${result.respostas} respostas, ${result.ranking} rankings.`);
+    }
+    return result;
+  } catch (e) {
+    console.error('❌ [Retenção LGPD] Erro ao executar purga de retenção:', e);
+    return result;
+  }
+}
 

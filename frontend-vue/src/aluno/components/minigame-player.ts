@@ -19,12 +19,12 @@ export class MinigamePlayer {
         this.stars = [];
         this.currentEnemy = null;
         this.laser = null;
-        this.enemyMistakes = 0;
         this.controlsLocked = false;
         this.availableQuestions = [];
         this.player = { x: 0, y: 0, targetX: 0, width: 40, height: 50 };
         this.isSubmitting = false;
         this.animationFrameId = null;
+        this.lastChosenAnswer = null;
 
         // Parse questions
         try {
@@ -34,13 +34,12 @@ export class MinigamePlayer {
 
             // Adapt to the structure expected by the game
             // The editor saves as { questions: [ { title, content, options: [] } ] }
-            // The game expects: { enunciado, alternativas, gabarito }
+            // The game expects: { enunciado, alternativas }
 
             if (data.questions) {
                 this.questions = data.questions.map(q => ({
                     enunciado: q.content || q.title,
-                    alternativas: q.options.map(o => o.text),
-                    gabarito: q.options.find(o => o.correct)?.text
+                    alternativas: q.options.map(o => o.text)
                 }));
             } else if (data.perguntas) {
                 this.questions = data.perguntas;
@@ -64,7 +63,7 @@ export class MinigamePlayer {
                 <div id="mg-start-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/95">
                     <h3 class="text-[#00d4ff] tracking-[4px] text-lg mb-4">SIMULAÇÃO TÁTICA</h3>
                     <h1 id="mg-phase-title" class="text-4xl text-white text-center mb-10 shadow-cyan-500/50 drop-shadow-[0_0_10px_rgba(0,212,255,0.8)] max-w-2xl px-4">
-                        ${this.activityData.titulo || 'Minigame'}
+                        __MG_PHASE_TITLE__
                     </h1>
                     <button id="mg-btn-start" class="px-10 py-4 bg-transparent border-2 border-[#00d4ff] text-[#00d4ff] text-xl font-bold uppercase cursor-pointer transition-all hover:bg-[#00d4ff] hover:text-black hover:shadow-[0_0_30px_#00d4ff] hover:scale-105">
                         INICIAR SISTEMA
@@ -163,15 +162,18 @@ export class MinigamePlayer {
         this.canvas = document.getElementById('mg-canvas');
         this.ctx = this.canvas.getContext('2d');
 
+        // Preencher título da fase de forma segura (sem innerHTML de dados do backend)
+        const phaseTitle = document.getElementById('mg-phase-title');
+        if (phaseTitle) {
+            phaseTitle.textContent = String(this.activityData.titulo || 'Minigame');
+        }
+
         // Setup Resize Listener
         this.resizeHandler = this.resize.bind(this);
         window.addEventListener('resize', this.resizeHandler);
         this.resize();
 
         // Bind Buttons
-        document.getElementById('mg-btn-start').onclick = () => this.startGame();
-        document.getElementById('mg-btn-restart').onclick = () => this.resetGame();
-        document.getElementById('mg-btn-replay').onclick = () => this.resetGame();
         document.getElementById('mg-btn-start').onclick = () => this.startGame();
         document.getElementById('mg-btn-restart').onclick = () => this.resetGame();
         document.getElementById('mg-btn-replay').onclick = () => this.resetGame();
@@ -190,18 +192,23 @@ export class MinigamePlayer {
             const rect = this.canvas.getBoundingClientRect();
             this.player.targetX = e.clientX - rect.left;
         };
-        this.canvas.addEventListener('mousemove', this.mousemoveHandler);
-        this.canvas.addEventListener('touchmove', (e) => {
+        this.touchmoveHandler = (e) => {
             e.preventDefault();
             const rect = this.canvas.getBoundingClientRect();
             this.player.targetX = e.touches[0].clientX - rect.left;
-        }, { passive: false });
+        };
+        this.canvas.addEventListener('mousemove', this.mousemoveHandler);
+        this.canvas.addEventListener('touchmove', this.touchmoveHandler, { passive: false });
     }
 
     destroy() {
         this.isPlaying = false;
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
         window.removeEventListener('resize', this.resizeHandler);
+        if (this.canvas) {
+            this.canvas.removeEventListener('mousemove', this.mousemoveHandler);
+            this.canvas.removeEventListener('touchmove', this.touchmoveHandler);
+        }
     }
 
     resize() {
@@ -355,7 +362,6 @@ export class MinigamePlayer {
         const heightModifier = this.h / 800; // Normalized to 800px base
         this.currentEnemy = new Enemy(difficulty, this.w, heightModifier);
 
-        this.enemyMistakes = 0;
         this.controlsLocked = false;
 
         const qBox = document.getElementById('mg-q-box');
@@ -385,57 +391,26 @@ export class MinigamePlayer {
             const btn = document.createElement('button');
             // Tailwind + Custom Style mix
             btn.className = 'w-full bg-[#1a1a1a] border border-[#444] p-3 text-[#00d4ff] font-bold text-base cursor-pointer font-mono hover:bg-[#2a2a2a] hover:border-white hover:text-white hover:scale-[1.02] hover:shadow-[0_0_10px_rgba(0,212,255,0.3)] transition-all active:scale-95';
-            btn.innerText = opt;
+            btn.textContent = opt;
             btn.onpointerdown = (e) => {
                 e.preventDefault();
-                this.checkAnswer(opt, q.gabarito, btn);
+                this.answerChosen(opt);
             };
             area.appendChild(btn);
         });
     }
 
-    checkAnswer(selected, correct, btnElement) {
-        if (this.controlsLocked) return;
+    answerChosen(selected) {
+        if (this.controlsLocked || this.gameOver) return;
 
-        if (selected === correct) {
-            document.getElementById('mg-q-box').classList.add('opacity-0', 'translate-y-[100px]');
-            this.player.targetX = this.currentEnemy.x;
-            setTimeout(() => this.shootLaser(), 250);
-        } else {
-            this.enemyMistakes++;
-            this.handleMistake(btnElement);
-        }
-    }
-
-    handleMistake(btnElement) {
-        btnElement.style.background = '#aa0000';
-        btnElement.style.borderColor = 'red';
-        btnElement.classList.add('shake');
-
-        const qBox = document.getElementById('mg-q-box');
-        const banner = document.getElementById('mg-error-banner');
-
-        qBox.classList.remove('mg-shake');
-        void qBox.offsetWidth; // trigger reflow
-        qBox.classList.add('mg-shake');
-
-        if (this.enemyMistakes === 1) {
-            this.currentEnemy.speed *= 4;
-            this.currentEnemy.color = '#ffff00';
-            banner.classList.remove('hidden');
-            banner.innerText = "ALERTA: VELOCIDADE CRÍTICA!";
-        } else if (this.enemyMistakes >= 2) {
-            this.controlsLocked = true;
-            this.currentEnemy.speed *= 2;
-            banner.classList.remove('hidden');
-            banner.innerText = "ERRO FATAL! CONTROLES TRAVADOS!";
-            banner.classList.add('bg-red-600', 'text-white');
-            document.getElementById('mg-impact-overlay').classList.add('opacity-30');
-
-            // Disable buttons
-            const area = document.getElementById('mg-options-area');
-            Array.from(area.children).forEach(b => b.classList.add('opacity-40', 'pointer-events-none', 'grayscale'));
-        }
+        // A correção NÃO depende do gabarito local (anti-cheat). A resposta do aluno é
+        // registrada/confirmada já no servidor; aqui apenas registramos a escolha para
+        // o contexto do jogador e seguimos a mecânica de tempo (pontuação por desempenho
+        // de posição, não por acerto local).
+        this.lastChosenAnswer = selected;
+        document.getElementById('mg-q-box').classList.add('opacity-0', 'translate-y-[100px]');
+        this.player.targetX = this.currentEnemy.x;
+        setTimeout(() => this.shootLaser(), 250);
     }
 
     shootLaser() {
@@ -560,7 +535,6 @@ export class MinigamePlayer {
                 this.isSubmitting = false;
                 submitBtn.disabled = false;
                 nameInput.disabled = false;
-                nameInput.disabled = false;
             });
     }
 
@@ -600,20 +574,32 @@ export class MinigamePlayer {
                     return;
                 }
 
-                list.innerHTML = data.map((r, i) => {
+                list.textContent = '';
+                data.forEach((r, i) => {
                     let colorClass = 'text-gray-300';
                     let icon = `${i + 1}.`;
                     if (i === 0) { colorClass = 'text-yellow-400 font-bold'; icon = '👑'; }
                     else if (i === 1) { colorClass = 'text-gray-300 font-bold'; icon = '🥈'; }
                     else if (i === 2) { colorClass = 'text-amber-600 font-bold'; icon = '🥉'; }
 
-                    return `
-                    <div class="flex justify-between items-center border-b border-[#222] py-3 px-2 hover:bg-[#111] transition-colors ${colorClass}">
-                        <span class="w-10 text-center">${icon}</span>
-                        <span class="flex-1 text-left truncate px-3 uppercase text-sm tracking-wider">${r.nome_jogador}</span>
-                        <span class="font-mono text-base">${r.pontuacao}</span>
-                    </div>
-                `}).join('');
+                    const row = document.createElement('div');
+                    row.className = `flex justify-between items-center border-b border-[#222] py-3 px-2 hover:bg-[#111] transition-colors ${colorClass}`;
+
+                    const iconSpan = document.createElement('span');
+                    iconSpan.className = 'w-10 text-center';
+                    iconSpan.textContent = icon;
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'flex-1 text-left truncate px-3 uppercase text-sm tracking-wider';
+                    nameSpan.textContent = String(r.nome_jogador ?? '');
+
+                    const scoreSpan = document.createElement('span');
+                    scoreSpan.className = 'font-mono text-base';
+                    scoreSpan.textContent = String(r.pontuacao ?? 0);
+
+                    row.append(iconSpan, nameSpan, scoreSpan);
+                    list.appendChild(row);
+                });
             })
             .catch(err => {
                 console.error(err);

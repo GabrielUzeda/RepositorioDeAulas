@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import type { Question, Option } from '@/shared/types';
+import { apiClient } from '@/shared/api/client';
+import { secureGet, secureSet } from '@/shared/utils/storage';
+import type { Question, Option, Atividade } from '@/shared/types';
 
 const props = defineProps<{
   show: boolean;
   questions: Question[];
   title: string;
+  atividade?: Atividade | null;
 }>();
 
 const emit = defineEmits<{
@@ -15,16 +18,25 @@ const emit = defineEmits<{
 
 const availableQuestions = ref<Question[]>([]);
 const currentQuestion = ref<Question | null>(null);
+const currentQuestionIndex = ref(-1);
 const selectedOption = ref<Option | null>(null);
 
-const correctCount = ref(0);
-const wrongCount = ref(0);
+const answeredCount = ref(0);
 
 const isAnimating = ref(false);
 const highlightedIndex = ref(-1);
 
 const showQuestionModal = ref(false);
 const isSubmitted = ref(false);
+
+const isSubmitting = ref(false);
+const isCorrectionDone = ref(false);
+const errorMessage = ref('');
+const resultAcertos = ref<number | null>(null);
+const resultTotal = ref<number | null>(null);
+const resultPontuacao = ref<number | null>(null);
+
+const answers = ref<Record<number, number>>({});
 
 watch(
   () => props.show,
@@ -40,13 +52,19 @@ watch(
 function resetGame() {
   availableQuestions.value = [...props.questions];
   currentQuestion.value = null;
+  currentQuestionIndex.value = -1;
   selectedOption.value = null;
-  correctCount.value = 0;
-  wrongCount.value = 0;
+  answeredCount.value = 0;
   isAnimating.value = false;
   highlightedIndex.value = -1;
   showQuestionModal.value = false;
   isSubmitted.value = false;
+  isSubmitting.value = false;
+  isCorrectionDone.value = false;
+  errorMessage.value = '';
+  resultAcertos.value = null;
+  resultTotal.value = null;
+  resultPontuacao.value = null;
 }
 
 const remainingCount = computed(() => availableQuestions.value.length);
@@ -76,6 +94,7 @@ function animateSpin() {
     } else {
       setTimeout(() => {
         currentQuestion.value = availableQuestions.value[currentIndex];
+        currentQuestionIndex.value = props.questions.indexOf(availableQuestions.value[currentIndex]);
         selectedOption.value = null;
         isSubmitted.value = false;
         showQuestionModal.value = true;
@@ -96,22 +115,70 @@ function handleConfirmAnswer() {
   if (!selectedOption.value || !currentQuestion.value) return;
   isSubmitted.value = true;
 
-  if (selectedOption.value.correct) {
-    correctCount.value++;
-    // Remove question from available pool
-    availableQuestions.value = availableQuestions.value.filter(
-      (q) => q !== currentQuestion.value
-    );
-  } else {
-    wrongCount.value++;
+  if (currentQuestionIndex.value >= 0) {
+    const optIndex = currentQuestion.value.options?.indexOf(selectedOption.value) ?? -1;
+    if (optIndex >= 0) answers.value[currentQuestionIndex.value] = optIndex;
+  }
+
+  // Question is always removed from the pool after the student answers;
+  // correctness is determined server-side, not via a local gabarito.
+  availableQuestions.value = availableQuestions.value.filter(
+    (q) => q !== currentQuestion.value
+  );
+  answeredCount.value++;
+}
+
+async function handleNextQuestion() {
+  showQuestionModal.value = false;
+  if (availableQuestions.value.length === 0) {
+    await submitAnswers();
   }
 }
 
-function handleNextQuestion() {
-  showQuestionModal.value = false;
-  if (availableQuestions.value.length === 0) {
+async function submitAnswers() {
+  if (isSubmitting.value) return;
+  if (!props.atividade) {
     emit('complete');
+    return;
   }
+  isSubmitting.value = true;
+  errorMessage.value = '';
+
+  const [nome, email] = await Promise.all([
+    secureGet('alunoNome'),
+    secureGet('alunoEmail'),
+  ]);
+
+  const respostas = props.questions.map((q, idx) => ({
+    questao: q.title || q.content,
+    resposta: answers.value[idx] !== undefined ? q.options?.[answers.value[idx]]?.text : null
+  }));
+
+  const res = await apiClient.post('/submeter-resposta', {
+    atividade_id: props.atividade.id,
+    aluno_nome: nome,
+    aluno_email: email,
+    respostas: JSON.stringify(respostas).trim()
+  });
+
+  isSubmitting.value = false;
+
+  if (res.success) {
+    isCorrectionDone.value = true;
+    if (res.data && res.data.consulta_token) {
+      secureSet(`consulta_token_${props.atividade.id}`, String(res.data.consulta_token));
+    }
+    if (res.data && res.data.acertos !== undefined) resultAcertos.value = res.data.acertos;
+    if (res.data && res.data.total !== undefined) resultTotal.value = res.data.total;
+    if (res.data && res.data.pontuacao !== undefined) resultPontuacao.value = res.data.pontuacao;
+    emit('complete');
+  } else {
+    errorMessage.value = res.error || 'Erro ao registrar respostas.';
+  }
+}
+
+function closeAfterSubmit() {
+  emit('close');
 }
 </script>
 
@@ -132,14 +199,9 @@ function handleNextQuestion() {
 
         <div class="flex items-center space-x-6">
           <div class="flex items-center space-x-4 bg-slate-800 px-4 py-2 rounded-xl text-xs font-bold">
-            <div class="flex items-center space-x-1 text-green-400" title="Corretas">
+            <div class="flex items-center space-x-1 text-emerald-400" title="Respondidas">
               <span class="material-icons text-sm">check_circle</span>
-              <span>{{ correctCount }}</span>
-            </div>
-            <div class="w-px h-4 bg-slate-700"></div>
-            <div class="flex items-center space-x-1 text-rose-400" title="Erradas">
-              <span class="material-icons text-sm">cancel</span>
-              <span>{{ wrongCount }}</span>
+              <span>{{ answeredCount }}</span>
             </div>
             <div class="w-px h-4 bg-slate-700"></div>
             <div class="flex items-center space-x-1 text-sky-400" title="Restantes">
@@ -181,11 +243,30 @@ function handleNextQuestion() {
 
         <!-- Completion View -->
         <div v-else class="text-center py-12 space-y-4">
-          <div class="p-4 bg-emerald-500/20 text-emerald-400 rounded-full inline-block">
-            <span class="material-icons text-5xl">emoji_events</span>
+          <div v-if="isSubmitting || isCorrectionDone" class="p-4 bg-emerald-500/20 text-emerald-400 rounded-full inline-block">
+            <span class="material-icons text-5xl" v-if="isSubmitting">sync</span>
+            <span class="material-icons text-5xl" v-else>emoji_events</span>
           </div>
-          <h3 class="text-3xl font-bold text-emerald-300">Parabéns! Atividade Concluída!</h3>
-          <p class="text-slate-400">Você respondeu todas as perguntas disponíveis nesta roleta.</p>
+          <template v-if="isSubmitting">
+            <h3 class="text-3xl font-bold text-emerald-300">{{ isCompleted ? 'Sincronizando com o servidor...' : '' }}</h3>
+            <p class="text-slate-400">Enviando suas respostas para correção no servidor.</p>
+          </template>
+          <template v-else>
+            <h3 class="text-3xl font-bold text-emerald-300">Parabéns! Atividade Concluída!</h3>
+            <p class="text-slate-400">Você respondeu todas as perguntas disponíveis nesta roleta.</p>
+            <p v-if="isCorrectionDone && resultAcertos !== null" class="text-slate-300">
+              Acertos: {{ resultAcertos }} / {{ resultTotal ?? props.questions.length }}
+              <template v-if="resultPontuacao !== null"> — Pontuação: {{ resultPontuacao }}</template>
+            </p>
+            <p v-if="errorMessage" class="text-rose-400 text-sm">{{ errorMessage }}</p>
+            <button
+              v-if="errorMessage"
+              @click="emit('close')"
+              class="mt-3 px-5 py-2 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-xl text-sm transition"
+            >
+              Fechar
+            </button>
+          </template>
         </div>
 
         <!-- Action Button -->
@@ -224,9 +305,7 @@ function handleNextQuestion() {
                 'w-full text-left p-4 rounded-xl border transition flex flex-col space-y-1',
                 selectedOption === opt
                   ? isSubmitted
-                    ? opt.correct
-                      ? 'border-emerald-500 bg-emerald-950/40 text-emerald-200'
-                      : 'border-rose-500 bg-rose-950/40 text-rose-200'
+                    ? 'border-emerald-500 bg-emerald-950/40 text-emerald-200'
                     : 'border-pink-500 bg-pink-950/40 text-white'
                   : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700'
               ]"
@@ -234,12 +313,8 @@ function handleNextQuestion() {
               <div class="flex justify-between items-center font-medium">
                 <span>{{ opt.text }}</span>
                 <span class="material-icons text-sm">
-                  {{ selectedOption === opt ? (isSubmitted ? (opt.correct ? 'check_circle' : 'cancel') : 'radio_button_checked') : 'radio_button_unchecked' }}
+                  {{ selectedOption === opt ? (isSubmitted ? 'check_circle' : 'radio_button_checked') : 'radio_button_unchecked' }}
                 </span>
-              </div>
-
-              <div v-if="isSubmitted && selectedOption === opt && opt.feedback" class="text-xs text-slate-400 pt-1 border-t border-slate-800/60">
-                {{ opt.feedback }}
               </div>
             </button>
           </div>

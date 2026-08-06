@@ -1,9 +1,10 @@
 import type { Context, Next } from 'hono';
 import { db } from './db';
 
-const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_ITERATIONS = 600000;
 const SALT_LENGTH = 16;
 const JWT_ALG = 'HS256';
+const HASH_PREFIX = 'pbkdf2_sha256';
 
 function base64UrlEncode(data: ArrayBuffer | Uint8Array): string {
   const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
@@ -20,29 +21,51 @@ function base64UrlDecode(str: string): Uint8Array {
   return bytes;
 }
 
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function deriveKey(password: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
   const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
   const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
     baseKey,
     256
   );
   return crypto.subtle.importKey('raw', derivedBits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
 
+function parseStoredHash(stored: string): { iterations: number; hash: string } {
+  if (stored.startsWith(`${HASH_PREFIX}$`)) {
+    const parts = stored.split('$');
+    if (parts.length === 3) {
+      const iterations = Number(parts[1]);
+      if (Number.isInteger(iterations) && iterations > 0) {
+        return { iterations, hash: parts[2] };
+      }
+    }
+  }
+  return { iterations: 100000, hash: stored };
+}
+
 export async function hashPassword(password: string): Promise<{ hash: string; salt: string }> {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-  const key = await deriveKey(password, salt);
+  const key = await deriveKey(password, salt, PBKDF2_ITERATIONS);
   const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(password));
-  return { hash: base64UrlEncode(new Uint8Array(signature)), salt: base64UrlEncode(salt) };
+  const stored = `${HASH_PREFIX}$${PBKDF2_ITERATIONS}$${base64UrlEncode(new Uint8Array(signature))}`;
+  return { hash: stored, salt: base64UrlEncode(salt) };
 }
 
 export async function verifyPassword(password: string, hash: string, salt: string): Promise<boolean> {
+  const { iterations, hash: expected } = parseStoredHash(hash);
   const saltBytes = base64UrlDecode(salt);
-  const key = await deriveKey(password, saltBytes);
+  const key = await deriveKey(password, saltBytes, iterations);
   const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(password));
   const computed = base64UrlEncode(new Uint8Array(signature));
-  return computed === hash;
+  return timingSafeEqual(computed, expected);
 }
 
 function getJwtSecret(): string {
@@ -125,14 +148,49 @@ interface RateLimitOptions {
   message?: string;
 }
 
+// [3.3] Extração confiável do IP real evita rate-limit spoofing.
+// - `cf-connecting-ip` (Cloudflare) tem prioridade: não é spoofável pelo cliente quando o
+// backend é alcançado via Cloudflare.
+// `x-forwarded-for` é uma lista onde o PRIMEIRO valor é o cliente (spoofável) e o ÚLTIMO é
+// acrescentado pelo proxy confiável mais próximo. Usa-se o ÚLTIMO elemento.
+// Caveat documentado: assume that o backend só é alcançável via proxy confiável (rede interna),
+// como já mitigado na arquitetura (porta não pública). Rate-limit não é uma barreira anti-cheat
+// absoluta contra IP spoofing; é defesa em profundidade.
+export function extractClientIp(c: Context): string {
+  const cf = c.req.header('cf-connecting-ip');
+  if (cf) return cf;
+  const forwarded = c.req.header('x-forwarded-for');
+  if (forwarded) {
+    const parts = forwarded
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last) return last;
+  }
+  return '127.0.0.1';
+}
+
 export function createRateLimiter(options: RateLimitOptions) {
   const store = new Map<string, { count: number; resetTime: number }>();
 
-  return async (c: Context, next: Next) => {
-    const ip = c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || '127.0.0.1';
+  const prune = () => {
     const now = Date.now();
-    let record = store.get(ip);
+    for (const [k, v] of store) {
+      if (now >= v.resetTime) store.delete(k);
+    }
+  };
 
+  return async (c: Context, next: Next) => {
+    const ip = extractClientIp(c);
+    const now = Date.now();
+
+    // [3.3] Cleanup LAZY (sem setInterval): evita um timer bloqueando o fim do processo e
+    // mantém o store sem entradas vencidas sob demanda. As janelas são curtas (ex.: 60s) e o
+    // número de chaves é pequeno, então uma varredura pontual basta.
+    if (store.size >= 1000) prune();
+
+    let record = store.get(ip);
     if (!record || now > record.resetTime) {
       record = { count: 1, resetTime: now + options.windowMs };
       store.set(ip, record);

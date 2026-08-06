@@ -264,8 +264,8 @@ function goBack() {
     <!-- Modals -->
     <PasswordModal :show="showPasswordModal" @close="showPasswordModal = false" @submit="handlePasswordSubmit" />
     <ActivityModal :show="showActivityModal" :atividade="activeActivity" @close="showActivityModal = false" />
-    <ReforcoModal :show="showReforcoModal" :questions="parsedQuestions" :title="activeActivity?.titulo || ''" @close="showReforcoModal = false" />
-    <RoletaModal :show="showRoletaModal" :questions="parsedQuestions" :title="activeActivity?.titulo || ''" @close="showRoletaModal = false" />
+    <ReforcoModal :show="showReforcoModal" :questions="parsedQuestions" :title="activeActivity?.titulo || ''" :atividade="activeActivity" @close="showReforcoModal = false" />
+    <RoletaModal :show="showRoletaModal" :questions="parsedQuestions" :title="activeActivity?.titulo || ''" :atividade="activeActivity" @close="showRoletaModal = false" />
     <MinigameModal :show="showMinigameModal" :atividade="activeActivity" @close="showMinigameModal = false" />
   </div>
 </template>

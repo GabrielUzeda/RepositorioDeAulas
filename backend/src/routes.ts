@@ -4,22 +4,105 @@ import { secureHeaders } from 'hono/secure-headers';
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { db } from './db';
-import { sanitizeSlug, sanitizePathOrUrl } from './utils';
-import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter } from './auth';
+import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail } from './utils';
+import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter, extractClientIp } from './auth';
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent, resolveFrontendDir } from './marp';
 
 const app = new Hono();
 
+async function logAudit(c: any, acao: string, recurso: string, detalhes?: object) {
+  try {
+    const ip = extractClientIp(c);
+    const userAgent = c.req.header('user-agent') || '';
+    const authHeader = c.req.header('authorization') || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : '';
+    const prof = token ? await verifyJwt(token) : null;
+
+    let sanitizedDetalhes: string | null = null;
+    if (detalhes && typeof detalhes === 'object') {
+      const copy: Record<string, any> = { ...detalhes };
+      delete copy.password;
+      delete copy.senha;
+      delete copy.token;
+      delete copy.salt;
+      delete copy.senha_hash;
+      sanitizedDetalhes = JSON.stringify(copy);
+    }
+
+    db.query(
+      `INSERT INTO audit_logs (usuario_id, usuario_email, acao, recurso, ip, user_agent, detalhes)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      prof?.sub ? Number(prof.sub) : null,
+      prof?.email || null,
+      acao,
+      recurso,
+      ip,
+      userAgent,
+      sanitizedDetalhes
+    );
+  } catch (e) {
+    console.error('❌ Falha ao gravar log de auditoria:', e);
+  }
+}
+
+// [3.9] CSP emitida pelo backend (não há nginx). Mínima permissiva para marp + mermaid (esm.sh).
+// Aplicada somente em respostas de arquivos .html. `--html` do marp foi MANTIDO de propósito:
+// sem ele, os blocos `<div class="mermaid">` injetados em marp.ts seriam escapados (diagramas quebram).
+const CSP_HTML = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://esm.sh",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "connect-src 'self' https://esm.sh",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join('; ');
+
+function serveFileWithCsp(filePath: string, contentType?: string): Response | null {
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) return null;
+  const headers: Record<string, string> = {};
+  if (contentType) headers['Content-Type'] = contentType;
+  if (filePath.endsWith('.html') || contentType?.includes('text/html')) {
+    headers['Content-Security-Policy'] = CSP_HTML;
+  }
+  return new Response(Bun.file(filePath), { headers });
+}
+
 app.use('*', secureHeaders());
-app.use('*', cors({ origin: '*', allowHeaders: ['Content-Type', 'Authorization'], allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
+
+// [3.4] CORS restrito: origens controladas via env CORS_ORIGIN (lista separada por vírgula).
+// Fallback apenas para dev local (http://localhost). Em produção exija CORS_ORIGIN explícito.
+function parseCorsOrigins(): string[] {
+  const raw = process.env.CORS_ORIGIN;
+  if (raw && raw.trim()) {
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return ['http://localhost'];
+}
+export const corsOrigins = parseCorsOrigins();
+app.use(
+  '*',
+  cors({
+    origin: corsOrigins,
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Materia-Senha'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    maxAge: 86400,
+  })
+);
 
 app.onError((err, c) => {
   console.error('[HTTP Server Error]:', err);
   return c.text('Internal Server Error', 500);
 });
 
-const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 100, message: 'Muitas tentativas de login. Aguarde 1 minuto.' });
+const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10, message: 'Muitas tentativas de login. Aguarde 1 minuto.' });
 const registerLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, message: 'Muitas tentativas de registro. Aguarde 10 minutos.' });
 const submissionLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 20, message: 'Muitas submissões de resposta. Aguarde 1 minuto.' });
 
@@ -48,6 +131,18 @@ function normalizeJsonData(value: any): string | null {
   if (value == null) return null;
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+}
+
+// [2.6] Leitura única e coesa da "senha" de acesso do aluno (matéria/atividade).
+// Prioriza o header `x-materia-senha` (não fica em logs/histórico de proxy);
+// mantém compat com `?senha=` na query apenas como fallback (frontend atual não foi alterado).
+// A senha NUNCA é usada em logging. Criação/edição segue em texto no DB por decisão
+// ("senha pública de turma"), mas o transporte por query fica normalizado/desincentivado.
+function readMateriaSenha(c: any): string | null {
+  const header = c.req.header('x-materia-senha')?.trim();
+  if (header) return header;
+  const q = c.req.query('senha');
+  return q && q.length > 0 ? q : null;
 }
 
 function getProfessor(c: any): { id: number; role: string } | null {
@@ -81,11 +176,22 @@ app.post('/auth/login', loginLimiter, async (c) => {
   const body = await parseBody(c);
   if (!body?.email || !body?.password || !isValidEmail(body.email)) return c.text('Invalid credentials', 400);
   const prof = dbq('SELECT * FROM professores WHERE email = ?').get(body.email) as any;
-  if (!prof) return c.text('Invalid credentials', 401);
+  if (!prof) {
+    await logAudit(c, 'login_failed', 'auth', { email: body.email, reason: 'user_not_found' });
+    return c.text('Invalid credentials', 401);
+  }
+  if (prof.status === 'pendente') {
+    await logAudit(c, 'login_failed', 'auth', { email: body.email, reason: 'pending_approval' });
+    return c.text('Aguardando aprovação do administrador', 403);
+  }
   const ok = await verifyPassword(body.password, prof.senha_hash, prof.salt);
-  if (!ok) return c.text('Invalid credentials', 401);
+  if (!ok) {
+    await logAudit(c, 'login_failed', 'auth', { email: body.email, reason: 'invalid_password' });
+    return c.text('Invalid credentials', 401);
+  }
   const token = await signJwt({ sub: String(prof.id), role: prof.role, email: prof.email });
-  return c.json({ token, professor: { id: prof.id, email: prof.email, nome: prof.nome, role: prof.role } });
+  await logAudit(c, 'login', `professor:${prof.id}`, { email: prof.email });
+  return c.json({ token, professor: { id: prof.id, email: prof.email, nome: prof.nome, role: prof.role, status: prof.status } });
 });
 
 app.post('/auth/register', registerLimiter, async (c) => {
@@ -94,10 +200,10 @@ app.post('/auth/register', registerLimiter, async (c) => {
   const existing = dbq('SELECT id FROM professores WHERE email = ?').get(body.email);
   if (existing) return c.text('Email already registered', 409);
   const { hash, salt } = await hashPassword(body.password);
-  const r = dbq('INSERT INTO professores (email, nome, senha_hash, salt, role) VALUES (?, ?, ?, ?, ?) RETURNING id, email, nome, role')
-    .get(body.email, body.nome, hash, salt, 'professor');
-  const token = await signJwt({ sub: String((r as any).id), role: 'professor', email: body.email });
-  return c.json({ token, professor: r }, 201);
+  const r = dbq('INSERT INTO professores (email, nome, senha_hash, salt, role, status) VALUES (?, ?, ?, ?, ?, ?) RETURNING id, email, nome, role, status')
+    .get(body.email, body.nome, hash, salt, 'professor', 'pendente') as any;
+  await logAudit(c, 'register', `professor:${r.id}`, { email: r.email, nome: r.nome });
+  return c.json({ mensagem: 'Cadastro realizado. Aguardando aprovação do administrador.', professor: r }, 201);
 });
 
 app.get('/check-auth', professorAuth, (c) => {
@@ -491,7 +597,7 @@ app.get('/aulas', async (c) => {
     }
   }
 
-  const senha = c.req.query('senha') ?? null;
+  const senha = readMateriaSenha(c);
   if ((materia.senha ?? null) !== senha) return c.text('Senha da materia incorreta', 401);
   const rows = dbq('SELECT * FROM aulas WHERE materia_id = ? ORDER BY ordem, titulo').all(materiaId);
   return c.json(rows);
@@ -516,7 +622,7 @@ app.get('/aulas/:id', async (c) => {
       }
     }
 
-    const senha = c.req.query('senha') ?? null;
+    const senha = readMateriaSenha(c);
     if ((materia.senha ?? null) !== senha) return c.text('Senha da materia incorreta', 401);
   }
 
@@ -541,7 +647,7 @@ app.get('/atividades', async (c) => {
     }
   }
 
-  const senha = c.req.query('senha') ?? null;
+  const senha = readMateriaSenha(c);
   if ((materia.senha ?? null) !== senha) return c.text('Senha da materia incorreta', 401);
   const rows = dbq('SELECT * FROM atividades WHERE materia_id = ? ORDER BY ordem, titulo').all(materiaId);
   return c.json(rows.map(mapAtividade));
@@ -568,7 +674,7 @@ app.get('/atividades/:id', async (c) => {
 
   const materia = dbq('SELECT * FROM materias WHERE id = ?').get(atv.materia_id) as any;
   if (!materia) return c.text('Materia not found for activity', 500);
-  const inputSenha = c.req.query('senha') ?? '';
+  const inputSenha = readMateriaSenha(c) ?? '';
   const materiaSenha = materia.senha ?? '';
   const atvSenha = atv.senha ?? '';
   const isProtected = !!atv.allow_password;
@@ -582,6 +688,53 @@ app.get('/atividades/:id', async (c) => {
     return c.text('Senha incorreta', 401);
   }
 });
+
+interface CorrecaoResultado {
+  acertos: number;
+  total: number;
+  pontuacao: number;
+}
+
+const MAX_RANKING_PONTUACAO = 1_000_000;
+
+function corrigirObjetivas(jsonData: string | null, respostasStr: string): CorrecaoResultado {
+  let questoes: any[] = [];
+  let respostasAluno: { questao?: string; resposta?: string | null }[] = [];
+  try {
+    const parsed = jsonData ? JSON.parse(jsonData) : null;
+    if (parsed && Array.isArray(parsed.questions)) questoes = parsed.questions;
+  } catch {
+    questoes = [];
+  }
+  try {
+    const parsedResp = JSON.parse(respostasStr);
+    if (Array.isArray(parsedResp)) respostasAluno = parsedResp;
+  } catch {
+    respostasAluno = [];
+  }
+
+  const respByQuestao = new Map<string, string | null | undefined>();
+  for (const r of respostasAluno) {
+    if (typeof r.questao === 'string') respByQuestao.set(r.questao, r.resposta);
+  }
+
+  let acertos = 0;
+  let total = 0;
+  for (const q of questoes) {
+    const options = Array.isArray(q?.options) ? q.options : [];
+    const correta = options.find((o: any) => o && o.correct === true);
+    if (!correta || typeof correta.text !== 'string') continue;
+    total++;
+    const chave = typeof q.title === 'string' ? q.title : typeof q.content === 'string' ? q.content : '';
+    if (!chave) continue;
+    const respAluno = respByQuestao.get(chave);
+    if (typeof respAluno === 'string' && respAluno.trim() === correta.text.trim()) {
+      acertos++;
+    }
+  }
+
+  return { acertos, total, pontuacao: acertos };
+}
 
 function formatPublicName(fullName: string): string {
   const parts = String(fullName || '').trim().split(/\s+/);
@@ -600,6 +753,8 @@ app.post('/ranking', submissionLimiter, async (c) => {
 
   const rawNome = String(body.nome_jogador || 'Aluno').trim();
   const nomePublico = formatPublicName(rawNome);
+  const pontuacaoInt = Math.floor(pontuacao);
+  const pontuacaoCap = Math.min(Math.max(pontuacaoInt, 0), MAX_RANKING_PONTUACAO);
 
   try {
     const r = db
@@ -607,7 +762,7 @@ app.post('/ranking', submissionLimiter, async (c) => {
         `INSERT INTO ranking (atividade_id, nome_jogador, pontuacao)
          VALUES (?, ?, ?) RETURNING *`
       )
-      .get(atividadeId, nomePublico, Math.floor(pontuacao));
+      .get(atividadeId, nomePublico, pontuacaoCap);
     return c.json(r, 200);
   } catch (e: any) {
     return c.text('Erro interno ao registrar ranking', 500);
@@ -627,6 +782,18 @@ app.get('/ranking/:atividade_id', (c) => {
 
 // ---------- Submissões de Respostas de Alunos ----------
 
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function generateConsultaToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 app.post('/submeter-resposta', submissionLimiter, async (c) => {
   const body = await parseBody(c);
   if (!body) return c.text('Dados inválidos', 400);
@@ -635,36 +802,114 @@ app.post('/submeter-resposta', submissionLimiter, async (c) => {
   if (!body.aluno_nome || !body.aluno_email || !isValidEmail(body.aluno_email) || !body.respostas) {
     return c.text('Informe nome, e-mail válido e respostas.', 400);
   }
-  const atv = dbq('SELECT id FROM atividades WHERE id = ?').get(atividadeId);
+  const atv = dbq('SELECT id, json_data FROM atividades WHERE id = ?').get(atividadeId);
   if (!atv) return c.text('Atividade não encontrada', 404);
+
+  const email = String(body.aluno_email).trim();
+  const nome = String(body.aluno_nome).trim();
+  const respostasStr = String(body.respostas).trim();
+
+  const token = generateConsultaToken();
+  const tokenHash = await sha256Hex(token);
+  const emailHash = await hashEmail(email);
+
+  const encNome = await encryptData(nome);
+  const encEmail = await encryptData(email);
+  const encRespostas = await encryptData(respostasStr);
+
+  const correcao = corrigirObjetivas(atv.json_data, respostasStr);
 
   try {
     const r = db
       .query(
-        `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, respostas)
-         VALUES (?, ?, ?, ?) RETURNING *`
+        `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash)
+         VALUES (?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
       )
-      .get(atividadeId, String(body.aluno_nome).trim(), String(body.aluno_email).trim(), String(body.respostas).trim());
-    return c.json(r, 201);
+      .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash) as any;
+
+    await logAudit(c, 'submeter_resposta', `atividade:${atividadeId}`, { email_hash: emailHash });
+
+    return c.json({
+      id: r.id,
+      atividade_id: r.atividade_id,
+      aluno_nome: nome,
+      aluno_email: email,
+      respostas: respostasStr,
+      criado_em: r.criado_em,
+      consulta_token: token,
+      acertos: correcao.acertos,
+      total: correcao.total,
+      pontuacao: correcao.pontuacao
+    }, 201);
   } catch (e: any) {
     return c.text('Erro interno ao salvar resposta', 500);
   }
 });
 
-// Direitos do Titular (Art. 18 LGPD) - Consulta de respostas próprias do aluno por e-mail (com rate limiter)
+// Direitos do Titular (Art. 18 LGPD) - Consulta e exclusão de respostas próprias do aluno.
+// Exige prova de posse do e-mail via token de consulta (devolvido pelo POST /submeter-resposta).
+// O token NUNCA é logado. O backend guarda apenas o SHA-256 do token no DB.
+
+function timingSafeHexEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 app.get('/aluno/minhas-respostas', submissionLimiter, async (c) => {
   const email = c.req.query('email');
-  if (!email || !isValidEmail(email)) {
-    return c.text('Informe um e-mail válido.', 400);
-  }
+  const token = c.req.query('token');
+  if (!email || !isValidEmail(email)) return c.text('Informe um e-mail válido.', 400);
+  if (!token || typeof token !== 'string' || token.length < 16) return c.text('Token de consulta obrigatório.', 401);
+
+  const tokenHash = await sha256Hex(token);
+  const emailHash = await hashEmail(email);
+
+  const own = dbq(
+    'SELECT 1 AS ok FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ? LIMIT 1'
+  ).get(emailHash, tokenHash);
+  if (!own) return c.text('Token inválido para este e-mail.', 401);
+
   const rows = dbq(
     `SELECT r.id, r.atividade_id, r.aluno_nome, r.aluno_email, r.respostas, r.criado_em, a.titulo as atividade_titulo
      FROM respostas_alunos r
      JOIN atividades a ON r.atividade_id = a.id
-     WHERE r.aluno_email = ?
+     WHERE r.aluno_email_hash = ? AND r.consulta_token_hash = ?
      ORDER BY r.criado_em DESC`
-  ).all(email);
-  return c.json(rows);
+  ).all(emailHash, tokenHash);
+
+  const decryptedRows = await Promise.all(
+    rows.map(async (row: any) => ({
+      ...row,
+      aluno_nome: await decryptData(row.aluno_nome),
+      aluno_email: await decryptData(row.aluno_email),
+      respostas: await decryptData(row.respostas),
+    }))
+  );
+
+  return c.json(decryptedRows);
+});
+
+app.delete('/aluno/minhas-respostas', submissionLimiter, async (c) => {
+  const email = c.req.query('email');
+  const token = c.req.query('token');
+  if (!email || !isValidEmail(email)) return c.text('Informe um e-mail válido.', 400);
+  if (!token || typeof token !== 'string' || token.length < 16) return c.text('Token de consulta obrigatório.', 401);
+
+  const tokenHash = await sha256Hex(token);
+  const emailHash = await hashEmail(email);
+
+  const tokenCheck = dbq(
+    'SELECT 1 AS ok FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ? LIMIT 1'
+  ).get(emailHash, tokenHash);
+  if (!tokenCheck) return c.text('Token inválido para este e-mail.', 401);
+
+  dbq('DELETE FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?').run(emailHash, tokenHash);
+
+  await logAudit(c, 'excluir_respostas_aluno', 'respostas_alunos', { email_hash: emailHash });
+
+  return c.body(null, 204);
 });
 
 app.get('/atividades/:id/respostas', professorAuth, async (c) => {
@@ -675,7 +920,17 @@ app.get('/atividades/:id/respostas', professorAuth, async (c) => {
   if (!(await canManageMateria(c, atv.materia_id))) return c.text('Access denied', 403);
 
   const rows = dbq('SELECT * FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em DESC').all(id);
-  return c.json(rows);
+
+  const decryptedRows = await Promise.all(
+    rows.map(async (row: any) => ({
+      ...row,
+      aluno_nome: await decryptData(row.aluno_nome),
+      aluno_email: await decryptData(row.aluno_email),
+      respostas: await decryptData(row.respostas),
+    }))
+  );
+
+  return c.json(decryptedRows);
 });
 
 app.delete('/respostas/:id', professorAuth, async (c) => {
@@ -687,6 +942,9 @@ app.delete('/respostas/:id', professorAuth, async (c) => {
   if (atv && !(await canManageMateria(c, atv.materia_id))) return c.text('Access denied', 403);
 
   dbq('DELETE FROM respostas_alunos WHERE id = ?').run(id);
+
+  await logAudit(c, 'excluir_resposta_professor', `resposta:${id}`);
+
   return c.body(null, 204);
 });
 
@@ -716,11 +974,11 @@ app.get('/db-test', (c) => {
 
 function mapProfessor(row: any) {
   if (!row) return row;
-  return { id: row.id, nome: row.nome, email: row.email, role: row.role, criado_em: row.criado_em };
+  return { id: row.id, nome: row.nome, email: row.email, role: row.role, status: row.status, criado_em: row.criado_em };
 }
 
 app.get('/professores', adminAuth, async (c) => {
-  const rows = dbq('SELECT id, nome, email, role, criado_em FROM professores ORDER BY nome').all();
+  const rows = dbq('SELECT id, nome, email, role, status, criado_em FROM professores ORDER BY nome').all();
   return c.json(rows.map(mapProfessor));
 });
 
@@ -733,8 +991,8 @@ app.post('/professores', adminAuth, async (c) => {
   if (existing) return c.text('Email already registered', 409);
   const role = body.role === 'admin' ? 'admin' : 'professor';
   const { hash, salt } = await hashPassword(body.password);
-  const r = dbq('INSERT INTO professores (email, nome, senha_hash, salt, role) VALUES (?, ?, ?, ?, ?) RETURNING id, nome, email, role, criado_em')
-    .get(body.email, body.nome, hash, salt, role);
+  const r = dbq('INSERT INTO professores (email, nome, senha_hash, salt, role, status) VALUES (?, ?, ?, ?, ?, ?) RETURNING id, nome, email, role, status, criado_em')
+    .get(body.email, body.nome, hash, salt, role, 'ativo');
   return c.json(mapProfessor(r), 201);
 });
 
@@ -754,16 +1012,21 @@ app.put('/professores/:id', adminAuth, async (c) => {
     if (dup) return c.text('Email already registered', 409);
   }
   const role = body.role === 'admin' ? 'admin' : body.role === 'professor' ? 'professor' : existing.role;
+  let status = existing.status;
+  if (body.status !== undefined) {
+    if (body.status !== 'ativo' && body.status !== 'pendente') return c.text('Status inválido', 400);
+    status = body.status;
+  }
 
   if (typeof body.password === 'string' && body.password) {
     const { hash, salt } = await hashPassword(body.password);
-    dbq('UPDATE professores SET nome = ?, email = ?, senha_hash = ?, salt = ?, role = ? WHERE id = ?')
-      .run(nome, email, hash, salt, role, id);
+    dbq('UPDATE professores SET nome = ?, email = ?, senha_hash = ?, salt = ?, role = ?, status = ? WHERE id = ?')
+      .run(nome, email, hash, salt, role, status, id);
   } else {
-    dbq('UPDATE professores SET nome = ?, email = ?, role = ? WHERE id = ?').run(nome, email, role, id);
+    dbq('UPDATE professores SET nome = ?, email = ?, role = ?, status = ? WHERE id = ?').run(nome, email, role, status, id);
   }
 
-  const r = dbq('SELECT id, nome, email, role, criado_em FROM professores WHERE id = ?').get(id);
+  const r = dbq('SELECT id, nome, email, role, status, criado_em FROM professores WHERE id = ?').get(id);
   return c.json(mapProfessor(r));
 });
 
@@ -787,9 +1050,39 @@ app.get('/materias/*', async (c) => {
     .split('/')
     .map((seg) => seg.replace(/\.\./g, '').replace(/\\/g, ''))
     .join('/');
+  const firstSeg = safe.split('/')[0] || '';
+  if (!firstSeg) return c.text('Not found', 404);
+
+  const materia = dbq('SELECT id, senha FROM materias WHERE slug = ?').get(firstSeg) as { id: number; senha: string } | undefined;
+  if (materia) {
+    const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '').trim() || '';
+    const prof = token ? verifyJwt(token) : null;
+    const isProfessor = prof && (prof.role === 'admin' || !!dbq('SELECT 1 FROM curso_professores cp INNER JOIN materias m ON m.curso_id = cp.curso_id WHERE m.id = ? AND cp.professor_id = ?').get(materia.id, Number(prof.sub)));
+    if (!isProfessor) {
+      const senha = readMateriaSenha(c);
+      if (!senha || senha !== materia.senha) return c.text('Unauthorized', 401);
+    }
+  }
+
   const abs = path.join(resolveFrontendDir(), 'materias', safe);
-  if (!safe || !existsSync(abs) || !statSync(abs).isFile()) return c.text('Not found', 404);
-  return new Response(Bun.file(abs));
+  const served = serveFileWithCsp(abs);
+  if (!served) return c.text('Not found', 404);
+  return served;
+});
+
+const frontendStaticDir = process.env.FRONTEND_STATIC_DIR || (existsSync('/app/frontend_static') ? '/app/frontend_static' : path.join(import.meta.dir, '..', '..', 'frontend-vue', 'dist'));
+
+app.use('*', async (c, next) => {
+  await next();
+  if (c.res.status === 404 && existsSync(frontendStaticDir)) {
+    const reqPath = c.req.path;
+    const filePath = path.join(frontendStaticDir, reqPath.startsWith('/') ? reqPath.slice(1) : reqPath);
+    const fileResp = serveFileWithCsp(filePath);
+    if (fileResp) return fileResp;
+    const indexPath = path.join(frontendStaticDir, 'index.html');
+    const indexResp = serveFileWithCsp(indexPath, 'text/html; charset=utf-8');
+    if (indexResp) return indexResp;
+  }
 });
 
 export default app;

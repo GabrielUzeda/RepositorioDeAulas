@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test';
+import { unlinkSync, existsSync } from 'node:fs';
+import path from 'node:path';
 import { hashPassword, verifyPassword, signJwt, verifyJwt } from './auth';
-import { db } from './db';
+import { resolveFrontendDir } from './marp';
+import { db, runDataRetentionPurge } from './db';
 import app from './routes';
 
 const ADMIN_SEED_PASSWORD = process.env.PROFESSOR_PASSWORD || 'senhasecreta';
@@ -82,9 +85,17 @@ describe('Auth Module & Multi-Professor System', () => {
 
     expect(regRes.status).toBe(201);
     const regBody = await regRes.json();
-    expect(regBody.token).toBeDefined();
-    const token = regBody.token;
+    expect(regBody.token).toBeUndefined();
+    expect(regBody.professor.status).toBe('pendente');
     const profId = regBody.professor.id;
+
+    // Login com professor pendente deve ser negado (aguardando aprovação)
+    const pendingLogin = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: uniqueEmail, password: 'Password123!' }),
+    });
+    expect(pendingLogin.status).toBe(403);
 
     // Admin cria um curso e atribui o professor 2 a ele
     const adminLogin = await app.request('/auth/login', {
@@ -97,6 +108,27 @@ describe('Auth Module & Multi-Professor System', () => {
     });
     const adminBody = await adminLogin.json();
     const adminToken = adminBody.token;
+
+    // Admin aprova o professor pendente
+    const approveRes = await app.request(`/professores/${profId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ status: 'ativo' }),
+    });
+    expect(approveRes.status).toBe(200);
+
+    // Login agora funciona
+    const profLogin = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: uniqueEmail, password: 'Password123!' }),
+    });
+    expect(profLogin.status).toBe(200);
+    const profLoginBody = await profLogin.json();
+    const token = profLoginBody.token;
 
     const testSlug = `curso_prof2_${Date.now()}`;
     const createCursoRes = await app.request('/cursos', {
@@ -200,6 +232,62 @@ describe('Auth Module & Multi-Professor System', () => {
     expect(res.status).toBe(400);
   });
 
+  test('Materia senha aceita via header x-materia-senha e via ?senha= (item 2.6)', async () => {
+    const materia = db.query(`SELECT id, senha FROM materias WHERE slug = 'demo-class'`).get() as any;
+    expect(materia).toBeDefined();
+    const materiaId = materia.id;
+    const senha = materia.senha;
+
+    const viaHeader = await app.request(`/aulas?materia_id=${materiaId}`, {
+      method: 'GET',
+      headers: { 'x-materia-senha': senha },
+    });
+    expect(viaHeader.status).toBe(200);
+
+    const viaQuery = await app.request(`/aulas?materia_id=${materiaId}&senha=${encodeURIComponent(senha)}`, {
+      method: 'GET',
+    });
+    expect(viaQuery.status).toBe(200);
+  });
+
+  test('CSP header present on marp HTML served by GET /materias/* (item 3.9)', async () => {
+    const materia = db.query(`SELECT id FROM materias WHERE slug = 'demo-class'`).get() as any;
+    const adminLogin = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '10.0.0.3' },
+      body: JSON.stringify({ email: 'admin@local', password: ADMIN_SEED_PASSWORD }),
+    });
+    const { token } = await adminLogin.json();
+
+    const createRes = await app.request('/aulas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        materia_id: materia.id,
+        titulo: `CSP Teste ${Date.now()}`,
+        markdown: '# Slide 1\n```mermaid\ngraph TD\nA-->B\n```',
+      }),
+    });
+    expect(createRes.status).toBe(201);
+    const aula = await createRes.json();
+    expect(aula.caminho).toMatch(/\.html$/);
+
+    const res = await app.request(`/${aula.caminho}`, {
+      method: 'GET',
+      headers: { 'x-materia-senha': 'asdf1234' },
+    });
+    expect(res.status).toBe(200);
+    const csp = res.headers.get('content-security-policy');
+    expect(csp).toBeDefined();
+    expect(csp).toContain('script-src');
+
+    const htmlAbs = path.join(resolveFrontendDir(), aula.caminho);
+    const mdAbs = htmlAbs.replace(/\.html$/, '.md');
+    for (const f of [htmlAbs, mdAbs]) {
+      if (existsSync(f)) unlinkSync(f);
+    }
+  });
+
   test('Rate Limiter blocks excessive login requests', async () => {
     for (let i = 0; i < 100; i++) {
       await app.request('/auth/login', {
@@ -249,18 +337,116 @@ describe('Auth Module & Multi-Professor System', () => {
     const listData = await listRes.json();
     expect(listData.some((r: any) => r.id === createdResp.id)).toBeTruthy();
 
-    // Consulta do próprio aluno aos seus dados (Art. 18 LGPD)
-    const alunoSelfRes = await app.request('/aluno/minhas-respostas?email=joao.silva@exemplo.com', {
+    // Consulta do próprio aluno aos seus dados (Art. 18 LGPD) — exige token de consulta
+    const consultaToken = createdResp.consulta_token;
+    expect(typeof consultaToken).toBe('string');
+    expect(consultaToken.length).toBeGreaterThan(0);
+
+    const alunoSelfRes = await app.request(`/aluno/minhas-respostas?email=joao.silva@exemplo.com&token=${encodeURIComponent(consultaToken)}`, {
       method: 'GET',
     });
     expect(alunoSelfRes.status).toBe(200);
     const alunoSelfData = await alunoSelfRes.json();
     expect(alunoSelfData.some((r: any) => r.id === createdResp.id)).toBeTruthy();
 
+    // Sem token, a consulta deve ser negada
+    const alunoSemToken = await app.request('/aluno/minhas-respostas?email=joao.silva@exemplo.com', { method: 'GET' });
+    expect(alunoSemToken.status).toBe(401);
+
+    // Token errado também é negado
+    const alunoTokenErrado = await app.request('/aluno/minhas-respostas?email=joao.silva@exemplo.com&token=token_invalido_qualquer', { method: 'GET' });
+    expect(alunoTokenErrado.status).toBe(401);
+
     const delRes = await app.request(`/respostas/${createdResp.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(delRes.status).toBe(204);
+  });
+
+  test('Retenção: runDataRetentionPurge remove só dados antigos (item 4.4)', async () => {
+    const atv = db.query('SELECT id FROM atividades LIMIT 1').get() as any;
+    const atvId = atv ? atv.id : 1;
+
+    const old = db
+      .query(
+        `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, criado_em)
+         VALUES (?, ?, ?, ?, ?, datetime('now','-730 days')) RETURNING id`
+      )
+      .get(atvId, 'Antigo Aluno', 'antigo@exemplo.com', 'hash_antigo', 'x') as any;
+
+    const fresh = db
+      .query(
+        `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas)
+         VALUES (?, ?, ?, ?, ?) RETURNING id`
+      )
+      .get(atvId, 'Aluno Novo', 'novo@exemplo.com', 'hash_novo', 'y') as any;
+
+    runDataRetentionPurge();
+
+    expect(db.query('SELECT id FROM respostas_alunos WHERE id = ?').get(old.id)).toBeNull();
+    expect(db.query('SELECT id FROM respostas_alunos WHERE id = ?').get(fresh.id)).toBeDefined();
+  });
+
+  test('Correção objetiva no servidor retorna acertos/total/pontuacao (item 3.6)', async () => {
+    const atv = db
+      .query("SELECT id, json_data FROM atividades WHERE json_data IS NOT NULL AND json_data LIKE '%\\\"correct\\\"%' LIMIT 1")
+      .get() as any;
+    const atvId = atv ? atv.id : 1;
+
+    const submitRes = await app.request('/submeter-resposta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '10.0.0.3' },
+      body: JSON.stringify({
+        atividade_id: atvId,
+        aluno_nome: 'Teste 3.6',
+        aluno_email: 'teste36@exemplo.com',
+        respostas: JSON.stringify([{ questao: 'SFTP', resposta: 'SFTP' }]),
+      }),
+    });
+    expect(submitRes.status).toBe(201);
+    const data = await submitRes.json();
+    expect(data).toHaveProperty('acertos');
+    expect(data).toHaveProperty('total');
+    expect(data).toHaveProperty('pontuacao');
+    expect(typeof data.acertos).toBe('number');
+    expect(typeof data.pontuacao).toBe('number');
+  });
+
+  test('Criptografia em repouso e Audit Logs (itens 5.1 e 5.4)', async () => {
+    const atv = db.query('SELECT id FROM atividades LIMIT 1').get() as any;
+    const atvId = atv ? atv.id : 1;
+
+    const emailTest = 'aluno.lgpd@exemplo.com';
+    const nomeTest = 'Aluno LGPD Cripto';
+    const respTest = 'Resposta confidencial LGPD';
+
+    const res = await app.request('/submeter-resposta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '10.0.0.99' },
+      body: JSON.stringify({
+        atividade_id: atvId,
+        aluno_nome: nomeTest,
+        aluno_email: emailTest,
+        respostas: respTest,
+      }),
+    });
+    expect(res.status).toBe(201);
+    const resData = await res.json();
+    expect(resData.aluno_nome).toBe(nomeTest);
+
+    // Verificação no SQLite: dados devem estar encriptados com prefixo enc:v1:
+    const rawRow = db.query('SELECT * FROM respostas_alunos WHERE id = ?').get(resData.id) as any;
+    expect(rawRow.aluno_nome).not.toBe(nomeTest);
+    expect(rawRow.aluno_nome.startsWith('enc:v1:')).toBe(true);
+    expect(rawRow.aluno_email.startsWith('enc:v1:')).toBe(true);
+    expect(rawRow.respostas.startsWith('enc:v1:')).toBe(true);
+    expect(rawRow.aluno_email_hash).toBeDefined();
+
+    // Verificação de Audit Log registrado no DB
+    const auditRow = db.query("SELECT * FROM audit_logs WHERE acao = 'submeter_resposta' ORDER BY id DESC LIMIT 1").get() as any;
+    expect(auditRow).toBeDefined();
+    expect(auditRow.recurso).toBe(`atividade:${atvId}`);
+    expect(auditRow.ip).toBe('10.0.0.99');
   });
 });
