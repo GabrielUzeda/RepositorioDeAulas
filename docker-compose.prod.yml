@@ -1,4 +1,21 @@
+# =============================================================================
+# docker-compose.prod.yml — Produção
+#
+# OPÇÃO A — COM nginx + Certbot (HTTPS automático via ACME/Let's Encrypt)
+#   Ideal para servidores dedicados sem nginx no host.
+#   Uso: docker compose -f docker-compose.prod.yml --profile with-nginx up -d
+#
+# OPÇÃO B — SEM nginx (proxy reverso externo no host, ex: seu nginx principal)
+#   O bun-server fica na porta ${PORT:-8080}, acessível via proxy do host.
+#   Uso: docker compose -f docker-compose.prod.yml up -d
+# =============================================================================
+
 services:
+
+  # --------------------------------------------------------------------------
+  # bun-server — Backend Bun + API Hono + serve o SPA Vue buildado
+  # Ativo em ambas as opções (A e B)
+  # --------------------------------------------------------------------------
   bun-server:
     image: oven/bun:1
     container_name: bun-server
@@ -7,57 +24,71 @@ services:
     volumes:
       - ./backend/:/app
       - backend_node_modules:/app/node_modules
-      - ${frontDir}:/app/frontend_static
+      - ./frontend-vue/dist/:/app/frontend_static
     working_dir: /app
     command: sh -c "bun install --production && bun run src/index.ts"
     expose:
       - "8080"
     ports:
-      - "8080:8080"
+      # Opção B: porta exposta diretamente no host para o proxy externo
+      # Opção A: apenas exposta internamente (nginx se comunica via rede Docker)
+      - "${PORT:-8080}:8080"
     networks:
-      - web-network
+      - app-network
     restart: unless-stopped
 
+  # --------------------------------------------------------------------------
+  # nginx — Reverse Proxy com HTTPS/TLS + ACME challenge (Opção A)
+  # Só sobe quando o profile "with-nginx" é ativado
+  # --------------------------------------------------------------------------
   nginx:
     image: nginx:alpine
-    container_name: nginx
+    container_name: nginx-proxy
+    profiles:
+      - with-nginx
     depends_on:
       - bun-server
     ports:
       - "80:80"
       - "443:443"
     env_file:
-      - .env                          # injeta SERVER_NAME para o script
+      - .env
     volumes:
-      - ./frontend/nginx/nginx.conf.template:/etc/nginx/nginx.conf.template:ro
-      - ./frontend/nginx/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
-      - ${frontDir}:/usr/share/nginx/html/:ro
-      - ${verificationDir}:/var/www/certbot
-      - ${sslDir}:/etc/letsencrypt
+      - ./nginx/nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+      - ./nginx/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./frontend-vue/dist/:/usr/share/nginx/html:ro
+      - ${sslDir:-/var/www/ssl}:/etc/letsencrypt
+      - ${verificationDir:-/var/www/certbot}:/var/www/certbot
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
-    restart: unless-stopped
     networks:
-      - web-network
+      - app-network
+    restart: unless-stopped
 
+  # --------------------------------------------------------------------------
+  # certbot — Emissão e renovação automática de certificados Let's Encrypt
+  # Só sobe quando o profile "with-nginx" é ativado
+  # --------------------------------------------------------------------------
   certbot:
     image: certbot/certbot:latest
     container_name: certbot-renewer
+    profiles:
+      - with-nginx
     env_file:
       - .env
     volumes:
-      - ${verificationDir}:/var/www/certbot
-      - ${sslDir}:/etc/letsencrypt
+      - ${sslDir:-/var/www/ssl}:/etc/letsencrypt
+      - ${verificationDir:-/var/www/certbot}:/var/www/certbot
     entrypoint: >
       sh -c "trap exit TERM; while true; do
              certbot renew --webroot -w /var/www/certbot --quiet;
-             sleep 12h;
+             sleep 12h & wait $${!};
              done"
-    restart: unless-stopped
     networks:
-      - web-network
+      - app-network
+    restart: unless-stopped
 
 networks:
-  web-network:
+  app-network:
     driver: bridge
 
 volumes:
