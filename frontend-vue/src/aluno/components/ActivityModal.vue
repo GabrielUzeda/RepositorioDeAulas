@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { apiClient } from '@/shared/api/client';
+import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
 import type { Atividade, Question } from '@/shared/types';
 
 const props = defineProps<{
@@ -20,6 +21,9 @@ const questionsList = ref<Question[]>([]);
 const isSubmitting = ref(false);
 const submitSuccess = ref(false);
 const errorMessage = ref('');
+const serverAcertos = ref<number | null>(null);
+const serverTotal = ref<number | null>(null);
+const serverPontuacao = ref<number | null>(null);
 
 watch(
   () => props.show,
@@ -27,9 +31,18 @@ watch(
     if (val && props.atividade) {
       submitSuccess.value = false;
       errorMessage.value = '';
-      alunoNome.value = localStorage.getItem('alunoNome') || '';
-      alunoEmail.value = localStorage.getItem('alunoEmail') || '';
-      respostaText.value = localStorage.getItem(`draft_${props.atividade.id}`) || '';
+      serverAcertos.value = null;
+      serverTotal.value = null;
+      serverPontuacao.value = null;
+      Promise.all([
+        secureGet('alunoNome'),
+        secureGet('alunoEmail'),
+        secureGet(`draft_${props.atividade.id}`),
+      ]).then(([nome, email, draft]) => {
+        alunoNome.value = nome || '';
+        alunoEmail.value = email || '';
+        respostaText.value = draft || '';
+      });
 
       if (props.atividade.json_data) {
         try {
@@ -49,9 +62,9 @@ watch(
 
 function handleSaveDraft() {
   if (props.atividade) {
-    localStorage.setItem(`draft_${props.atividade.id}`, respostaText.value);
-    localStorage.setItem('alunoNome', alunoNome.value);
-    localStorage.setItem('alunoEmail', alunoEmail.value);
+    secureSet(`draft_${props.atividade.id}`, respostaText.value);
+    secureSet('alunoNome', alunoNome.value);
+    secureSet('alunoEmail', alunoEmail.value);
   }
 }
 
@@ -73,7 +86,13 @@ async function handleSubmit() {
 
   if (res.success) {
     submitSuccess.value = true;
-    localStorage.removeItem(`draft_${props.atividade.id}`);
+    secureRemove(`draft_${props.atividade.id}`);
+    if (res.data && res.data.consulta_token) {
+      secureSet(`consulta_token_${props.atividade.id}`, String(res.data.consulta_token));
+    }
+    if (res.data && res.data.acertos !== undefined) serverAcertos.value = res.data.acertos;
+    if (res.data && res.data.total !== undefined) serverTotal.value = res.data.total;
+    if (res.data && res.data.pontuacao !== undefined) serverPontuacao.value = res.data.pontuacao;
     emit('submit', {
       nome: alunoNome.value,
       email: alunoEmail.value,
@@ -81,7 +100,7 @@ async function handleSubmit() {
     });
     setTimeout(() => {
       emit('close');
-    }, 2000);
+    }, serverAcertos.value !== null ? 6000 : 2000);
   } else {
     errorMessage.value = res.error || 'Erro ao enviar resposta. Tente novamente.';
   }
@@ -106,6 +125,10 @@ async function handleSubmit() {
         <span class="material-icons text-4xl text-emerald-600">check_circle</span>
         <h3 class="text-lg font-bold">Resposta Enviada com Sucesso!</h3>
         <p class="text-sm">Sua resposta foi salva no sistema e está disponível para correção do professor.</p>
+        <div v-if="serverAcertos !== null" class="pt-1">
+          <p class="text-sm font-semibold">Correção do servidor: {{ serverAcertos }} / {{ serverTotal ?? questionsList.length }} acertos</p>
+          <p v-if="serverPontuacao !== null" class="text-sm">Pontuação: {{ serverPontuacao }}</p>
+        </div>
       </div>
 
       <div v-else class="space-y-6">
@@ -142,11 +165,11 @@ async function handleSubmit() {
             {{ errorMessage }}
           </div>
 
-          <!-- Aviso de Transparência LGPD -->
+          <!-- Aviso de Transparência LGPD & ECA Digital -->
           <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 flex items-start space-x-2">
-            <span class="material-icons text-sm text-indigo-500 mt-0.5">lock</span>
+            <span class="material-icons text-sm text-indigo-500 mt-0.5">verified_user</span>
             <div>
-              <strong>Aviso de Privacidade (LGPD):</strong> Seus dados de identificação (nome e e-mail) e suas respostas serão armazenados no sistema com a finalidade exclusiva de registro e avaliação pelo professor.
+              <strong>Aviso de Privacidade (LGPD & ECA Digital - Lei 15.211/2025):</strong> Coletamos apenas seu nome e e-mail com a finalidade exclusiva de registro e acompanhamento pedagógico pelo professor. Não realizamos perfilamento, nem compartilhamos dados com terceiros ou para fins comerciais.
             </div>
           </div>
 
