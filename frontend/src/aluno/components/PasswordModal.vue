@@ -31,7 +31,7 @@ function handleSubmit() {
         type="password"
         @keyup.enter="handleSubmit"
         placeholder="Digite a senha"
-        class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+        class="w-full px-4 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
         autofocus
       />
       <div class="flex justify-end space-x-3 pt-2">
