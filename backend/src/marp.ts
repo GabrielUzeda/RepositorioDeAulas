@@ -591,15 +591,22 @@ document.addEventListener('mousemove', () => {
   idleTimer = setTimeout(() => controls.classList.add('idle'), 2500);
 });
 
-try {
-  const _url = new URL(window.location.href);
-  if (_url.searchParams.has('senha')) {
-    _url.searchParams.delete('senha');
-    window.history.replaceState({}, document.title, _url.pathname + (_url.searchParams.toString() ? '?' + _url.searchParams.toString() : '') + _url.hash);
-  }
-} catch (e) {}
+function renderAllKaTeX() {
+  if (!window.katex) return;
+  document.querySelectorAll('.slide-content').forEach(container => {
+    container.innerHTML = container.innerHTML.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+      try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
+      catch (e) { return '$$' + math + '$$'; }
+    });
+    container.innerHTML = container.innerHTML.replace(/(^|[^\\])\$([^\$\n]+?)\$/g, (_, prefix, math) => {
+      try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
+      catch (e) { return prefix + '$' + math + '$'; }
+    });
+  });
+}
 
 activateSlide(0);
+renderAllKaTeX();
 initMermaid(document.documentElement.dataset.theme || 'dark');
 renderAllMermaid();
 </script>

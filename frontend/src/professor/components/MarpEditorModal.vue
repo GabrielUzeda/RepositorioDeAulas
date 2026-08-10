@@ -297,11 +297,38 @@ function renderSlides(source: string) {
       <span class="slide-number">${i + 1}/${totalSlidesNum}</span>
       <div class="slide-content">${html}</div>
     `;
+    renderKaTeX(el);
     container.appendChild(el);
   });
 
   activateSlide(Math.min(currentSlideNum, totalSlidesNum - 1));
   requestAnimationFrame(() => renderAllMermaid());
+}
+
+function renderKaTeX(container: HTMLElement) {
+  const w = window as any;
+  if (!w.katex) return;
+
+  const contentDiv = container.querySelector('.slide-content');
+  if (!contentDiv) return;
+
+  // Processa blocos $$...$$ primeiro
+  contentDiv.innerHTML = contentDiv.innerHTML.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+    try {
+      return w.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false });
+    } catch (e) {
+      return `$$${math}$$`;
+    }
+  });
+
+  // Processa inline $...$
+  contentDiv.innerHTML = contentDiv.innerHTML.replace(/(^|[^\\])\$([^\$\n]+?)\$/g, (_, prefix, math) => {
+    try {
+      return prefix + w.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false });
+    } catch (e) {
+      return `${prefix}$${math}$`;
+    }
+  });
 }
 
 async function renderAllMermaid() {
@@ -1271,7 +1298,22 @@ try {
   }
 } catch (e) {}
 
+function renderAllKaTeX() {
+  if (!window.katex) return;
+  document.querySelectorAll('.slide-content').forEach(container => {
+    container.innerHTML = container.innerHTML.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+      try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
+      catch (e) { return '$$' + math + '$$'; }
+    });
+    container.innerHTML = container.innerHTML.replace(/(^|[^\\])\$([^\$\n]+?)\$/g, (_, prefix, math) => {
+      try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
+      catch (e) { return prefix + '$' + math + '$'; }
+    });
+  });
+}
+
 activateSlide(0);
+renderAllKaTeX();
 initMermaid(document.documentElement.dataset.theme || 'dark');
 renderAllMermaid();
 <\/script>
