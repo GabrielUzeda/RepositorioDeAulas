@@ -115,6 +115,7 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
   --font-scale: 1;
   --anim-duration: 0.5s;
 }
+
 [data-theme="light"] {
   --bg-app: #f8fafc;
   --text-primary: #0f172a;
@@ -126,30 +127,157 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
   --code-fg: #4338ca;
   --slide-bg: #ffffff;
 }
+
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 100vw; height: 100vh; background: var(--bg-app); color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; user-select: none; }
-#slides-container { width: 100vw; height: 100vh; position: relative; display: flex; align-items: center; justify-content: center; }
-.slide { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--slide-bg); padding: 60px 80px; display: flex; flex-direction: column; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; font-size: calc(16px * var(--font-scale)); overflow: visible; }
-.slide.active { opacity: 1; pointer-events: auto; z-index: 10; }
-.slide.centered { text-align: center; align-items: center; }
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  overflow: hidden;
+  user-select: none;
+}
+
+#slides-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  background: var(--slide-bg);
+  border: none;
+  border-radius: 0;
+  padding: 60px 80px;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1);
+  transition: opacity 0.4s ease;
+  font-size: calc(16px * var(--font-scale));
+  overflow: visible;
+}
+
+.slide.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+  z-index: 10;
+}
+
+.slide.centered {
+  text-align: center;
+  align-items: center;
+}
+
 .slide-content h1 { font-size: calc(2.8em * var(--font-scale)); font-weight: 900; letter-spacing: -1px; line-height: 1.1; margin-bottom: 0.4em; color: var(--text-primary); }
 .slide-content h2 { font-size: calc(2.0em * var(--font-scale)); font-weight: 700; letter-spacing: -0.5px; margin-bottom: 0.4em; color: var(--text-primary); }
 .slide-content h3 { font-size: calc(1.4em * var(--font-scale)); font-weight: 600; margin-bottom: 0.4em; color: var(--text-primary); }
-.slide-content p { font-size: calc(1.15em * var(--font-scale)); line-height: 1.75; margin-bottom: 0.6em; color: var(--text-secondary); }
-.table-wrap { margin: 1.2em 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.slide-content table { width: 100%; border-collapse: collapse; font-size: calc(0.95em * var(--font-scale)); margin: 0; }
-.slide-content th, .slide-content td { padding: 12px 18px; border: 1px solid var(--border); text-align: left; line-height: 1.5; }
-.slide-content th { background: var(--accent-dim); color: var(--text-primary); font-weight: 700; }
-.slide-content code { font-family: var(--font-mono); font-size: 0.88em; background: var(--accent-dim); color: var(--code-fg); padding: 2px 6px; border-radius: 4px; }
-.slide-content pre { background: #0d1117; color: #e6edf3; padding: 20px 24px; border-radius: 8px; overflow-x: auto; font-size: 0.85em; line-height: 1.65; font-family: var(--font-mono); margin: 1em 0; }
-.slide-content pre code { background: none; color: inherit; padding: 0; }
-.slide-content ul, .slide-content ol { font-size: calc(1.1em * var(--font-scale)); line-height: 1.8; padding-left: 1.6em; margin-bottom: 0.8em; color: var(--text-secondary); }
+.slide-content p { font-size: calc(1.15em * var(--font-scale)); line-height: 1.7; margin-bottom: 0.6em; color: var(--text-secondary); }
+
+/* Table Styles for Standalone HTML */
+.table-wrap {
+  margin: 1.2em 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.slide-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: calc(0.95em * var(--font-scale));
+  border: none;
+  border-radius: 0;
+  margin: 0;
+}
+.slide-content th, .slide-content td {
+  padding: 12px 18px;
+  border: 1px solid var(--border);
+  text-align: left;
+  line-height: 1.5;
+}
+.slide-content th {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.slide-content tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
+}
+[data-theme="light"] .slide-content tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.slide-content code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--accent-dim);
+  color: var(--code-fg);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.slide-content pre {
+  background: #0d1117;
+  color: #e6edf3;
+  padding: 20px 24px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.65;
+  font-family: var(--font-mono);
+  margin: 1em 0;
+}
+.slide-content pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+
+.slide-content ul, .slide-content ol {
+  font-size: calc(1.1em * var(--font-scale));
+  line-height: 1.8;
+  padding-left: 1.6em;
+  margin-bottom: 0.8em;
+  color: var(--text-secondary);
+}
 .slide-content li::marker { color: var(--accent); }
-.slide-content blockquote { border-left: 4px solid var(--accent); padding-left: 18px; color: var(--text-muted); font-style: italic; margin: 1em 0; }
+.slide-content blockquote {
+  border-left: 4px solid var(--accent);
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 1em 0;
+}
 .slide-content img { max-width: 100%; max-height: 75vh; object-fit: contain; height: auto; border-radius: 8px; }
 .slide-content a { color: var(--accent); text-decoration: none; }
-.slide-number { position: absolute; bottom: 20px; right: 24px; font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 600; }
+.slide-content a:hover { text-decoration: underline; }
 
+.slide-number {
+  position: absolute;
+  bottom: 20px;
+  right: 24px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* Animations */
 .slide .slide-content > * { opacity:1; transition: opacity .3s, transform .3s; }
 body.anim-mode .slide:not(.active) .slide-content > * { opacity:0; }
 body.anim-mode .slide.active .slide-content > * { animation-fill-mode:forwards; }
@@ -190,11 +318,59 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(6) { 
 body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(7) { animation-delay:calc(var(--anim-stagger)*6); }
 body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { animation-delay:calc(var(--anim-stagger)*7); }
 
-.mermaid-block { width: 100%; display: flex; justify-content: center; align-items: center; overflow: visible !important; margin: 1em 0; }
-.mermaid-block svg { overflow: visible !important; max-width: 100%; height: auto; }
-.mermaid-block p, .mermaid-block div, .mermaid-block span { margin: 0 !important; padding: 0 !important; line-height: 1.25 !important; }
-.mermaid-block foreignObject { overflow: visible !important; }
-.mermaid-block foreignObject div { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; box-sizing: border-box !important; overflow: visible !important; white-space: nowrap !important; text-align: center !important; line-height: 1.25 !important; }
+#controls-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  transition: opacity 0.3s ease;
+}
+[data-theme="light"] #controls-bar {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+}
+#controls-bar.idle { opacity: 0.15; }
+#controls-bar:hover, #controls-bar.idle:hover { opacity: 1; }
+
+.ctrl-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+}
+.ctrl-btn:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+#progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+  z-index: 1001;
+}
 
 @media print {
   html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
@@ -202,37 +378,72 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   #controls-bar, #progress-bar { display: none !important; }
   .slide { page-break-after: always !important; break-after: page !important; position: relative !important; opacity: 1 !important; width: 100vw !important; height: 100vh !important; }
   body.anim-mode .slide .slide-content > * { opacity: 1 !important; animation: none !important; }
-#controls-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 30px; padding: 6px 16px; display: flex; align-items: center; gap: 10px; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.4); transition: opacity 0.3s ease; }
-[data-theme="light"] #controls-bar { background: rgba(255, 255, 255, 0.92); box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
-#controls-bar.idle { opacity: 0.15; }
-#controls-bar:hover, #controls-bar.idle:hover { opacity: 1; }
-.ctrl-btn { background: transparent; border: 1px solid transparent; color: var(--text-primary); font-family: var(--font-sans); font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; }
-.ctrl-btn:hover { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
-#progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent); transition: width 0.3s ease; z-index: 1001; }
+}
+.mermaid-block {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: visible !important;
+  margin: 1em 0;
+}
+.mermaid-block svg {
+  overflow: visible !important;
+  max-width: 100%;
+  height: auto;
+}
+.mermaid-block p, .mermaid-block div, .mermaid-block span {
+  line-height: 1.25 !important;
+  margin: 0 !important;
+}
+.mermaid-block foreignObject {
+  overflow: visible !important;
+}
+.mermaid-block foreignObject > div {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+}
 </style>
 </head>
 <body class="anim-mode">
+
 <div id="progress-bar"></div>
 <div id="slides-container">
   ${slidesHtml}
 </div>
+
 <div id="controls-bar">
-  <button class="ctrl-btn" id="btn-prev">◀</button>
-  <button class="ctrl-btn" id="btn-next">▶</button>
+  <button class="ctrl-btn" id="btn-prev" title="Anterior (← / ↑)">◀</button>
+  <button class="ctrl-btn" id="btn-next" title="Próximo (→ / ↓ / Espaço)">▶</button>
   <span id="counter" style="font-size:12px;font-family:var(--font-mono);color:var(--text-muted);padding:0 6px;">${slides.length > 0 ? '1/' + slides.length : '0/0'}</span>
   <div style="width:1px;height:16px;background:var(--border);"></div>
-  <button class="ctrl-btn" id="btn-theme" title="Alternar Tema (T)">◐ Tema</button>
+  <button class="ctrl-btn" id="btn-theme" title="Alternar Tema (T)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Escuro</button>
   <button class="ctrl-btn" id="btn-font-dec" title="Diminuir Fonte (-)">A-</button>
   <button class="ctrl-btn" id="btn-font-reset" title="Resetar Fonte">100%</button>
   <button class="ctrl-btn" id="btn-font-inc" title="Aumentar Fonte (+)">A+</button>
   <div style="width:1px;height:16px;background:var(--border);"></div>
   <button class="ctrl-btn" id="btn-fs" title="Tela Cheia (F)">⛶ Fullscreen</button>
 </div>
+
 <script>
+const sunSvg = \`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>\`;
+const moonSvg = \`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>\`;
+
 let currentSlide = 0;
 const totalSlides = ${slides.length};
 let fontScale = 1.0;
 let mermaidCounter = 0;
+
+// Save original mermaid code blocks so theme switching can re-render them
+document.querySelectorAll('.slide-content pre').forEach(pre => {
+  const code = pre.querySelector('code');
+  if (code && (code.className.includes('mermaid') || /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline)/m.test(code.textContent.trim()))) {
+    pre.dataset.rawMermaid = code.textContent.trim();
+    pre.dataset.isMermaid = '1';
+  }
+});
 
 function initMermaid(themeName) {
   if (window.mermaid) {
@@ -240,40 +451,67 @@ function initMermaid(themeName) {
       startOnLoad: false,
       theme: themeName === 'dark' ? 'dark' : 'default',
       securityLevel: 'loose',
-      fontFamily: 'Inter, system-ui, sans-serif',
       flowchart: { useMaxWidth: true, htmlLabels: true, padding: 20 },
       sequence: { useMaxWidth: true, wrap: true },
-      themeVariables: { primaryColor: '#6366f1', primaryTextColor: themeName === 'dark' ? '#f8fafc' : '#0f172a', lineColor: themeName === 'dark' ? '#94a3b8' : '#475569', fontSize: '15px' }
+      themeVariables: {
+        primaryColor: '#6366f1',
+        primaryTextColor: themeName === 'dark' ? '#f8fafc' : '#0f172a',
+        lineColor: themeName === 'dark' ? '#94a3b8' : '#475569',
+        fontSize: '15px'
+      }
     });
   }
 }
+
+function updateThemeUI(themeName) {
+  const btn = document.getElementById('btn-theme');
+  if (btn) {
+    btn.innerHTML = themeName === 'dark' ? sunSvg + ' Claro' : moonSvg + ' Escuro';
+  }
+}
+
 function activateSlide(idx) {
   if (totalSlides === 0) return;
   currentSlide = Math.max(0, Math.min(idx, totalSlides - 1));
-  document.querySelectorAll('.slide').forEach((s, i) => s.classList.toggle('active', i === currentSlide));
+  document.querySelectorAll('.slide').forEach((s, i) => {
+    s.classList.toggle('active', i === currentSlide);
+  });
   document.getElementById('counter').textContent = (currentSlide + 1) + '/' + totalSlides;
   document.getElementById('progress-bar').style.width = (((currentSlide + 1) / totalSlides) * 100) + '%';
 }
+
 async function renderAllMermaid() {
   if (!window.mermaid) return;
-  try { await document.fonts.ready; } catch(e){}
+  try {
+    await document.fonts.ready;
+    await document.fonts.load('16px Inter');
+  } catch (e) {}
+
   document.querySelectorAll('.slide-content').forEach(container => {
-    container.querySelectorAll('pre').forEach(el => {
-      const code = el.querySelector('code');
-      const src = code ? code.textContent.trim() : '';
+    container.querySelectorAll('pre, .mermaid-block').forEach(el => {
+      const src = el.dataset.rawMermaid || (el.querySelector('code') ? el.querySelector('code').textContent.trim() : null);
       if (!src) return;
-      const isMmd = (code && code.className.includes('mermaid')) || /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline)/m.test(src);
+
+      const isMmd = el.dataset.isMermaid === '1' ||
+        (el.querySelector('code') && el.querySelector('code').className.includes('mermaid')) ||
+        /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline)/m.test(src);
       if (!isMmd) return;
+
       const id = 'mmd-p-' + (++mermaidCounter);
       const wrapper = document.createElement('div');
       wrapper.className = 'mermaid-block';
+      wrapper.dataset.rawMermaid = src;
+      wrapper.dataset.isMermaid = '1';
       el.replaceWith(wrapper);
+
       mermaid.render(id, src).then(({ svg }) => {
         wrapper.innerHTML = svg;
         const svgEl = wrapper.querySelector('svg');
         if (svgEl) {
-          svgEl.removeAttribute('width'); svgEl.removeAttribute('height');
-          svgEl.style.width = '100%'; svgEl.style.height = 'auto';
+          svgEl.removeAttribute('width');
+          svgEl.removeAttribute('height');
+          svgEl.style.width = '100%';
+          svgEl.style.height = 'auto';
           const vb = svgEl.getAttribute('viewBox');
           if (vb) {
             const [x, y, w, h] = vb.split(' ').map(Number);
@@ -282,43 +520,68 @@ async function renderAllMermaid() {
           svgEl.style.overflow = 'visible';
           svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach(node => node.style.overflow = 'visible');
         }
-      }).catch(err => { wrapper.innerHTML = '<div style="color:#ef4444;font-size:12px;">⚠ Mermaid: ' + err.message + '</div>'; });
+      }).catch(err => {
+        wrapper.innerHTML = '<div style="color:#ef4444;font-size:12px;">⚠ Mermaid: ' + err.message + '</div>';
+      });
     });
   });
 }
+
+// Navigation & Controls
 document.getElementById('btn-prev').addEventListener('click', () => activateSlide(currentSlide - 1));
 document.getElementById('btn-next').addEventListener('click', () => activateSlide(currentSlide + 1));
-document.getElementById('btn-theme').addEventListener('click', () => {
+
+document.getElementById('btn-theme').addEventListener('click', toggleTheme);
+function toggleTheme() {
   const cur = document.documentElement.dataset.theme || 'dark';
   const next = cur === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
+  updateThemeUI(next);
   initMermaid(next);
   renderAllMermaid();
-});
+}
+
 document.getElementById('btn-font-inc').addEventListener('click', () => adjustFont(1.1));
 document.getElementById('btn-font-dec').addEventListener('click', () => adjustFont(0.9));
 document.getElementById('btn-font-reset').addEventListener('click', () => { fontScale = 1.0; applyFontScale(); });
-function adjustFont(f) { fontScale = Math.max(0.6, Math.min(2.5, fontScale * f)); applyFontScale(); }
-function applyFontScale() { document.documentElement.style.setProperty('--font-scale', fontScale); }
+
+function adjustFont(factor) {
+  fontScale *= factor;
+  fontScale = Math.max(0.6, Math.min(2.5, fontScale));
+  applyFontScale();
+}
+function applyFontScale() {
+  document.documentElement.style.setProperty('--font-scale', fontScale);
+}
+
 document.getElementById('btn-fs').addEventListener('click', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen();
   else document.exitFullscreen();
 });
+
+// Keyboard Hotkeys
 document.addEventListener('keydown', e => {
   switch (e.key) {
-    case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': e.preventDefault(); activateSlide(currentSlide + 1); break;
-    case 'ArrowLeft': case 'ArrowUp': case 'PageUp': e.preventDefault(); activateSlide(currentSlide - 1); break;
+    case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
+      e.preventDefault(); activateSlide(currentSlide + 1); break;
+    case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
+      e.preventDefault(); activateSlide(currentSlide - 1); break;
     case 'Home': e.preventDefault(); activateSlide(0); break;
     case 'End': e.preventDefault(); activateSlide(totalSlides - 1); break;
-    case 'f': case 'F': if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); break;
+    case 'f': case 'F':
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+      break;
     case 't': case 'T':
-      const cur = document.documentElement.dataset.theme || 'dark';
-      document.documentElement.dataset.theme = cur === 'dark' ? 'light' : 'dark';
-      initMermaid(document.documentElement.dataset.theme); renderAllMermaid(); break;
-    case '+': case '=': adjustFont(1.1); break;
-    case '-': case '_': adjustFont(0.9); break;
+      toggleTheme(); break;
+    case '+': case '=':
+      adjustFont(1.1); break;
+    case '-': case '_':
+      adjustFont(0.9); break;
   }
 });
+
+// Controls auto-hide when idle
 let idleTimer;
 const controls = document.getElementById('controls-bar');
 document.addEventListener('mousemove', () => {
@@ -326,6 +589,7 @@ document.addEventListener('mousemove', () => {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => controls.classList.add('idle'), 2500);
 });
+
 try {
   const _url = new URL(window.location.href);
   if (_url.searchParams.has('senha')) {
@@ -333,6 +597,7 @@ try {
     window.history.replaceState({}, document.title, _url.pathname + (_url.searchParams.toString() ? '?' + _url.searchParams.toString() : '') + _url.hash);
   }
 } catch (e) {}
+
 activateSlide(0);
 initMermaid(document.documentElement.dataset.theme || 'dark');
 renderAllMermaid();
