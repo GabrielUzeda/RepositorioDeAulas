@@ -424,25 +424,33 @@ function scrollToCharIndex(textarea: HTMLTextAreaElement, charIndex: number, foc
 
   const prevActive = document.activeElement as HTMLElement | null;
 
-  const textBefore = textarea.value.substring(0, charIndex);
-  const linesBefore = textBefore.split('\n').length - 1;
-
-  const style = window.getComputedStyle(textarea);
-  const fontSize = parseFloat(style.fontSize) || 13;
-  const lineHeight = parseFloat(style.lineHeight) || (fontSize * 1.7);
-  const paddingTop = parseFloat(style.paddingTop) || 20;
-
-  // Centraliza a linha encontrada na tela do editor
-  const targetScrollTop = Math.max(0, (linesBefore * lineHeight) + paddingTop - (textarea.clientHeight / 2));
-
   if (focusTarget) textarea.focus();
   textarea.setSelectionRange(charIndex, charIndex);
-  textarea.scrollTop = targetScrollTop;
-  syncBackdropScroll();
 
-  if (!focusTarget && prevActive && prevActive !== textarea && typeof prevActive.focus === 'function') {
-    prevActive.focus();
-  }
+  // Usa o elemento DOM de destaque real para rolar o scroll na posição física exata da tela
+  nextTick(() => {
+    if (editorHighlightsRef.value) {
+      const activeMark = editorHighlightsRef.value.querySelector('mark.find-match.active') as HTMLElement | null;
+      if (activeMark) {
+        const markTop = activeMark.offsetTop;
+        const targetScrollTop = Math.max(0, markTop - (textarea.clientHeight / 2) + (activeMark.offsetHeight / 2));
+        textarea.scrollTop = targetScrollTop;
+      } else {
+        const textBefore = textarea.value.substring(0, charIndex);
+        const linesBefore = textBefore.split('\n').length - 1;
+        const style = window.getComputedStyle(textarea);
+        const fontSize = parseFloat(style.fontSize) || 13;
+        const lineHeight = parseFloat(style.lineHeight) || (fontSize * 1.7);
+        const paddingTop = parseFloat(style.paddingTop) || 20;
+        textarea.scrollTop = Math.max(0, (linesBefore * lineHeight) + paddingTop - (textarea.clientHeight / 2));
+      }
+    }
+    syncBackdropScroll();
+
+    if (!focusTarget && prevActive && prevActive !== textarea && typeof prevActive.focus === 'function') {
+      prevActive.focus();
+    }
+  });
 }
 
 function getSlideIndexForCharIndex(source: string, charIndex: number): number {
