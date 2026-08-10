@@ -31,6 +31,8 @@ services:
       - vite_node_modules:/app/node_modules
     working_dir: /app
     command: sh -c "bun install && bun run dev --host 0.0.0.0"
+    expose:
+      - "5173"
     ports:
       - "15173:5173"
     networks:
