@@ -1500,11 +1500,11 @@ onBeforeUnmount(() => {
       <div class="sep"></div>
 
       <!-- Inputs for Title & Description -->
-      <div class="flex items-center space-x-2 flex-1 max-w-xl">
+      <div class="flex items-center space-x-2 flex-1 max-w-3xl">
         <input
           v-model="titleInput"
           placeholder="Título da Aula"
-          class="tb-input font-semibold w-48"
+          class="tb-input font-semibold w-52 shrink-0"
         />
         <input
           v-model="descInput"
@@ -1516,11 +1516,10 @@ onBeforeUnmount(() => {
       <div class="sep"></div>
       <button class="tb-btn" :class="{ active: isPresentMode }" @click="togglePresentMode" title="Apresentar (F)">▶ Apresentar</button>
       <button class="tb-btn" :class="{ active: isAnimMode }" @click="isAnimMode = !isAnimMode" title="Toggle animações">✦ Anim</button>
-      <button class="tb-btn" @click="toggleTheme" title="Toggle tema">◐ Tema</button>
 
-      <select v-model="currentTheme" @change="applyTheme(currentTheme, true)" class="tb-btn" style="padding:4px 8px;font-size:11px;">
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
+      <select v-model="currentTheme" @change="applyTheme(currentTheme, true)" class="tb-btn" style="padding:4px 8px;font-size:11px;" title="Alternar tema da apresentação">
+        <option value="dark">🌙 Dark</option>
+        <option value="light">☀️ Light</option>
       </select>
 
       <!-- Export Dropdown -->
