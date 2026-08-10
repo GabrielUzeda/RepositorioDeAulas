@@ -44,6 +44,19 @@ const fontScale = ref(1.0);
 const isIdle = ref(false);
 let idleTimer: any = null;
 
+// Internal Engine State
+const currentSlide = ref(0);
+const totalSlides = ref(0);
+let currentSlideNum = 0;
+let totalSlidesNum = 0;
+let renderTimer: any = null;
+let scrollTimer: any = null;
+let mermaidCounter = 0;
+let mermaidReady = false;
+let findMatches: Array<{ start: number; end: number }> = [];
+let currentMatchIndex = -1;
+let isResizing = false;
+
 function adjustFont(factor: number) {
   fontScale.value *= factor;
   fontScale.value = Math.max(0.6, Math.min(2.5, fontScale.value));
@@ -243,8 +256,9 @@ function parseSlides(source: string) {
 // ─── Renderer ────────────────────────────────
 function renderSlides(source: string) {
   const { slides, global } = parseSlides(source);
-  totalSlides = slides.length;
-  slideCountText.value = `${totalSlides} slides`;
+  totalSlidesNum = slides.length;
+  totalSlides.value = totalSlidesNum;
+  slideCountText.value = `${totalSlidesNum} slides`;
   charCountText.value = `${source.length} chars`;
 
   const targetTheme = (global.theme && (global.theme === 'light' || global.theme === 'dark'))
@@ -278,13 +292,13 @@ function renderSlides(source: string) {
     let html = md ? md.render(slide.content) : `<p>${escapeHtml(slide.content)}</p>`;
     html = html.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml: string) => `<div class="table-wrap">${tableHtml}</div>`);
     el.innerHTML = `
-      <span class="slide-number">${i + 1}/${totalSlides}</span>
+      <span class="slide-number">${i + 1}/${totalSlidesNum}</span>
       <div class="slide-content">${html}</div>
     `;
     container.appendChild(el);
   });
 
-  activateSlide(Math.min(currentSlide, totalSlides - 1));
+  activateSlide(Math.min(currentSlideNum, totalSlidesNum - 1));
   requestAnimationFrame(() => renderAllMermaid());
 }
 
@@ -356,13 +370,14 @@ function fixSvgOverflow(container: HTMLElement) {
 }
 
 function activateSlide(index: number) {
-  if (totalSlides === 0) return;
-  currentSlide = Math.max(0, Math.min(index, totalSlides - 1));
+  if (totalSlides.value === 0) return;
+  currentSlideNum = Math.max(0, Math.min(index, totalSlides.value - 1));
+  currentSlide.value = currentSlideNum;
   if (!previewPaneRef.value) return;
 
   const slides = previewPaneRef.value.querySelectorAll('.slide');
   slides.forEach((s, i) => {
-    s.classList.toggle('active', i === currentSlide);
+    s.classList.toggle('active', i === currentSlideNum);
   });
 
   const active = previewPaneRef.value.querySelector('.slide.active');
@@ -370,13 +385,13 @@ function activateSlide(index: number) {
   updateProgress();
 }
 
-function nextSlide() { activateSlide(currentSlide + 1); }
-function prevSlide() { activateSlide(currentSlide - 1); }
+function nextSlide() { activateSlide(currentSlide.value + 1); }
+function prevSlide() { activateSlide(currentSlide.value - 1); }
 
 function updateProgress() {
-  const pct = totalSlides > 0 ? ((currentSlide + 1) / totalSlides) * 100 : 0;
+  const pct = totalSlides.value > 0 ? ((currentSlide.value + 1) / totalSlides.value) * 100 : 0;
   if (progressBarRef.value) progressBarRef.value.style.width = pct + '%';
-  if (statusBarRef.value) statusBarRef.value.textContent = `${currentSlide + 1} / ${totalSlides}`;
+  if (statusBarRef.value) statusBarRef.value.textContent = `${currentSlide.value + 1} / ${totalSlides.value}`;
 }
 
 // ─── Slide Editor Sync ───────────────────────
@@ -1441,7 +1456,7 @@ function handleGlobalKeydown(e: KeyboardEvent) {
       activateSlide(0);
     } else if (e.key === 'End') {
       e.preventDefault();
-      activateSlide(totalSlides - 1);
+      activateSlide(totalSlidesNum - 1);
     }
   }
 }
@@ -1459,8 +1474,8 @@ onMounted(() => {
     exportHtml,
     exportPdf,
     exportPptx,
-    get current() { return currentSlide; },
-    get total() { return totalSlides; },
+    get current() { return currentSlideNum; },
+    get total() { return totalSlidesNum; },
   };
 });
 
