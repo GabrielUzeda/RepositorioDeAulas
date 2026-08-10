@@ -1542,7 +1542,7 @@ onBeforeUnmount(() => {
         <button class="tb-btn" @click.stop="showThemeMenu = !showThemeMenu; showExportMenu = false" title="Alternar tema da apresentação">
           {{ currentTheme === 'dark' ? '🌙 Dark' : '☀️ Light' }} ▾
         </button>
-        <div v-if="showThemeMenu" class="export-menu">
+        <div v-if="showThemeMenu" class="export-menu theme-menu">
           <button class="export-item" :class="{ active: currentTheme === 'dark' }" @click="applyTheme('dark', true); showThemeMenu = false">
             🌙 Dark
           </button>
@@ -1727,18 +1727,7 @@ onBeforeUnmount(() => {
 .tb-btn:hover { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
 .tb-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
 
-.tb-select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding-right: 28px !important;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-}
-.tb-select option {
-  background: var(--bg-editor);
-  color: var(--text-primary);
-}
+
 
 .tb-input {
   height: 32px;
@@ -1838,10 +1827,15 @@ onBeforeUnmount(() => {
   border-radius: 6px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
   z-index: 100; min-width: 240px; padding: 4px 0;
 }
+.export-menu.theme-menu {
+  min-width: 100%;
+  white-space: nowrap;
+}
 .export-item {
   display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px;
   border: none; background: transparent; color: var(--text-primary);
   font-size: 12px; cursor: pointer; text-align: left; transition: background 0.15s;
+  white-space: nowrap;
 }
 .export-item:hover { background: var(--accent-dim); color: var(--accent); }
 .export-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
