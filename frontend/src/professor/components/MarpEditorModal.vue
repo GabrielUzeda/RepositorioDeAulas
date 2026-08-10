@@ -132,6 +132,11 @@ background: linear-gradient(135deg, #667eea, #764ba2)
 Edite este Markdown à esquerda
 `;
 
+// ─── HTML Escaping ───────────────────────────
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m] || m));
+}
+
 // Markdown-it Instance
 function getMarkdownIt() {
   const w = window as any;
@@ -741,6 +746,34 @@ async function exportPptx() {
   });
 
   pptx.writeFile({ fileName: 'apresentacao-marp-next.pptx' });
+}
+
+// ─── Resizer (drag to resize editor pane) ────
+function onResizerMouseDown() {
+  isResizing = true;
+  if (editorPaneRef.value) editorPaneRef.value.classList.add('dragging');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+
+  const onMove = (e: MouseEvent) => {
+    if (!isResizing) return;
+    const pct = (e.clientX / window.innerWidth) * 100;
+    if (pct > 20 && pct < 75) {
+      if (editorPaneRef.value) editorPaneRef.value.style.width = pct + '%';
+    }
+  };
+
+  const onUp = () => {
+    isResizing = false;
+    if (editorPaneRef.value) editorPaneRef.value.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 }
 
 // ─── Save & Props Sync ─────────────────────

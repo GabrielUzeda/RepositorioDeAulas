@@ -395,9 +395,9 @@ function handleOpenRespostas(atividade: Atividade) {
 
     <!-- JSON Activity Editor Modal -->
     <JsonActivityEditorModal
-      :show="showJsonActivityModal"
+      :show="showActivityEditorModal"
       :atividade="editingActivity"
-      @close="showJsonActivityModal = false"
+      @close="showActivityEditorModal = false"
       @save="handleSaveActivity"
     />
 

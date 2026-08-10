@@ -41,7 +41,7 @@ services:
       - bun-server
     restart: unless-stopped
   playwright:
-    image: mcr.microsoft.com/playwright:v1.49.1-noble
+    image: mcr.microsoft.com/playwright:v1.50.0-noble
     container_name: e2e-playwright
     environment:
       PLAYWRIGHT_CONTAINER: "true"
