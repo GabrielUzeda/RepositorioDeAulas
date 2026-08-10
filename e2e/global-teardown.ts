@@ -13,5 +13,8 @@ function composeE2E(...args: string[]) {
 }
 
 export default async function globalTeardown() {
+  if (process.env.PLAYWRIGHT_CONTAINER) {
+    return;
+  }
   composeE2E('down', '--remove-orphans');
 }
