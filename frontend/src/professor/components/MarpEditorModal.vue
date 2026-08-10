@@ -275,15 +275,14 @@ async function renderAllMermaid() {
 
   const containers = previewPaneRef.value.querySelectorAll('.slide-content');
   containers.forEach(container => {
-    const pres = container.querySelectorAll('pre');
-    pres.forEach(pre => {
-      const code = pre.querySelector('code');
-      if (!code) return;
+    container.querySelectorAll('pre, .mermaid-block').forEach(el => {
+      const src = (el as HTMLElement).dataset.rawMermaid || (el.querySelector('code') ? el.querySelector('code')!.textContent?.trim() : null);
+      if (!src) return;
 
-      const text = code.textContent?.trim() || '';
-      const isMermaid =
-        code.className.includes('mermaid') ||
-        /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline|quadrantChart)/m.test(text);
+      const code = el.querySelector('code');
+      const isMermaid = (el as HTMLElement).dataset.isMermaid === '1' ||
+        (code && code.className.includes('mermaid')) ||
+        /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline|quadrantChart)/m.test(src);
 
       if (!isMermaid) return;
 
@@ -291,9 +290,11 @@ async function renderAllMermaid() {
       const wrapper = document.createElement('div');
       wrapper.className = 'mermaid-block';
       wrapper.dataset.mmdId = id;
-      pre.replaceWith(wrapper);
+      wrapper.dataset.rawMermaid = src;
+      wrapper.dataset.isMermaid = '1';
+      el.replaceWith(wrapper);
 
-      attemptRenderMermaid(wrapper, id, text, 0);
+      attemptRenderMermaid(wrapper, id, src, 0);
     });
   });
 }
