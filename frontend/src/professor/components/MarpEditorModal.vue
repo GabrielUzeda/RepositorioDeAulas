@@ -255,7 +255,8 @@ function renderSlides(source: string) {
     }
     if (slide.directives.background) el.style.background = slide.directives.background;
 
-    const html = md ? md.render(slide.content) : `<p>${escapeHtml(slide.content)}</p>`;
+    let html = md ? md.render(slide.content) : `<p>${escapeHtml(slide.content)}</p>`;
+    html = html.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml: string) => `<div class="table-wrap">${tableHtml}</div>`);
     el.innerHTML = `
       <span class="slide-number">${i + 1}/${totalSlides}</span>
       <div class="slide-content">${html}</div>
@@ -673,7 +674,7 @@ function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): stri
 
     const styleAttr = styleParts.length > 0 ? `style="${styleParts.join(';')}"` : '';
     let rawHtml = md ? md.render(slide.content) : `<p>${escapeHtml(slide.content)}</p>`;
-    rawHtml = rawHtml.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml) => `<div class="table-wrap">${tableHtml}</div>`);
+    rawHtml = rawHtml.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml: string) => `<div class="table-wrap">${tableHtml}</div>`);
 
     slidesHtml += `
     <section class="${cls}" data-slide="${i}" ${animAttr} ${staggerAttr} ${styleAttr}>
@@ -1709,14 +1710,18 @@ onBeforeUnmount(() => {
 :deep(.slide-content h3) { font-size:1.4rem; font-weight:600; }
 :deep(.slide-content p)  { font-size:1.15rem; line-height:1.75; color:var(--text-secondary); }
 :deep(.slide-content ul), :deep(.slide-content ol) { font-size:1.1rem; line-height:2; padding-left:1.4rem; color:var(--text-secondary); }
-:deep(.slide-content li::marker) { color:var(--accent); }
-:deep(.slide-content a) { color:var(--accent); text-decoration:none; }
+:deep(.slide-content strong) { color:var(--text-primary); }
+:deep(.slide-content em) { color:var(--yellow); }
+.marpnext-modal-root[data-theme="light"] :deep(.slide-content em) { color:#b45309; }
 :deep(.slide-content blockquote) { border-left:3px solid var(--accent); padding-left:16px; color:var(--text-muted); font-style:italic; }
-:deep(.slide-content pre) { background:#0d1117; color:#e6edf3; padding:20px 24px; border-radius:8px; overflow-x:auto; font-size:0.85rem; line-height:1.65; font-family:var(--font-mono); }
-:deep(.slide-content pre code) { background:none; color:inherit; padding:0; }
-:deep(.slide-content table) { width:100%; border-collapse:collapse; font-size:0.95rem; }
+:deep(.slide-content hr) { border:none; height:1px; background:var(--border); margin:1rem 0; }
+:deep(.slide-content img) { max-width:100%; border-radius:8px; }
+:deep(.table-wrap) { margin: 1.2em 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+:deep(.slide-content table) { width:100%; border-collapse:collapse; font-size:0.95rem; margin:0; }
 :deep(.slide-content th), :deep(.slide-content td) { padding:10px 14px; border:1px solid var(--border); text-align:left; }
 :deep(.slide-content th) { background:var(--accent-dim); font-weight:600; }
+:deep(.slide-content tr:nth-child(even)) { background: rgba(255, 255, 255, 0.03); }
+.marpnext-modal-root[data-theme="light"] :deep(.slide-content tr:nth-child(even)) { background: rgba(0, 0, 0, 0.03); }
 :deep(.slide.centered .slide-content) { align-items:center; text-align:center; }
 
 /* MERMAID STYLING */
