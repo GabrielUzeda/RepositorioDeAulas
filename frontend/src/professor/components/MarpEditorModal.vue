@@ -23,6 +23,7 @@ const charCountText = ref('0 caracteres');
 const previewPaneRef = ref<HTMLDivElement | null>(null);
 const editorPaneRef = ref<HTMLDivElement | null>(null);
 const editorRef = ref<HTMLTextAreaElement | null>(null);
+const findInputRef = ref<HTMLInputElement | null>(null);
 const editorHighlightsRef = ref<HTMLDivElement | null>(null);
 const editorBackdropRef = ref<HTMLDivElement | null>(null);
 const progressBarRef = ref<HTMLDivElement | null>(null);
@@ -425,19 +426,59 @@ function scrollToCharIndex(textarea: HTMLTextAreaElement, charIndex: number, foc
 
   const textBefore = textarea.value.substring(0, charIndex);
   const linesBefore = textBefore.split('\n').length - 1;
-  const fontSize = 13;
-  const lineHeight = fontSize * 1.7;
-  const paddingTop = 20;
 
-  const targetScrollTop = Math.max(0, (linesBefore * lineHeight) + paddingTop - 40);
+  const style = window.getComputedStyle(textarea);
+  const fontSize = parseFloat(style.fontSize) || 13;
+  const lineHeight = parseFloat(style.lineHeight) || (fontSize * 1.7);
+  const paddingTop = parseFloat(style.paddingTop) || 20;
+
+  // Centraliza a linha encontrada na tela do editor
+  const targetScrollTop = Math.max(0, (linesBefore * lineHeight) + paddingTop - (textarea.clientHeight / 2));
 
   if (focusTarget) textarea.focus();
   textarea.setSelectionRange(charIndex, charIndex);
   textarea.scrollTop = targetScrollTop;
+  syncBackdropScroll();
 
   if (!focusTarget && prevActive && prevActive !== textarea && typeof prevActive.focus === 'function') {
     prevActive.focus();
   }
+}
+
+function getSlideIndexForCharIndex(source: string, charIndex: number): number {
+  const { body } = extractFrontMatter(source);
+  const offset = source.length - body.length;
+  if (charIndex < offset) return 0;
+
+  const SEPARATOR_GLOBAL = /^(?:---|\*\*\*|<!--\s*(?:break|slide)\s*-->)\s*$/gm;
+  let slideIdx = 0;
+  let match;
+  while ((match = SEPARATOR_GLOBAL.exec(body)) !== null) {
+    if (offset + match.index > charIndex) break;
+    slideIdx++;
+  }
+  return slideIdx;
+}
+
+function highlightCurrentMatch(focusTarget = false) {
+  if (findMatches.length === 0 || currentMatchIndex < 0) {
+    findCountText.value = '0/0';
+    updateEditorHighlights();
+    return;
+  }
+
+  findCountText.value = `${currentMatchIndex + 1}/${findMatches.length}`;
+  const m = findMatches[currentMatchIndex];
+  if (editorRef.value) {
+    scrollToCharIndex(editorRef.value, m.start, focusTarget);
+    editorRef.value.setSelectionRange(m.start, m.end);
+  }
+
+  // Sincroniza e rola para o slide correspondente no preview
+  const targetSlideIdx = getSlideIndexForCharIndex(markdownInput.value, m.start);
+  activateSlide(targetSlideIdx);
+
+  updateEditorHighlights();
 }
 
 function handlePreviewClick(e: MouseEvent) {
@@ -518,6 +559,10 @@ function openFindBar(showReplace = false) {
   showReplaceRow.value = showReplace;
   nextTick(() => {
     updateFindMatches();
+    if (findInputRef.value) {
+      findInputRef.value.focus();
+      findInputRef.value.select();
+    }
   });
 }
 
@@ -608,21 +653,7 @@ function updateFindMatches() {
   }
 }
 
-function highlightCurrentMatch(focusTarget = false) {
-  if (findMatches.length === 0 || currentMatchIndex < 0) {
-    findCountText.value = '0/0';
-    updateEditorHighlights();
-    return;
-  }
 
-  findCountText.value = `${currentMatchIndex + 1}/${findMatches.length}`;
-  const m = findMatches[currentMatchIndex];
-  if (editorRef.value) {
-    scrollToCharIndex(editorRef.value, m.start, focusTarget);
-    editorRef.value.setSelectionRange(m.start, m.end);
-  }
-  updateEditorHighlights();
-}
 
 function findNext() {
   if (findMatches.length === 0) return;
