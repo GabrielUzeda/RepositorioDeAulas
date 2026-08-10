@@ -1709,6 +1709,22 @@ onBeforeUnmount(() => {
 .tb-btn:hover { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
 .tb-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
 
+select.tb-btn {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+}
+select.tb-btn option {
+  background-color: var(--bg-editor);
+  color: var(--text-primary);
+  padding: 6px;
+}
+
 .tb-input {
   height: 32px;
   padding: 0 12px;
