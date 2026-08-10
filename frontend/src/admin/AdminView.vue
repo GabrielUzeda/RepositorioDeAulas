@@ -90,7 +90,7 @@ async function handleSaveProfessor(payload: { nome: string; email: string; passw
 }
 
 async function handleDeleteProfessor(prof: Professor) {
-  if (!confirm(`Tem certeza que deseja excluir "${prof.nome}"? As materias associadas também serão removidas.`)) return;
+  if (!confirm(`Tem certeza que deseja excluir "${prof.nome}"? As disciplinas associadas também serão removidas.`)) return;
   const res = await apiClient.delete(`/professores/${prof.id}`);
   if (!res.success) {
     error.value = res.error || 'Falha ao excluir professor.';
@@ -139,7 +139,7 @@ async function handleSaveCurso(payload: { nome: string; descricao: string; cor: 
 }
 
 async function handleDeleteCurso(curso: Curso) {
-  if (!confirm(`Tem certeza que deseja excluir o curso "${curso.nome}"? As materias dele também serão removidas.`)) return;
+  if (!confirm(`Tem certeza que deseja excluir o curso "${curso.nome}"? As disciplinas dele também serão removidas.`)) return;
   const res = await apiClient.delete(`/cursos/${curso.id}`);
   if (!res.success) {
     error.value = res.error || 'Falha ao excluir curso.';
@@ -293,7 +293,7 @@ function logout() {
               <h3 class="text-lg font-bold text-white">{{ curso.nome }}</h3>
               <p class="text-slate-400 text-sm mt-1 line-clamp-2">{{ curso.descricao || 'Sem descrição.' }}</p>
               <div class="flex items-center space-x-4 mt-3 text-xs text-slate-500">
-                <span>{{ curso.total_materias ?? 0 }} matérias</span>
+                <span>{{ curso.total_disciplinas ?? 0 }} disciplinas</span>
                 <span>{{ curso.total_professores ?? 0 }} professores</span>
               </div>
             </div>
@@ -303,6 +303,6 @@ function logout() {
     </main>
 
     <ProfessorFormModal :show="showProfessorModal" :professor="editingProfessor" @close="showProfessorModal = false" @submit="handleSaveProfessor" />
-    <CursoFormModal :show="showCursoModal" :curso="editingCurso" @close="showCursoModal = false" @submit="handleSaveCurso" />
+    <CursoFormModal :show="showCursoModal" :curso="editingCurso" :professores="professores" @close="showCursoModal = false" @submit="handleSaveCurso" />
   </div>
 </template>

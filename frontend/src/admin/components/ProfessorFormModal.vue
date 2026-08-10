@@ -40,7 +40,7 @@ watch(
 
       if (props.professor) {
         const res = await apiClient.get<Curso[]>(`/professores/${props.professor.id}/cursos`);
-        selectedCursoIds.value = res.success && res.data ? res.data.map((c) => c.id) : [];
+        selectedCursoIds.value = res.success && res.data ? res.data.map((c: Curso) => c.id) : [];
       } else {
         selectedCursoIds.value = [];
       }
@@ -52,7 +52,7 @@ watch(role, async (newRole) => {
   if (newRole === 'professor' && props.professor && selectedCursoIds.value.length === 0) {
     const res = await apiClient.get<Curso[]>(`/professores/${props.professor.id}/cursos`);
     if (res.success && res.data) {
-      selectedCursoIds.value = res.data.map((c) => c.id);
+      selectedCursoIds.value = res.data.map((c: Curso) => c.id);
     }
   }
 });

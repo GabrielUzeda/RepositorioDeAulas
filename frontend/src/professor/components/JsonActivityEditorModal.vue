@@ -26,7 +26,7 @@ watch(
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
         descricao.value = props.atividade.descricao || '';
-        tipo.value = props.atividade.tipo || 'normal';
+        tipo.value = (props.atividade.tipo as any) || 'normal';
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
 

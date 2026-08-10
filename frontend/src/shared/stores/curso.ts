@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { apiClient } from '@/shared/api/client';
-import type { Curso, Materia, Aula, Atividade } from '@/shared/types';
+import type { Curso, Disciplina, Aula, Atividade } from '@/shared/types';
 
 export const useCursoStore = defineStore('curso', () => {
   const cursos = ref<Curso[]>([]);
   const currentCurso = ref<Curso | null>(null);
-  const materias = ref<Materia[]>([]);
-  const currentMateria = ref<Materia | null>(null);
+  const disciplinas = ref<Disciplina[]>([]);
+  const currentDisciplina = ref<Disciplina | null>(null);
   const aulas = ref<Aula[]>([]);
   const atividades = ref<Atividade[]>([]);
   const unlockedActivities = ref<Set<number>>(new Set());
@@ -22,22 +22,22 @@ export const useCursoStore = defineStore('curso', () => {
     }
   }
 
-  async function fetchMaterias(cursoId: number): Promise<void> {
+  async function fetchDisciplinas(cursoId: number): Promise<void> {
     isLoading.value = true;
-    const res = await apiClient.get<Materia[]>(`/cursos/${cursoId}/materias`);
+    const res = await apiClient.get<Disciplina[]>(`/cursos/${cursoId}/disciplinas`);
     isLoading.value = false;
     if (res.success && res.data) {
-      materias.value = res.data;
+      disciplinas.value = res.data;
     }
   }
 
-  async function loadMateriaContent(materiaId: number, password?: string): Promise<boolean> {
+  async function loadDisciplinaContent(disciplinaId: number, password?: string): Promise<boolean> {
     isLoading.value = true;
     const pwdParam = password ? `&senha=${encodeURIComponent(password)}` : '';
 
     const [aulasRes, atvRes] = await Promise.all([
-      apiClient.get<Aula[]>(`/aulas?materia_id=${materiaId}${pwdParam}`),
-      apiClient.get<Atividade[]>(`/atividades?materia_id=${materiaId}${pwdParam}`)
+      apiClient.get<Aula[]>(`/aulas?disciplina_id=${disciplinaId}${pwdParam}`),
+      apiClient.get<Atividade[]>(`/atividades?disciplina_id=${disciplinaId}${pwdParam}`)
     ]);
 
     isLoading.value = false;
@@ -61,15 +61,19 @@ export const useCursoStore = defineStore('curso', () => {
   return {
     cursos,
     currentCurso,
-    materias,
-    currentMateria,
+    disciplinas,
+    materias: disciplinas, // alias de compatibilidade
+    currentDisciplina,
+    currentMateria: currentDisciplina,
     aulas,
     atividades,
     unlockedActivities,
     isLoading,
     fetchCursos,
-    fetchMaterias,
-    loadMateriaContent,
+    fetchDisciplinas,
+    fetchMaterias: fetchDisciplinas,
+    loadDisciplinaContent,
+    loadMateriaContent: loadDisciplinaContent,
     unlockActivity,
     isUnlocked
   };

@@ -34,12 +34,12 @@ const isMatIcon = computed(() => {
         <span class="material-icons text-slate-400">chevron_right</span>
       </div>
       <p class="text-slate-600 text-sm mt-2 line-clamp-3 whitespace-pre-line">
-        {{ props.curso.descricao || 'Clique para visualizar as matérias.' }}
+        {{ props.curso.descricao || 'Clique para visualizar as disciplinas.' }}
       </p>
       <div class="flex items-center space-x-4 mt-4 text-xs text-slate-500">
         <span class="flex items-center space-x-1">
           <span class="material-icons text-sm">book</span>
-          <span>{{ props.curso.total_materias ?? 0 }} matérias</span>
+          <span>{{ props.curso.total_disciplinas ?? 0 }} disciplinas</span>
         </span>
         <span class="flex items-center space-x-1">
           <span class="material-icons text-sm">group</span>

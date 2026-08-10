@@ -11,12 +11,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'submit', payload: { nome: string; email: string; respostas: string }): void;
+  (e: 'submit', payload: { nome: string; email: string; respostas: Record<string, string> }): void;
 }>();
 
 const alunoNome = ref('');
 const alunoEmail = ref('');
-const respostaText = ref('');
+const respostasMap = ref<Record<string, string>>({});
 const questionsList = ref<Question[]>([]);
 const isSubmitting = ref(false);
 const submitSuccess = ref(false);
@@ -34,6 +34,8 @@ watch(
       serverAcertos.value = null;
       serverTotal.value = null;
       serverPontuacao.value = null;
+      respostasMap.value = {};
+
       Promise.all([
         secureGet('alunoNome'),
         secureGet('alunoEmail'),
@@ -41,7 +43,13 @@ watch(
       ]).then(([nome, email, draft]) => {
         alunoNome.value = nome || '';
         alunoEmail.value = email || '';
-        respostaText.value = draft || '';
+        if (draft) {
+          try {
+            respostasMap.value = JSON.parse(draft);
+          } catch {
+            respostasMap.value = { "0": draft };
+          }
+        }
       });
 
       if (props.atividade.json_data) {
@@ -60,12 +68,21 @@ watch(
   }
 );
 
+function getQuestionKey(q: Question, idx: number): string {
+  return q.id !== undefined ? String(q.id) : String(idx);
+}
+
 function handleSaveDraft() {
   if (props.atividade) {
-    secureSet(`draft_${props.atividade.id}`, respostaText.value);
+    secureSet(`draft_${props.atividade.id}`, JSON.stringify(respostasMap.value));
     secureSet('alunoNome', alunoNome.value);
     secureSet('alunoEmail', alunoEmail.value);
   }
+}
+
+function selectOption(key: string, optionText: string) {
+  respostasMap.value[key] = optionText;
+  handleSaveDraft();
 }
 
 async function handleSubmit() {
@@ -79,7 +96,7 @@ async function handleSubmit() {
     atividade_id: props.atividade.id,
     aluno_nome: alunoNome.value,
     aluno_email: alunoEmail.value,
-    respostas: respostaText.value
+    respostas: respostasMap.value
   });
 
   isSubmitting.value = false;
@@ -96,7 +113,7 @@ async function handleSubmit() {
     emit('submit', {
       nome: alunoNome.value,
       email: alunoEmail.value,
-      respostas: respostaText.value
+      respostas: respostasMap.value
     });
     setTimeout(() => {
       emit('close');
@@ -127,23 +144,14 @@ async function handleSubmit() {
         <p class="text-sm">Sua resposta foi salva no sistema e está disponível para correção do professor.</p>
         <div v-if="serverAcertos !== null" class="pt-1">
           <p class="text-sm font-semibold">Correção do servidor: {{ serverAcertos }} / {{ serverTotal ?? questionsList.length }} acertos</p>
-          <p v-if="serverPontuacao !== null" class="text-sm">Pontuação: {{ serverPontuacao }}</p>
+          <p v-if="serverPontuacao !== null" class="text-sm">Pontuação: {{ serverPontuacao }}%</p>
         </div>
       </div>
 
       <div v-else class="space-y-6">
-        <!-- Questions content -->
-        <div v-if="questionsList.length > 0" class="space-y-4 border-t border-b py-4 my-2">
-          <h3 class="text-lg font-semibold text-slate-800">Perguntas da Atividade</h3>
-          <div v-for="(q, idx) in questionsList" :key="idx" class="p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <p class="font-bold text-slate-700">{{ idx + 1 }}. {{ q.title || 'Questão' }}</p>
-            <p class="text-slate-600 text-sm mt-1">{{ q.content }}</p>
-          </div>
-        </div>
-
-        <!-- Student Answers Form -->
-        <form @submit.prevent="handleSubmit" class="space-y-4">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form @submit.prevent="handleSubmit" class="space-y-6">
+          <!-- Identificação do Aluno -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b">
             <div>
               <label for="aluno-nome" class="block text-sm font-medium text-slate-700 mb-1">Seu Nome *</label>
               <input id="aluno-nome" v-model="alunoNome" @input="handleSaveDraft" required type="text" placeholder="Nome Completo" class="w-full px-4 py-2 bg-white text-slate-900 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400" />
@@ -154,10 +162,49 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <div>
-            <label for="aluno-respostas" class="block text-sm font-medium text-slate-700 mb-1">Suas Respostas *</label>
-            <textarea id="aluno-respostas" v-model="respostaText" @input="handleSaveDraft" required rows="5" placeholder="Escreva aqui suas respostas..." class="w-full p-4 bg-white text-slate-900 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-sans text-sm placeholder:text-slate-400"></textarea>
-            <p class="text-xs text-slate-400 mt-1">Seu rascunho é salvo automaticamente no navegador.</p>
+          <!-- Perguntas com Respostas Individuais -->
+          <div v-if="questionsList.length > 0" class="space-y-6">
+            <h3 class="text-lg font-semibold text-slate-800">Perguntas da Atividade</h3>
+            <div v-for="(q, idx) in questionsList" :key="idx" class="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <p class="font-bold text-slate-800 text-sm sm:text-base">{{ idx + 1 }}. {{ q.title || q.content }}</p>
+              <p v-if="q.title && q.content" class="text-slate-600 text-sm">{{ q.content }}</p>
+
+              <!-- Questão Objetiva: Opções/Alternativas -->
+              <div v-if="q.options && q.options.length > 0" class="space-y-2 pt-1">
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Selecione uma alternativa:</label>
+                <div class="grid grid-cols-1 gap-2">
+                  <button
+                    v-for="(opt, optIdx) in q.options"
+                    :key="optIdx"
+                    type="button"
+                    @click="selectOption(getQuestionKey(q, idx), opt.text)"
+                    :class="[
+                      'w-full text-left px-4 py-2.5 rounded-xl border text-sm transition-all flex items-center justify-between',
+                      respostasMap[getQuestionKey(q, idx)] === opt.text
+                        ? 'bg-indigo-50 border-indigo-500 text-indigo-900 font-semibold ring-1 ring-indigo-500'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    ]"
+                  >
+                    <span>{{ opt.text }}</span>
+                    <span v-if="respostasMap[getQuestionKey(q, idx)] === opt.text" class="material-icons text-indigo-600 text-base">check_circle</span>
+                    <span v-else class="material-icons text-slate-300 text-base">radio_button_unchecked</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Questão Discursiva: Textarea Individual -->
+              <div v-else class="pt-1">
+                <label :for="`resposta-q-${idx}`" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Sua resposta:</label>
+                <textarea
+                  :id="`resposta-q-${idx}`"
+                  v-model="respostasMap[getQuestionKey(q, idx)]"
+                  @input="handleSaveDraft"
+                  rows="3"
+                  placeholder="Escreva sua resposta para esta pergunta..."
+                  class="w-full p-3.5 bg-white text-slate-900 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-sans text-sm placeholder:text-slate-400"
+                ></textarea>
+              </div>
+            </div>
           </div>
 
           <!-- Mensagem de erro -->

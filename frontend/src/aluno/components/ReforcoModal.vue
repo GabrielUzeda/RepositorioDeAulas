@@ -7,7 +7,7 @@ import type { Question, Atividade } from '@/shared/types';
 const props = defineProps<{
   show: boolean;
   questions: Question[];
-  title: string;
+  title?: string;
   atividade?: Atividade | null;
 }>();
 
