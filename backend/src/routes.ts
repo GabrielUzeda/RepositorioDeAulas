@@ -482,6 +482,7 @@ app.put('/cursos/:id/professores', adminAuth, async (c) => {
 });
 
 app.post('/disciplinas', professorAuth, createDisciplina);
+app.post('/materias', professorAuth, createDisciplina);
 app.put('/disciplinas/:id', professorAuth, updateDisciplina);
 app.post('/disciplinas/:id', professorAuth, updateDisciplina);
 app.delete('/disciplinas/:id', professorAuth, async (c) => {
