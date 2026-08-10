@@ -1825,7 +1825,13 @@ onBeforeUnmount(() => {
 :deep(.slide-content h2) { font-size:2rem; font-weight:700; letter-spacing:-0.5px; }
 :deep(.slide-content h3) { font-size:1.4rem; font-weight:600; }
 :deep(.slide-content p)  { font-size:1.15rem; line-height:1.75; color:var(--text-secondary); }
-:deep(.slide-content ul), :deep(.slide-content ol) { font-size:1.1rem; line-height:2; padding-left:1.4rem; color:var(--text-secondary); }
+:deep(.slide-content ul), :deep(.slide-content ol) { font-size:1.1rem; line-height:1.8; padding-left:1.6rem; margin-bottom:0.8em; color:var(--text-secondary); list-style-position: outside; }
+:deep(.slide-content ul ul), :deep(.slide-content ul ol), :deep(.slide-content ol ul), :deep(.slide-content ol ol) { font-size:0.95em; line-height:1.6; margin-top:0.3em; margin-bottom:0.3em; padding-left:1.4rem; }
+:deep(.slide-content ul) { list-style-type: disc; }
+:deep(.slide-content ul ul) { list-style-type: circle; }
+:deep(.slide-content ul ul ul) { list-style-type: square; }
+:deep(.slide-content ol) { list-style-type: decimal; }
+:deep(.slide-content li::marker) { color:var(--accent); }
 :deep(.slide-content strong) { color:var(--text-primary); }
 :deep(.slide-content em) { color:var(--yellow); }
 .marpnext-modal-root[data-theme="light"] :deep(.slide-content em) { color:#b45309; }
