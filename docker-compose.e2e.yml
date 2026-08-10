@@ -38,6 +38,26 @@ services:
     depends_on:
       - bun-server
     restart: unless-stopped
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.49.1-noble
+    container_name: e2e-playwright
+    environment:
+      PLAYWRIGHT_CONTAINER: "true"
+      E2E_FRONTEND_URL: http://vite:5173
+      E2E_BACKEND_URL: http://bun-server:8080
+      E2E_ADMIN_EMAIL: admin@escola.com
+      E2E_ADMIN_PASSWORD: ${PROFESSOR_PASSWORD:-ProfessorUzeda!}
+      PROFESSOR_PASSWORD: ${PROFESSOR_PASSWORD:-ProfessorUzeda!}
+    volumes:
+      - ./e2e:/app
+    working_dir: /app
+    ipc: host
+    networks:
+      - e2e-network
+    depends_on:
+      - vite
+      - bun-server
+    command: sh -c "npm install && npx playwright test"
 
 networks:
   e2e-network:
@@ -46,3 +66,4 @@ networks:
 volumes:
   backend_node_modules:
   vite_node_modules:
+
