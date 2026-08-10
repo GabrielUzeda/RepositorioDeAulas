@@ -174,7 +174,7 @@ Ambiente isolado em portas alternativas para rodar testes automatizados de ponta
 * **Autenticação Segura:** Autenticação JWT com PBKDF2 SHA-256 (600k iterações) e sistema de aprovação de contas de professores por administradores (`status: pendente` -> `status: ativo`).
 * **Gestão de Cursos e Matérias:** Criar, editar, organizar e personalizar cores, ícones e senhas de matérias e cursos.
 * **Vínculo Multi-Professor:** Múltiplos professores podem ser vinculados para gerenciar um mesmo curso.
-* **Gerador de Aulas Marp:** Criador de aulas em Markdown com suporte a diagramas Mermaid e compilação em HTML5 profissional.
+* **Gerador e Editor de Aulas Marp:** Criador e editor visual de aulas em Markdown/Marp com suporte a diagramas Mermaid, renderização KaTeX e compilação em HTML5 profissional.
 * **Editor Visual de Atividades:** Criador e editor visual de questionários, roletas, provas e minigames.
 * **Gestão de Respostas de Alunos:** Visualização, filtragem por disciplina/turma e descarte de submissões de alunos.
 * **Gestão de Usuários (Exclusivo Admin):** Aprovação de novos registros de professores, definição de papéis (`admin` / `professor`) e remoção de contas.
