@@ -155,13 +155,14 @@ function initMermaid(themeName: 'dark' | 'light') {
       theme: themeName === 'dark' ? 'dark' : 'default',
       securityLevel: 'loose',
       logLevel: 'error',
-      fontFamily: 'Inter, system-ui, sans-serif',
       flowchart: { useMaxWidth: true, htmlLabels: true, padding: 20, nodeSpacing: 50, rankSpacing: 60, curve: 'basis' },
       sequence: { useMaxWidth: true, actorMargin: 80, width: 200, noteMargin: 16, messageMargin: 40, wrap: true, wrapPadding: 16 },
       themeVariables: {
         primaryColor: '#6366f1',
         primaryTextColor: themeName === 'dark' ? '#f8fafc' : '#0f172a',
         lineColor: themeName === 'dark' ? '#94a3b8' : '#475569',
+        secondaryColor: themeName === 'dark' ? '#1e1b4b' : '#e0e7ff',
+        tertiaryColor: themeName === 'dark' ? '#1e293b' : '#f1f5f9',
         fontSize: '15px',
       }
     });
