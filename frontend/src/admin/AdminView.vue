@@ -62,7 +62,8 @@ function openEditProfessor(prof: Professor) {
   showProfessorModal.value = true;
 }
 
-async function handleSaveProfessor(payload: { nome: string; email: string; password: string; role: string }) {
+async function handleSaveProfessor(payload: { nome: string; email: string; password: string; role: string; curso_ids: number[] }) {
+  let profId = editingProfessor.value?.id;
   if (editingProfessor.value) {
     const res = await apiClient.put(`/professores/${editingProfessor.value.id}`, payload);
     if (!res.success) {
@@ -70,9 +71,17 @@ async function handleSaveProfessor(payload: { nome: string; email: string; passw
       return;
     }
   } else {
-    const res = await apiClient.post('/professores', payload);
-    if (!res.success) {
+    const res = await apiClient.post<Professor>('/professores', payload);
+    if (!res.success || !res.data) {
       error.value = res.error || 'Falha ao criar professor.';
+      return;
+    }
+    profId = res.data.id;
+  }
+  if (profId && payload.role !== 'admin' && Array.isArray(payload.curso_ids)) {
+    const resCursos = await apiClient.put(`/professores/${profId}/cursos`, { curso_ids: payload.curso_ids });
+    if (!resCursos.success) {
+      error.value = resCursos.error || 'Falha ao vincular cursos ao professor.';
       return;
     }
   }
@@ -101,21 +110,30 @@ function openEditCurso(curso: Curso) {
 }
 
 async function handleSaveCurso(payload: { nome: string; descricao: string; cor: string; icone: string; professor_ids: number[] }) {
+  let cursoId = editingCurso.value?.id;
   if (editingCurso.value) {
     const res = await apiClient.put(`/cursos/${editingCurso.value.id}`, payload);
     if (!res.success) {
       error.value = res.error || 'Falha ao atualizar curso.';
       return;
     }
-    await apiClient.put(`/cursos/${editingCurso.value.id}/professores`, { professor_ids: payload.professor_ids });
   } else {
-    const res = await apiClient.post('/cursos', payload);
-    if (!res.success) {
+    const res = await apiClient.post<Curso>('/cursos', payload);
+    if (!res.success || !res.data) {
       error.value = res.error || 'Falha ao criar curso.';
       return;
     }
-    await apiClient.put(`/cursos/${res.data.id}/professores`, { professor_ids: payload.professor_ids });
+    cursoId = res.data.id;
   }
+
+  if (cursoId && Array.isArray(payload.professor_ids)) {
+    const resProfs = await apiClient.put(`/cursos/${cursoId}/professores`, { professor_ids: payload.professor_ids });
+    if (!resProfs.success) {
+      error.value = resProfs.error || 'Falha ao vincular professores ao curso.';
+      return;
+    }
+  }
+
   showCursoModal.value = false;
   await fetchCursos();
 }
@@ -193,15 +211,16 @@ function logout() {
                 <th class="px-6 py-3 font-semibold">Nome</th>
                 <th class="px-6 py-3 font-semibold">E-mail</th>
                 <th class="px-6 py-3 font-semibold">Perfil</th>
+                <th class="px-6 py-3 font-semibold">Cursos</th>
                 <th class="px-6 py-3 font-semibold text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="4" class="px-6 py-8 text-center text-slate-400">Carregando...</td>
+                <td colspan="5" class="px-6 py-8 text-center text-slate-400">Carregando...</td>
               </tr>
               <tr v-else-if="professores.length === 0">
-                <td colspan="4" class="px-6 py-8 text-center text-slate-400">Nenhum professor cadastrado.</td>
+                <td colspan="5" class="px-6 py-8 text-center text-slate-400">Nenhum professor cadastrado.</td>
               </tr>
               <tr v-for="prof in professores" :key="prof.id" class="border-t border-slate-700 hover:bg-slate-700/40">
                 <td class="px-6 py-3 text-white font-medium">{{ prof.nome }}</td>
@@ -209,6 +228,14 @@ function logout() {
                 <td class="px-6 py-3">
                   <span :class="prof.role === 'admin' ? 'bg-indigo-600/30 text-indigo-300' : 'bg-slate-700 text-slate-300'" class="px-2.5 py-0.5 rounded-md text-xs font-bold uppercase">
                     {{ prof.role }}
+                  </span>
+                </td>
+                <td class="px-6 py-3">
+                  <span v-if="prof.role === 'admin'" class="px-2.5 py-0.5 bg-purple-950/60 border border-purple-800/50 text-purple-300 text-xs font-bold rounded-md uppercase">
+                    Acesso Total
+                  </span>
+                  <span v-else class="px-2.5 py-0.5 bg-slate-800 border border-slate-700 text-indigo-300 text-xs font-bold rounded-md uppercase">
+                    {{ prof.total_cursos ?? 0 }} {{ prof.total_cursos === 1 ? 'curso' : 'cursos' }}
                   </span>
                 </td>
                 <td class="px-6 py-3">
