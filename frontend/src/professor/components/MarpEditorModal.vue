@@ -1504,12 +1504,12 @@ onBeforeUnmount(() => {
         <input
           v-model="titleInput"
           placeholder="Título da Aula"
-          class="h-8 px-3 bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded outline-none focus:border-indigo-500 w-48 placeholder:text-slate-500"
+          class="tb-input font-semibold w-48"
         />
         <input
           v-model="descInput"
           placeholder="Descrição rápida da aula..."
-          class="h-8 px-3 bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded outline-none focus:border-indigo-500 flex-1 placeholder:text-slate-500"
+          class="tb-input flex-1"
         />
       </div>
 
@@ -1700,6 +1700,27 @@ onBeforeUnmount(() => {
 }
 .tb-btn:hover { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
 .tb-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+.tb-input {
+  height: 32px;
+  padding: 0 12px;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  border-radius: 6px;
+  outline: none;
+  transition: all .15s ease;
+}
+.tb-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+.tb-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
 
 #editor-pane {
   width: 42%; min-width: 320px;
