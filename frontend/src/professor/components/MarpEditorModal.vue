@@ -228,14 +228,14 @@ function renderSlides(source: string) {
   slideCountText.value = `${totalSlides} slides`;
   charCountText.value = `${source.length} chars`;
 
-  if (global.theme) {
-    const normTheme = String(global.theme).trim().toLowerCase();
-    if (normTheme === 'dark' || normTheme === 'light') {
-      if (currentTheme.value !== normTheme) {
-        applyTheme(normTheme as 'dark' | 'light', false);
-      }
-    }
+  const targetTheme = (global.theme && (global.theme === 'light' || global.theme === 'dark'))
+    ? (global.theme as 'dark' | 'light')
+    : currentTheme.value;
+
+  if (currentTheme.value !== targetTheme) {
+    currentTheme.value = targetTheme;
   }
+  initMermaid(targetTheme);
 
   const container = previewPaneRef.value;
   if (!container) return;
