@@ -1379,9 +1379,57 @@ function cleanupAutoSave() {
   }
 }
 
-// ─── Global API (4.7) ──────────────────────
+function togglePresentMode() {
+  isPresentMode.value = !isPresentMode.value;
+  if (isPresentMode.value) {
+    try { document.documentElement.requestFullscreen?.(); } catch(e){}
+  } else {
+    try { if (document.fullscreenElement) document.exitFullscreen?.(); } catch(e){}
+  }
+}
+
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (!props.show) return;
+
+  const target = e.target as HTMLElement | null;
+  const isInputTarget = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('#find-bar'));
+
+  if (e.key === 'f' || e.key === 'F') {
+    if (!isInputTarget) {
+      e.preventDefault();
+      togglePresentMode();
+      return;
+    }
+  }
+
+  if (e.key === 'Escape') {
+    if (isPresentMode.value) {
+      isPresentMode.value = false;
+      try { if (document.fullscreenElement) document.exitFullscreen?.(); } catch(e){}
+      return;
+    }
+  }
+
+  if (isPresentMode.value || !isInputTarget) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ' || e.key === 'PageDown') {
+      e.preventDefault();
+      nextSlide();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      prevSlide();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      activateSlide(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      activateSlide(totalSlides - 1);
+    }
+  }
+}
+
 onMounted(() => {
   setupAutoSave();
+  window.addEventListener('keydown', handleGlobalKeydown);
   const w = window as any;
   w.marpNext = {
     render: renderSlides,
@@ -1398,6 +1446,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cleanupAutoSave();
+  window.removeEventListener('keydown', handleGlobalKeydown);
   const w = window as any;
   if (w.marpNext) delete w.marpNext;
 });
@@ -1426,7 +1475,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="sep"></div>
-      <button class="tb-btn" :class="{ active: isPresentMode }" @click="isPresentMode = !isPresentMode" title="Apresentar (F)">▶ Apresentar</button>
+      <button class="tb-btn" :class="{ active: isPresentMode }" @click="togglePresentMode" title="Apresentar (F)">▶ Apresentar</button>
       <button class="tb-btn" :class="{ active: isAnimMode }" @click="isAnimMode = !isAnimMode" title="Toggle animações">✦ Anim</button>
       <button class="tb-btn" @click="toggleTheme" title="Toggle tema">◐ Tema</button>
 
