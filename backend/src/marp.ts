@@ -40,7 +40,7 @@ export function processMarpContent(
   let content = mdContent;
   if (!content.includes('mermaid.initialize')) {
     content +=
-      '\n\n<script type="module">\n  import mermaid from "https://esm.sh/mermaid@10";\n  mermaid.initialize({ startOnLoad: true, theme: \'default\' });\n</script>';
+      '\n\n<script type="module">\n  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@latest/+esm";\n  mermaid.initialize({ startOnLoad: true, theme: \'default\' });\n</script>';
   }
   content = content.replace(/```mermaid\s*([\s\S]*?)```/g, (_, code) => `<div class="mermaid">${code}</div>`);
 

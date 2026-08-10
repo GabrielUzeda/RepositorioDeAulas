@@ -452,11 +452,15 @@ app.put('/cursos/:id/professores', adminAuth, async (c) => {
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
   const professorIds = Array.isArray(body.professor_ids) ? body.professor_ids.map(Number).filter((n: number) => Number.isInteger(n)) : [];
-  dbq('DELETE FROM curso_professores WHERE curso_id = ?').run(id);
-  const ins = db.query('INSERT OR IGNORE INTO curso_professores (curso_id, professor_id) VALUES (?, ?)');
-  for (const pid of professorIds) {
-    if (dbq('SELECT id FROM professores WHERE id = ?').get(pid)) ins.run(id, pid);
-  }
+
+  db.transaction(() => {
+    dbq('DELETE FROM curso_professores WHERE curso_id = ?').run(id);
+    const ins = db.query('INSERT OR IGNORE INTO curso_professores (curso_id, professor_id) VALUES (?, ?)');
+    for (const pid of professorIds) {
+      if (dbq('SELECT id FROM professores WHERE id = ?').get(pid)) ins.run(id, pid);
+    }
+  })();
+
   const rows = dbq(
     `SELECT p.id, p.nome, p.email, p.role FROM curso_professores cp
      JOIN professores p ON p.id = cp.professor_id
@@ -978,8 +982,12 @@ function mapProfessor(row: any) {
 }
 
 app.get('/professores', adminAuth, async (c) => {
-  const rows = dbq('SELECT id, nome, email, role, status, criado_em FROM professores ORDER BY nome').all();
-  return c.json(rows.map(mapProfessor));
+  const rows = dbq(`
+    SELECT p.id, p.nome, p.email, p.role, p.status, p.criado_em,
+           (SELECT COUNT(*) FROM curso_professores cp WHERE cp.professor_id = p.id) AS total_cursos
+    FROM professores p ORDER BY p.nome
+  `).all();
+  return c.json(rows.map(r => ({ ...mapProfessor(r), total_cursos: Number((r as any).total_cursos || 0) })));
 });
 
 app.post('/professores', adminAuth, async (c) => {
@@ -1037,6 +1045,42 @@ app.delete('/professores/:id', adminAuth, async (c) => {
   if (!existing) return c.text('Professor not found', 404);
   dbq('DELETE FROM professores WHERE id = ?').run(id);
   return c.body(null, 204);
+});
+
+app.get('/professores/:id/cursos', adminAuth, (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const rows = dbq(
+    `SELECT c.id, c.slug, c.nome, c.cor, c.icone, c.descricao FROM curso_professores cp
+     JOIN cursos c ON c.id = cp.curso_id
+     WHERE cp.professor_id = ? ORDER BY c.nome`
+  ).all(id);
+  return c.json(rows);
+});
+
+app.put('/professores/:id/cursos', adminAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const prof = dbq('SELECT id FROM professores WHERE id = ?').get(id);
+  if (!prof) return c.text('Professor not found', 404);
+  const body = await parseBody(c);
+  if (!body || !Array.isArray(body.curso_ids)) return c.text('curso_ids required', 400);
+  const cursoIds = body.curso_ids.map(Number).filter((n: number) => Number.isInteger(n));
+
+  db.transaction(() => {
+    dbq('DELETE FROM curso_professores WHERE professor_id = ?').run(id);
+    const ins = db.query('INSERT OR IGNORE INTO curso_professores (curso_id, professor_id) VALUES (?, ?)');
+    for (const cid of cursoIds) {
+      if (dbq('SELECT id FROM cursos WHERE id = ?').get(cid)) ins.run(cid, id);
+    }
+  })();
+
+  const rows = dbq(
+    `SELECT c.id, c.slug, c.nome, c.cor, c.icone, c.descricao FROM curso_professores cp
+     JOIN cursos c ON c.id = cp.curso_id
+     WHERE cp.professor_id = ? ORDER BY c.nome`
+  ).all(id);
+  return c.json(rows);
 });
 
 app.get('/materias/*', async (c) => {
