@@ -40,17 +40,36 @@ const isMatchRegex = ref(false);
 const findCountText = ref('0/0');
 const findQuery = ref('');
 const replaceQuery = ref('');
+const fontScale = ref(1.0);
+const isIdle = ref(false);
+let idleTimer: any = null;
 
-// Internal Engine State
-let currentSlide = 0;
-let totalSlides = 0;
-let renderTimer: any = null;
-let scrollTimer: any = null;
-let mermaidCounter = 0;
-let mermaidReady = false;
-let findMatches: Array<{ start: number; end: number }> = [];
-let currentMatchIndex = -1;
-let isResizing = false;
+function adjustFont(factor: number) {
+  fontScale.value *= factor;
+  fontScale.value = Math.max(0.6, Math.min(2.5, fontScale.value));
+  document.documentElement.style.setProperty('--font-scale', String(fontScale.value));
+}
+
+function resetFont() {
+  fontScale.value = 1.0;
+  document.documentElement.style.setProperty('--font-scale', '1.0');
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.();
+  } else {
+    document.exitFullscreen?.();
+  }
+}
+
+function handleMouseMove() {
+  isIdle.value = false;
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    isIdle.value = true;
+  }, 2500);
+}
 
 // Default Markdown Template
 const DEFAULT_MD = `---
@@ -1430,6 +1449,7 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 onMounted(() => {
   setupAutoSave();
   window.addEventListener('keydown', handleGlobalKeydown);
+  window.addEventListener('mousemove', handleMouseMove);
   const w = window as any;
   w.marpNext = {
     render: renderSlides,
@@ -1447,6 +1467,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   cleanupAutoSave();
   window.removeEventListener('keydown', handleGlobalKeydown);
+  window.removeEventListener('mousemove', handleMouseMove);
+  if (idleTimer) clearTimeout(idleTimer);
   const w = window as any;
   if (w.marpNext) delete w.marpNext;
 });
@@ -1579,6 +1601,24 @@ onBeforeUnmount(() => {
 
     <div id="progress-bar" ref="progressBarRef"></div>
     <div id="status-bar" ref="statusBarRef"></div>
+
+    <!-- FLOATING PRESENTATION CONTROLS (Igual a apresentacao-marp-next.html) -->
+    <div v-if="isPresentMode" id="controls-bar" :class="{ idle: isIdle }">
+      <button class="ctrl-btn" @click="prevSlide" title="Anterior (← / ↑)">◀</button>
+      <button class="ctrl-btn" @click="nextSlide" title="Próximo (→ / ↓ / Espaço)">▶</button>
+      <span id="counter" style="font-size:12px;font-family:var(--font-mono);color:var(--text-muted);padding:0 6px;">{{ currentSlide + 1 }}/{{ totalSlides }}</span>
+      <div style="width:1px;height:16px;background:var(--border);"></div>
+      <button class="ctrl-btn" @click="toggleTheme" title="Alternar Tema (T)">
+        <svg v-if="currentTheme === 'dark'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        {{ currentTheme === 'dark' ? 'Claro' : 'Escuro' }}
+      </button>
+      <button class="ctrl-btn" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
+      <button class="ctrl-btn" @click="resetFont" title="Resetar Fonte">100%</button>
+      <button class="ctrl-btn" @click="adjustFont(1.1)" title="Aumentar Fonte (+)">A+</button>
+      <div style="width:1px;height:16px;background:var(--border);"></div>
+      <button class="ctrl-btn" @click="toggleFullscreen" title="Tela Cheia (F)">⛶ Fullscreen</button>
+    </div>
   </div>
 </template>
 
@@ -1845,9 +1885,60 @@ onBeforeUnmount(() => {
   box-shadow:none!important; border:none!important; padding:60px 80px!important; margin:0!important;
 }
 
+/* Floating Presentation Controls Overlay */
+#controls-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  transition: opacity 0.3s ease, background 0.3s ease, border-color 0.3s ease;
+}
+
+.marpnext-modal-root[data-theme="light"] #controls-bar {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+}
+
+#controls-bar.idle {
+  opacity: 0.15;
+}
+#controls-bar:hover, #controls-bar.idle:hover {
+  opacity: 1;
+}
+
+.ctrl-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+}
+.ctrl-btn:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 @media print {
   .marpnext-modal-root { position: static !important; background: #fff !important; }
-  #topbar, #editor-pane, #resizer, #progress-bar, #status-bar, #find-bar { display: none !important; }
+  #topbar, #editor-pane, #resizer, #progress-bar, #status-bar, #find-bar, #controls-bar { display: none !important; }
   #preview-pane { display: block !important; position: static !important; width: 100% !important; height: auto !important; overflow: visible !important; padding: 0 !important; gap: 0 !important; background: #fff !important; }
   .marpnext-modal-root.anim-mode :deep(.slide .slide-content > *) { opacity: 1 !important; animation: none !important; transition: none !important; }
   :deep(.slide) { page-break-after: always !important; break-after: page !important; position: relative !important; opacity: 1 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; margin: 0 !important; box-shadow: none !important; border-radius: 0 !important; transform: none !important; }
