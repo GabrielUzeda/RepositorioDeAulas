@@ -61,45 +61,62 @@ function handleSubmit() {
 </script>
 
 <template>
-  <div v-if="props.show" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 relative border border-slate-100" @click.stop>
-      <button @click="emit('close')" class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition">
-        <span class="material-icons">close</span>
-      </button>
+  <div v-if="props.show" class="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-50" @click.self="emit('close')">
+    <div class="bg-slate-900 rounded-3xl w-full max-w-xl shadow-2xl border border-slate-800 flex flex-col max-h-[92vh] overflow-hidden">
+      <!-- Header with tight icon fit & generous horizontal padding -->
+      <div class="px-8 py-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/90 shrink-0">
+        <div class="flex items-center space-x-3.5">
+          <div class="w-11 h-11 shrink-0 bg-indigo-600/20 text-indigo-400 rounded-2xl border border-indigo-500/30 flex items-center justify-center shadow-inner">
+            <span class="material-icons text-xl">{{ icone || 'group' }}</span>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-white leading-tight">{{ props.materia ? 'Editar Matéria' : 'Nova Matéria' }}</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Configure título, ícone, cor e senha de acesso dos estudantes</p>
+          </div>
+        </div>
+        <button @click="emit('close')" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
 
-      <h3 class="text-xl font-bold text-slate-800">{{ props.materia ? 'Editar Materia' : 'Nova Materia' }}</h3>
-
-      <form @submit.prevent="handleSubmit" class="space-y-4">
+      <!-- Form Body with px-8 padding & custom scrollbar -->
+      <form @submit.prevent="handleSubmit" class="px-8 py-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
         <div>
-          <label for="materia-nome" class="block text-sm font-medium text-slate-700 mb-1">Nome da Materia *</label>
-          <input id="materia-nome" v-model="nome" required type="text" placeholder="Ex: Web Mobile 2026" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
+          <label for="materia-nome" class="block text-sm font-semibold text-slate-200 mb-1.5">Nome da Matéria *</label>
+          <input id="materia-nome" v-model="nome" required type="text" placeholder="Ex: Programação Web Mobile" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 text-sm" />
         </div>
 
         <div>
-          <label for="materia-desc" class="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-          <textarea id="materia-desc" v-model="descricao" rows="3" placeholder="Descrição da materia para os alunos..." class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+          <label for="materia-desc" class="block text-sm font-semibold text-slate-200 mb-1.5">Descrição da Matéria</label>
+          <textarea id="materia-desc" v-model="descricao" rows="3" placeholder="Descreva os tópicos principais e plano de aula desta matéria..." class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 text-sm min-h-[90px] custom-scrollbar resize-y"></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          <div>
+            <label class="block text-sm font-semibold text-slate-200 mb-1.5">Ícone da Matéria</label>
+            <IconPicker v-model="icone" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-200 mb-1.5">Cor de Identificação</label>
+            <ColorPicker v-model="cor" />
+          </div>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-2">Cor da Materia</label>
-          <ColorPicker v-model="cor" />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-2">Ícone da Materia</label>
-          <IconPicker v-model="icone" />
-        </div>
-
-        <div>
-          <label for="materia-senha" class="block text-sm font-medium text-slate-700 mb-1">Senha de Acesso para Alunos</label>
-          <input id="materia-senha" v-model="senha" :required="!props.materia" type="password" :placeholder="props.materia ? 'Deixe em branco para manter a atual' : 'Defina a senha da materia'" class="w-full px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" />
-        </div>
-
-        <div class="flex justify-end space-x-3 pt-4 border-t">
-          <button @click="emit('close')" type="button" class="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium">Cancelar</button>
-          <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-md">Salvar Materia</button>
+          <label for="materia-senha" class="block text-sm font-semibold text-slate-200 mb-1.5">
+            Senha de Acesso dos Alunos
+            <span v-if="props.materia" class="text-slate-500 font-normal">(deixe em branco para manter a atual)</span>
+          </label>
+          <input id="materia-senha" v-model="senha" :required="!props.materia" type="password" :placeholder="props.materia ? '••••••••' : 'Defina uma senha de acesso'" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 text-sm" />
         </div>
       </form>
+
+      <!-- Footer with px-8 horizontal padding -->
+      <div class="px-8 py-4 border-t border-slate-800 flex justify-end space-x-3 bg-slate-900/90 shrink-0">
+        <button @click="emit('close')" type="button" class="px-5 py-2.5 text-slate-400 hover:text-white rounded-xl text-xs font-medium transition-colors">Cancelar</button>
+        <button @click="handleSubmit" type="button" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all">Salvar Matéria</button>
+      </div>
     </div>
   </div>
 </template>

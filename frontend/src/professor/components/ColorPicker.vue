@@ -24,7 +24,7 @@ function selectColor(colorClass: string) {
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-3 py-1">
+  <div class="flex flex-wrap gap-2.5 py-1">
     <button
       v-for="color in COLOR_OPTIONS"
       :key="color.class"
@@ -32,12 +32,12 @@ function selectColor(colorClass: string) {
       :title="color.name"
       @click="selectColor(color.class)"
       :class="[
-        'w-9 h-9 rounded-full flex items-center justify-center text-white transition-all transform hover:scale-110 shadow-sm',
+        'w-8 h-8 rounded-full flex items-center justify-center text-white transition-all transform hover:scale-110 shadow-sm border border-white/20',
         color.class,
-        props.modelValue === color.class ? 'ring-2 ring-offset-2 ring-gray-800 scale-110 opacity-100' : 'opacity-80 hover:opacity-100'
+        props.modelValue === color.class ? 'ring-2 ring-offset-2 ring-offset-slate-900 ring-indigo-400 scale-110 opacity-100 shadow-indigo-500/50 shadow-lg' : 'opacity-70 hover:opacity-100'
       ]"
     >
-      <span v-if="props.modelValue === color.class" class="material-icons text-sm">check</span>
+      <span v-if="props.modelValue === color.class" class="material-icons text-xs font-bold">check</span>
     </button>
   </div>
 </template>
