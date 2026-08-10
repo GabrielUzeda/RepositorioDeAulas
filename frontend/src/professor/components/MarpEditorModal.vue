@@ -1515,7 +1515,7 @@ onBeforeUnmount(() => {
 
       <div class="sep"></div>
       <button class="tb-btn" :class="{ active: isPresentMode }" @click="togglePresentMode" title="Apresentar (F)">▶ Apresentar</button>
-      <button class="tb-btn" :class="{ active: isAnimMode }" @click="isAnimMode = !isAnimMode" title="Toggle animações">✦ Anim</button>
+      <button class="tb-btn" :class="{ active: isAnimMode }" @click="isAnimMode = !isAnimMode" title="Toggle animações">✦ Animação</button>
 
       <select v-model="currentTheme" @change="applyTheme(currentTheme, true)" class="tb-btn" title="Alternar tema da apresentação">
         <option value="dark">🌙 Dark</option>
@@ -1696,7 +1696,7 @@ onBeforeUnmount(() => {
   height: 32px; padding: 0 12px; border-radius:6px; border:1px solid var(--border);
   background:transparent; color:var(--text-secondary); font-size:12px; font-weight: 500;
   font-family:var(--font-sans); cursor:pointer; transition:all .15s;
-  box-sizing: border-box; outline: none;
+  box-sizing: border-box; outline: none; white-space: nowrap; flex-shrink: 0;
 }
 .tb-btn:hover { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
 .tb-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
