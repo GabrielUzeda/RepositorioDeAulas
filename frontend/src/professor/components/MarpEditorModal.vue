@@ -462,8 +462,9 @@ function handlePreviewScroll() {
       const top = slides[i].offsetTop;
       const bottom = top + slides[i].offsetHeight;
       if (mid >= top && mid < bottom) {
-        if (currentSlide !== i) {
-          currentSlide = i;
+        if (currentSlideNum !== i) {
+          currentSlideNum = i;
+          currentSlide.value = i;
           slides.forEach((s, j) => s.classList.toggle('active', j === i));
           updateProgress();
         }
@@ -1378,7 +1379,8 @@ watch(
     descInput.value = props.descricao ?? '';
     const draft = window.localStorage?.getItem('marp-next-content') ?? '';
     markdownInput.value = props.markdown ?? (draft.trim() ? draft : DEFAULT_MD);
-    currentSlide = 0;
+    currentSlideNum = 0;
+    currentSlide.value = 0;
     nextTick(() => {
       renderSlides(markdownInput.value);
       if (editorRef.value) editorRef.value.focus();
