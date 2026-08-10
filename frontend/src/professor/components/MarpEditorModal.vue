@@ -672,7 +672,8 @@ function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): stri
     if (slide.directives['animation-stagger']) styleParts.push(`--anim-stagger:${slide.directives['animation-stagger']}`);
 
     const styleAttr = styleParts.length > 0 ? `style="${styleParts.join(';')}"` : '';
-    const rawHtml = md ? md.render(slide.content) : `<p>${escapeHtml(slide.content)}</p>`;
+    let rawHtml = md ? md.render(slide.content) : `<p>${escapeHtml(slide.content)}</p>`;
+    rawHtml = rawHtml.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml) => `<div class="table-wrap">${tableHtml}</div>`);
 
     slidesHtml += `
     <section class="${cls}" data-slide="${i}" ${animAttr} ${staggerAttr} ${styleAttr}>
@@ -689,7 +690,7 @@ function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): stri
 <title>${escapeHtml(docTitle)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&family=JetBrains Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>
