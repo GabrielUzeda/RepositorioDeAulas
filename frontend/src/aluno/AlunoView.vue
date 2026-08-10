@@ -53,7 +53,22 @@ async function handleSelectCurso(curso: Curso) {
 
 async function handleSelectDisciplina(disciplina: Disciplina) {
   selectedDisciplina.value = disciplina;
-  const cursoPwd = selectedCurso.value?.senha || '';
+
+  // Verificar se o curso exige senha e se já está concedido
+  if (selectedCurso.value?.senha) {
+    const savedToken = await secureGet(`curso_access_${selectedCurso.value.id}`);
+    if (savedToken !== 'granted') {
+      pendingCurso.value = selectedCurso.value;
+      showPasswordModal.value = true;
+      return;
+    }
+  }
+
+  let cursoPwd = selectedCurso.value?.senha || '';
+  if (!cursoPwd && selectedCurso.value?.id) {
+    cursoPwd = (await secureGet(`curso_senha_${selectedCurso.value.id}`)) || '';
+  }
+
   const success = await cursoStore.loadDisciplinaContent(disciplina.id, cursoPwd);
   if (success) {
     activeView.value = 'content';
@@ -72,7 +87,13 @@ async function handlePasswordSubmit(password: string) {
       showPasswordModal.value = false;
       const curso = pendingCurso.value;
       pendingCurso.value = null;
-      await handleSelectCurso(curso);
+
+      // Se já estava selecionando uma disciplina específica
+      if (selectedDisciplina.value && selectedDisciplina.value.curso_id === curso.id) {
+        await handleSelectDisciplina(selectedDisciplina.value);
+      } else {
+        await handleSelectCurso(curso);
+      }
     } else {
       alert('Senha do curso incorreta!');
     }
@@ -93,10 +114,7 @@ async function handlePasswordSubmit(password: string) {
 async function handleOpenAula(aula: Aula) {
   let url = aula.caminho;
   if (selectedCurso.value?.id) {
-    let senha = selectedCurso.value.senha;
-    if (!senha) {
-      senha = await secureGet(`curso_senha_${selectedCurso.value.id}`);
-    }
+    let senha = selectedCurso.value.senha || (await secureGet(`curso_senha_${selectedCurso.value.id}`)) || undefined;
     if (senha) {
       const sep = url.includes('?') ? '&' : '?';
       url += `${sep}senha=${encodeURIComponent(senha)}`;
@@ -279,8 +297,8 @@ function goBack() {
               v-for="atividade in cursoStore.atividades"
               :key="atividade.id"
               :atividade="atividade"
-              :is-locked="!cursoStore.isUnlocked(atividade.id)"
-              @open="handleOpenAtividade"
+              :is-locked="!!atividade.allow_password && !cursoStore.isUnlocked(atividade.id)"
+              @click="handleOpenAtividade"
             />
           </div>
         </div>
