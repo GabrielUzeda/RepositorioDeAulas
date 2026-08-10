@@ -22,7 +22,7 @@ async function waitFor(url: string, timeoutMs = 120000) {
   while (Date.now() < deadline) {
     try {
       const res = await fetch(url);
-      if (res.ok) return;
+      if (res.status < 400) return;
     } catch {
       // not ready yet
     }
