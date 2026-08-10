@@ -34,7 +34,7 @@ async function waitFor(url: string, timeoutMs = 120000) {
 export default async function globalSetup() {
   if (process.env.PLAYWRIGHT_CONTAINER) {
     console.log('[e2e] Rodando dentro do container Playwright. Aguardando serviços...');
-    await waitFor(`${E2E_BACKEND_URL}/check-auth`);
+    await waitFor(`${E2E_BACKEND_URL}/cursos`);
     await waitFor(E2E_FRONTEND_URL);
     console.log('[e2e] Serviços prontos.');
     return;
