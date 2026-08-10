@@ -326,6 +326,13 @@ document.addEventListener('mousemove', () => {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => controls.classList.add('idle'), 2500);
 });
+try {
+  const _url = new URL(window.location.href);
+  if (_url.searchParams.has('senha')) {
+    _url.searchParams.delete('senha');
+    window.history.replaceState({}, document.title, _url.pathname + (_url.searchParams.toString() ? '?' + _url.searchParams.toString() : '') + _url.hash);
+  }
+} catch (e) {}
 activateSlide(0);
 initMermaid(document.documentElement.dataset.theme || 'dark');
 renderAllMermaid();

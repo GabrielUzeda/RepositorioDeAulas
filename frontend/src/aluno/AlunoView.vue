@@ -67,6 +67,7 @@ async function handlePasswordSubmit(password: string) {
   if (pendingCurso.value) {
     const res = await apiClient.post(`/cursos/${pendingCurso.value.id}/verificar-senha`, { senha: password });
     if (res.success) {
+      await secureSet(`curso_senha_${pendingCurso.value.id}`, password);
       await secureSet(`curso_access_${pendingCurso.value.id}`, 'granted');
       showPasswordModal.value = false;
       const curso = pendingCurso.value;
@@ -89,8 +90,19 @@ async function handlePasswordSubmit(password: string) {
   }
 }
 
-function handleOpenAula(aula: Aula) {
-  window.open(aula.caminho, '_blank');
+async function handleOpenAula(aula: Aula) {
+  let url = aula.caminho;
+  if (selectedCurso.value?.id) {
+    let senha = selectedCurso.value.senha;
+    if (!senha) {
+      senha = await secureGet(`curso_senha_${selectedCurso.value.id}`);
+    }
+    if (senha) {
+      const sep = url.includes('?') ? '&' : '?';
+      url += `${sep}senha=${encodeURIComponent(senha)}`;
+    }
+  }
+  window.open(url, '_blank');
 }
 
 function handleOpenAtividade(atividade: Atividade) {
