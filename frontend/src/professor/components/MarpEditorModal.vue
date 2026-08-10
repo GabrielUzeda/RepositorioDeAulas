@@ -1305,7 +1305,7 @@ function renderAllKaTeX() {
       try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
       catch (e) { return '$$' + math + '$$'; }
     });
-    container.innerHTML = container.innerHTML.replace(/(^|[^\\])\$([^\$\n]+?)\$/g, (_, prefix, math) => {
+    container.innerHTML = container.innerHTML.replace(/(^|[^\\\\])\$([^\\$\\n]+?)\$/g, (_, prefix, math) => {
       try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
       catch (e) { return prefix + '$' + math + '$'; }
     });
