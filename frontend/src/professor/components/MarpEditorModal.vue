@@ -1945,8 +1945,23 @@ onBeforeUnmount(() => {
 :deep(.mermaid-block svg) { overflow: visible !important; max-width: 100%; }
 :deep(.mermaid-error) { color: var(--red); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; }
 :deep(.mermaid-block p), :deep(.mermaid-block div), :deep(.mermaid-block span) { margin: 0 !important; padding: 0 !important; line-height: 1.25 !important; }
+:deep(.mermaid-block .nodeLabel),
+:deep(.mermaid-block .edgeLabel),
+:deep(.mermaid-block text),
+:deep(.mermaid-block .label),
+:deep(.mermaid-block .cluster-label text),
+:deep(.mermaid-block .actor) {
+  white-space: pre-wrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.25 !important;
+}
 :deep(.mermaid-block foreignObject) { overflow: visible !important; }
 :deep(.mermaid-block foreignObject div) { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; box-sizing: border-box !important; overflow: visible !important; white-space: nowrap !important; text-align: center !important; line-height: 1.25 !important; }
+:deep(.mermaid-block .node rect),
+:deep(.mermaid-block .node polygon),
+:deep(.mermaid-block .node circle),
+:deep(.mermaid-block .node ellipse) { stroke-width: 1.5px; }
 
 /* ANIMATIONS */
 :deep(.slide .slide-content > *) { opacity:1; transition: opacity .3s, transform .3s; }
