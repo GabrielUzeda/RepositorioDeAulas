@@ -59,7 +59,7 @@ services:
     depends_on:
       - vite
       - bun-server
-    command: sh -c "npx playwright test"
+    command: sh -c "npm install && npx playwright test"
 
 networks:
   e2e-network:
