@@ -1341,14 +1341,22 @@ watch(
     titleInput.value = props.titulo ?? '';
     descInput.value = props.descricao ?? '';
     const draft = window.localStorage?.getItem('marp-next-content') ?? '';
-    markdownInput.value = props.markdown ?? draft ?? DEFAULT_MD;
+    markdownInput.value = props.markdown ?? (draft.trim() ? draft : DEFAULT_MD);
     currentSlide = 0;
-    renderSlides(markdownInput.value);
     nextTick(() => {
+      renderSlides(markdownInput.value);
       if (editorRef.value) editorRef.value.focus();
     });
-  }
+  },
+  { immediate: true }
 );
+
+watch(markdownInput, (newVal) => {
+  if (renderTimer) clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => {
+    renderSlides(newVal);
+  }, 100);
+});
 
 // ─── Auto-save (4.7) ───────────────────────
 let autoSaveTimer: any = null;
