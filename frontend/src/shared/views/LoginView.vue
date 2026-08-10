@@ -40,6 +40,10 @@ async function handleLogin() {
       </div>
 
       <form @submit.prevent="handleLogin" class="space-y-4">
+        <div v-if="route.query.expired" class="p-3.5 bg-amber-950/60 border border-amber-700/60 text-amber-200 text-xs rounded-xl flex items-center space-x-2.5">
+          <span class="material-icons text-amber-400 text-base shrink-0">schedule</span>
+          <span>Sua sessão expirou por razões de segurança. Por favor, entre novamente.</span>
+        </div>
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">E-mail</label>
           <input v-model="emailInput" required type="email" placeholder="professor@local" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500" />

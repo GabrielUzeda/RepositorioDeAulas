@@ -31,7 +31,7 @@ router.beforeEach(async (to) => {
     if (!auth.isAuthenticated) {
       const ok = await auth.checkAuth();
       if (!ok) {
-        return { name: 'login', query: { redirect: to.fullPath } };
+        return { name: 'login', query: { redirect: to.fullPath, expired: 'true' } };
       }
     }
     const role = auth.professor?.role;

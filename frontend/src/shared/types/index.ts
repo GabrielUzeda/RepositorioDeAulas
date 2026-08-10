@@ -3,6 +3,7 @@ export interface Professor {
   email: string;
   nome: string;
   role: string;
+  total_cursos?: number;
 }
 
 export interface Curso {
