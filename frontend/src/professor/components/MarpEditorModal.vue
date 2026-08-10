@@ -32,6 +32,7 @@ const statusBarRef = ref<HTMLDivElement | null>(null);
 const isPresentMode = ref(false);
 const isAnimMode = ref(true);
 const currentTheme = ref<'dark' | 'light'>('dark');
+const showThemeMenu = ref(false);
 const showExportMenu = ref(false);
 const showFindBar = ref(false);
 const showReplaceRow = ref(false);
@@ -1475,10 +1476,16 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
+function handleWindowClick() {
+  showThemeMenu.value = false;
+  showExportMenu.value = false;
+}
+
 onMounted(() => {
   setupAutoSave();
   window.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('mousemove', handleMouseMove);
+  window.addEventListener('click', handleWindowClick);
   const w = window as any;
   w.marpNext = {
     render: renderSlides,
@@ -1497,6 +1504,7 @@ onBeforeUnmount(() => {
   cleanupAutoSave();
   window.removeEventListener('keydown', handleGlobalKeydown);
   window.removeEventListener('mousemove', handleMouseMove);
+  window.removeEventListener('click', handleWindowClick);
   if (idleTimer) clearTimeout(idleTimer);
   const w = window as any;
   if (w.marpNext) delete w.marpNext;
@@ -1529,19 +1537,28 @@ onBeforeUnmount(() => {
       <button class="tb-btn" :class="{ active: isPresentMode }" @click="togglePresentMode" title="Apresentar (F)">▶ Apresentar</button>
       <button class="tb-btn" :class="{ active: isAnimMode }" @click="isAnimMode = !isAnimMode" title="Toggle animações">✦ Animação</button>
 
-      <!-- Select de Tema com seta SVG customizada idêntica -->
-      <select v-model="currentTheme" @change="applyTheme(currentTheme, true)" class="tb-btn tb-select" title="Alternar tema da apresentação">
-        <option value="dark">🌙 Dark</option>
-        <option value="light">☀️ Light</option>
-      </select>
-
-      <!-- Export Dropdown -->
+      <!-- Dropdown de Tema (Idêntico ao de Exportar) -->
       <div class="export-dropdown relative">
-        <button class="tb-btn" @click.stop="showExportMenu = !showExportMenu" title="Exportar Apresentação">📥 Exportar ▾</button>
+        <button class="tb-btn" @click.stop="showThemeMenu = !showThemeMenu; showExportMenu = false" title="Alternar tema da apresentação">
+          {{ currentTheme === 'dark' ? '🌙 Dark' : '☀️ Light' }} ▾
+        </button>
+        <div v-if="showThemeMenu" class="export-menu">
+          <button class="export-item" :class="{ active: currentTheme === 'dark' }" @click="applyTheme('dark', true); showThemeMenu = false">
+            🌙 Dark
+          </button>
+          <button class="export-item" :class="{ active: currentTheme === 'light' }" @click="applyTheme('light', true); showThemeMenu = false">
+            ☀️ Light
+          </button>
+        </div>
+      </div>
+
+      <!-- Dropdown de Exportar -->
+      <div class="export-dropdown relative">
+        <button class="tb-btn" @click.stop="showExportMenu = !showExportMenu; showThemeMenu = false" title="Exportar Apresentação">📥 Exportar ▾</button>
         <div v-if="showExportMenu" class="export-menu">
-          <button class="export-item" @click="exportHtml">🌐 HTML Autossuficiente (.html)</button>
-          <button class="export-item" @click="exportPdf">📄 Documento PDF (.pdf)</button>
-          <button class="export-item" @click="exportPptx">📊 Apresentação PowerPoint (.pptx)</button>
+          <button class="export-item" @click="exportHtml(); showExportMenu = false">🌐 HTML Autossuficiente (.html)</button>
+          <button class="export-item" @click="exportPdf(); showExportMenu = false">📄 Documento PDF (.pdf)</button>
+          <button class="export-item" @click="exportPptx(); showExportMenu = false">📊 Apresentação PowerPoint (.pptx)</button>
         </div>
       </div>
 
@@ -1827,6 +1844,7 @@ onBeforeUnmount(() => {
   font-size: 12px; cursor: pointer; text-align: left; transition: background 0.15s;
 }
 .export-item:hover { background: var(--accent-dim); color: var(--accent); }
+.export-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
 
 /* EDITOR HIGHLIGHTS BACKDROP */
 #editor-wrapper { position: relative; flex: 1; width: 100%; height: 100%; overflow: hidden; display: flex; }
