@@ -1,5 +1,4 @@
 import type { Context, Next } from 'hono';
-import { db } from './db';
 
 const PBKDF2_ITERATIONS = 600000;
 const SALT_LENGTH = 16;

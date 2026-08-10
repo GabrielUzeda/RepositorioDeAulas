@@ -6,7 +6,7 @@ import { resolveFrontendDir } from './marp';
 import { db, runDataRetentionPurge } from './db';
 import app from './routes';
 
-const ADMIN_SEED_PASSWORD = process.env.PROFESSOR_PASSWORD || 'senhasecreta';
+const ADMIN_SEED_PASSWORD = process.env.PROFESSOR_PASSWORD || 'MudeEstaSenha!';
 
 describe('Auth Module & Multi-Professor System', () => {
   test('Password Hashing & Verification', async () => {
@@ -38,7 +38,7 @@ describe('Auth Module & Multi-Professor System', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'admin@local',
+        email: 'admin@escola.com',
         password: ADMIN_SEED_PASSWORD,
       }),
     });
@@ -46,7 +46,7 @@ describe('Auth Module & Multi-Professor System', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.token).toBeDefined();
-    expect(body.professor.email).toBe('admin@local');
+    expect(body.professor.email).toBe('admin@escola.com');
   });
 
   test('GET /check-auth with Bearer token', async () => {
@@ -54,7 +54,7 @@ describe('Auth Module & Multi-Professor System', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'admin@local',
+        email: 'admin@escola.com',
         password: ADMIN_SEED_PASSWORD,
       }),
     });
@@ -102,7 +102,7 @@ describe('Auth Module & Multi-Professor System', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'admin@local',
+        email: 'admin@escola.com',
         password: ADMIN_SEED_PASSWORD,
       }),
     });
@@ -145,9 +145,39 @@ describe('Auth Module & Multi-Professor System', () => {
       }),
     });
     expect(createCursoRes.status).toBe(201);
-    const createdCurso = await createCursoRes.json();
+    const cData = await createCursoRes.json();
+    const curso2Id = cData.id;
 
-    const assignRes = await app.request(`/cursos/${createdCurso.id}/professores`, {
+    // Vincular prof2 ao curso2
+    await app.request(`/professores/${profId}/cursos`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ curso_ids: [curso2Id] }),
+    });
+
+    // POST /disciplinas enviando apenas nome (sem slug)
+    const createDiscRes = await app.request('/disciplinas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        nome: 'Programacao Web',
+        descricao: 'Aula de programacao',
+        cor: 'bg-emerald-600',
+        icone: 'school',
+        curso_id: curso2Id,
+      }),
+    });
+    expect(createDiscRes.status).toBe(201);
+    const discData = await createDiscRes.json();
+    expect(discData.slug).toBe('programacao_web');
+
+    const assignRes = await app.request(`/cursos/${cData.id}/professores`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -157,15 +187,15 @@ describe('Auth Module & Multi-Professor System', () => {
     });
     expect(assignRes.status).toBe(200);
 
-    // Register materia as prof2 no curso atribuído
-    const createMateriaRes = await app.request('/materias', {
+    // Register disciplina as prof2 no curso atribuído
+    const createMateriaRes = await app.request('/disciplinas', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        curso_id: createdCurso.id,
+        curso_id: cData.id,
         slug: `materia_prof2_${Date.now()}`,
         nome: 'Materia do Professor 2',
         cor: 'bg-blue-500',
@@ -182,18 +212,18 @@ describe('Auth Module & Multi-Professor System', () => {
     });
     const listBody = await listCursosRes.json();
     expect(listBody.length).toBeGreaterThanOrEqual(1);
-    expect(listBody.some((c: any) => c.id === createdCurso.id)).toBeTruthy();
+    expect(listBody.some((c: any) => c.id === cData.id)).toBeTruthy();
 
-    // Test updateMateria (verify parameter order bug fix)
+    // Test updateDisciplina (verify parameter order bug fix)
     const materiaId = createdMateria.id;
-    const updateMateriaRes = await app.request(`/materias/${materiaId}`, {
+    const updateMateriaRes = await app.request(`/disciplinas/${materiaId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        curso_id: createdCurso.id,
+        curso_id: cData.id,
         slug: `materia_mod_${Date.now()}`,
         nome: 'Materia Modificada',
       }),
@@ -233,10 +263,11 @@ describe('Auth Module & Multi-Professor System', () => {
   });
 
   test('Materia senha aceita via header x-materia-senha e via ?senha= (item 2.6)', async () => {
-    const materia = db.query(`SELECT id, senha FROM materias WHERE slug = 'demo-class'`).get() as any;
+    const materia = db.query(`SELECT id, curso_id FROM disciplinas WHERE slug = 'demo-class'`).get() as any;
     expect(materia).toBeDefined();
     const materiaId = materia.id;
-    const senha = materia.senha;
+    const curso = db.query(`SELECT senha FROM cursos WHERE id = ?`).get(materia.curso_id) as any;
+    const senha = curso?.senha || 'asdf1234';
 
     const viaHeader = await app.request(`/aulas?materia_id=${materiaId}`, {
       method: 'GET',
@@ -251,11 +282,11 @@ describe('Auth Module & Multi-Professor System', () => {
   });
 
   test('CSP header present on marp HTML served by GET /materias/* (item 3.9)', async () => {
-    const materia = db.query(`SELECT id FROM materias WHERE slug = 'demo-class'`).get() as any;
+    const materia = db.query(`SELECT id FROM disciplinas WHERE slug = 'demo-class'`).get() as any;
     const adminLogin = await app.request('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '10.0.0.3' },
-      body: JSON.stringify({ email: 'admin@local', password: ADMIN_SEED_PASSWORD }),
+      body: JSON.stringify({ email: 'admin@escola.com', password: ADMIN_SEED_PASSWORD }),
     });
     const { token } = await adminLogin.json();
 
@@ -325,7 +356,7 @@ describe('Auth Module & Multi-Professor System', () => {
     const adminLogin = await app.request('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '10.0.0.2' },
-      body: JSON.stringify({ email: 'admin@local', password: ADMIN_SEED_PASSWORD }),
+      body: JSON.stringify({ email: 'admin@escola.com', password: ADMIN_SEED_PASSWORD }),
     });
     const { token } = await adminLogin.json();
 

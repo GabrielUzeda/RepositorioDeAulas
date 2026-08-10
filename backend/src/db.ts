@@ -1,38 +1,44 @@
 import { Database } from 'bun:sqlite';
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
+import { existsSync, mkdirSync } from 'fs';
+import { dirname } from 'path';
+import { hashPassword } from './auth';
 
-const DATA_DIR = process.env.DATA_DIR || path.join(import.meta.dir, '..', 'data');
-mkdirSync(DATA_DIR, { recursive: true });
+const dbPath = process.env.DATABASE_PATH || './data/app.db';
+const dbDir = dirname(dbPath);
 
-const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'app.db');
+if (!existsSync(dbDir)) {
+  mkdirSync(dbDir, { recursive: true });
+}
 
-export const db = new Database(DB_PATH, { create: true });
-db.exec('PRAGMA journal_mode = WAL;');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec('PRAGMA busy_timeout = 5000;');
+export const db = new Database(dbPath);
 
-const SCHEMA = `
+// Ativa as Foreign Keys no SQLite
+db.query('PRAGMA foreign_keys = ON;').run();
+
+// [1] Criação das Tabelas Principais (se não existirem)
+db.run(`
 CREATE TABLE IF NOT EXISTS professores (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT NOT NULL UNIQUE,
+  email TEXT UNIQUE NOT NULL,
   nome TEXT NOT NULL,
-  senha_hash TEXT NOT NULL,
-  salt TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'professor',
   status TEXT NOT NULL DEFAULT 'ativo',
-  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  senha_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS cursos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  slug TEXT NOT NULL UNIQUE,
+  slug TEXT UNIQUE NOT NULL,
   nome TEXT NOT NULL,
-  cor TEXT,
-  icone TEXT,
+  cor TEXT DEFAULT 'bg-indigo-600',
+  icone TEXT DEFAULT 'school',
+  senha TEXT,
   descricao TEXT,
-  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS curso_professores (
@@ -41,56 +47,47 @@ CREATE TABLE IF NOT EXISTS curso_professores (
   PRIMARY KEY (curso_id, professor_id)
 );
 
-CREATE TABLE IF NOT EXISTS materias (
+CREATE TABLE IF NOT EXISTS disciplinas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
   slug TEXT NOT NULL,
   nome TEXT NOT NULL,
-  cor TEXT,
-  icone TEXT,
-  senha TEXT,
+  cor TEXT DEFAULT 'bg-indigo-600',
+  icone TEXT DEFAULT 'school',
   descricao TEXT,
-  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   UNIQUE(slug, curso_id)
 );
 
 CREATE TABLE IF NOT EXISTS aulas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE,
+  disciplina_id INTEGER NOT NULL REFERENCES disciplinas(id) ON DELETE CASCADE,
   titulo TEXT NOT NULL,
   caminho TEXT NOT NULL,
-  icone TEXT,
+  icone TEXT DEFAULT '00',
   descricao TEXT,
   ordem INTEGER DEFAULT 0,
   conteudo_md TEXT,
-  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS atividades (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE,
+  disciplina_id INTEGER NOT NULL REFERENCES disciplinas(id) ON DELETE CASCADE,
   external_id TEXT,
   titulo TEXT NOT NULL,
   descricao TEXT,
   caminho TEXT NOT NULL,
-  icone TEXT,
+  icone TEXT DEFAULT 'assignment',
   json_data TEXT,
   tipo TEXT DEFAULT 'normal',
+  ordem INTEGER DEFAULT 0,
   senha TEXT,
   allow_password INTEGER DEFAULT 0,
-  ordem INTEGER DEFAULT 0,
-  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-);
-
-CREATE TABLE IF NOT EXISTS ranking (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  atividade_id INTEGER NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
-  nome_jogador TEXT NOT NULL,
-  pontuacao INTEGER NOT NULL,
-  data_envio TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS respostas_alunos (
@@ -101,102 +98,106 @@ CREATE TABLE IF NOT EXISTS respostas_alunos (
   aluno_email_hash TEXT NOT NULL,
   respostas TEXT NOT NULL,
   consulta_token_hash TEXT,
+  nota REAL,
+  feedback TEXT,
+  enviado_em TEXT,
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS disciplina_feedbacks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  disciplina_id INTEGER NOT NULL REFERENCES disciplinas(id) ON DELETE CASCADE,
+  aluno_email_hash TEXT,
+  feedback_geral TEXT,
+  enviado_em TEXT,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  UNIQUE(disciplina_id, aluno_email_hash)
+);
+
+CREATE TABLE IF NOT EXISTS ranking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  atividade_id INTEGER NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
+  nome_jogador TEXT NOT NULL,
+  pontuacao INTEGER NOT NULL,
+  data_envio TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  usuario_id INTEGER,
+  usuario_id INTEGER REFERENCES professores(id) ON DELETE SET NULL,
   usuario_email TEXT,
   acao TEXT NOT NULL,
   recurso TEXT NOT NULL,
-  ip TEXT NOT NULL,
-  user_agent TEXT,
   detalhes TEXT,
-  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  ip TEXT,
+  user_agent TEXT,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
+`);
 
+// [2] Índices para alta performance
+db.run(`
 CREATE INDEX IF NOT EXISTS idx_ranking_atividade_pontuacao ON ranking(atividade_id, pontuacao DESC);
 CREATE INDEX IF NOT EXISTS idx_respostas_atividade ON respostas_alunos(atividade_id);
 CREATE INDEX IF NOT EXISTS idx_respostas_aluno_email_hash ON respostas_alunos(aluno_email_hash);
-CREATE INDEX IF NOT EXISTS idx_materias_curso ON materias(curso_id);
+CREATE INDEX IF NOT EXISTS idx_respostas_aluno_email ON respostas_alunos(aluno_email);
+CREATE INDEX IF NOT EXISTS idx_disciplinas_curso ON disciplinas(curso_id);
+CREATE INDEX IF NOT EXISTS idx_disciplina_feedbacks_disc ON disciplina_feedbacks(disciplina_id);
 CREATE INDEX IF NOT EXISTS idx_curso_professores_professor ON curso_professores(professor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_criado_em ON audit_logs(criado_em);
-`;
+`);
 
-db.exec(SCHEMA);
+// [3] Função de Seed Automático para ambiente Demo
+export async function seedDemoData() {
+  const countCursos = db.query('SELECT COUNT(*) as total FROM cursos').get() as { total: number };
+  if (countCursos.total > 0) return;
 
-const PBKDF2_ITERATIONS = 600000;
-const SALT_LENGTH = 16;
-const HASH_PREFIX = 'pbkdf2_sha256';
+  const email = process.env.PROFESSOR_EMAIL || 'admin@escola.com';
+  const rawPass = process.env.PROFESSOR_PASSWORD || 'MudeEstaSenha!';
+  const { hash, salt } = await hashPassword(rawPass);
 
-function b64url(data: Uint8Array): string {
-  let binary = '';
-  for (const byte of data) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function seedHashPassword(password: string): Promise<{ hash: string; salt: string }> {
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-  const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  const derivedBits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, baseKey, 256);
-  const key = await crypto.subtle.importKey('raw', derivedBits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(password));
-  return { hash: `${HASH_PREFIX}$${PBKDF2_ITERATIONS}$${b64url(new Uint8Array(signature))}`, salt: b64url(salt) };
-}
-
-async function seedDemoData() {
-  const existing = db.query('SELECT id FROM professores LIMIT 1').get();
-  if (existing) return;
-
-  const email = process.env.PROFESSOR_EMAIL || 'admin@local';
-  const password = process.env.PROFESSOR_PASSWORD;
-  if (!password || password === 'admin123') {
-    throw new Error('PROFESSOR_PASSWORD é obrigatório e não pode ser o padrão "admin123". Defina um valor forte no .env antes de iniciar o backend.');
-  }
-  const { hash, salt } = await seedHashPassword(password);
-
-  const insertProf = db.query(
-    `INSERT INTO professores (email, nome, senha_hash, salt, role, status) VALUES (?, ?, ?, ?, 'admin', 'ativo')`
+  const insertAdmin = db.query(
+    `INSERT INTO professores (email, nome, role, status, senha_hash, salt) VALUES (?, ?, 'admin', 'ativo', ?, ?)`
   );
-  insertProf.run(email, 'Administrador', hash, salt);
+  insertAdmin.run(email, 'Administrador Demo', hash, salt);
 
   const admin = db.query('SELECT id FROM professores WHERE email = ?').get(email) as any;
   const adminId = Number(admin.id);
 
   const insertCurso = db.query(
-    `INSERT INTO cursos (slug, nome, cor, icone, descricao) VALUES (?, ?, ?, ?, ?)`
+    `INSERT INTO cursos (slug, nome, cor, icone, descricao, senha) VALUES (?, ?, ?, ?, ?, ?)`
   );
   const cursoResult = insertCurso.run(
     'demo-course',
     'Curso de Demonstração',
     'bg-indigo-600',
     'school',
-    'Curso de exemplo com matérias variadas.\n- Web Mobile 2026\n- Web Mobile 2025\nA senha das matérias de acesso é "asdf1234".\nEste curso contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)'
+    'Curso de exemplo com disciplinas variadas.\n- Web Mobile 2026\n- Web Mobile 2025\nA senha de acesso é "asdf1234".\nEste curso contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)',
+    'asdf1234'
   );
   const cursoId = Number(cursoResult.lastInsertRowid);
 
   db.query('INSERT INTO curso_professores (curso_id, professor_id) VALUES (?, ?)').run(cursoId, adminId);
 
-  const insertMateria = db.query(
-    `INSERT INTO materias (curso_id, slug, nome, cor, icone, senha, descricao) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  const insertDisciplina = db.query(
+    `INSERT INTO disciplinas (curso_id, slug, nome, cor, icone, descricao) VALUES (?, ?, ?, ?, ?, ?)`
   );
-  const materiaResult = insertMateria.run(
+  const disciplinaResult = insertDisciplina.run(
     cursoId,
     'demo-class',
-    'Matéria de Demonstração',
+    'Disciplina de Demonstração',
     'bg-indigo-600',
     'school',
-    'asdf1234',
-    'Clique aqui para entrar na matéria. A senha de acesso é "asdf1234".\nEsta matéria contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)'
+    'Clique aqui para entrar na disciplina. A senha de acesso ao curso é "asdf1234".\nEsta disciplina contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)'
   );
-  const materiaId = Number(materiaResult.lastInsertRowid);
+  const disciplinaId = Number(disciplinaResult.lastInsertRowid);
 
   const insertAula = db.query(
-    `INSERT INTO aulas (materia_id, titulo, caminho, icone, descricao, ordem, conteudo_md) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO aulas (disciplina_id, titulo, caminho, icone, descricao, ordem, conteudo_md) VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
   insertAula.run(
-    materiaId,
+    disciplinaId,
     'Boas-vindas ao Sistema',
     '/static/boas-vindas.html',
     '00',
@@ -206,79 +207,84 @@ async function seedDemoData() {
   );
 
   const insertAtividade = db.query(
-    `INSERT INTO atividades (materia_id, external_id, titulo, descricao, caminho, icone, tipo, ordem, senha, allow_password, json_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO atividades (disciplina_id, external_id, titulo, descricao, caminho, icone, tipo, ordem, senha, allow_password, json_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const atividades = [
     {
       external_id: 'demo-minigame',
-      titulo: 'Simulação Tática: Defesa Cibernética',
-      descricao: 'Teste seus reflexos e conhecimentos neste minigame de nave.',
-      icone: '01',
+      titulo: 'Minigame: Batalha Naval de Redes (Exemplo)',
+      descricao: 'Teste seus conhecimentos táticos em Redes de Computadores eliminando navios inimigos!',
+      caminho: '/static/atividades/minigame.html',
+      icone: 'sports_esports',
       tipo: 'minigame',
       ordem: 1,
       senha: null,
       allow_password: 0,
       json_data:
-        '{"questions":[{"content":"Qual protocolo é seguro para transferência de arquivos?","options":[{"text":"FTP","correct":false},{"text":"SFTP","correct":true},{"text":"HTTP","correct":false}]},{"content":"O que significa a sigla VPN?","options":[{"text":"Virtual Private Network","correct":true},{"text":"Very Public Network","correct":false},{"text":"Visual Point Node","correct":false}]}]}',
+        '{"meta":{"type":"minigame","title":"Batalha Naval de Redes"},"questions":[{"content":"Qual protocolo é utilizado para transferência segura de arquivos cifrados via SSH?","options":[{"text":"FTP","correct":false,"feedback":"FTP é inseguro (texto claro)."},{"text":"SFTP","correct":true,"feedback":"Excelente! SFTP roda sobre SSH (porta 22)."},{"text":"HTTP","correct":false,"feedback":"HTTP não usa criptografia por padrão."}]},{"content":"Qual tecnologia cria um túnel criptografado sobre uma rede pública?","options":[{"text":"NAT","correct":false,"feedback":"NAT apenas traduz endereços IP."},{"text":"VPN","correct":true,"feedback":"Perfeito! VPN provê confidencialidade e integridade."}]}]}',
     },
     {
       external_id: 'demo-roleta',
-      titulo: 'Roleta do Conhecimento',
-      descricao: 'Gire a roleta e responda à pergunta sorteada!',
-      icone: '02',
+      titulo: 'Roleta do Conhecimento: Hardware (Exemplo)',
+      descricao: 'Gire a roleta e responda a perguntas sorteadas de Arquitetura de Computadores!',
+      caminho: '/static/atividades/roleta.html',
+      icone: 'casino',
       tipo: 'roleta',
       ordem: 2,
       senha: null,
       allow_password: 0,
       json_data:
-        '{"questions":[{"title":"Conceitos Básicos","content":"O que é um algoritmo?","options":[{"text":"Sequência de passos lógicos","correct":true,"feedback":"Correto! Um algoritmo é uma receita para resolver problemas passo a passo."},{"text":"Uma peça de hardware","correct":false,"feedback":"Incorreto. O hardware é a parte física (como teclado e monitor). Um algoritmo é lógico/software."}]},{"title":"Hardware","content":"Cite 3 componentes de entrada.","options":[{"text":"Teclado, Mouse, Microfone","correct":true,"feedback":"Excelente! Esses são exemplos clássicos de hardware de entrada de dados."},{"text":"Monitor, Caixa de Som","correct":false,"feedback":"Incorreto. Monitor e caixa de som são exemplos de dispositivos de SAÍDA de dados."}]},{"title":"Software","content":"Qual a diferença entre SO e Aplicativo?","options":[{"text":"O SO gerencia tudo, o aplicativo faz tarefas específicas.","correct":true,"feedback":"Isso mesmo! O Sistema Operacional controla o computador, e o aplicativo atende ao usuário."},{"text":"Ambos são a mesma coisa fisicamente","correct":false,"feedback":"Incorreto. Ambos são softwares e servem a propósitos distindos (gerenciamento vs tarefas específicas)."}]},{"title":"Redes","content":"Qual a utilidade do IP?","options":[{"text":"Identificar uma máquina na rede","correct":true,"feedback":"Exatamente! O IP é como o endereço residencial de um computador na rede."},{"text":"Proteger contra vírus","correct":false,"feedback":"Incorreto. A proteção contra vírus é feita por antivírus e firewalls, não pelo protocolo IP."}]},{"title":"Segurança","content":"O que é Phishing?","options":[{"text":"Um tipo de ataque de engenharia social","correct":true,"feedback":"Correto! É quando tentam enganar você para que forneça dados sensíveis."},{"text":"Um programa de edição de imagem","correct":false,"feedback":"Incorreto. Programas de edição de imagem nada têm a ver com Phishing."}]},{"title":"Geral","content":"O que significa WWW?","options":[{"text":"World Wide Web","correct":true,"feedback":"Correto! WWW é a sigla para World Wide Web, a rede mundial de computadores."},{"text":"Wide Web Window","correct":false,"feedback":"Incorreto. WWW significa World Wide Web."}]}]}',
+        '{"meta":{"type":"roleta","title":"Roleta do Conhecimento"},"questions":[{"content":"Qual é a função da memória cache L1/L2/L3 na CPU?","options":[{"text":"Reduzir o tempo de acesso a dados frequentes da RAM","correct":true,"feedback":"Correto! A cache é extremamente rápida e fica próxima dos núcleos."},{"text":"Armazenar arquivos permanentemente","correct":false,"feedback":"Incorreto. Cache é volátil e temporária."}]},{"content":"Qual componente é responsável pelo processamento gráfico vetorial em paralelo?","options":[{"text":"GPU","correct":true,"feedback":"Exato! Placa de vídeo/GPU possui milhares de núcleos para cálculo paralelo."},{"text":"Fonte ATX","correct":false,"feedback":"A fonte apenas fornece energia elétrica."}]}]}',
     },
     {
       external_id: 'demo-prova',
-      titulo: 'Avaliação Diagnóstica',
-      descricao: 'Teste seus conhecimentos iniciais. Senha de acesso: avaliação',
-      icone: '03',
+      titulo: 'Prova 01: Fundamentos de TI (Exemplo)',
+      descricao: 'Avaliação formal cobrindo conceitos de Sistemas Operacionais, Hardware e Redes.',
+      caminho: '/static/atividades/prova.html',
+      icone: 'assignment_turned_in',
       tipo: 'prova',
       ordem: 3,
-      senha: 'avaliação',
+      senha: '123',
       allow_password: 1,
       json_data:
-        '{"meta":{"title":"Avaliação Diagnóstica"},"questions":[{"content":"Qual a função da Memória RAM no processamento de dados do computador?"},{"content":"Descreva como funciona o fluxo de informação entre o processador, a memória e o disco de armazenamento."},{"content":"Disserte sobre a importância dos sistemas operacionais e como eles ajudam o usuário comum."}]}',
+        '{"meta":{"type":"prova","title":"Prova 01: Fundamentos de TI"},"questions":[{"content":"Qual sistema operacional é baseado no Kernel Linux?","options":[{"text":"Ubuntu","correct":true,"feedback":"Correto! Ubuntu é uma distribuição Linux."},{"text":"Windows 11","correct":false,"feedback":"Windows possui kernel próprio (NT)."}]}]}',
     },
     {
       external_id: 'demo-reforco',
-      titulo: 'Atividade de Reforço',
-      descricao: 'Exercícios extras para praticar.',
-      icone: '04',
+      titulo: 'Reforço: Prática de Fixação (Exemplo)',
+      descricao: 'Exercícios práticos adaptativos para consolidar o aprendizado.',
+      caminho: '/static/atividades/reforco.html',
+      icone: 'psychology',
       tipo: 'reforco',
       ordem: 4,
       senha: null,
       allow_password: 0,
       json_data:
-        '{"meta":{"type":"reforco","title":"Prática de Fixação"},"questions":[{"content":"Hardware é a parte física, Software é a parte lógica.","options":[{"text":"Verdadeiro","correct":true,"feedback":"Isso mesmo! Hardware é tocável, software não."},{"text":"Falso","correct":false,"feedback":"Incorreto. A definição de HW/SW segue essa base."}]},{"content":"A Memória RAM é não-volátil (não perde dados se faltar energia).","options":[{"text":"Falso","correct":true,"feedback":"Correto! A RAM é volátil."},{"text":"Verdadeiro","correct":false,"feedback":"Incorreto. A memória não-volátil é a ROM ou o Disco."}]},{"content":"Um navegador web atua como um Hardware.","options":[{"text":"Falso","correct":true,"feedback":"Excelente! O navegador é um software."},{"text":"Verdadeiro","correct":false,"feedback":"Incorreto. É um aplicativo, portanto, software."}]},{"content":"Para salvar um documento de texto permanentemente usamos:","options":[{"text":"O Disco (SSD/HD)","correct":true,"feedback":"Perfeito! O armazenamento em massa é persistente."},{"text":"A CPU","correct":false,"feedback":"Incorreto. CPU processa, não armazena permanentemente."}]}]}',
+        '{"meta":{"type":"reforco","title":"Prática de Fixação"},"questions":[{"content":"Hardware é a parte física, Software é a parte lógica.","options":[{"text":"Verdadeiro","correct":true,"feedback":"Isso mesmo! Hardware é tocável, software não."},{"text":"Falso","correct":false,"feedback":"Incorreto. A definição de HW/SW segue essa base."}]},{"content":"A Memória RAM é não-volátil (não perde dados se faltar energia).","options":[{"text":"Falso","correct":true,"feedback":"Correto! A RAM é volátil."},{"text":"Verdadeiro","correct":false,"feedback":"Incorreto. A memória não-volátil é a ROM ou o Disco."}]}]}',
     },
     {
       external_id: 'demo-normal',
-      titulo: 'Atividade Normal',
-      descricao: 'Responda as questões discursivas e envie para avaliação.',
-      icone: '05',
+      titulo: 'Atividade Aberta: Questionário Geral (Exemplo)',
+      descricao: 'Responda com suas palavras as perguntas sobre os tópicos estudados.',
+      caminho: '/static/atividades/normal.html',
+      icone: 'edit_note',
       tipo: 'normal',
       ordem: 5,
       senha: null,
       allow_password: 0,
       json_data:
-        '{"meta":{"title":"Questionário Teórico","description":"Responda as questões discrusivas utilizando o editor."},"questions":[{"content":"Explique com suas palavras as três principais etapas de qualquer algoritmo na computação."},{"content":"Qual é a principal função da Placa-Mãe em relação aos demais Hardwares?"}]}',
+        '{"questions":[{"content":"Descreva a diferença entre IPv4 e IPv6."},{"content":"Explique a importância da segurança da informação na empresa."}]}',
     },
   ];
 
   for (const atv of atividades) {
     insertAtividade.run(
-      materiaId,
+      disciplinaId,
       atv.external_id,
       atv.titulo,
       atv.descricao,
-      '#',
+      atv.caminho,
       atv.icone,
       atv.tipo,
       atv.ordem,
@@ -291,54 +297,38 @@ async function seedDemoData() {
 
 await seedDemoData().catch((e) => console.error('seed failed:', e));
 
-// [4.4] Retenção LGPD (Art. 15/16): purga de dados pessoais antigos.
-// Retenção configurável via env RETENTION_DAYS (default 365 = 1 ano letivo).
-// Executa DELETE em lote (LIMIT por iteração) para evitar "database is locked"
-// em tabelas grandes, parando quando uma iteração não apaga mais nada.
-// Só remove registros além do período de retenção — nunca dados recentes.
+// [4] Retenção LGPD (Art. 15/16): purga de dados pessoais antigos.
 export function runDataRetentionPurge(): { respostas: number; ranking: number } {
   const result = { respostas: 0, ranking: 0 };
   const raw = Number(process.env.RETENTION_DAYS);
   const days = Number.isInteger(raw) && raw > 0 ? raw : 365;
 
   try {
-    // Ponto de corte FIXO, calculado uma única vez (mesmo formato do criado_em: %Y-%m-%dT%H:%M:%SZ),
-    // para que o corte não avance entre iterações de um loop longo.
     const cutoffRow = db
       .query(`SELECT strftime('%Y-%m-%dT%H:%M:%SZ','now', ?) AS c`)
       .get(`-${days} days`) as { c: string };
     const cutoff = cutoffRow?.c;
     if (!cutoff) return result;
 
-    const delRespostas = db.query(
-      `DELETE FROM respostas_alunos WHERE id IN (
-         SELECT id FROM respostas_alunos WHERE criado_em < ? LIMIT 500
-       )`
-    );
-    const delRanking = db.query(
-      `DELETE FROM ranking WHERE id IN (
-         SELECT id FROM ranking WHERE data_envio < ? LIMIT 500
-       )`
-    );
-
-    for (;;) {
-      const r = delRespostas.run(cutoff);
-      result.respostas += r.changes;
-      if (r.changes === 0) break;
-    }
-    for (;;) {
-      const r = delRanking.run(cutoff);
-      result.ranking += r.changes;
-      if (r.changes === 0) break;
+    while (true) {
+      const res = db
+        .query(`DELETE FROM respostas_alunos WHERE id IN (SELECT id FROM respostas_alunos WHERE criado_em < ? LIMIT 500)`)
+        .run(cutoff);
+      result.respostas += res.changes;
+      if (res.changes < 500) break;
     }
 
-    if (result.respostas > 0 || result.ranking > 0) {
-      console.log(`🧹 [Retenção LGPD] Purga (${days} dias): ${result.respostas} respostas, ${result.ranking} rankings.`);
+    while (true) {
+      const res = db
+        .query(`DELETE FROM ranking WHERE id IN (SELECT id FROM ranking WHERE data_envio < ? LIMIT 500)`)
+        .run(cutoff);
+      result.ranking += res.changes;
+      if (res.changes < 500) break;
     }
+
     return result;
   } catch (e) {
-    console.error('❌ [Retenção LGPD] Erro ao executar purga de retenção:', e);
+    console.error('Erro no expurgo LGPD:', e);
     return result;
   }
 }
-
