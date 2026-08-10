@@ -17,7 +17,7 @@ const titleInput = ref('');
 const descInput = ref('');
 const markdownInput = ref('');
 const slideCountText = ref('0 slides');
-const charCountText = ref('0 chars');
+const charCountText = ref('0 caracteres');
 
 // References
 const previewPaneRef = ref<HTMLDivElement | null>(null);
@@ -259,7 +259,7 @@ function renderSlides(source: string) {
   totalSlidesNum = slides.length;
   totalSlides.value = totalSlidesNum;
   slideCountText.value = `${totalSlidesNum} slides`;
-  charCountText.value = `${source.length} chars`;
+  charCountText.value = `${source.length} caracteres`;
 
   const targetTheme = (global.theme && (global.theme === 'light' || global.theme === 'dark'))
     ? (global.theme as 'dark' | 'light')
@@ -1427,10 +1427,22 @@ function togglePresentMode() {
 function handleGlobalKeydown(e: KeyboardEvent) {
   if (!props.show) return;
 
+  const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+  if (isCtrlOrCmd && (e.key === 'f' || e.key === 'F')) {
+    e.preventDefault();
+    openFindBar(false);
+    return;
+  }
+  if (isCtrlOrCmd && (e.key === 'h' || e.key === 'H')) {
+    e.preventDefault();
+    openFindBar(true);
+    return;
+  }
+
   const target = e.target as HTMLElement | null;
   const isInputTarget = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('#find-bar'));
 
-  if (e.key === 'f' || e.key === 'F') {
+  if ((e.key === 'f' || e.key === 'F') && !isCtrlOrCmd) {
     if (!isInputTarget) {
       e.preventDefault();
       togglePresentMode();
@@ -1532,11 +1544,8 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="flex-1"></div>
-      <span class="slide-count-text">{{ slideCountText }}</span>
-
       <!-- Action Buttons -->
-      <div class="flex items-center space-x-2 ml-4">
+      <div class="flex items-center space-x-2 ml-auto">
         <button @click="emit('close')" type="button" class="px-3 py-1.5 text-slate-400 hover:text-white text-xs font-medium rounded hover:bg-slate-800 transition">Cancelar</button>
         <button @click="handleSave" type="button" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold shadow transition">Salvar Aula</button>
       </div>
@@ -1548,7 +1557,6 @@ onBeforeUnmount(() => {
         <div id="editor-header">
           <span>Markdown</span>
           <div class="flex items-center space-x-3">
-            <button class="tb-btn-xs" @click="openFindBar(false)" title="Localizar e Substituir (Ctrl+F / Ctrl+H)">🔍 Localizar</button>
             <span id="char-count">{{ charCountText }}</span>
           </div>
         </div>
