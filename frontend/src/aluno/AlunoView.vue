@@ -179,9 +179,9 @@ function goBack() {
             <p class="text-indigo-200 text-xs mt-0.5">Repositório de Aulas e Atividades Interativas</p>
           </div>
         </div>
-        <router-link to="/professor" class="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 rounded-xl text-sm font-semibold transition flex items-center space-x-2">
+        <router-link to="/login" class="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 rounded-xl text-sm font-semibold transition flex items-center space-x-2">
           <span class="material-icons text-sm">admin_panel_settings</span>
-          <span>Área do Professor</span>
+          <span>Área Restrita</span>
         </router-link>
       </div>
     </header>

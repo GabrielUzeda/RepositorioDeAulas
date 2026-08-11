@@ -20,7 +20,7 @@ async function handleLogin() {
   }
   const role = authStore.professor?.role;
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '';
-  if (redirect) {
+  if (redirect && !(role === 'admin' && redirect === '/professor')) {
     router.push(redirect);
   } else if (role === 'admin') {
     router.push('/admin');
