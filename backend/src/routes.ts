@@ -112,6 +112,27 @@ function mapAtividade(row: any) {
   return { ...row, allow_password: row.allow_password == null ? null : !!row.allow_password };
 }
 
+function stripGabarito(row: any): any {
+  if (row == null || row.json_data == null) return row;
+  const out = { ...row };
+  try {
+    const parsed = typeof out.json_data === 'string' ? JSON.parse(out.json_data) : out.json_data;
+    if (parsed && Array.isArray(parsed.questions)) {
+      for (const q of parsed.questions) {
+        if (q && Array.isArray(q.options)) {
+          for (const opt of q.options) {
+            if (opt && typeof opt === 'object') delete opt.correct;
+          }
+        }
+      }
+      out.json_data = JSON.stringify(parsed);
+    }
+  } catch {
+    return out;
+  }
+  return out;
+}
+
 function parseId(v: string | undefined): number | null {
   if (v === undefined || v === '') return null;
   const n = Number(v);
@@ -372,7 +393,7 @@ async function createAtividade(c: any) {
   if (disciplinaId === null) return c.text('', 400);
   if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
   const externalId = body.external_id != null ? sanitizeSlug(body.external_id) : null;
-  const caminho = sanitizePathOrUrl(body.caminho ?? '');
+  const caminho = sanitizePathOrUrl((body.caminho ?? '') || (body.slug ?? ''));
   const r = db
     .query(
       `INSERT INTO atividades (disciplina_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem)
@@ -406,7 +427,7 @@ async function updateAtividade(c: any) {
   if (disciplinaId === null) return c.text('', 400);
   if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
   const externalId = body.external_id != null ? sanitizeSlug(body.external_id) : null;
-  const caminho = sanitizePathOrUrl(body.caminho ?? '');
+  const caminho = sanitizePathOrUrl((body.caminho ?? '') || (body.slug ?? ''));
   const r = db
     .query(
       `UPDATE atividades
@@ -703,7 +724,7 @@ app.get('/atividades', async (c) => {
     if ((curso.senha ?? null) !== senha) return c.text('Senha do curso incorreta', 401);
   }
   const rows = dbq('SELECT * FROM atividades WHERE disciplina_id = ? ORDER BY ordem, titulo').all(disciplinaId);
-  return c.json(rows.map(mapAtividade));
+  return c.json(rows.map(stripGabarito));
 });
 
 app.get('/atividades/:id', async (c) => {
@@ -735,10 +756,9 @@ app.get('/atividades/:id', async (c) => {
   const isProtected = !!atv.allow_password;
 
   if (inputSenha === atvSenha && isProtected) {
-    return c.json(atv);
+    return c.json(stripGabarito(atv));
   } else if (inputSenha === cursoSenha) {
-    if (isProtected) atv.json_data = null;
-    return c.json(atv);
+    return c.json(stripGabarito(atv));
   } else {
     return c.text('Senha incorreta', 401);
   }

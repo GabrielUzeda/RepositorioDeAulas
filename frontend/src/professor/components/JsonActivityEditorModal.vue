@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import type { Atividade, Question, Option } from '@/shared/types';
+import { ref, watch, computed } from 'vue';
+import type { Atividade, Question, QuestionOption } from '@/shared/types';
 
 const props = defineProps<{
   show: boolean;
@@ -19,6 +19,26 @@ const allowPassword = ref(false);
 const senha = ref('');
 const questions = ref<Question[]>([]);
 
+const usesOptions = computed(() => tipo.value !== 'normal' && tipo.value !== 'prova');
+
+function normalizeQuestion(q: any): Question {
+  let options: QuestionOption[] | undefined;
+  const rawOptions = Array.isArray(q?.options) ? q.options : Array.isArray(q?.alternativas) ? q.alternativas : null;
+  if (rawOptions && rawOptions.length > 0) {
+    options = rawOptions.map((opt: any) => ({
+      text: String(opt?.text ?? opt?.label ?? ''),
+      correct: !!opt?.correct,
+      feedback: String(opt?.feedback ?? '')
+    }));
+  }
+  if (q?.type === 'text') options = undefined;
+  return {
+    title: String(q?.title ?? ''),
+    content: String(q?.content ?? ''),
+    ...(options ? { options } : {})
+  };
+}
+
 watch(
   () => props.show,
   (val) => {
@@ -35,7 +55,7 @@ watch(
             const parsed = typeof props.atividade.json_data === 'string'
               ? JSON.parse(props.atividade.json_data)
               : props.atividade.json_data;
-            questions.value = parsed.questions || [];
+            questions.value = (Array.isArray(parsed?.questions) ? parsed.questions : []).map(normalizeQuestion);
           } catch {
             questions.value = [];
           }
@@ -55,14 +75,22 @@ watch(
 );
 
 function addQuestion() {
-  questions.value.push({
-    title: `Questão ${questions.value.length + 1}`,
-    content: '',
-    options: [
-      { text: 'Opção 1', correct: true, feedback: 'Correto!' },
-      { text: 'Opção 2', correct: false, feedback: 'Incorreto.' }
-    ]
-  });
+  const base = { title: `Questão ${questions.value.length + 1}`, content: '' };
+  if (usesOptions.value) {
+    questions.value.push({
+      ...base,
+      options: [
+        { text: 'Opção 1', correct: true, feedback: 'Correto!' },
+        { text: 'Opção 2', correct: false, feedback: 'Incorreto.' }
+      ]
+    });
+  } else {
+    questions.value.push(base);
+  }
+}
+
+function handleTypeChange() {
+  questions.value = [];
 }
 
 function removeQuestion(index: number) {
@@ -108,7 +136,7 @@ function handleSave() {
     tipo: tipo.value,
     allow_password: allowPassword.value,
     senha: allowPassword.value ? senha.value : null,
-    slug: titulo.value.toLowerCase().replace(/\s+/g, '_'),
+    caminho: titulo.value.toLowerCase().replace(/\s+/g, '_'),
     json_data: JSON.stringify({ questions: questions.value })
   };
 
@@ -133,9 +161,19 @@ function handleImportJson(e: Event) {
   reader.onload = (event) => {
     try {
       const parsed = JSON.parse(event.target?.result as string);
-      if (parsed.questions && Array.isArray(parsed.questions)) {
-        questions.value = parsed.questions;
+      const raw = Array.isArray(parsed?.questions) ? parsed.questions : Array.isArray(parsed?.perguntas) ? parsed.perguntas : null;
+      if (!raw) {
+        alert('Arquivo JSON não contém perguntas.');
+        return;
       }
+      if (parsed?.titulo) titulo.value = String(parsed.titulo);
+      if (parsed?.descricao) descricao.value = String(parsed.descricao);
+      if (parsed?.tipo) tipo.value = (parsed.tipo === 'game' ? 'minigame' : parsed.tipo);
+      if (parsed?.senha) {
+        allowPassword.value = true;
+        senha.value = String(parsed.senha);
+      }
+      questions.value = raw.map(normalizeQuestion);
     } catch {
       alert('Arquivo JSON inválido!');
     }
@@ -185,7 +223,7 @@ function handleImportJson(e: Event) {
 
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-1">Tipo de Atividade</label>
-              <select v-model="tipo" class="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500">
+              <select v-model="tipo" @change="handleTypeChange" class="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="normal">Normal</option>
                 <option value="prova">Prova</option>
                 <option value="minigame">Minigame Tático</option>
@@ -225,6 +263,11 @@ function handleImportJson(e: Event) {
             Nenhuma pergunta adicionada. Clique em "Adicionar Pergunta" para começar.
           </div>
 
+          <div v-if="!usesOptions" class="p-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 text-xs">
+            <span class="material-icons text-sm align-middle mr-1 text-indigo-400">edit_note</span>
+            <span>Atividade do tipo <strong class="text-slate-300">{{ tipo }}</strong>: as perguntas são <strong class="text-slate-300">discursivas</strong> (resposta em texto). Não são exibidas alternativas.</span>
+          </div>
+
           <div
             v-for="(q, qIndex) in questions"
             :key="qIndex"
@@ -250,8 +293,8 @@ function handleImportJson(e: Event) {
               <textarea v-model="q.content" rows="2" placeholder="Digite a pergunta para o aluno..." class="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"></textarea>
             </div>
 
-            <!-- Options Section -->
-            <div class="space-y-2 pt-2">
+            <!-- Options Section (apenas para tipos objetivos: minigame/roleta/reforco) -->
+            <div v-if="usesOptions" class="space-y-2 pt-2">
               <div class="flex justify-between items-center">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-400">Alternativas de Resposta</label>
                 <button @click="addOption(qIndex)" type="button" class="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center">

@@ -25,6 +25,9 @@ export class MinigamePlayer {
         this.isSubmitting = false;
         this.animationFrameId = null;
         this.lastChosenAnswer = null;
+        this.currentOpts = [];
+        this.currentFeedbacks = [];
+        this.feedbackTimer = null;
 
         // Parse questions
         try {
@@ -39,7 +42,8 @@ export class MinigamePlayer {
             if (data.questions) {
                 this.questions = data.questions.map(q => ({
                     enunciado: q.content || q.title,
-                    alternativas: q.options.map(o => o.text)
+                    alternativas: q.options.map(o => o.text),
+                    feedbacks: q.options.map(o => o.feedback || '')
                 }));
             } else if (data.perguntas) {
                 this.questions = data.perguntas;
@@ -139,6 +143,9 @@ export class MinigamePlayer {
                         </div>
                     </div>
                 </div>
+
+                <!-- Feedback da opção escolhida (toast) -->
+                <div id="mg-feedback" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-amber-50 border-l-4 border-amber-400 p-3 text-sm text-amber-800 rounded-r max-w-md pointer-events-none text-left shadow-lg"></div>
             </div>
             
             <style>
@@ -204,6 +211,7 @@ export class MinigamePlayer {
     destroy() {
         this.isPlaying = false;
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+        if (this.feedbackTimer) clearTimeout(this.feedbackTimer);
         window.removeEventListener('resize', this.resizeHandler);
         if (this.canvas) {
             this.canvas.removeEventListener('mousemove', this.mousemoveHandler);
@@ -387,6 +395,11 @@ export class MinigamePlayer {
         const opts = q.alternativas && q.alternativas.length > 0 ? [...q.alternativas] : ['Verdadeiro', 'Falso'];
         opts.sort(() => Math.random() - 0.5);
 
+        this.currentOpts = opts;
+        this.currentFeedbacks = q.feedbacks || [];
+        const fbEl = document.getElementById('mg-feedback');
+        if (fbEl) fbEl.classList.add('hidden');
+
         opts.forEach(opt => {
             const btn = document.createElement('button');
             // Tailwind + Custom Style mix
@@ -411,6 +424,17 @@ export class MinigamePlayer {
         document.getElementById('mg-q-box').classList.add('opacity-0', 'translate-y-[100px]');
         this.player.targetX = this.currentEnemy.x;
         setTimeout(() => this.shootLaser(), 250);
+
+        // Mostra o feedback da opção escolhida (texto informativo do professor)
+        const idx = this.currentOpts.indexOf(selected);
+        const fb = idx >= 0 ? (this.currentFeedbacks[idx] || '') : '';
+        const fbEl = document.getElementById('mg-feedback');
+        if (fb && fbEl) {
+            fbEl.textContent = fb;
+            fbEl.classList.remove('hidden');
+            clearTimeout(this.feedbackTimer);
+            this.feedbackTimer = setTimeout(() => fbEl.classList.add('hidden'), 2000);
+        }
     }
 
     shootLaser() {
@@ -491,6 +515,8 @@ export class MinigamePlayer {
         this.currentEnemy = null;
         this.particles = [];
         this.isPlaying = false;
+        const fbEl = document.getElementById('mg-feedback');
+        if (fbEl) fbEl.classList.add('hidden');
     }
 
     submitScore() {

@@ -155,6 +155,28 @@ async function handleDeleteActivity(atividadeId: number) {
   }
 }
 
+async function moveAula(index: number, direction: 'up' | 'down') {
+  const list = cursoStore.aulas;
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (target < 0 || target >= list.length) return;
+  const a = list.splice(index, 1)[0];
+  list.splice(target, 0, a);
+  await apiClient.put(`/aulas/${a.id}`, { ordem: target });
+  const b = list[index];
+  if (b) await apiClient.put(`/aulas/${b.id}`, { ordem: index });
+}
+
+async function moveAtividade(index: number, direction: 'up' | 'down') {
+  const list = cursoStore.atividades;
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (target < 0 || target >= list.length) return;
+  const a = list.splice(index, 1)[0];
+  list.splice(target, 0, a);
+  await apiClient.put(`/atividades/${a.id}`, { ordem: target });
+  const b = list[index];
+  if (b) await apiClient.put(`/atividades/${b.id}`, { ordem: index });
+}
+
 function handleOpenRespostas(atividade: Atividade) {
   selectedRespostasAtividade.value = atividade;
   showRespostasModal.value = true;
@@ -311,7 +333,7 @@ function handleOpenRespostas(atividade: Atividade) {
           </div>
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="aula in cursoStore.aulas" :key="aula.id" class="p-4 bg-slate-800/40 border border-slate-700/50 rounded-2xl flex items-center justify-between">
+            <div v-for="(aula, idx) in cursoStore.aulas" :key="aula.id" class="p-4 bg-slate-800/40 border border-slate-700/50 rounded-2xl flex items-center justify-between">
               <div class="flex items-center space-x-3 truncate">
                 <span class="material-icons text-indigo-400 text-lg shrink-0">slideshow</span>
                 <div class="truncate">
@@ -320,6 +342,14 @@ function handleOpenRespostas(atividade: Atividade) {
                 </div>
               </div>
               <div class="flex items-center space-x-1 shrink-0 ml-2">
+                <div class="flex flex-col mr-1">
+                  <button @click="moveAula(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:pointer-events-none">
+                    <span class="material-icons text-sm">keyboard_arrow_up</span>
+                  </button>
+                  <button @click="moveAula(idx, 'down')" :disabled="idx === cursoStore.aulas.length - 1" title="Mover para baixo" class="text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:pointer-events-none">
+                    <span class="material-icons text-sm">keyboard_arrow_down</span>
+                  </button>
+                </div>
                 <button @click="handleOpenMarpModal(aula)" class="p-1.5 text-slate-400 hover:text-white">
                   <span class="material-icons text-sm">edit</span>
                 </button>
@@ -346,7 +376,7 @@ function handleOpenRespostas(atividade: Atividade) {
           </div>
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="atv in cursoStore.atividades" :key="atv.id" class="p-4 bg-slate-800/40 border border-slate-700/50 rounded-2xl flex flex-col justify-between space-y-3">
+            <div v-for="(atv, idx) in cursoStore.atividades" :key="atv.id" class="p-4 bg-slate-800/40 border border-slate-700/50 rounded-2xl flex flex-col justify-between space-y-3">
               <div class="flex items-start justify-between">
                 <div class="flex items-center space-x-3 truncate">
                   <span class="material-icons text-indigo-400 text-lg shrink-0">assignment</span>
@@ -356,6 +386,14 @@ function handleOpenRespostas(atividade: Atividade) {
                   </div>
                 </div>
                 <div class="flex items-center space-x-1 shrink-0 ml-2">
+                  <div class="flex flex-col mr-1">
+                    <button @click="moveAtividade(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:pointer-events-none">
+                      <span class="material-icons text-sm">keyboard_arrow_up</span>
+                    </button>
+                    <button @click="moveAtividade(idx, 'down')" :disabled="idx === cursoStore.atividades.length - 1" title="Mover para baixo" class="text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:pointer-events-none">
+                      <span class="material-icons text-sm">keyboard_arrow_down</span>
+                    </button>
+                  </div>
                   <button @click="handleOpenActivityEditor(atv)" class="p-1.5 text-slate-400 hover:text-white">
                     <span class="material-icons text-sm">edit</span>
                   </button>

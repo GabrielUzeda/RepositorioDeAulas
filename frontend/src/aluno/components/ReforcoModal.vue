@@ -50,6 +50,10 @@ const currentQuestion = computed(() => {
 
 const currentAnswered = computed(() => answeredQuestions.value.has(currentIndex.value));
 const allAnswered = computed(() => answeredQuestions.value.size >= props.questions.length);
+const selectedFeedback = computed(() => {
+  if (selectedOptionIndex.value === null || !currentQuestion.value) return null;
+  return currentQuestion.value.options?.[selectedOptionIndex.value]?.feedback || null;
+});
 
 function handleSelectOption(optionIndex: number) {
   if (answeredQuestions.value.has(currentIndex.value) || !currentQuestion.value) return;
@@ -192,6 +196,12 @@ function prevQuestion() {
             <span>{{ option.text }}</span>
             <span v-if="selectedOptionIndex === idx" class="material-icons text-xl ml-2">radio_button_checked</span>
           </button>
+        </div>
+
+        <!-- Feedback da opção selecionada -->
+        <div v-if="selectedFeedback" class="p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl text-sm text-amber-800 flex items-start space-x-2">
+          <span class="material-icons text-base text-amber-500 mt-0.5">info</span>
+          <span>{{ selectedFeedback }}</span>
         </div>
       </div>
 

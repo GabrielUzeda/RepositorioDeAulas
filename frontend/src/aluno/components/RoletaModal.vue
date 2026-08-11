@@ -319,6 +319,12 @@ function closeAfterSubmit() {
             </button>
           </div>
 
+          <!-- Feedback da opção escolhida -->
+          <div v-if="isSubmitted && selectedOption?.feedback" class="p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl text-sm text-amber-800 flex items-start space-x-2">
+            <span class="material-icons text-base text-amber-500 mt-0.5">info</span>
+            <span>{{ selectedOption.feedback }}</span>
+          </div>
+
           <!-- Modal Action -->
           <div class="flex justify-end pt-4 border-t border-slate-800">
             <button
