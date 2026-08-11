@@ -1,0 +1,209 @@
+# AGENTS.md — Guia do Repositório (RepositorioDeAulas)
+
+Guia geral para agentes de IA e desenvolvedores trabalharem neste monorepo. Cobre arquitetura, convenções, comandos, arquivos-chave e o guia de testes E2E. **Todas as informações foram verificadas diretamente no código.**
+
+---
+
+## 1. Visão geral do projeto
+
+Plataforma educacional de repositório de aulas: professores criam cursos, disciplinas (matérias), aulas (renderizadas a partir de Markdown via Marp) e atividades interativas; alunos acessam anonimamente com senha de curso e respondem atividades; professores avaliam respostas com nota e feedback e geram relatórios de feedback da turma.
+
+**Stack:** Bun + Hono + SQLite (backend) · Vue 3 + Vite + Pinia + Tailwind 3.4 (frontend) · Playwright (E2E).
+
+```
+RepositorioDeAulas_new/
+├── docker-compose.yml          # Stack dev (bun-server 8080 + vite 5173)
+├── docker-compose.prod.yml     # Produção (opções com/sem nginx+Certbot)
+├── docker-compose.e2e.yml      # Stack E2E isolada (bun-server 18080 + vite 15173 + playwright)
+├── .env                        # Credenciais (SMTP, JWT, PROFESSOR_EMAIL/PASSWORD, Postgres)
+├── example.env                 # Template do ambiente
+├── backend/                    # API Bun + Hono + SQLite
+│   ├── src/db.ts               # Conexão SQLite, schema, seed (admin/demo)
+│   ├── src/routes.ts           # TODAS as rotas HTTP (~1500 linhas, fonte da verdade da API)
+│   ├── src/marp.ts             # Geração de HTML de aulas (Marp/Markdown)
+│   ├── src/mailer.ts           # Nodemailer (SMTP, degrada sem config)
+│   ├── src/auth.ts             # login/registro, JWT
+│   ├── src/env.ts              # Carrega .env da raiz do repo
+│   ├── src/utils.ts            # sanitizeSlug, encryptData/decryptData, hashEmail
+│   └── src/templates/          # Templates de e-mail (envio_atividades.html)
+├── frontend/                   # Vue 3 + Vite + Tailwind
+│   ├── src/admin/              # AdminView + modais (CRUD professor/curso)
+│   ├── src/professor/          # ProfessorView + modais (Marp, atividade, respostas, feedback)
+│   ├── src/aluno/              # AlunoView + componentes (ActivityModal, AulaCard...)
+│   ├── src/shared/             # router, stores (auth/curso), api/client, LoginView
+│   │   └── src/materias/       # Aulas geradas localmente (dev, não-tracked)
+│   │   └── src/public/static/  # Imagens de capa por tipo de atividade (.webp)
+├── frontend-vue/               # Aplicação Vue antiga (legado, NÃO usar)
+└── e2e/                        # Playwright (config, setup, helpers, tests)
+```
+
+---
+
+## 2. Comandos
+
+### Backend (workdir `backend/`)
+```bash
+bun install          # instalar deps
+bun run dev          # bun run --watch src/index.ts (porta 8080)
+bun run start        # produção
+bun test             # testes (pequeno conjunto, ex: auth.test.ts)
+```
+
+### Frontend (workdir `frontend/`)
+```bash
+npm install
+npm run dev          # vite --port 5173
+npm run build        # vue-tsc && vite build  (gera dist/ — necessário p/ E2E)
+```
+
+### Typecheck / lint
+```bash
+npx vue-tsc --noEmit            # frontend (workdir frontend/)
+npx vite build --outDir /tmp/... # build sem tocar dist root
+```
+
+### E2E — ver seção 8 (rodar sempre via Docker).
+
+### Docker
+```bash
+docker compose up -d                 # dev (8080 + 5173)
+docker compose -f docker-compose.prod.yml --profile with-nginx up -d  # prod opção A
+docker compose -f docker-compose.e2e.yml up -d  # e2e manual
+```
+
+---
+
+## 3. Arquitetura e camadas
+
+### Backend
+- **Hono** (framework) + **SQLite** via `dbq` (wrapper síncrono — `dbq(sql).get(...).run(...)`).
+- **DB path**: `db.ts` usa `process.env.DATABASE_PATH || './data/app.db'` (relativo ao working_dir; no container `/app/data/app.db`). **`DB_PATH` não é lido** — só `DATABASE_PATH`.
+- **Criptografia/LGPD**: `encryptData/decryptData` (AES-GCM, prefixo `enc:v1:`), `hashEmail` (HMAC SHA-256 b64url; NÃO existe `hashData`). Respostas de alunos são criptografadas; e-mail é hasheado.
+- **Seed** (`db.ts`): cria admin com `process.env.PROFESSOR_EMAIL||'admin@escola.com'` e `PROFESSOR_PASSWORD||'MudeEstaSenha!'`, curso demo `demo-course` (senha `asdf1234`), disciplina e aulas demo.
+- **Aliases:** `POST /materias` ≡ `POST /disciplinas`; `POST /disciplinas/:id` ≡ PUT. Em todo o código, "disciplina" = "matéria".
+
+### Frontend
+- **Router** (`src/shared/router/index.ts`): `/`→AlunoView, `/login`→LoginView, `/professor` (guard)→ProfessorView, `/admin`→AdminView.
+- **Stores Pinia**: `auth` (token, login/logout), `curso` (cursos, disciplinas, aulas, atividades; alias: `materias`).
+- **API client** (`src/shared/api/client.ts`): `baseUrl='/api'`; envia `Authorization: Bearer` se token em `sessionStorage['professor_auth']` (JSON `{token, expiry: 24h}`); 401 em rota protegida limpa auth.
+- **Storage criptografado** (`src/shared/utils/storage.ts`): `secureGet/secureSet` usam chave AES-GCM derivada/local armazenada em `localStorage['enc_key_v1']` (usado p/ senhas de curso/atividade do aluno).
+- **Tipos globais** (`src/shared/types/index.ts`): `Professor, Curso, Disciplina, Aula, Question, QuestionOption, ...`.
+
+### Vite proxy (dev) — `frontend/vite.config.ts`
+- `publicDir: 'src/public'`, alias `@→./src`.
+- Proxy: `/api` → `VITE_PROXY_TARGET||http://localhost:8080` (strip `/api`); `/cursos` e `/materias` → target. **NÃO cobre `/disciplinas`** (aulas são servidas sob `/materias`).
+
+---
+
+## 4. Modelo de dados principal (SQLite — `db.ts`)
+
+- `usuarios` (admin/professor), `cursos` (com coluna `senha`), `curso_professores`
+- `disciplinas` (curso_id, slug, nome, cor, icone, descricao, **`senha`**)
+- `aulas` (disciplina_id, titulo, **caminho** → `materias/{slug}/aulas/{slug}.html`, descricao, ordem, conteudo_md)
+- `atividades` (disciplina_id, external_id, titulo, descricao, caminho, icone, `json_data`, tipo, senha, allow_password, ordem)
+- `respostas_alunos` (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas [criptografadas], acertos, total, pontuacao, **nota REAL, feedback TEXT, enviado_em**, consulta_token, criado_em)
+- `disciplina_feedbacks` (disciplina_id, aluno_email_hash [NULL=turma], feedback_geral, enviado_em, criado_em, atualizado_em, UNIQUE(disciplina_id, aluno_email_hash))
+
+**Convenção:** resposta individual tem `aluno_email_hash` preenchido; feedback de turma é o registro com hash NULL.
+
+---
+
+## 5. Convenções de código
+
+- **Sem comentários** no código (salvo quando o usuário pedir).
+- **Tailwind JIT** só gera classes **literais** — paletas de cores são escritas por extenso (ex.: `bg-indigo-600`); nunca monte strings de classe dinamicamente.
+- Nomes de arquivos: PascalCase para componentes (`.vue`), camelCase para stores/utilities.
+- Tipagem forte via TS em frontend e backend (Bun).
+- Conexões/erros de DB não usam ORM; SQLite cru com `dbq`.
+
+---
+
+## 6. LGPD / privacidade (pontos relevantes ao mexer)
+
+- Nome/email/respostas do aluno são **criptografados** ao submeter; e-mail vira hash para joins.
+- `DELETE /respostas/:id` existe para direito de exclusão (LGPD).
+- Consulta do aluno a suas respostas: `GET /aluno/minhas-respostas?email+token` e `DELETE` (token = `consulta_token`).
+- E-mails reais exigem SMTP no `.env`; sem SMTP, envios degradam silenciosamente (não lançam erro).
+
+---
+
+## 7. Fluxos de negócio (importantes)
+
+- **Professor**: login → `Seus Cursos` → clica curso → lista de disciplinas → **`Gerenciar Aulas & Atividades`** abre os detalhes (note: o h3 do card de disciplina NÃO é clicável — só o botão) → seções Aulas (MarpEditor) e Atividades (JsonActivityEditor) → para avaliar: `Ver Respostas dos Alunos` → `Avaliar / Ver` → nota+feedback → `Salvar Avaliação` → gerar relatório: botão **`Gerar Feedback da Disciplina`** (FeedbackConsolidadoModal).
+- **Aluno (anônimo)**: `/` → `Área do Aluno` → seleciona curso → disciplina → corpo de conteúdo com tabs `Aulas (N)` / `Atividades (N)` → aula abre em **popup (window.open)** apontando para `materias/...` (servido pelo vite proxy / backend com CSP) → atividade abre em modal e submete resposta.
+- **Controle de acesso**:
+  - **Curso com senha** → aluno precisa verificar `POST /cursos/:id/verificar-senha` antes de ver conteúdo. É a senha do **CURSO** que importa para aulas/atividades (`readCursoSenha`).
+  - Atividade com `allow_password` → senha própria, verificada ao abrir a atividade.
+  - **Armadilha conhecida:** `createMateria` grava senha na **disciplina**, mas o backend checa **`curso.senha`** — uma disciplina com senha mas curso sem senha não bloqueia acesso.
+
+---
+
+## 8. Testes E2E (Playwright via Docker — caminho oficial)
+
+### Escopo
+Há 6 specs em `e2e/tests/`. Status verificados:
+
+| Spec | Status | Cobre |
+|---|---|---|
+| `admin.spec.ts` | ✅ atual | Login admin, CRUD professor/curso via UI |
+| `auth.spec.ts` | ✅ atual | Credenciais inválidas, redirects p/ `/login?redirect=` |
+| `professor.spec.ts` | ⚠️ **STALE** | Selectors de UI antiga (`Meus Cursos`, `Gerenciar Materias`, `Nova Materia`, `Salvar Materia`, `Aulas Cadastradas`, `Criar Aula (Marp)`, etc.) inexistentes na UI atual. Precisa reescrita. |
+| `aluno.spec.ts` | ⚠️ **parcial** | Setup por API; a parte do modal `Acesso Restrito` pós-disciplina não casa com a UI atual (senha é do curso, não da disciplina). Cobre navegação, popup da aula (só URL), envio de resposta. |
+| `aluno-atividades-avancadas.spec.ts` | ⚠️ **parcial** | Reforço/roleta/minigame/senha de atividade — mesmo problema de senha de curso. |
+| `fluxo-completo.spec.ts` | ✅ **novo** | Jornada completa (ver abaixo). |
+
+### Como executar
+```bash
+# Caminho oficial (reproduz CI, isento de problema local):
+cd e2e && npm install && npx playwright test
+
+# OU o mesmo via compose (o global-setup local sobe a stack sozinha):
+PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.config.ts
+```
+
+**`PLAYWRIGHT_CONFIG` ou `E2E_ADMIN_PASSWORD`/`PROFESSOR_PASSWORD` é obrigatório** — sem ele, `playwright.config.ts` lança erro.
+
+- **Local (fora do container):** `global-setup` roda `docker compose -f docker-compose.e2e.yml down --remove-orphans`, apaga `backend/data/e2e-test.db` (+`-wal`/`-shm`), sobe `bun-server`+`vite`, aguarda `/db-test` e frontend; `global-teardown` derruba o compose.
+- **Container** (`PLAYWRIGHT_CONTAINER=true` no compose): só espera os serviços.
+
+### Resultados
+- Reporter `list`; trace on-first-retry; screenshot only-on-failure; video retain-on-failure. PDF/vídeo ficam em `e2e/test-results/`.
+
+---
+
+## 9. Guia de escrita de testes E2E
+
+### Helpers (`e2e/helpers.ts`)
+- `unique(prefix)` / `uniqueName(prefix)` — sufixo `_{Date.now()}_{rand}`
+- `setupAdminContext(request)` → `{adminToken}`; `createProfessor(...)` → `{id, nome, email, password}` (senha `'senha12345'`, role professor); `createCurso(request, adminToken, professorIds=[])` → `{id, nome, slug}` (sem senha por padrão); `createMateria(request, profToken, cursoId)` → `{id, nome, slug, senha}` (disciplina, senha `'materia123'`); `cleanupEntities(request, adminToken, cursoId?, professorId?)`.
+- `loginViaUI(page, email, password, expectedUrl)` — `/login` → fill placeholders → `Entrar` → `waitForURL`.
+- `profLogin` + `api` (GET/POST/PUT/DELETE autenticado, sem prefixo `/api`) são definidos localmente em `aluno.spec.ts` e `fluxo-completo.spec.ts` (copie o padrão).
+
+### Seletores atuais (verificados) — resumo rápido
+- **Login**: placeholders `professor@local` e `••••••••`; botão `Entrar`.
+- **Aluno**: heading `Área do Aluno`; card curso/disciplina = `h3` (nome); tabs `Aulas (N)`/`Atividades (N)`; aula abre em popup com URL contendo `/materias/`; PasswordModal: `Acesso Restrito` + placeholder `Digite a senha`.
+- **ActivityModal (aluno)**: duas `getByLabel('Seu Nome *'/'Seu E-mail *')`; opções objetivas são **botões** (nome = texto da opção, ex. `Brasília`); success `h3 'Resposta Enviada com Sucesso!'` + `Correção do servidor: X / Y acertos`.
+- **Professor**: heading `Painel do Professor`; curso card `h3`; disciplina `h3` + botão `Gerenciar Aulas & Atividades`; botão `Ver Respostas dos Alunos`; `Gerar Feedback da Disciplina`.
+- **RespostasModal**: `Total de Envios: {n}`; botão `Avaliar / Ver`; inputs `placeholder='Ex: 85'` (nota) e `placeholder='Escreva um comentário pedagógico para este aluno...'` (feedback); sucesso `Avaliação Salva!`; botão `Fechar`.
+- **FeedbackConsolidadoModal**: heading `Relatório de Feedback da Disciplina`; textarea da turma (placeholder `Digite um comunicado ou feedback geral para toda a turma...`); botão `Salvar Feedback da Turma` → `Feedback Geral da Turma salvo com sucesso!`; input individual (placeholder `Escreva observações pedagógicas gerais para este aluno...`); botão `Salvar Feedback` → `Feedback para {nome} salvo!`; badges `E-mail Enviado`/`E-mail Pendente`.
+
+### Programação defensiva
+- Monte a cena via API em `beforeAll`; use a UI só para o comportamento sob teste; valide efeitos via API sempre que possível (ex.: relatorios).
+- Ao abrir aula: `const [popup] = await Promise.all([context.waitForEvent('page'), h3.click()])` e valide `popup.content()` antes de fechar.
+- Limpe dados com `cleanupEntities` em `afterAll`.
+
+---
+
+## 10. Armadilhas validadas (leia antes de editar != código)
+
+1. **Senha de disciplina ≠ senha de curso**: `createMateria` grava em `disciplinas.senha`, mas acesso anônimo a aulas/atividades checa `curso.senha`. Para fluxo anônimo sem modal, use curso sem senha.
+2. **`GET /cursos/:id` devolve `senha` inclusive para anônimos**; `GET /cursos/:id/disciplinas` anon omite campos.
+3. **Tailwind JIT** só com classes literais.
+4. **Marp** grava em `resolveFrontendDir()` → no container `/app/frontend_static` (bind de `./frontend/dist/`). Se `frontend/dist/` não existir no host, o mount cria pasta vazia e aulas dão 404 → **rode `npm run build` no frontend antes de E2E**.
+5. **E-mail**: sem SMTP, `enviar-emails-feedback` roda com `enviados=0` (não lança). Para testar entrega real, adicionar um SMTP fake (ex.: Mailhog) ao compose.
+6. **Não existe `hashData`** — use `hashEmail` (bug histórico já corrigido em `routes.ts`).
+7. **Compose e2e usa `DATABASE_PATH`** (não `DB_PATH`) para bater com o reset do `global-setup`.
+8. **`e2e/node_modules` local pode estar quebrado** (root/stale; lock `@playwright/test@1.62.1` vs package.json `1.50.0` e imagem `v1.50.0-noble`) → **rode por Docker** (container faz `npm install` limpo). Não troque versões sem necessidade.
+9. **`npm run build` no frontend pode falhar com EACCES** em `dist/assets` (dono root) — problema pré-existente do ambiente local.
+10. **Vite proxy não cobre `/disciplinas`** — aulas são servidas sob `/materias`.
+11. **Legado**: `frontend-vue/` é a app Vue antiga — não editar.
