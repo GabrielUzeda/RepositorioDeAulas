@@ -1,0 +1,16 @@
+# Server block HTTP-only — usado no PRIMEIRO boot (certificado ainda não emitido).
+# Serve ACME na porta 80 E a aplicação completa (como o README documenta:
+# "o nginx sobe em modo HTTP-only sem certificado ainda").
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SERVER_NAME} _;
+
+    # Desafio ACME (Let's Encrypt) — sempre disponível na porta 80
+    location /.well-known/acme-challenge/ {
+        root ${verificationDir};
+        default_type text/plain;
+    }
+
+    include /etc/nginx/app-locations.conf;
+}

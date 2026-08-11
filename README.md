@@ -69,6 +69,13 @@ cp example.env .env
 docker compose -f docker-compose.prod.yml --profile with-nginx up -d
 ```
 > O nginx sobe em modo HTTP-only (sem certificado ainda) e o bun-server fica disponível internamente.
+>
+> A configuração do nginx fica na pasta [`nginx/`](nginx/) (`nginx.conf.template` +
+> `docker-entrypoint.sh` + `conf.d/*.template`). O entrypoint detecta se o certificado
+> de `${SERVER_NAME}` já existe e alterna automaticamente entre HTTP-only e HTTPS.
+> **Importante:** `/api`, `/materias`, `/disciplinas` e `/cursos` são **sempre proxy**
+> para o bun-server — isso preserva a verificação de senha de curso e o CSP emitidos
+> pelo Bun nos HTMLs gerados pelo Marp (nunca servidos direto do disco pelo nginx).
 
 **3. Emita o certificado SSL (execute uma única vez):**
 ```bash
@@ -98,11 +105,14 @@ Para servidores onde o Nginx (ou qualquer outro proxy) já roda no host e você 
 ```bash
 cp example.env .env
 # PORT=8080   (ou outra porta interna livre)
+# BIND_ADDRESS=127.0.0.1   (IP de escuta do Bun no host — padrão loopback. Use 0.0.0.0 apenas se o Docker rodar em outra máquina/VM)
 ```
 
 **2. Suba apenas o bun-server:**
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml up -d
+# (não existe Dockerfile — a imagem é a oficial oven/bun; rode npm run build
+#  no frontend antes para gerar ./frontend/dist, que é montado no container)
 ```
 
 **3. Adicione o subdomínio no Nginx do host** (ex: `/etc/nginx/sites-available/repositorio.conf`):
@@ -123,6 +133,17 @@ server {
     ssl_certificate     /etc/letsencrypt/live/repositorio.dominio.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/repositorio.dominio.com/privkey.pem;
 
+    # API: o Bun registra as rotas SEM o prefixo /api (quem remove é este proxy)
+    location /api/ {
+        proxy_pass         http://127.0.0.1:8080/;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    # Todo o resto (SPA, /materias, /disciplinas, /cursos): repassa ao Bun,
+    # preservando a senha de curso e o CSP — NUNCA sirva o dist/ direto do disco.
     location / {
         proxy_pass         http://127.0.0.1:8080;
         proxy_set_header   Host              $host;
@@ -190,13 +211,17 @@ cp example.env .env
 
 | Variável | Descrição | Padrão |
 |---|---|---|
-| `PROFESSOR_EMAIL` | E-mail do Administrador criado no 1º boot | `admin@local` |
+| `SERVER_NAME` | Domínio público da aplicação (usado pelo nginx/certbot) | — |
+| `sslDir` | Pasta no host com os certificados SSL/TLS | `/var/www/ssl` |
+| `verificationDir` | Pasta para validação ACME/HTTP-01 do Certbot | `/var/www/certbot` |
+| `PROFESSOR_EMAIL` | E-mail do Administrador criado no 1º boot | `admin@escola.com` |
 | `PROFESSOR_PASSWORD` | Senha inicial do Administrador (Obrigatório alterar) | — |
-| `JWT_SECRET` | Chave secreta para assinatura dos tokens JWT | — |
-| `PORT` | Porta TCP exposta no Docker e no backend Bun | `8080` |
+| `JWT_SECRET` | Chave secreta para assinatura dos tokens JWT (obrigatória forte em produção) | — |
+| `PORT` | Porta TCP do backend exposta no host (Opção B) | `8080` |
+| `BIND_ADDRESS` | IP de escuta do backend no host | `127.0.0.1` |
 | `HOST` | IP de escuta do servidor backend | `0.0.0.0` |
 | `DATA_DIR` | Pasta de dados e SQLite | `./backend/data` |
-| `DB_PATH` | Caminho do arquivo SQLite principal | `./backend/data/app.db` |
+| `DATABASE_PATH` | Caminho do arquivo SQLite principal (o código NÃO lê `DB_PATH`) | `./backend/data/app.db` |
 | `SMTP_HOST` | Servidor SMTP para envio de e-mails | `smtp.zoho.com` |
 | `SMTP_PORT` | Porta do servidor SMTP (465 SSL / 587 STARTTLS) | `465` |
 | `SMTP_USERNAME` | Usuário de autenticação SMTP | — |

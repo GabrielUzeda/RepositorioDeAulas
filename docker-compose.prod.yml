@@ -4,9 +4,15 @@
 # OPÇÃO A — COM nginx + Certbot (HTTPS automático via ACME/Let's Encrypt)
 #   Ideal para servidores dedicados sem nginx no host.
 #   Uso: docker compose -f docker-compose.prod.yml --profile with-nginx up -d
+#   A configuração do nginx fica na pasta ./nginx/ (nginx.conf.template +
+#   docker-entrypoint.sh + conf.d/*.template). O entrypoint detecta o
+#   certificado e alterna entre HTTP-only (primeiro boot, para o desafio ACME)
+#   e HTTPS completo.
 #
 # OPÇÃO B — SEM nginx (proxy reverso externo no host, ex: seu nginx principal)
-#   O bun-server fica na porta ${PORT:-8080}, acessível via proxy do host.
+#   O bun-server fica em 127.0.0.1:${PORT:-8080} (BIND_ADDRESS trocável), e o
+#   proxy do host repassa o tráfego — o proxy DEVE repassar /api, /materias,
+#   /disciplinas e /cursos para o bun-server para preservar senha de curso/CSP.
 #   Uso: docker compose -f docker-compose.prod.yml up -d
 # =============================================================================
 
@@ -17,7 +23,7 @@ services:
   # Ativo em ambas as opções (A e B)
   # --------------------------------------------------------------------------
   bun-server:
-    image: oven/bun:1
+    image: oven/bun:1.2
     container_name: bun-server
     env_file:
       - .env
@@ -30,9 +36,15 @@ services:
     expose:
       - "8080"
     ports:
-      # Opção B: porta exposta diretamente no host para o proxy externo
-      # Opção A: apenas exposta internamente (nginx se comunica via rede Docker)
-      - "${PORT:-8080}:8080"
+      # Opção B: 127.0.0.1:PORT no host para o proxy externo (README usa 127.0.0.1:8080).
+      # Opção A: mesmo assim, a API NÃO fica exposta na rede — apenas loopback do host.
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:8080/db-test').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks:
       - app-network
     restart: unless-stopped
@@ -42,7 +54,7 @@ services:
   # Só sobe quando o profile "with-nginx" é ativado
   # --------------------------------------------------------------------------
   nginx:
-    image: nginx:alpine
+    image: nginx:1.28-alpine
     container_name: nginx-proxy
     profiles:
       - with-nginx
@@ -51,15 +63,25 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      SERVER_NAME: ${SERVER_NAME:-localhost}
+      verificationDir: ${verificationDir:-/var/www/certbot}
     env_file:
       - .env
     volumes:
       - ./nginx/nginx.conf.template:/etc/nginx/nginx.conf.template:ro
       - ./nginx/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./nginx/conf.d/:/etc/nginx/conf.d-templates:ro
       - ./frontend/dist/:/usr/share/nginx/html:ro
       - ${sslDir:-/var/www/ssl}:/etc/letsencrypt
       - ${verificationDir:-/var/www/certbot}:/var/www/certbot
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - app-network
     restart: unless-stopped
@@ -69,7 +91,7 @@ services:
   # Só sobe quando o profile "with-nginx" é ativado
   # --------------------------------------------------------------------------
   certbot:
-    image: certbot/certbot:latest
+    image: certbot/certbot:v3.0.0
     container_name: certbot-renewer
     profiles:
       - with-nginx

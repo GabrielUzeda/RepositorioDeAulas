@@ -1497,10 +1497,16 @@ app.use('*', async (c, next) => {
     const reqPath = c.req.path;
     const filePath = path.join(frontendStaticDir, reqPath.startsWith('/') ? reqPath.slice(1) : reqPath);
     const fileResp = serveFileWithCsp(filePath);
-    if (fileResp) return fileResp;
+    if (fileResp) {
+      c.res = fileResp;
+      return;
+    }
     const indexPath = path.join(frontendStaticDir, 'index.html');
     const indexResp = serveFileWithCsp(indexPath, 'text/html; charset=utf-8');
-    if (indexResp) return indexResp;
+    if (indexResp) {
+      c.res = indexResp;
+      return;
+    }
   }
 });
 
