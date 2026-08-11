@@ -1291,7 +1291,7 @@ app.post('/disciplinas/:id/salvar-feedback-geral', professorAuth, async (c) => {
   if (!body) return c.json({ success: false, error: 'JSON inválido' }, 400);
 
   const rawEmail = body.aluno_email ? String(body.aluno_email).trim().toLowerCase() : null;
-  const emailHash = rawEmail ? await hashData(rawEmail) : null;
+  const emailHash = rawEmail ? await hashEmail(rawEmail) : null;
   const feedbackGeral = body.feedback_geral ? String(body.feedback_geral).trim() : '';
 
   dbq(
@@ -1318,7 +1318,7 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
 
   const body = await parseBody(c) || {};
   const targetEmail = body.aluno_email ? String(body.aluno_email).trim().toLowerCase() : null;
-  const targetHash = targetEmail ? await hashData(targetEmail) : null;
+  const targetHash = targetEmail ? await hashEmail(targetEmail) : null;
   const forcarReenvio = !!body.forcar_reenvio;
 
   const turmaFeedbackRow = dbq(
