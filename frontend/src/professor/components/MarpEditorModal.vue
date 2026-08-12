@@ -188,15 +188,12 @@ function initMermaid(themeName: 'dark' | 'light') {
       startOnLoad: false,
       theme: themeName === 'dark' ? 'dark' : 'default',
       securityLevel: 'loose',
-      logLevel: 'error',
-      flowchart: { useMaxWidth: true, htmlLabels: true, padding: 20, nodeSpacing: 50, rankSpacing: 60, curve: 'basis' },
-      sequence: { useMaxWidth: true, actorMargin: 80, width: 200, noteMargin: 16, messageMargin: 40, wrap: true, wrapPadding: 16 },
+      flowchart: { useMaxWidth: true, htmlLabels: true, padding: 20 },
+      sequence: { useMaxWidth: true, wrap: true },
       themeVariables: {
         primaryColor: '#6366f1',
         primaryTextColor: themeName === 'dark' ? '#f8fafc' : '#0f172a',
         lineColor: themeName === 'dark' ? '#94a3b8' : '#475569',
-        secondaryColor: themeName === 'dark' ? '#1e1b4b' : '#e0e7ff',
-        tertiaryColor: themeName === 'dark' ? '#1e293b' : '#f1f5f9',
         fontSize: '15px',
       }
     });
@@ -332,69 +329,52 @@ function renderKaTeX(container: HTMLElement) {
 }
 
 async function renderAllMermaid() {
+  const w = window as any;
   if (!mermaidReady) await waitForFonts();
   if (!previewPaneRef.value) return;
+  if (!w.mermaid) return;
+  try {
+    await document.fonts.ready;
+    await document.fonts.load('16px Inter');
+  } catch (e) {}
 
-  const containers = previewPaneRef.value.querySelectorAll('.slide-content');
-  containers.forEach(container => {
+  previewPaneRef.value.querySelectorAll('.slide-content').forEach(container => {
     container.querySelectorAll('pre, .mermaid-block').forEach(el => {
       const src = (el as HTMLElement).dataset.rawMermaid || (el.querySelector('code') ? el.querySelector('code')!.textContent?.trim() : null);
       if (!src) return;
 
-      const code = el.querySelector('code');
-      const isMermaid = (el as HTMLElement).dataset.isMermaid === '1' ||
-        (code && code.className.includes('mermaid')) ||
-        /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline|quadrantChart)/m.test(src);
+      const isMmd = (el as HTMLElement).dataset.isMermaid === '1' ||
+        (el.querySelector('code') && el.querySelector('code')!.className.includes('mermaid')) ||
+        /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline)/m.test(src);
+      if (!isMmd) return;
 
-      if (!isMermaid) return;
-
-      const id = `mmd-mn-${++mermaidCounter}`;
+      const id = 'mmd-mn-' + (++mermaidCounter);
       const wrapper = document.createElement('div');
       wrapper.className = 'mermaid-block';
-      wrapper.dataset.mmdId = id;
       wrapper.dataset.rawMermaid = src;
       wrapper.dataset.isMermaid = '1';
       el.replaceWith(wrapper);
 
-      attemptRenderMermaid(wrapper, id, src, 0);
+      w.mermaid.render(id, src).then(({ svg }: { svg: string }) => {
+        wrapper.innerHTML = svg;
+        const svgEl = wrapper.querySelector('svg');
+        if (svgEl) {
+          svgEl.removeAttribute('width');
+          svgEl.removeAttribute('height');
+          svgEl.style.width = '100%';
+          svgEl.style.height = 'auto';
+          const vb = svgEl.getAttribute('viewBox');
+          if (vb) {
+            const [x, y, w, h] = vb.split(' ').map(Number);
+            svgEl.setAttribute('viewBox', (x - 12) + ' ' + (y - 12) + ' ' + (w + 24) + ' ' + (h + 24));
+          }
+          svgEl.style.overflow = 'visible';
+          svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach((node: Element) => (node as HTMLElement).style.overflow = 'visible');
+        }
+      }).catch((err: any) => {
+        wrapper.innerHTML = '<div style="color:#ef4444;font-size:12px;">⚠ Mermaid: ' + err.message + '</div>';
+      });
     });
-  });
-}
-
-function attemptRenderMermaid(wrapper: HTMLElement, id: string, src: string, retries: number) {
-  const w = window as any;
-  if (!w.mermaid) return;
-  w.mermaid.render(id, src).then(({ svg }: { svg: string }) => {
-    wrapper.innerHTML = svg;
-    fixSvgOverflow(wrapper);
-  }).catch((err: any) => {
-    if (retries < 2) {
-      setTimeout(() => attemptRenderMermaid(wrapper, id, src, retries + 1), 200);
-    } else {
-      wrapper.innerHTML = `<div class="mermaid-error">⚠ Mermaid: ${err.message || 'Erro de renderização'}</div>`;
-    }
-  });
-}
-
-function fixSvgOverflow(container: HTMLElement) {
-  const svg = container.querySelector('svg');
-  if (!svg) return;
-
-  svg.removeAttribute('width');
-  svg.removeAttribute('height');
-  svg.style.width = '100%';
-  svg.style.height = 'auto';
-
-  const vb = svg.getAttribute('viewBox');
-  if (vb) {
-    const [x, y, w, h] = vb.split(' ').map(Number);
-    const pad = 12;
-    svg.setAttribute('viewBox', `${x - pad} ${y - pad} ${w + pad * 2} ${h + pad * 2}`);
-  }
-
-  svg.style.overflow = 'visible';
-  svg.querySelectorAll('g, foreignObject, text, rect, div').forEach((el: any) => {
-    el.style.overflow = 'visible';
   });
 }
 
@@ -1091,19 +1071,45 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   overflow: visible !important;
   max-width: 100%;
   height: auto;
+  transform: scale(var(--font-scale, 1));
+  transform-origin: center center;
 }
 .mermaid-block p, .mermaid-block div, .mermaid-block span {
   line-height: 1.25 !important;
   margin: 0 !important;
+  padding: 0 !important;
+}
+.mermaid-block .nodeLabel,
+.mermaid-block .edgeLabel,
+.mermaid-block text,
+.mermaid-block .label,
+.mermaid-block .cluster-label text,
+.mermaid-block .actor {
+  white-space: pre-wrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.25 !important;
 }
 .mermaid-block foreignObject {
   overflow: visible !important;
 }
-.mermaid-block foreignObject > div {
+.mermaid-block foreignObject div {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  width: 100% !important;
   height: 100% !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  line-height: 1.25 !important;
+}
+.mermaid-block .node rect,
+.mermaid-block .node polygon,
+.mermaid-block .node circle,
+.mermaid-block .node ellipse {
+  stroke-width: 1.5px;
 }
 </style>
 </head>
@@ -1301,11 +1307,11 @@ try {
 function renderAllKaTeX() {
   if (!window.katex) return;
   document.querySelectorAll('.slide-content').forEach(container => {
-    container.innerHTML = container.innerHTML.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+    container.innerHTML = container.innerHTML.replace(/\\$\\$([\\s\\S]+?)\\$\\$/g, (_, math) => {
       try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
       catch (e) { return '$$' + math + '$$'; }
     });
-    container.innerHTML = container.innerHTML.replace(/(^|[^\\\\])\$([^\\$\\n]+?)\$/g, (_, prefix, math) => {
+    container.innerHTML = container.innerHTML.replace(/(^|[^\\\\])\\$([^\\$\\n]+?)\\$/g, (_, prefix, math) => {
       try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
       catch (e) { return prefix + '$' + math + '$'; }
     });
@@ -1957,11 +1963,11 @@ onBeforeUnmount(() => {
 :deep(.slide.active) { box-shadow: 0 8px 48px rgba(129,140,248,0.12), 0 0 0 2px var(--accent); }
 :deep(.slide-number) { position:absolute; top:16px; right:20px; font-size:11px; color:var(--text-muted); font-weight:600; }
 :deep(.slide-content) { width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; gap:1.2rem; }
-:deep(.slide-content h1) { font-size:2.8rem; font-weight:900; letter-spacing:-1px; line-height:1.1; }
-:deep(.slide-content h2) { font-size:2rem; font-weight:700; letter-spacing:-0.5px; }
-:deep(.slide-content h3) { font-size:1.4rem; font-weight:600; }
-:deep(.slide-content p)  { font-size:1.15rem; line-height:1.75; color:var(--text-secondary); }
-:deep(.slide-content ul), :deep(.slide-content ol) { font-size:1.1rem; line-height:1.8; padding-left:1.6rem; margin-bottom:0.8em; color:var(--text-secondary); list-style-position: outside; }
+:deep(.slide-content h1) { font-size: calc(2.8rem * var(--font-scale, 1)); font-weight:900; letter-spacing:-1px; line-height:1.1; }
+:deep(.slide-content h2) { font-size: calc(2rem * var(--font-scale, 1)); font-weight:700; letter-spacing:-0.5px; }
+:deep(.slide-content h3) { font-size: calc(1.4rem * var(--font-scale, 1)); font-weight:600; }
+:deep(.slide-content p)  { font-size: calc(1.15rem * var(--font-scale, 1)); line-height:1.75; color:var(--text-secondary); }
+:deep(.slide-content ul), :deep(.slide-content ol) { font-size: calc(1.1rem * var(--font-scale, 1)); line-height:1.8; padding-left:1.6rem; margin-bottom:0.8em; color:var(--text-secondary); list-style-position: outside; }
 :deep(.slide-content ul ul), :deep(.slide-content ul ol), :deep(.slide-content ol ul), :deep(.slide-content ol ol) { font-size:0.95em; line-height:1.6; margin-top:0.3em; margin-bottom:0.3em; padding-left:1.4rem; }
 :deep(.slide-content ul) { list-style-type: disc; }
 :deep(.slide-content ul ul) { list-style-type: circle; }
@@ -1975,7 +1981,7 @@ onBeforeUnmount(() => {
 :deep(.slide-content hr) { border:none; height:1px; background:var(--border); margin:1rem 0; }
 :deep(.slide-content img) { max-width:100%; border-radius:8px; }
 :deep(.table-wrap) { margin: 1.2em 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-:deep(.slide-content table) { width:100%; border-collapse:collapse; font-size:0.95rem; margin:0; }
+:deep(.slide-content table) { width:100%; border-collapse:collapse; font-size: calc(0.95rem * var(--font-scale, 1)); margin:0; }
 :deep(.slide-content th), :deep(.slide-content td) { padding:10px 14px; border:1px solid var(--border); text-align:left; }
 :deep(.slide-content th) { background:var(--accent-dim); font-weight:600; }
 :deep(.slide-content tr:nth-child(even)) { background: rgba(255, 255, 255, 0.03); }
@@ -1984,7 +1990,7 @@ onBeforeUnmount(() => {
 
 /* MERMAID STYLING */
 :deep(.mermaid-block) { display: flex; justify-content: center; overflow: visible !important; padding: 16px 0; }
-:deep(.mermaid-block svg) { overflow: visible !important; max-width: 100%; }
+:deep(.mermaid-block svg) { overflow: visible !important; max-width: 100%; transform: scale(var(--font-scale, 1)); transform-origin: center center; }
 :deep(.mermaid-error) { color: var(--red); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; }
 :deep(.mermaid-block p), :deep(.mermaid-block div), :deep(.mermaid-block span) { margin: 0 !important; padding: 0 !important; line-height: 1.25 !important; }
 :deep(.mermaid-block .nodeLabel),

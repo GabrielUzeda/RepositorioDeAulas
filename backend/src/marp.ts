@@ -70,7 +70,7 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
   let slidesHtml = '';
   slides.forEach((slide, i) => {
     const cls = 'slide' + (slide.directives.class ? ' ' + slide.directives.class : '');
-    const animAttr = slide.directives.animation ? `data-animation="${slide.directives.animation}"` : '';
+    const animAttr = slide.directives.animation ? `data-animation="${escapeHtml(slide.directives.animation)}"` : '';
     const staggerAttr = slide.directives['animation-stagger'] ? `data-anim-stagger="true"` : '';
 
     let styleParts: string[] = [];
@@ -392,19 +392,45 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   overflow: visible !important;
   max-width: 100%;
   height: auto;
+  transform: scale(var(--font-scale, 1));
+  transform-origin: center center;
 }
 .mermaid-block p, .mermaid-block div, .mermaid-block span {
   line-height: 1.25 !important;
   margin: 0 !important;
+  padding: 0 !important;
+}
+.mermaid-block .nodeLabel,
+.mermaid-block .edgeLabel,
+.mermaid-block text,
+.mermaid-block .label,
+.mermaid-block .cluster-label text,
+.mermaid-block .actor {
+  white-space: pre-wrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.25 !important;
 }
 .mermaid-block foreignObject {
   overflow: visible !important;
 }
-.mermaid-block foreignObject > div {
+.mermaid-block foreignObject div {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  width: 100% !important;
   height: 100% !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  line-height: 1.25 !important;
+}
+.mermaid-block .node rect,
+.mermaid-block .node polygon,
+.mermaid-block .node circle,
+.mermaid-block .node ellipse {
+  stroke-width: 1.5px;
 }
 </style>
 </head>
@@ -591,14 +617,22 @@ document.addEventListener('mousemove', () => {
   idleTimer = setTimeout(() => controls.classList.add('idle'), 2500);
 });
 
+try {
+  const _url = new URL(window.location.href);
+  if (_url.searchParams.has('senha')) {
+    _url.searchParams.delete('senha');
+    window.history.replaceState({}, document.title, _url.pathname + (_url.searchParams.toString() ? '?' + _url.searchParams.toString() : '') + _url.hash);
+  }
+} catch (e) {}
+
 function renderAllKaTeX() {
   if (!window.katex) return;
   document.querySelectorAll('.slide-content').forEach(container => {
-    container.innerHTML = container.innerHTML.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+    container.innerHTML = container.innerHTML.replace(/\\$\\$([\\s\\S]+?)\\$\\$/g, (_, math) => {
       try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
       catch (e) { return '$$' + math + '$$'; }
     });
-    container.innerHTML = container.innerHTML.replace(/(^|[^\\\\])\$([^\\$\\n]+?)\$/g, (_, prefix, math) => {
+    container.innerHTML = container.innerHTML.replace(/(^|[^\\\\])\\$([^\\$\\n]+?)\\$/g, (_, prefix, math) => {
       try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
       catch (e) { return prefix + '$' + math + '$'; }
     });
