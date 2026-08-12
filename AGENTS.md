@@ -134,7 +134,7 @@ docker compose -f docker-compose.e2e.yml up -d  # e2e manual
 - **Controle de acesso**:
   - **Curso com senha** → aluno precisa verificar `POST /cursos/:id/verificar-senha` antes de ver conteúdo. É a senha do **CURSO** que importa para aulas/atividades (`readCursoSenha`).
   - Atividade com `allow_password` → senha própria, verificada ao abrir a atividade.
-  - **Armadilha conhecida:** `createMateria` grava senha na **disciplina**, mas o backend checa **`curso.senha`** — uma disciplina com senha mas curso sem senha não bloqueia acesso.
+  - **Senha é exclusiva do curso:** `disciplinas` não possui mais coluna `senha` (foi removida). O acesso anônimo a aulas/atividades é controlado **apenas** por `cursos.senha`. O formulário `DisciplinaFormModal.vue` não tem campo de senha — não há risco de "disciplina com senha mas curso sem senha".
 
 ---
 
@@ -175,7 +175,7 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 
 ### Helpers (`e2e/helpers.ts`)
 - `unique(prefix)` / `uniqueName(prefix)` — sufixo `_{Date.now()}_{rand}`
-- `setupAdminContext(request)` → `{adminToken}`; `createProfessor(...)` → `{id, nome, email, password}` (senha `'senha12345'`, role professor); `createCurso(request, adminToken, professorIds=[])` → `{id, nome, slug}` (sem senha por padrão); `createMateria(request, profToken, cursoId)` → `{id, nome, slug, senha}` (disciplina, senha `'materia123'`); `cleanupEntities(request, adminToken, cursoId?, professorId?)`.
+- `setupAdminContext(request)` → `{adminToken}`; `createProfessor(...)` → `{id, nome, email, password}` (senha `'senha12345'`, role professor); `createCurso(request, adminToken, professorIds=[])` → `{id, nome, slug}` (sem senha por padrão); `createMateria(request, profToken, cursoId)` → `{id, nome, slug}` (disciplina; a senha da disciplina foi removida — o acesso é controlado pela senha do curso); `cleanupEntities(request, adminToken, cursoId?, professorId?)`.
 - `loginViaUI(page, email, password, expectedUrl)` — `/login` → fill placeholders → `Entrar` → `waitForURL`.
 - `profLogin` + `api` (GET/POST/PUT/DELETE autenticado, sem prefixo `/api`) são definidos localmente em `aluno.spec.ts` e `fluxo-completo.spec.ts` (copie o padrão).
 
@@ -196,7 +196,7 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 
 ## 10. Armadilhas validadas (leia antes de editar != código)
 
-1. **Senha de disciplina ≠ senha de curso**: `createMateria` grava em `disciplinas.senha`, mas acesso anônimo a aulas/atividades checa `curso.senha`. Para fluxo anônimo sem modal, use curso sem senha.
+1. **Senha é exclusiva do curso**: `disciplinas` não possui mais coluna `senha`. O acesso anônimo a aulas/atividades checa apenas `cursos.senha`. Para fluxo anônimo sem modal de senha, crie o curso sem senha.
 2. **`GET /cursos/:id` devolve `senha` inclusive para anônimos**; `GET /cursos/:id/disciplinas` anon omite campos.
 3. **Tailwind JIT** só com classes literais.
 4. **Marp** grava em `resolveFrontendDir()` → no container `/app/frontend_static` (bind de `./frontend/dist/`). Se `frontend/dist/` não existir no host, o mount cria pasta vazia e aulas dão 404 → **rode `npm run build` no frontend antes de E2E**.
