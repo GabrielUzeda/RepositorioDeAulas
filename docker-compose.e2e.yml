@@ -8,6 +8,9 @@ services:
       - .env
     environment:
       DATABASE_PATH: /app/data/e2e-test.db
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM: "no-reply@escola.com"
     volumes:
       - ./backend/:/app
       - backend_node_modules:/app/node_modules
@@ -20,6 +23,17 @@ services:
       - "18080:8080"
     networks:
       - e2e-network
+    depends_on:
+      - mailhog
+    restart: unless-stopped
+  mailhog:
+    image: mailhog/mailhog
+    container_name: e2e-mailhog
+    ports:
+      - "11025:1025"
+      - "18025:8025"
+    networks:
+      - e2e-network
     restart: unless-stopped
   vite:
     image: oven/bun:1
@@ -30,7 +44,7 @@ services:
       - ./frontend/:/app
       - vite_node_modules:/app/node_modules
     working_dir: /app
-    command: sh -c "bun install && bun run dev --host 0.0.0.0"
+    command: sh -c "bun install && bun x vite build && bun run dev --host 0.0.0.0"
     expose:
       - "5173"
     ports:
