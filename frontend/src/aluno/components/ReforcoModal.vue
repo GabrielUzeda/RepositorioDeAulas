@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet } from '@/shared/utils/storage';
+import { useToast } from '@/shared/composables/useToast';
 import type { Question, Atividade } from '@/shared/types';
 
 const props = withDefaults(defineProps<{
@@ -28,6 +29,7 @@ const answers = ref<Record<number, number>>({});
 const isSubmitting = ref(false);
 const isSubmitted = ref(false);
 const errorMessage = ref('');
+const { success } = useToast();
 const resultAcertos = ref<number | null>(null);
 const resultTotal = ref<number | null>(null);
 const resultPontuacao = ref<number | null>(null);
@@ -107,6 +109,13 @@ async function submitAnswers() {
     if (res.data && res.data.acertos !== undefined) resultAcertos.value = res.data.acertos;
     if (res.data && res.data.total !== undefined) resultTotal.value = res.data.total;
     if (res.data && res.data.pontuacao !== undefined) resultPontuacao.value = res.data.pontuacao;
+    let msg = 'Respostas registradas!';
+    if (resultAcertos.value !== null) {
+      const total = resultTotal.value ?? props.questions.length;
+      msg += ` Acertos: ${resultAcertos.value} / ${total}`;
+      if (resultPontuacao.value !== null) msg += ` — Pontuação: ${resultPontuacao.value}%`;
+    }
+    success(msg);
   } else {
     errorMessage.value = res.error || 'Erro ao registrar respostas.';
   }
@@ -134,57 +143,39 @@ function prevQuestion() {
 </script>
 
 <template>
-  <div v-if="props.show" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl space-y-6 relative border border-slate-100" @click.stop>
+  <div v-if="props.show" class="fixed inset-0 bg-surface backdrop-blur-md flex items-center justify-center p-4 z-50">
+    <div class="bg-surface-alt rounded-3xl p-8 max-w-2xl w-full shadow-2xl space-y-6 relative border border-line" @click.stop>
       <!-- Header -->
       <div class="flex justify-between items-center border-b pb-4">
         <div>
-          <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase tracking-wider">Modo Reforço</span>
-          <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ props.title }}</h2>
+          <span class="px-3 py-1 bg-surface-alt text-success text-xs font-bold rounded-full uppercase tracking-wider">Modo Reforço</span>
+          <h2 class="text-2xl font-bold text-primary mt-1">{{ props.title }}</h2>
         </div>
-        <button @click="emit('close')" class="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition">
+        <button @click="emit('close')" class="text-secondary hover:text-primary p-2 rounded-full hover:bg-surface transition">
           <span class="material-icons">close</span>
         </button>
       </div>
 
       <!-- Question Counter -->
-      <div class="flex justify-between items-center text-sm font-semibold text-slate-500">
+      <div class="flex justify-between items-center text-sm font-semibold text-secondary">
         <span>Questão {{ currentIndex + 1 }} de {{ props.questions.length }}</span>
-        <span class="text-indigo-600">Respondidas: {{ answeredQuestions.size }} / {{ props.questions.length }}</span>
+        <span class="text-accent">Respondidas: {{ answeredQuestions.size }} / {{ props.questions.length }}</span>
       </div>
 
       <!-- Submission Status -->
-      <div v-if="isSubmitting" class="p-4 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-sm font-medium text-center">
+      <div v-if="isSubmitting" class="p-4 bg-surface-alt border border-accent text-accent rounded-xl text-sm font-medium text-center">
         Enviando respostas para correção do servidor...
       </div>
 
-      <!-- Server Correction Result -->
-      <div v-if="isSubmitted" class="p-4 rounded-xl border text-center space-y-1">
-        <span class="material-icons text-3xl text-green-600">check_circle</span>
-        <p class="text-lg font-bold text-slate-800">Respostas registradas e corrigidas pelo servidor.</p>
-        <p v-if="resultAcertos !== null" class="text-sm text-slate-600">
-          Acertos: {{ resultAcertos }} / {{ resultTotal ?? props.questions.length }}
-        </p>
-        <p v-if="resultPontuacao !== null" class="text-sm text-slate-600">
-          Pontuação: {{ resultPontuacao }}
-        </p>
-        <button
-          @click="closeAfterSubmit"
-          class="mt-3 px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 shadow-md"
-        >
-          Fechar
-        </button>
-      </div>
-
       <!-- Error -->
-      <div v-if="errorMessage && !isSubmitted" class="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl">
+      <div v-if="errorMessage && !isSubmitted" class="p-3 bg-danger border border-danger text-danger text-sm rounded-xl">
         {{ errorMessage }}
       </div>
 
       <!-- Question Body -->
       <div v-if="currentQuestion && !isSubmitting && !isSubmitted" class="space-y-4">
-        <h4 v-if="currentQuestion.title" class="text-lg font-semibold text-indigo-700">{{ currentQuestion.title }}</h4>
-        <p class="text-slate-700 text-base leading-relaxed">{{ currentQuestion.content }}</p>
+        <h4 v-if="currentQuestion.title" class="text-lg font-semibold text-accent">{{ currentQuestion.title }}</h4>
+        <p class="text-secondary text-base leading-relaxed">{{ currentQuestion.content }}</p>
 
         <!-- Options -->
         <div class="space-y-3 pt-2">
@@ -197,8 +188,8 @@ function prevQuestion() {
             :class="[
               'w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between font-medium',
               selectedOptionIndex === idx
-                ? 'border-indigo-500 bg-indigo-50 text-indigo-800 shadow-md'
-                : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50 text-slate-700'
+                ? 'border-accent bg-surface-alt text-accent shadow-md'
+                : 'border-line hover:border-accent hover:bg-surface text-secondary'
             ]"
           >
             <span>{{ option.text }}</span>
@@ -207,8 +198,8 @@ function prevQuestion() {
         </div>
 
         <!-- Feedback da opção selecionada -->
-        <div v-if="selectedFeedback" class="p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl text-sm text-amber-800 flex items-start space-x-2">
-          <span class="material-icons text-base text-amber-500 mt-0.5">info</span>
+        <div v-if="selectedFeedback" class="p-4 bg-surface-alt border-l-4 border-accent rounded-r-xl text-sm text-secondary flex items-start space-x-2">
+          <span class="material-icons text-base text-accent mt-0.5">info</span>
           <span>{{ selectedFeedback }}</span>
         </div>
       </div>
@@ -218,14 +209,14 @@ function prevQuestion() {
         <button
           @click="prevQuestion"
           :disabled="currentIndex === 0"
-          class="px-4 py-2 border rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          class="px-4 py-2 border rounded-xl text-sm font-medium text-secondary hover:bg-surface disabled:opacity-40"
         >
           Anterior
         </button>
         <button
           @click="nextQuestion"
           :disabled="currentIndex === props.questions.length - 1 ? !allAnswered : !currentAnswered"
-          class="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 shadow-md disabled:opacity-40"
+          class="px-5 py-2 bg-accent text-white rounded-xl text-sm font-semibold hover:opacity-90 shadow-md disabled:opacity-40"
         >
           {{ currentIndex === props.questions.length - 1 ? 'Finalizar' : 'Próxima' }}
         </button>

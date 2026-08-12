@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import ColorPicker from '@/professor/components/ColorPicker.vue';
 import IconPicker from '@/professor/components/IconPicker.vue';
+import { apiClient } from '@/shared/api/client';
 import type { Curso, Professor } from '@/shared/types';
 
 const props = defineProps<{
@@ -17,7 +18,7 @@ const emit = defineEmits<{
 
 const nome = ref('');
 const descricao = ref('');
-const cor = ref('bg-indigo-600');
+const cor = ref('bg-accent');
 const icone = ref('school');
 const senha = ref('');
 const selectedProfessorIds = ref<number[]>([]);
@@ -30,15 +31,27 @@ watch(
       if (props.curso) {
         nome.value = props.curso.nome || '';
         descricao.value = props.curso.descricao || '';
-        cor.value = props.curso.cor || 'bg-indigo-600';
+        cor.value = props.curso.cor || 'bg-accent';
         icone.value = props.curso.icone || 'school';
         senha.value = props.curso.senha || '';
+        selectedProfessorIds.value = [];
+        apiClient
+          .get<{ id: number }[]>(`/cursos/${props.curso.id}/professores`)
+          .then((res) => {
+            if (res.success && Array.isArray(res.data)) {
+              selectedProfessorIds.value = res.data.map((r) => r.id);
+            }
+          })
+          .catch(() => {
+            selectedProfessorIds.value = [];
+          });
       } else {
         nome.value = '';
         descricao.value = '';
-        cor.value = 'bg-indigo-600';
+        cor.value = 'bg-accent';
         icone.value = 'school';
         senha.value = '';
+        selectedProfessorIds.value = [];
       }
       searchQuery.value = '';
     }
@@ -95,19 +108,19 @@ function handleSubmit() {
 
 <template>
   <div v-if="props.show" class="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-50" @click.self="emit('close')">
-    <div class="bg-slate-900 rounded-3xl w-full max-w-xl shadow-2xl border border-slate-800 flex flex-col max-h-[92vh] overflow-hidden">
+    <div class="bg-surface rounded-3xl w-full max-w-xl shadow-2xl border border-line flex flex-col max-h-[92vh] overflow-hidden">
       <!-- Header -->
-      <div class="px-8 py-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/90 shrink-0">
+      <div class="px-8 py-6 border-b border-line flex justify-between items-center bg-surface shrink-0">
         <div class="flex items-center space-x-3.5">
-          <div class="w-11 h-11 shrink-0 bg-indigo-600/20 text-indigo-400 rounded-2xl border border-indigo-500/30 flex items-center justify-center shadow-inner">
+          <div class="w-11 h-11 shrink-0 bg-surface-alt text-accent rounded-2xl border border-line flex items-center justify-center shadow-inner">
             <span class="material-icons text-xl">{{ icone || 'school' }}</span>
           </div>
           <div>
-            <h3 class="text-xl font-bold text-white leading-tight">{{ props.curso ? 'Editar Curso' : 'Novo Curso' }}</h3>
-            <p class="text-xs text-slate-400 mt-0.5">Configure título, ícone, cor, senha e professores do curso</p>
+            <h3 class="text-xl font-bold text-primary leading-tight">{{ props.curso ? 'Editar Curso' : 'Novo Curso' }}</h3>
+            <p class="text-xs text-secondary mt-0.5">Configure título, ícone, cor, senha e professores do curso</p>
           </div>
         </div>
-        <button @click="emit('close')" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors">
+        <button @click="emit('close')" class="p-2 text-secondary hover:text-primary hover:bg-surface rounded-xl transition-colors">
           <span class="material-icons">close</span>
         </button>
       </div>
@@ -115,79 +128,79 @@ function handleSubmit() {
       <!-- Form Body -->
       <form @submit.prevent="handleSubmit" class="px-8 py-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
         <div>
-          <label for="curso-nome" class="block text-sm font-semibold text-slate-200 mb-1.5">Nome do Curso *</label>
-          <input id="curso-nome" v-model="nome" required type="text" placeholder="Ex: Engenharia de Software 2026" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 text-sm" />
+          <label for="curso-nome" class="block text-sm font-semibold text-primary mb-1.5">Nome do Curso *</label>
+          <input id="curso-nome" v-model="nome" required type="text" placeholder="Ex: Engenharia de Software 2026" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
         </div>
 
         <div>
-          <label for="curso-desc" class="block text-sm font-semibold text-slate-200 mb-1.5">Descrição do Curso</label>
-          <textarea id="curso-desc" v-model="descricao" rows="3" placeholder="Descreva os objetivos, ementa e público-alvo do curso..." class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 text-sm min-h-[90px] custom-scrollbar resize-y"></textarea>
+          <label for="curso-desc" class="block text-sm font-semibold text-primary mb-1.5">Descrição do Curso</label>
+          <textarea id="curso-desc" v-model="descricao" rows="3" placeholder="Descreva os objetivos, ementa e público-alvo do curso..." class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm min-h-[90px] custom-scrollbar resize-y"></textarea>
         </div>
 
         <div>
-          <label for="curso-senha" class="block text-sm font-semibold text-slate-200 mb-1.5">
+          <label for="curso-senha" class="block text-sm font-semibold text-primary mb-1.5">
             Senha de Acesso dos Estudantes
-            <span class="text-slate-500 font-normal">(deixe em branco se for de acesso livre)</span>
+            <span class="text-secondary font-normal">(deixe em branco se for de acesso livre)</span>
           </label>
-          <input id="curso-senha" v-model="senha" type="password" placeholder="••••••••" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 text-sm" />
+          <input id="curso-senha" v-model="senha" type="password" placeholder="••••••••" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
           <div>
-            <label class="block text-sm font-semibold text-slate-200 mb-1.5">Ícone do Curso</label>
+            <label class="block text-sm font-semibold text-primary mb-1.5">Ícone do Curso</label>
             <IconPicker v-model="icone" />
           </div>
 
           <div>
-            <label class="block text-sm font-semibold text-slate-200 mb-1.5">Cor de Identificação</label>
+            <label class="block text-sm font-semibold text-primary mb-1.5">Cor de Identificação</label>
             <ColorPicker v-model="cor" />
           </div>
         </div>
 
         <!-- Seleção de Professores -->
-        <div class="space-y-2.5 pt-2 border-t border-slate-800/80">
+        <div class="space-y-2.5 pt-2 border-t border-line">
           <div class="flex items-center justify-between">
-            <label class="block text-sm font-semibold text-slate-200">
+            <label class="block text-sm font-semibold text-primary">
               Professores Responsáveis
-              <span class="text-xs font-normal text-slate-400 ml-1">({{ selectedProfessorIds.length }} selecionados)</span>
+              <span class="text-xs font-normal text-secondary ml-1">({{ selectedProfessorIds.length }} selecionados)</span>
             </label>
             <div class="flex items-center space-x-2 text-xs">
-              <button type="button" @click="selectAll" class="text-indigo-400 hover:text-indigo-300 font-medium">Selecionar Todos</button>
-              <span class="text-slate-600">•</span>
-              <button type="button" @click="clearAll" class="text-slate-400 hover:text-slate-200 font-medium">Limpar</button>
+              <button type="button" @click="selectAll" class="text-accent hover:text-accent font-medium">Selecionar Todos</button>
+              <span class="text-secondary">•</span>
+              <button type="button" @click="clearAll" class="text-secondary hover:text-primary font-medium">Limpar</button>
             </div>
           </div>
 
-          <div v-if="selectedProfessoresObjects.length > 0" class="flex flex-wrap gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-2xl max-h-28 overflow-y-auto custom-scrollbar">
+          <div v-if="selectedProfessoresObjects.length > 0" class="flex flex-wrap gap-2 p-2.5 bg-surface border border-line rounded-2xl max-h-28 overflow-y-auto custom-scrollbar">
             <span
               v-for="p in selectedProfessoresObjects"
               :key="p.id"
-              class="inline-flex items-center space-x-1.5 px-3 py-1 bg-indigo-950/80 border border-indigo-700/60 text-indigo-200 text-xs rounded-xl font-medium shadow-sm"
+              class="inline-flex items-center space-x-1.5 px-3 py-1 bg-surface-alt border border-line text-accent text-xs rounded-xl font-medium shadow-sm"
             >
               <span>{{ p.nome }}</span>
-              <button type="button" @click="removeProfessor(p.id)" class="text-indigo-400 hover:text-white ml-1">
+              <button type="button" @click="removeProfessor(p.id)" class="text-accent hover:text-primary ml-1">
                 <span class="material-icons text-sm leading-none">close</span>
               </button>
             </span>
           </div>
 
           <div class="relative">
-            <span class="material-icons absolute left-3.5 top-3 text-slate-500 text-base">search</span>
+            <span class="material-icons absolute left-3.5 top-3 text-secondary text-base">search</span>
             <input
               v-model="searchQuery"
               type="text"
               placeholder="Buscar professor por nome ou e-mail..."
-              class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600"
+              class="w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-xl text-primary text-xs outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary"
             />
           </div>
 
-          <div v-if="professores.length === 0" class="text-xs text-slate-500 text-center py-5">
+          <div v-if="professores.length === 0" class="text-xs text-secondary text-center py-5">
             Nenhum professor cadastrado no sistema.
           </div>
-          <div v-else-if="filteredProfessores.length === 0" class="text-xs text-slate-500 text-center py-5">
+          <div v-else-if="filteredProfessores.length === 0" class="text-xs text-secondary text-center py-5">
             Nenhum professor encontrado para "{{ searchQuery }}".
           </div>
-          <div v-else class="max-h-48 overflow-y-auto border border-slate-800 rounded-2xl p-2 bg-slate-950 grid grid-cols-1 gap-1.5 custom-scrollbar">
+          <div v-else class="max-h-48 overflow-y-auto border border-line rounded-2xl p-2 bg-surface grid grid-cols-1 gap-1.5 custom-scrollbar">
             <button
               v-for="p in filteredProfessores"
               :key="p.id"
@@ -196,30 +209,30 @@ function handleSubmit() {
               :class="[
                 'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all text-left border',
                 selectedProfessorIds.includes(p.id)
-                  ? 'bg-indigo-950/60 border-indigo-500/80 text-white shadow-sm ring-1 ring-indigo-500/40'
-                  : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  ? 'bg-accent border-accent text-white shadow-sm ring-1 ring-accent'
+                  : 'bg-surface-alt border-line text-secondary hover:bg-surface hover:text-primary'
               ]"
             >
               <div class="flex items-center space-x-3 truncate">
-                <div class="w-7 h-7 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-bold shrink-0">
+                <div class="w-7 h-7 rounded-full bg-surface-alt text-secondary flex items-center justify-center text-xs font-bold shrink-0">
                   {{ p.nome.charAt(0).toUpperCase() }}
                 </div>
                 <div class="truncate">
-                  <p class="text-slate-200 font-medium leading-tight truncate">{{ p.nome }}</p>
-                  <p class="text-slate-500 text-[10px] truncate">{{ p.email }}</p>
+                  <p class="text-primary font-medium leading-tight truncate">{{ p.nome }}</p>
+                  <p class="text-secondary text-[10px] truncate">{{ p.email }}</p>
                 </div>
               </div>
-              <span v-if="selectedProfessorIds.includes(p.id)" class="material-icons text-indigo-400 text-base shrink-0 ml-2">check_circle</span>
-              <span v-else class="material-icons text-slate-700 text-base shrink-0 ml-2">radio_button_unchecked</span>
+              <span v-if="selectedProfessorIds.includes(p.id)" class="material-icons text-accent text-base shrink-0 ml-2">check_circle</span>
+              <span v-else class="material-icons text-secondary text-base shrink-0 ml-2">radio_button_unchecked</span>
             </button>
           </div>
         </div>
       </form>
 
       <!-- Footer -->
-      <div class="px-8 py-4 border-t border-slate-800 flex justify-end space-x-3 bg-slate-900/90 shrink-0">
-        <button @click="emit('close')" type="button" class="px-5 py-2.5 text-slate-400 hover:text-white rounded-xl text-xs font-medium transition-colors">Cancelar</button>
-        <button @click="handleSubmit" type="button" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all">Salvar Curso</button>
+      <div class="px-8 py-4 border-t border-line flex justify-end space-x-3 bg-surface shrink-0">
+        <button @click="emit('close')" type="button" class="px-5 py-2.5 text-secondary hover:text-primary rounded-xl text-xs font-medium transition-colors">Cancelar</button>
+        <button @click="handleSubmit" type="button" class="px-6 py-2.5 bg-accent hover:opacity-90 text-white rounded-xl text-xs font-bold shadow-lg transition-all">Salvar Curso</button>
       </div>
     </div>
   </div>

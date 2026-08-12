@@ -122,19 +122,19 @@ function handleSubmit() {
 
 <template>
   <div v-if="show" class="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-6" @click.self="emit('close')">
-    <div class="bg-slate-900 rounded-3xl w-full max-w-xl shadow-2xl border border-slate-800 flex flex-col max-h-[92vh] overflow-hidden">
+    <div class="bg-surface rounded-3xl w-full max-w-xl shadow-2xl border border-line flex flex-col max-h-[92vh] overflow-hidden">
       <!-- Header with tight icon fit & generous horizontal padding -->
-      <div class="px-8 py-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/90 shrink-0">
+      <div class="px-8 py-6 border-b border-line flex justify-between items-center bg-surface shrink-0">
         <div class="flex items-center space-x-3.5">
-          <div class="w-11 h-11 shrink-0 bg-indigo-600/20 text-indigo-400 rounded-2xl border border-indigo-500/30 flex items-center justify-center shadow-inner">
+          <div class="w-11 h-11 shrink-0 bg-surface-alt text-accent rounded-2xl border border-line flex items-center justify-center shadow-inner">
             <span class="material-icons text-xl">person</span>
           </div>
           <div>
-            <h3 class="text-xl font-bold text-white leading-tight">{{ professor ? 'Editar Professor' : 'Novo Professor' }}</h3>
-            <p class="text-xs text-slate-400 mt-0.5">Gerencie credenciais e atribuições de disciplinas</p>
+            <h3 class="text-xl font-bold text-primary leading-tight">{{ professor ? 'Editar Professor' : 'Novo Professor' }}</h3>
+            <p class="text-xs text-secondary mt-0.5">Gerencie credenciais e atribuições de disciplinas</p>
           </div>
         </div>
-        <button @click="emit('close')" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors">
+        <button @click="emit('close')" class="p-2 text-secondary hover:text-primary hover:bg-surface rounded-xl transition-colors">
           <span class="material-icons">close</span>
         </button>
       </div>
@@ -142,64 +142,64 @@ function handleSubmit() {
       <!-- Form Body with px-8 padding & custom scrollbar -->
       <form @submit.prevent="handleSubmit" class="px-8 py-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
         <div>
-          <label for="prof-nome" class="block text-sm font-semibold text-slate-200 mb-1.5">Nome Completo *</label>
-          <input id="prof-nome" v-model="nome" type="text" required placeholder="Ex: Maria Silva" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 text-sm" />
+          <label for="prof-nome" class="block text-sm font-semibold text-primary mb-1.5">Nome Completo *</label>
+          <input id="prof-nome" v-model="nome" type="text" required placeholder="Ex: Maria Silva" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
         </div>
 
         <div>
-          <label for="prof-email" class="block text-sm font-semibold text-slate-200 mb-1.5">E-mail Corporativo *</label>
-          <input id="prof-email" v-model="email" type="email" required placeholder="exemplo@escola.gov.br" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 text-sm" />
+          <label for="prof-email" class="block text-sm font-semibold text-primary mb-1.5">E-mail Corporativo *</label>
+          <input id="prof-email" v-model="email" type="email" required placeholder="exemplo@escola.gov.br" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
         </div>
 
         <div>
-          <label for="prof-senha" class="block text-sm font-semibold text-slate-200 mb-1.5">
+          <label for="prof-senha" class="block text-sm font-semibold text-primary mb-1.5">
             Senha
-            <span v-if="professor" class="text-slate-500 font-normal">(deixe em branco para manter a atual)</span>
+            <span v-if="professor" class="text-secondary font-normal">(deixe em branco para manter a atual)</span>
           </label>
-          <input id="prof-senha" v-model="password" type="password" placeholder="••••••••" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 text-sm" />
+          <input id="prof-senha" v-model="password" type="password" placeholder="••••••••" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
         </div>
 
         <div>
-          <label for="prof-perfil" class="block text-sm font-semibold text-slate-200 mb-1.5">Perfil de Acesso *</label>
-          <select id="prof-perfil" v-model="role" class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+          <label for="prof-perfil" class="block text-sm font-semibold text-primary mb-1.5">Perfil de Acesso *</label>
+          <select id="prof-perfil" v-model="role" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent text-sm">
             <option value="professor">Professor (Acesso Restrito aos Cursos Vinculados)</option>
             <option value="admin">Administrador (Acesso Irrestrito ao Sistema)</option>
           </select>
         </div>
 
         <!-- Role = Admin Note -->
-        <div v-if="role === 'admin'" class="p-4 bg-indigo-950/40 border border-indigo-800/40 rounded-2xl flex items-start space-x-3.5">
-          <span class="material-icons text-indigo-400 text-xl mt-0.5 shrink-0">verified_user</span>
-          <div class="text-xs text-slate-300 leading-relaxed">
-            <strong class="text-indigo-300 font-semibold block mb-0.5">Acesso Global Ativo</strong>
+        <div v-if="role === 'admin'" class="p-4 bg-surface-alt border border-line rounded-2xl flex items-start space-x-3.5">
+          <span class="material-icons text-accent text-xl mt-0.5 shrink-0">verified_user</span>
+          <div class="text-xs text-secondary leading-relaxed">
+            <strong class="text-accent font-semibold block mb-0.5">Acesso Global Ativo</strong>
             Como Administrador, este perfil possui permissão total de gerenciamento de todos os cursos e matérias da plataforma. A vinculação individual de cursos aplica-se apenas a perfis de Professor.
           </div>
         </div>
 
         <!-- Role = Professor Course Selector -->
-        <div v-else class="space-y-3.5 pt-3 border-t border-slate-800">
+        <div v-else class="space-y-3.5 pt-3 border-t border-line">
           <div class="flex items-center justify-between">
-            <label class="block text-sm font-semibold text-slate-200">
+            <label class="block text-sm font-semibold text-primary">
               Cursos Vinculados
-              <span class="text-xs font-normal text-slate-400 ml-1">({{ selectedCursoIds.length }} selecionados)</span>
+              <span class="text-xs font-normal text-secondary ml-1">({{ selectedCursoIds.length }} selecionados)</span>
             </label>
             <div class="flex items-center space-x-2 text-xs">
-              <button type="button" @click="selectAllFiltered" class="text-indigo-400 hover:text-indigo-300 font-medium">Selecionar todos</button>
-              <span class="text-slate-600">•</span>
-              <button type="button" @click="clearAll" class="text-slate-400 hover:text-slate-200 font-medium">Limpar</button>
+              <button type="button" @click="selectAllFiltered" class="text-accent hover:text-accent font-medium">Selecionar todos</button>
+              <span class="text-secondary">•</span>
+              <button type="button" @click="clearAll" class="text-secondary hover:text-primary font-medium">Limpar</button>
             </div>
           </div>
 
           <!-- Selected Badges Cloud -->
-          <div v-if="selectedCursosObjects.length > 0" class="flex flex-wrap gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-2xl max-h-28 overflow-y-auto custom-scrollbar">
+          <div v-if="selectedCursosObjects.length > 0" class="flex flex-wrap gap-2 p-2.5 bg-surface border border-line rounded-2xl max-h-28 overflow-y-auto custom-scrollbar">
             <span
               v-for="c in selectedCursosObjects"
               :key="c.id"
-              class="inline-flex items-center space-x-1.5 px-3 py-1 bg-indigo-950/80 border border-indigo-700/60 text-indigo-200 text-xs rounded-xl font-medium shadow-sm"
+              class="inline-flex items-center space-x-1.5 px-3 py-1 bg-surface-alt border border-line text-accent text-xs rounded-xl font-medium shadow-sm"
             >
-              <span class="w-2 h-2 rounded-full shrink-0" :style="{ backgroundColor: c.cor || '#6366f1' }"></span>
+              <span class="w-2 h-2 rounded-full shrink-0" :style="{ backgroundColor: c.cor || 'var(--c-accent)' }"></span>
               <span>{{ c.nome }}</span>
-              <button type="button" @click="removeCurso(c.id)" class="text-indigo-400 hover:text-white ml-1">
+              <button type="button" @click="removeCurso(c.id)" class="text-accent hover:text-primary ml-1">
                 <span class="material-icons text-sm leading-none">close</span>
               </button>
             </span>
@@ -207,23 +207,23 @@ function handleSubmit() {
 
           <!-- Search Filter Input -->
           <div class="relative">
-            <span class="material-icons absolute left-3.5 top-3 text-slate-500 text-base">search</span>
+            <span class="material-icons absolute left-3.5 top-3 text-secondary text-base">search</span>
             <input
               v-model="searchQuery"
               type="text"
               placeholder="Buscar curso por nome..."
-              class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600"
+              class="w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-xl text-primary text-xs outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary"
             />
           </div>
 
           <!-- Scalable Toggle Chips Grid -->
-          <div v-if="cursos.length === 0" class="text-xs text-slate-500 text-center py-5">
+          <div v-if="cursos.length === 0" class="text-xs text-secondary text-center py-5">
             Nenhum curso cadastrado no sistema.
           </div>
-          <div v-else-if="filteredCursos.length === 0" class="text-xs text-slate-500 text-center py-5">
+          <div v-else-if="filteredCursos.length === 0" class="text-xs text-secondary text-center py-5">
             Nenhum curso encontrado para "{{ searchQuery }}".
           </div>
-          <div v-else class="max-h-52 overflow-y-auto border border-slate-800 rounded-2xl p-2 bg-slate-950 grid grid-cols-1 gap-1.5 custom-scrollbar">
+          <div v-else class="max-h-52 overflow-y-auto border border-line rounded-2xl p-2 bg-surface grid grid-cols-1 gap-1.5 custom-scrollbar">
             <button
               v-for="c in filteredCursos"
               :key="c.id"
@@ -232,29 +232,29 @@ function handleSubmit() {
               :class="[
                 'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all text-left border',
                 selectedCursoIds.includes(c.id)
-                  ? 'bg-indigo-950/60 border-indigo-500/80 text-white shadow-sm ring-1 ring-indigo-500/40'
-                  : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  ? 'bg-accent border-accent text-white shadow-sm ring-1 ring-accent'
+                  : 'bg-surface-alt border-line text-secondary hover:bg-surface hover:text-primary'
               ]"
             >
               <div class="flex items-center space-x-3 truncate">
-                <span class="w-3 h-3 rounded-full shrink-0" :style="{ backgroundColor: c.cor || '#6366f1' }"></span>
+                <span class="w-3 h-3 rounded-full shrink-0" :style="{ backgroundColor: c.cor || 'var(--c-accent)' }"></span>
                 <span class="truncate">{{ c.nome }}</span>
               </div>
-              <span v-if="selectedCursoIds.includes(c.id)" class="material-icons text-indigo-400 text-base shrink-0 ml-2">check_circle</span>
-              <span v-else class="material-icons text-slate-700 text-base shrink-0 ml-2">radio_button_unchecked</span>
+              <span v-if="selectedCursoIds.includes(c.id)" class="material-icons text-accent text-base shrink-0 ml-2">check_circle</span>
+              <span v-else class="material-icons text-secondary text-base shrink-0 ml-2">radio_button_unchecked</span>
             </button>
           </div>
         </div>
 
-        <div v-if="error" class="p-3.5 bg-rose-950/60 border border-rose-800 text-rose-200 text-xs rounded-xl">
+        <div v-if="error" class="p-3.5 bg-surface-alt border border-danger text-danger text-xs rounded-xl">
           {{ error }}
         </div>
       </form>
 
       <!-- Footer with px-8 horizontal padding -->
-      <div class="px-8 py-4 border-t border-slate-800 flex justify-end space-x-3 bg-slate-900/90 shrink-0">
-        <button @click="emit('close')" type="button" class="px-5 py-2.5 text-slate-400 hover:text-white rounded-xl text-xs font-medium transition-colors">Cancelar</button>
-        <button @click="handleSubmit" type="button" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all">Salvar Professor</button>
+      <div class="px-8 py-4 border-t border-line flex justify-end space-x-3 bg-surface shrink-0">
+        <button @click="emit('close')" type="button" class="px-5 py-2.5 text-secondary hover:text-primary rounded-xl text-xs font-medium transition-colors">Cancelar</button>
+        <button @click="handleSubmit" type="button" class="px-6 py-2.5 bg-accent hover:opacity-90 text-white rounded-xl text-xs font-bold shadow-lg transition-all">Salvar Professor</button>
       </div>
     </div>
   </div>

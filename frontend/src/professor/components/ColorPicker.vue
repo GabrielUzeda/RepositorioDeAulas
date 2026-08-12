@@ -266,7 +266,7 @@ const selectedColor = computed(() => {
   }
   return {
     name: props.modelValue?.startsWith('bg-') ? 'Cor personalizada' : 'Padrão',
-    class: props.modelValue?.startsWith('bg-') ? props.modelValue : 'bg-indigo-600'
+    class: props.modelValue?.startsWith('bg-') ? props.modelValue : 'bg-accent'
   };
 });
 
@@ -283,13 +283,13 @@ function selectColor(colorClass: string) {
       type="button"
       @click="toggle"
       @keydown.esc="close"
-      class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white hover:bg-slate-900 transition-colors focus:ring-2 focus:ring-indigo-500"
+      class="w-full flex items-center justify-between px-4 py-2.5 bg-surface border border-line rounded-xl text-primary hover:bg-surface transition-colors focus:ring-2 focus:ring-accent"
     >
       <div class="flex items-center space-x-3">
         <div class="w-8 h-8 rounded-full border border-white/20 shadow-inner shrink-0" :class="selectedColor.class"></div>
-        <span class="text-sm font-medium text-slate-200 truncate">{{ selectedColor.name }}</span>
+        <span class="text-sm font-medium text-secondary truncate">{{ selectedColor.name }}</span>
       </div>
-      <span class="material-icons text-slate-400 text-sm transition-transform shrink-0" :class="{ 'rotate-180': isOpen }">unfold_more</span>
+      <span class="material-icons text-secondary text-sm transition-transform shrink-0" :class="{ 'rotate-180': isOpen }">unfold_more</span>
     </button>
   </div>
 
@@ -305,15 +305,15 @@ function selectColor(colorClass: string) {
         v-if="isOpen"
         ref="panelRef"
         :style="panelStyle"
-        class="fixed z-[60] w-[320px] max-h-80 overflow-y-auto bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl p-3 space-y-2.5 custom-scrollbar"
+        class="fixed z-[60] w-[320px] max-h-80 overflow-y-auto bg-surface border border-line shadow-2xl rounded-2xl p-3 space-y-2.5 custom-scrollbar"
       >
         <div class="flex items-center justify-between shrink-0 pl-0.5">
-          <span class="text-xs font-bold text-slate-300 uppercase tracking-wide">Cores de Identificação</span>
-          <span class="text-[10px] text-slate-500">132 cores</span>
+          <span class="text-xs font-bold text-secondary uppercase tracking-wide">Cores de Identificação</span>
+          <span class="text-[10px] text-secondary">132 cores</span>
         </div>
 
         <div v-for="group in COLOR_GROUPS" :key="group.name" class="space-y-1">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500 pl-0.5">{{ group.name }}</p>
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-secondary pl-0.5">{{ group.name }}</p>
           <div class="grid grid-cols-6 gap-1.5">
             <button
               v-for="color in group.colors"
@@ -325,7 +325,7 @@ function selectColor(colorClass: string) {
               :class="[
                 color.class,
                 props.modelValue === color.class
-                  ? 'ring-2 ring-offset-1 ring-offset-slate-900 ring-white scale-110 shadow-lg'
+                  ? 'ring-2 ring-offset-1 ring-offset-surface ring-white scale-110 shadow-lg'
                   : 'opacity-75 hover:opacity-100'
               ]"
             >

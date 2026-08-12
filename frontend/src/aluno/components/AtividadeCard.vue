@@ -14,7 +14,7 @@ const emit = defineEmits<{
 const typeStyles = computed(() => {
   switch (props.atividade.tipo) {
     case 'prova':
-      return { bg: 'bg-amber-100', text: 'text-amber-600', cover: '/static/prova.webp' };
+      return { bg: 'bg-surface-alt', text: 'text-accent', cover: '/static/prova.webp' };
     case 'minigame':
       return { bg: 'bg-purple-100', text: 'text-purple-600', cover: '/static/minigame.webp' };
     case 'roleta':
@@ -35,10 +35,10 @@ const isMatIcon = computed(() => {
 <template>
   <div
     @click="emit('click', props.atividade)"
-    class="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl cursor-pointer card-hover relative border border-slate-100 flex flex-col justify-between"
+    class="bg-surface-alt rounded-2xl overflow-hidden shadow-md hover:shadow-xl cursor-pointer card-hover relative border border-line flex flex-col justify-between"
   >
     <!-- Cover Header -->
-    <div class="h-28 bg-slate-100 relative overflow-hidden">
+    <div class="h-28 bg-surface-alt relative overflow-hidden">
       <img
         :src="typeStyles.cover"
         :alt="props.atividade.titulo"
@@ -57,13 +57,13 @@ const isMatIcon = computed(() => {
     <!-- Content Area -->
     <div class="p-5 space-y-2 flex-1 flex flex-col justify-between">
       <div>
-        <h3 class="text-base font-bold text-slate-800 line-clamp-1">{{ props.atividade.titulo }}</h3>
-        <p class="text-slate-500 text-xs mt-1 line-clamp-2">
+        <h3 class="text-base font-bold text-primary line-clamp-1">{{ props.atividade.titulo }}</h3>
+        <p class="text-secondary text-xs mt-1 line-clamp-2">
           {{ props.isLocked ? 'Conteúdo protegido por senha.' : (props.atividade.descricao || 'Atividade interativa.') }}
         </p>
       </div>
 
-      <div class="flex items-center justify-between pt-3 border-t border-slate-100 text-xs font-semibold text-indigo-600">
+      <div class="flex items-center justify-between pt-3 border-t border-line text-xs font-semibold text-accent">
         <span>Acessar Atividade</span>
         <span class="material-icons text-sm">arrow_forward</span>
       </div>

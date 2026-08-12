@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet } from '@/shared/utils/storage';
+import { useToast } from '@/shared/composables/useToast';
 import type { Question, Option, Atividade } from '@/shared/types';
 
 const props = withDefaults(defineProps<{
@@ -38,6 +39,7 @@ const isSubmitted = ref(false);
 const isSubmitting = ref(false);
 const isCorrectionDone = ref(false);
 const errorMessage = ref('');
+const { success } = useToast();
 const resultAcertos = ref<number | null>(null);
 const resultTotal = ref<number | null>(null);
 const resultPontuacao = ref<number | null>(null);
@@ -179,6 +181,13 @@ async function submitAnswers() {
     if (res.data && res.data.acertos !== undefined) resultAcertos.value = res.data.acertos;
     if (res.data && res.data.total !== undefined) resultTotal.value = res.data.total;
     if (res.data && res.data.pontuacao !== undefined) resultPontuacao.value = res.data.pontuacao;
+    let msg = 'Atividade concluída!';
+    if (resultAcertos.value !== null) {
+      const total = resultTotal.value ?? props.questions.length;
+      msg += ` Acertos: ${resultAcertos.value} / ${total}`;
+      if (resultPontuacao.value !== null) msg += ` — Pontuação: ${resultPontuacao.value}%`;
+    }
+    success(msg);
     emit('complete');
   } else {
     errorMessage.value = res.error || 'Erro ao registrar respostas.';
@@ -191,34 +200,34 @@ function closeAfterSubmit() {
 </script>
 
 <template>
-  <div v-if="props.show" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 rounded-3xl p-6 max-w-4xl w-full shadow-2xl space-y-6 relative border border-slate-800 text-white" @click.stop>
+  <div v-if="props.show" class="fixed inset-0 bg-surface backdrop-blur-md flex items-center justify-center p-4 z-50">
+    <div class="bg-surface-alt rounded-3xl p-6 max-w-4xl w-full shadow-2xl space-y-6 relative border border-line text-primary" @click.stop>
       <!-- Header -->
-      <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+      <div class="flex justify-between items-center border-b border-line pb-4">
         <div class="flex items-center space-x-3">
           <div class="p-3 bg-pink-500/20 text-pink-400 rounded-2xl flex items-center justify-center">
             <span class="material-icons leading-none">casino</span>
           </div>
           <div>
             <span class="px-3 py-1 bg-pink-900/60 text-pink-300 text-xs font-bold rounded-full uppercase tracking-wider">Roleta do Conhecimento</span>
-            <h2 class="text-xl font-bold text-slate-100 mt-1">{{ props.title }}</h2>
+            <h2 class="text-xl font-bold text-primary mt-1">{{ props.title }}</h2>
           </div>
         </div>
 
         <div class="flex items-center space-x-6">
-          <div class="flex items-center space-x-4 bg-slate-800 px-4 py-2 rounded-xl text-xs font-bold">
-            <div class="flex items-center space-x-1 text-emerald-400" title="Respondidas">
+          <div class="flex items-center space-x-4 bg-surface px-4 py-2 rounded-xl text-xs font-bold">
+            <div class="flex items-center space-x-1 text-success" title="Respondidas">
               <span class="material-icons text-sm">check_circle</span>
               <span>{{ answeredCount }}</span>
             </div>
-            <div class="w-px h-4 bg-slate-700"></div>
+            <div class="w-px h-4 bg-line"></div>
             <div class="flex items-center space-x-1 text-sky-400" title="Restantes">
               <span class="material-icons text-sm">help</span>
               <span>{{ remainingCount }}</span>
             </div>
           </div>
 
-          <button @click="emit('close')" class="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition">
+          <button @click="emit('close')" class="text-secondary hover:text-primary p-2 rounded-full hover:bg-surface transition">
             <span class="material-icons">close</span>
           </button>
         </div>
@@ -227,8 +236,8 @@ function closeAfterSubmit() {
       <!-- Main Wheel Area -->
       <div class="py-8 flex flex-col items-center justify-center space-y-6">
         <div v-if="!isCompleted" class="text-center space-y-1">
-          <h3 class="text-2xl font-bold text-slate-100">Sua Vez de Jogar</h3>
-          <p class="text-slate-400 text-sm">Clique no botão para sortear uma pergunta no painel.</p>
+          <h3 class="text-2xl font-bold text-primary">Sua Vez de Jogar</h3>
+          <p class="text-secondary text-sm">Clique no botão para sortear uma pergunta no painel.</p>
         </div>
 
         <!-- Wheel Grid -->
@@ -240,7 +249,7 @@ function closeAfterSubmit() {
               'p-6 rounded-2xl border-2 flex items-center justify-center aspect-square transition-all duration-200 shadow-md',
               highlightedIndex === idx
                 ? 'border-pink-500 bg-pink-950/60 text-pink-400 scale-105 shadow-pink-500/20'
-                : 'border-slate-800 bg-slate-950 text-slate-600'
+                : 'border-line bg-surface text-secondary'
             ]"
           >
             <span class="material-icons text-3xl">
@@ -251,22 +260,19 @@ function closeAfterSubmit() {
 
         <!-- Completion View -->
         <div v-else class="text-center py-12 space-y-4">
-          <div v-if="isSubmitting || isCorrectionDone" class="p-4 bg-emerald-500/20 text-emerald-400 rounded-full inline-block">
-            <span class="material-icons text-5xl" v-if="isSubmitting">sync</span>
-            <span class="material-icons text-5xl" v-else>emoji_events</span>
-          </div>
           <template v-if="isSubmitting">
-            <h3 class="text-3xl font-bold text-emerald-300">{{ isCompleted ? 'Sincronizando com o servidor...' : '' }}</h3>
-            <p class="text-slate-400">Enviando suas respostas para correção no servidor.</p>
+            <span class="material-icons text-5xl text-secondary">sync</span>
+            <h3 class="text-3xl font-bold text-secondary">{{ isCompleted ? 'Sincronizando com o servidor...' : '' }}</h3>
+            <p class="text-secondary">Enviando suas respostas para correção no servidor.</p>
           </template>
           <template v-else>
-            <h3 class="text-3xl font-bold text-emerald-300">Parabéns! Atividade Concluída!</h3>
-            <p class="text-slate-400">Você respondeu todas as perguntas disponíveis nesta roleta.</p>
-            <p v-if="isCorrectionDone && resultAcertos !== null" class="text-slate-300">
+            <h3 class="text-3xl font-bold text-success">Parabéns! Atividade Concluída!</h3>
+            <p class="text-secondary">Você respondeu todas as perguntas disponíveis nesta roleta.</p>
+            <p v-if="isCorrectionDone && resultAcertos !== null" class="text-secondary">
               Acertos: {{ resultAcertos }} / {{ resultTotal ?? props.questions.length }}
               <template v-if="resultPontuacao !== null"> — Pontuação: {{ resultPontuacao }}</template>
             </p>
-            <p v-if="errorMessage" class="text-rose-400 text-sm">{{ errorMessage }}</p>
+            <p v-if="errorMessage" class="text-danger text-sm">{{ errorMessage }}</p>
             <button
               v-if="errorMessage"
               @click="emit('close')"
@@ -289,16 +295,16 @@ function closeAfterSubmit() {
       </div>
 
       <!-- Question Modal Popup -->
-      <div v-if="showQuestionModal && currentQuestion" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-2xl w-full space-y-6 shadow-2xl text-white">
-          <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+      <div v-if="showQuestionModal && currentQuestion" class="fixed inset-0 bg-surface backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-surface-alt border border-line rounded-3xl p-6 max-w-2xl w-full space-y-6 shadow-2xl text-primary">
+          <div class="flex justify-between items-center border-b border-line pb-3">
             <h4 class="text-lg font-bold text-pink-400 flex items-center space-x-2">
               <span class="material-icons">quiz</span>
               <span>{{ currentQuestion.title }}</span>
             </h4>
           </div>
 
-          <div class="text-lg font-medium text-slate-100">
+          <div class="text-lg font-medium text-primary">
             {{ currentQuestion.content }}
           </div>
 
@@ -313,9 +319,9 @@ function closeAfterSubmit() {
                 'w-full text-left p-4 rounded-xl border transition flex flex-col space-y-1',
                 selectedOption === opt
                   ? isSubmitted
-                    ? 'border-emerald-500 bg-emerald-950/40 text-emerald-200'
+                    ? 'border-success bg-surface text-success'
                     : 'border-pink-500 bg-pink-950/40 text-white'
-                  : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700'
+                  : 'border-line bg-surface text-secondary hover:border-line'
               ]"
             >
               <div class="flex justify-between items-center font-medium">
@@ -328,13 +334,13 @@ function closeAfterSubmit() {
           </div>
 
           <!-- Feedback da opção escolhida -->
-          <div v-if="isSubmitted && selectedOption?.feedback" class="p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl text-sm text-amber-800 flex items-start space-x-2">
-            <span class="material-icons text-base text-amber-500 mt-0.5">info</span>
+          <div v-if="isSubmitted && selectedOption?.feedback" class="p-4 bg-surface-alt border-l-4 border-accent rounded-r-xl text-sm text-secondary flex items-start space-x-2">
+            <span class="material-icons text-base text-accent mt-0.5">info</span>
             <span>{{ selectedOption.feedback }}</span>
           </div>
 
           <!-- Modal Action -->
-          <div class="flex justify-end pt-4 border-t border-slate-800">
+          <div class="flex justify-end pt-4 border-t border-line">
             <button
               v-if="!isSubmitted"
               @click="handleConfirmAnswer"
@@ -346,7 +352,7 @@ function closeAfterSubmit() {
             <button
               v-else
               @click="handleNextQuestion"
-              class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-sm transition"
+              class="px-6 py-2.5 bg-success hover:opacity-90 font-bold rounded-xl text-sm transition"
             >
               Continuar
             </button>

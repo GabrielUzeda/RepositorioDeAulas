@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue';
+import { useToast } from '@/shared/composables/useToast';
 
 const props = defineProps<{
   show: boolean;
@@ -1365,7 +1366,7 @@ async function exportPptx() {
         script.onerror = reject;
       });
     } catch (e) {
-      alert('Não foi possível carregar a biblioteca PptxGenJS.');
+      useToast().error('Não foi possível carregar a biblioteca PptxGenJS.');
       return;
     }
   }

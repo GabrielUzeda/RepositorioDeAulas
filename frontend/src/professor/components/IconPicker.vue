@@ -131,15 +131,15 @@ function selectIcon(iconId: string) {
       type="button"
       @click="toggle"
       @keydown.esc="close"
-      class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white hover:bg-slate-900 transition-colors focus:ring-2 focus:ring-indigo-500"
+      class="w-full flex items-center justify-between px-4 py-2.5 bg-surface border border-line rounded-xl text-primary hover:bg-surface transition-colors focus:ring-2 focus:ring-accent"
     >
       <div class="flex items-center space-x-3">
-        <div class="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 flex items-center justify-center shrink-0">
+        <div class="w-8 h-8 rounded-lg bg-surface border border-line text-accent flex items-center justify-center shrink-0">
           <span class="material-icons text-lg">{{ selectedIconObject.id }}</span>
         </div>
-        <span class="text-sm font-medium text-slate-200 truncate">{{ selectedIconObject.label }}</span>
+        <span class="text-sm font-medium text-secondary truncate">{{ selectedIconObject.label }}</span>
       </div>
-      <span class="material-icons text-slate-400 text-sm transition-transform shrink-0" :class="{ 'rotate-180': isOpen }">unfold_more</span>
+      <span class="material-icons text-secondary text-sm transition-transform shrink-0" :class="{ 'rotate-180': isOpen }">unfold_more</span>
     </button>
   </div>
 
@@ -155,16 +155,16 @@ function selectIcon(iconId: string) {
         v-if="isOpen"
         ref="panelRef"
         :style="panelStyle"
-        class="fixed z-[60] w-[340px] bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl p-3 space-y-3 max-h-72 flex flex-col"
+        class="fixed z-[60] w-[340px] bg-surface border border-line shadow-2xl rounded-2xl p-3 space-y-3 max-h-72 flex flex-col"
       >
         <!-- Search Input -->
         <div class="relative shrink-0">
-          <span class="material-icons absolute left-3 top-2.5 text-slate-500 text-sm">search</span>
+          <span class="material-icons absolute left-3 top-2.5 text-secondary text-sm">search</span>
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Pesquisar entre +80 ícones..."
-            class="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600"
+            class="w-full pl-9 pr-3 py-1.5 bg-surface border border-line rounded-xl text-primary text-xs outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary"
             autofocus
           />
         </div>
@@ -180,11 +180,11 @@ function selectIcon(iconId: string) {
             :class="[
               'p-2 rounded-xl border flex flex-col items-center justify-center transition-all',
               props.modelValue === icon.id
-                ? 'border-indigo-500 bg-indigo-950/80 text-white ring-2 ring-indigo-500/50 shadow-md font-bold'
-                : 'border-slate-800 bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-white'
+                ? 'border-accent bg-surface text-primary ring-2 ring-accent shadow-md font-bold'
+                : 'border-line bg-surface hover:bg-surface text-secondary hover:text-primary'
             ]"
           >
-            <span class="material-icons text-xl mb-0.5" :class="props.modelValue === icon.id ? 'text-indigo-400' : 'text-slate-400'">{{ icon.id }}</span>
+            <span class="material-icons text-xl mb-0.5" :class="props.modelValue === icon.id ? 'text-accent' : 'text-secondary'">{{ icon.id }}</span>
             <span class="text-[10px] leading-tight truncate w-full text-center">{{ icon.label }}</span>
           </button>
         </div>

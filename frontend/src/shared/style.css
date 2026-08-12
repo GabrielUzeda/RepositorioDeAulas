@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --c-surface: #f8fafc;
+  --c-surface-alt: #ffffff;
+  --c-primary: #0f172a;
+  --c-secondary: #475569;
+  --c-line: #e2e8f0;
+  --c-accent: #4f46e5;
+  --c-danger: #e11d48;
+  --c-success: #059669;
+}
+
+.dark {
+  --c-surface: #0f172a;
+  --c-surface-alt: #1e293b;
+  --c-primary: #f1f5f9;
+  --c-secondary: #cbd5e1;
+  --c-line: #334155;
+  --c-accent: #4f46e5;
+  --c-danger: #f43f5e;
+  --c-success: #10b981;
+}
+
 @layer utilities {
   .card-hover {
     @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;

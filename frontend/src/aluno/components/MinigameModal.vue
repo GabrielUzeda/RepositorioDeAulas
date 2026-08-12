@@ -45,11 +45,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="props.show" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 z-50">
-    <div class="bg-slate-900 rounded-2xl overflow-hidden shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col border border-slate-800" @click.stop>
-      <div class="flex justify-between items-center px-5 py-3 border-b border-slate-800 bg-slate-950">
+  <div v-if="props.show" class="fixed inset-0 bg-surface backdrop-blur-md flex items-center justify-center p-2 sm:p-6 z-50">
+    <div class="bg-surface-alt rounded-2xl overflow-hidden shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col border border-line" @click.stop>
+      <div class="flex justify-between items-center px-5 py-3 border-b border-line bg-surface">
         <span class="px-3 py-1 bg-cyan-900/60 text-cyan-300 text-xs font-bold rounded-full uppercase tracking-wider">Simulação Tática</span>
-        <button @click="emit('close')" class="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition">
+        <button @click="emit('close')" class="text-secondary hover:text-primary p-2 rounded-full hover:bg-surface transition">
           <span class="material-icons">close</span>
         </button>
       </div>

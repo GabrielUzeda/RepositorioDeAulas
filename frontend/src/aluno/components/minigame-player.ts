@@ -148,7 +148,7 @@ export class MinigamePlayer {
                 </div>
 
                 <!-- Feedback da opção escolhida (toast) -->
-                <div id="mg-feedback" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-amber-50 border-l-4 border-amber-400 p-3 text-sm text-amber-800 rounded-r max-w-md pointer-events-none text-left shadow-lg"></div>
+                <div id="mg-feedback" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-surface-alt border-l-4 border-accent p-3 text-sm text-secondary rounded-r max-w-md pointer-events-none text-left shadow-lg"></div>
             </div>
             
             <style>
@@ -639,7 +639,7 @@ export class MinigamePlayer {
                     let icon = `${i + 1}.`;
                     if (i === 0) { colorClass = 'text-yellow-400 font-bold'; icon = '👑'; }
                     else if (i === 1) { colorClass = 'text-gray-300 font-bold'; icon = '🥈'; }
-                    else if (i === 2) { colorClass = 'text-amber-600 font-bold'; icon = '🥉'; }
+                    else if (i === 2) { colorClass = 'text-accent font-bold'; icon = '🥉'; }
 
                     const row = document.createElement('div');
                     row.className = `flex justify-between items-center border-b border-[#222] py-3 px-2 hover:bg-[#111] transition-colors ${colorClass}`;
