@@ -41,3 +41,5 @@ e2e/playwright-report/
 # Documento de pendências (não deve ser commitado)
 DEBITO.md
 
+# Diretorio legado
+old/
