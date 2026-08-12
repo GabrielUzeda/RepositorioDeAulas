@@ -502,15 +502,17 @@ app.put('/cursos/:id/professores', adminAuth, async (c) => {
   if (!curso) return c.text('Curso not found', 404);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-  const professorIds = Array.isArray(body.professor_ids) ? body.professor_ids.map(Number).filter((n: number) => Number.isInteger(n)) : [];
 
-  db.transaction(() => {
-    dbq('DELETE FROM curso_professores WHERE curso_id = ?').run(id);
-    const ins = db.query('INSERT OR IGNORE INTO curso_professores (curso_id, professor_id) VALUES (?, ?)');
-    for (const pid of professorIds) {
-      if (dbq('SELECT id FROM professores WHERE id = ?').get(pid)) ins.run(id, pid);
-    }
-  })();
+  if (Object.prototype.hasOwnProperty.call(body, 'professor_ids') && Array.isArray(body.professor_ids)) {
+    const professorIds = body.professor_ids.map(Number).filter((n: number) => Number.isInteger(n));
+    db.transaction(() => {
+      dbq('DELETE FROM curso_professores WHERE curso_id = ?').run(id);
+      const ins = db.query('INSERT OR IGNORE INTO curso_professores (curso_id, professor_id) VALUES (?, ?)');
+      for (const pid of professorIds) {
+        if (dbq('SELECT id FROM professores WHERE id = ?').get(pid)) ins.run(id, pid);
+      }
+    })();
+  }
 
   const rows = dbq(
     `SELECT p.id, p.nome, p.email, p.role FROM curso_professores cp
@@ -1487,8 +1489,7 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
       await sendMail({
         to: item.aluno_email,
         subject: `[Feedback] ${disciplina.nome} - Relatório de Avaliação`,
-        body: htmlContent,
-        isHtml: true
+        html: htmlContent,
       });
 
       const respIds = item.respostas.map(r => r.id);

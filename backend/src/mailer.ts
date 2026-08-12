@@ -7,6 +7,8 @@ export interface MailRequest {
   subject: string;
   template?: string;
   variables?: Record<string, string>;
+  html?: string;
+  text?: string;
 }
 
 interface MailJob {
@@ -102,26 +104,41 @@ async function processMail(req: MailRequest): Promise<void> {
     throw new Error('SMTP não configurado');
   }
 
-  const templateName = req.template || 'default.txt';
-  if (
-    templateName.includes('..') ||
-    templateName.includes('/') ||
-    templateName.includes('\\') ||
-    path.basename(templateName) !== templateName
-  ) {
-    throw new Error('Invalid template name');
-  }
+  let html: string | undefined;
+  let text: string | undefined;
 
-  const templatePath = path.join(resolveTemplatesDir(), templateName);
-  const file = Bun.file(templatePath);
-  if (!(await file.exists())) {
-    throw new Error('Template file not found');
-  }
-  let body = await file.text();
+  if (req.html) {
+    html = req.html;
+  } else if (req.text) {
+    text = req.text;
+  } else {
+    const templateName = req.template || 'default.txt';
+    if (
+      templateName.includes('..') ||
+      templateName.includes('/') ||
+      templateName.includes('\\') ||
+      path.basename(templateName) !== templateName
+    ) {
+      throw new Error('Invalid template name');
+    }
 
-  if (req.variables) {
-    for (const [k, v] of Object.entries(req.variables)) {
-      body = body.replaceAll(`{{${k}}}`, () => v);
+    const templatePath = path.join(resolveTemplatesDir(), templateName);
+    const file = Bun.file(templatePath);
+    if (!(await file.exists())) {
+      throw new Error('Template file not found');
+    }
+    let body = await file.text();
+
+    if (req.variables) {
+      for (const [k, v] of Object.entries(req.variables)) {
+        body = body.replaceAll(`{{${k}}}`, () => v);
+      }
+    }
+
+    if (templateName.endsWith('.html')) {
+      html = body;
+    } else {
+      text = body;
     }
   }
 
@@ -132,11 +149,8 @@ async function processMail(req: MailRequest): Promise<void> {
     to: req.to,
     subject: req.subject,
   };
-  if (templateName.endsWith('.html')) {
-    message.html = body;
-  } else {
-    message.text = body;
-  }
+  if (html) message.html = html;
+  if (text) message.text = text;
 
   await transporter.sendMail(message);
 }
