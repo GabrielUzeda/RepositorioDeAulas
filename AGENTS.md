@@ -33,7 +33,6 @@ RepositorioDeAulas_new/
 │   ├── src/shared/             # router, stores (auth/curso), api/client, LoginView
 │   │   └── src/materias/       # Aulas geradas localmente (dev, não-tracked)
 │   │   └── src/public/static/  # Imagens de capa por tipo de atividade (.webp)
-├── frontend-vue/               # Aplicação Vue antiga (legado, NÃO usar)
 └── e2e/                        # Playwright (config, setup, helpers, tests)
 ```
 
@@ -63,6 +62,10 @@ npx vite build --outDir /tmp/... # build sem tocar dist root
 ```
 
 ### E2E — ver seção 8 (rodar sempre via Docker).
+
+### ⚠️ Recomendação de Ambiente (Docker First)
+> **SEMPRE use Docker (`docker compose`) para executar operações com Bun (backend), Banco de Dados (SQLite) ou Vue/Vite (frontend).**  
+> Executar instalações de dependências, builds ou manipulações de banco diretamente na máquina host gera arquivos residuais ("lixo"), poluição de dependências locais e problemas de permissão (ex.: diretório `dist/` gerado como `root`).
 
 ### Docker
 ```bash
