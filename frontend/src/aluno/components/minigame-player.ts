@@ -1,9 +1,11 @@
 // @ts-nocheck
 
 export class MinigamePlayer {
-    constructor(activityData, onComplete) {
+    constructor(activityData, onComplete, senhaCurso = '', senhaAtividade = '') {
         this.activityData = activityData;
         this.onComplete = onComplete;
+        this.senhaCurso = senhaCurso;
+        this.senhaAtividade = senhaAtividade;
         this.questions = [];
         this.containerId = null;
         this.canvas = null;
@@ -100,6 +102,7 @@ export class MinigamePlayer {
                     
                     <div class="flex flex-col gap-4 items-center w-4/5 max-w-xs mb-8">
                         <input type="text" id="mg-player-name" class="w-full p-4 bg-[#111] border-2 border-[#333] text-[#00ff66] font-mono text-center text-xl uppercase outline-none focus:border-[#00ff66] focus:shadow-[0_0_15px_rgba(0,255,102,0.2)] transition-all placeholder-gray-700" placeholder="SEU NOME" maxlength="12" autocomplete="off">
+                        <input type="email" id="mg-player-email" class="w-full p-4 bg-[#111] border-2 border-[#333] text-[#00ff66] font-mono text-center text-xl outline-none focus:border-[#00ff66] focus:shadow-[0_0_15px_rgba(0,255,102,0.2)] transition-all placeholder-gray-700" placeholder="SEU E-MAIL" autocomplete="email">
                         <button id="mg-btn-submit" class="w-full px-10 py-4 bg-transparent border-2 border-[#00ff66] text-[#00ff66] text-xl font-bold uppercase cursor-pointer transition-all hover:bg-[#00ff66] hover:text-black hover:shadow-[0_0_30px_#00ff66] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#444] disabled:hover:shadow-none">
                             REGISTRAR MARCO
                         </button>
@@ -498,9 +501,12 @@ export class MinigamePlayer {
 
         // Reset inputs
         const nameIn = document.getElementById('mg-player-name');
+        const emailIn = document.getElementById('mg-player-email');
         const submitBtn = document.getElementById('mg-btn-submit');
         nameIn.value = '';
+        if (emailIn) emailIn.value = '';
         nameIn.disabled = false;
+        if (emailIn) emailIn.disabled = false;
         submitBtn.disabled = false;
         submitBtn.innerText = "REGISTRAR MARCO";
     }
@@ -523,31 +529,57 @@ export class MinigamePlayer {
         if (this.isSubmitting) return;
 
         const nameInput = document.getElementById('mg-player-name');
+        const emailInput = document.getElementById('mg-player-email');
         const submitBtn = document.getElementById('mg-btn-submit');
         const rankMsg = document.getElementById('mg-rank-msg');
         const playerName = nameInput.value.trim();
+        const playerEmail = emailInput ? emailInput.value.trim() : '';
 
         if (playerName === "") {
             rankMsg.style.color = "red";
             rankMsg.innerText = "NOME INVÁLIDO";
             return;
         }
+        if (playerEmail === "") {
+            rankMsg.style.color = "red";
+            rankMsg.innerText = "E-MAIL INVÁLIDO";
+            return;
+        }
 
         this.isSubmitting = true;
         nameInput.disabled = true;
+        if (emailInput) emailInput.disabled = true;
         submitBtn.disabled = true;
         submitBtn.innerText = "TRANSMITINDO...";
         rankMsg.innerText = "";
+
+        const headers = { 'Content-Type': 'application/json' };
 
         fetch('/api/ranking', {
             method: 'POST',
             body: JSON.stringify({
                 nome_jogador: playerName,
                 pontuacao: this.score,
-                atividade_id: this.activityData.id
+                atividade_id: this.activityData.id,
+                senha_curso: this.senhaCurso,
+                senha_atividade: this.senhaAtividade
             }),
-            headers: { 'Content-Type': 'application/json' }
+            headers
         })
+            .then(() => {
+                return fetch('/api/submeter-resposta', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        atividade_id: this.activityData.id,
+                        aluno_nome: playerName,
+                        aluno_email: playerEmail,
+                        respostas: JSON.stringify({ tipo: 'minigame', pontuacao: this.score }),
+                        senha_curso: this.senhaCurso,
+                        senha_atividade: this.senhaAtividade
+                    }),
+                    headers
+                });
+            })
             .then(() => {
                 submitBtn.innerText = "DADOS ENVIADOS";
                 rankMsg.style.color = "#00ff66";
@@ -561,6 +593,7 @@ export class MinigamePlayer {
                 this.isSubmitting = false;
                 submitBtn.disabled = false;
                 nameInput.disabled = false;
+                if (emailInput) emailInput.disabled = false;
             });
     }
 

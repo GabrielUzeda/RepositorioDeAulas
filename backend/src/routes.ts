@@ -161,6 +161,24 @@ function readCursoSenha(c: any): string | null {
   return q && q.length > 0 ? q : null;
 }
 
+// [2.7] Valida senha de curso e de atividade para submissões/ranking do aluno.
+// Só exige senha quando o curso tem senha (curso.senha) ou a atividade é
+// protegida (allow_password). Cursos sem senha seguem liberados.
+function validarSenhasSubmissao(body: any, atv: any): string | null {
+  const disciplina = dbq('SELECT id, curso_id FROM disciplinas WHERE id = ?').get(atv.disciplina_id) as any;
+  if (!disciplina) return 'Disciplina não encontrada';
+  const curso = dbq('SELECT id, senha FROM cursos WHERE id = ?').get(disciplina.curso_id) as any;
+  if (!curso) return 'Curso não encontrado';
+
+  if (curso.senha && body.senha_curso !== curso.senha) {
+    return 'Senha do curso incorreta';
+  }
+  if (atv.allow_password && atv.senha && body.senha_atividade !== atv.senha) {
+    return 'Senha da atividade incorreta';
+  }
+  return null;
+}
+
 function getProfessor(c: any): { id: number; role: string } | null {
   const id = c.get('professorId');
   const role = c.get('professorRole');
@@ -835,8 +853,11 @@ app.post('/ranking', submissionLimiter, async (c) => {
   const atividadeId = parseId(String(body.atividade_id));
   const pontuacao = Number(body.pontuacao);
   if (atividadeId === null || isNaN(pontuacao)) return c.text('Parâmetros inválidos', 400);
-  const atv = dbq('SELECT id FROM atividades WHERE id = ?').get(atividadeId);
+  const atv = dbq('SELECT id, allow_password, senha, disciplina_id FROM atividades WHERE id = ?').get(atividadeId) as any;
   if (!atv) return c.text('Atividade não encontrada', 404);
+
+  const errSenha = validarSenhasSubmissao(body, atv);
+  if (errSenha) return c.json({ erro: errSenha }, 403);
 
   const rawNome = String(body.nome_jogador || 'Aluno').trim();
   const nomePublico = formatPublicName(rawNome);
@@ -889,8 +910,11 @@ app.post('/submeter-resposta', submissionLimiter, async (c) => {
   if (!body.aluno_nome || !body.aluno_email || !isValidEmail(body.aluno_email) || body.respostas === undefined) {
     return c.text('Informe nome, e-mail válido e respostas.', 400);
   }
-  const atv = dbq('SELECT id, json_data FROM atividades WHERE id = ?').get(atividadeId) as any;
+  const atv = dbq('SELECT id, json_data, allow_password, senha, disciplina_id FROM atividades WHERE id = ?').get(atividadeId) as any;
   if (!atv) return c.text('Atividade não encontrada', 404);
+
+  const errSenha = validarSenhasSubmissao(body, atv);
+  if (errSenha) return c.json({ erro: errSenha }, 403);
 
   const email = String(body.aluno_email).trim();
   const nome = String(body.aluno_nome).trim();
@@ -909,12 +933,25 @@ app.post('/submeter-resposta', submissionLimiter, async (c) => {
   const correcao = corrigirObjetivas(atv.json_data, respostasInput);
 
   try {
-    const r = db
-      .query(
-        `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash)
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
-      )
-      .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash) as any;
+    // Upsert: submissões repetidas do mesmo e-mail na mesma atividade
+    // atualizam o registro anterior (última tentativa vence), mantendo o
+    // consulta_token original para o direito de consulta LGPD.
+    const existente = dbq('SELECT id, criado_em FROM respostas_alunos WHERE atividade_id = ? AND aluno_email_hash = ?').get(atividadeId, emailHash) as any;
+
+    let r: any;
+    if (existente) {
+      dbq(
+        'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ? WHERE id = ?'
+      ).run(encNome, encEmail, encRespostas, existente.id);
+      r = { id: existente.id, atividade_id: atividadeId, criado_em: existente.criado_em };
+    } else {
+      r = db
+        .query(
+          `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash)
+           VALUES (?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
+        )
+        .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash) as any;
+    }
 
     await logAudit(c, 'submeter_resposta', `atividade:${atividadeId}`, { email_hash: emailHash });
 
@@ -929,7 +966,7 @@ app.post('/submeter-resposta', submissionLimiter, async (c) => {
       acertos: correcao.acertos,
       total: correcao.total,
       pontuacao: correcao.pontuacao
-    }, 201);
+    }, existente ? 200 : 201);
   } catch (e: any) {
     return c.text('Erro interno ao salvar resposta', 500);
   }

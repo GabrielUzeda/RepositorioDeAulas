@@ -4,10 +4,15 @@ import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
 import type { Atividade, Question } from '@/shared/types';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   show: boolean;
   atividade: Atividade | null;
-}>();
+  senhaCurso?: string;
+  senhaAtividade?: string;
+}>(), {
+  senhaCurso: '',
+  senhaAtividade: '',
+});
 
 const emit = defineEmits<{
   (e: 'close'): void;
@@ -96,7 +101,9 @@ async function handleSubmit() {
     atividade_id: props.atividade.id,
     aluno_nome: alunoNome.value,
     aluno_email: alunoEmail.value,
-    respostas: respostasMap.value
+    respostas: respostasMap.value,
+    senha_curso: props.senhaCurso,
+    senha_atividade: props.senhaAtividade
   });
 
   isSubmitting.value = false;

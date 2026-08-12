@@ -4,12 +4,18 @@ import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet } from '@/shared/utils/storage';
 import type { Question, Atividade } from '@/shared/types';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   show: boolean;
   questions: Question[];
   title?: string;
   atividade?: Atividade | null;
-}>();
+  senhaCurso?: string;
+  senhaAtividade?: string;
+}>(), {
+  title: '',
+  senhaCurso: '',
+  senhaAtividade: '',
+});
 
 const emit = defineEmits<{
   (e: 'close'): void;
@@ -86,7 +92,9 @@ async function submitAnswers() {
     atividade_id: props.atividade.id,
     aluno_nome: nome,
     aluno_email: email,
-    respostas: JSON.stringify(respostas).trim()
+    respostas: JSON.stringify(respostas).trim(),
+    senha_curso: props.senhaCurso,
+    senha_atividade: props.senhaAtividade
   });
 
   isSubmitting.value = false;

@@ -3,10 +3,15 @@ import { ref, watch, onUnmounted, nextTick } from 'vue';
 import { MinigamePlayer } from './minigame-player';
 import type { Atividade } from '@/shared/types';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   show: boolean;
   atividade: Atividade | null;
-}>();
+  senhaCurso?: string;
+  senhaAtividade?: string;
+}>(), {
+  senhaCurso: '',
+  senhaAtividade: '',
+});
 
 const emit = defineEmits<{
   (e: 'close'): void;
@@ -23,7 +28,7 @@ watch(
         if (!containerRef.value || player) return;
         player = new MinigamePlayer(props.atividade, () => {
           emit('close');
-        });
+        }, props.senhaCurso, props.senhaAtividade);
         player.mount(containerRef.value.id);
       });
     } else if (!val) {

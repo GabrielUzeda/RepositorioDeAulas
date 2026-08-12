@@ -32,6 +32,8 @@ const showMinigameModal = ref(false);
 
 const activeActivity = ref<Atividade | null>(null);
 const parsedQuestions = ref<Question[]>([]);
+const cursoSenha = ref('');
+const atividadeSenha = ref('');
 
 onMounted(async () => {
   await cursoStore.fetchCursos();
@@ -68,6 +70,7 @@ async function handleSelectDisciplina(disciplina: Disciplina) {
   if (!cursoPwd && selectedCurso.value?.id) {
     cursoPwd = (await secureGet(`curso_senha_${selectedCurso.value.id}`)) || '';
   }
+  cursoSenha.value = cursoPwd;
 
   const success = await cursoStore.loadDisciplinaContent(disciplina.id, cursoPwd);
   if (success) {
@@ -84,6 +87,7 @@ async function handlePasswordSubmit(password: string) {
     if (res.success) {
       await secureSet(`curso_senha_${pendingCurso.value.id}`, password);
       await secureSet(`curso_access_${pendingCurso.value.id}`, 'granted');
+      cursoSenha.value = password;
       showPasswordModal.value = false;
       const curso = pendingCurso.value;
       pendingCurso.value = null;
@@ -101,6 +105,7 @@ async function handlePasswordSubmit(password: string) {
     const res = await apiClient.get<Atividade>(`/atividades/${pendingActivity.value.id}?senha=${encodeURIComponent(password)}`);
     if (res.success && res.data && res.data.json_data) {
       cursoStore.unlockActivity(pendingActivity.value.id);
+      atividadeSenha.value = password;
       showPasswordModal.value = false;
       const unlockedAtv = res.data;
       pendingActivity.value = null;
@@ -315,6 +320,8 @@ function goBack() {
     <ActivityModal
       :show="showActivityModal"
       :atividade="activeActivity"
+      :senha-curso="cursoSenha"
+      :senha-atividade="atividadeSenha"
       @close="showActivityModal = false"
     />
 
@@ -322,6 +329,8 @@ function goBack() {
       :show="showReforcoModal"
       :atividade="activeActivity"
       :questions="parsedQuestions"
+      :senha-curso="cursoSenha"
+      :senha-atividade="atividadeSenha"
       @close="showReforcoModal = false"
     />
 
@@ -329,6 +338,8 @@ function goBack() {
       :show="showRoletaModal"
       :atividade="activeActivity"
       :questions="parsedQuestions"
+      :senha-curso="cursoSenha"
+      :senha-atividade="atividadeSenha"
       @close="showRoletaModal = false"
     />
 
@@ -336,6 +347,8 @@ function goBack() {
       :show="showMinigameModal"
       :atividade="activeActivity"
       :questions="parsedQuestions"
+      :senha-curso="cursoSenha"
+      :senha-atividade="atividadeSenha"
       @close="showMinigameModal = false"
     />
   </div>
