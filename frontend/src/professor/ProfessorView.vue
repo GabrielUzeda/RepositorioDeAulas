@@ -9,6 +9,7 @@ import MarpEditorModal from '@/professor/components/MarpEditorModal.vue';
 import JsonActivityEditorModal from '@/professor/components/JsonActivityEditorModal.vue';
 import RespostasModal from '@/professor/components/RespostasModal.vue';
 import FeedbackConsolidadoModal from '@/professor/components/FeedbackConsolidadoModal.vue';
+import ThemeToggle from '@/shared/components/ThemeToggle.vue';
 import type { Curso, Disciplina, Aula, Atividade } from '@/shared/types';
 
 const router = useRouter();
@@ -184,17 +185,18 @@ function handleOpenRespostas(atividade: Atividade) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
+  <div class="min-h-screen bg-surface text-primary flex flex-col">
     <!-- Header -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+    <header class="border-b border-line bg-surface backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
       <div class="flex items-center space-x-3">
-        <span class="material-icons text-indigo-400 text-2xl">school</span>
-        <h1 class="text-xl font-bold text-white tracking-tight">Painel do Professor</h1>
+        <span class="material-icons text-accent text-2xl">school</span>
+        <h1 class="text-xl font-bold text-primary tracking-tight">Painel do Professor</h1>
       </div>
 
       <div class="flex items-center space-x-4">
-        <span class="text-xs text-slate-400">Olá, <strong class="text-slate-200">{{ authStore.professor?.nome }}</strong></span>
-        <button @click="logout" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 rounded-xl transition">
+        <span class="text-xs text-secondary">Olá, <strong class="text-primary">{{ authStore.professor?.nome }}</strong></span>
+        <ThemeToggle />
+        <button @click="logout" class="p-2 text-secondary hover:text-danger hover:bg-surface rounded-xl transition">
           <span class="material-icons text-sm">logout</span>
         </button>
       </div>
@@ -206,12 +208,12 @@ function handleOpenRespostas(atividade: Atividade) {
       <section v-if="activeView === 'cursos'" class="space-y-6">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-2xl font-bold text-white">Seus Cursos</h2>
-            <p class="text-slate-400 text-xs mt-1">Selecione um curso para gerenciar suas disciplinas e conteúdos.</p>
+            <h2 class="text-2xl font-bold text-primary">Seus Cursos</h2>
+            <p class="text-secondary text-xs mt-1">Selecione um curso para gerenciar suas disciplinas e conteúdos.</p>
           </div>
         </div>
 
-        <div v-if="cursoStore.cursos.length === 0" class="p-12 text-center border border-slate-800 rounded-3xl bg-slate-950 text-slate-500">
+        <div v-if="cursoStore.cursos.length === 0" class="p-12 text-center border border-line rounded-3xl bg-surface text-secondary">
           Você não possui acesso a nenhum curso no momento.
         </div>
 
@@ -220,21 +222,21 @@ function handleOpenRespostas(atividade: Atividade) {
             v-for="curso in cursoStore.cursos"
             :key="curso.id"
             @click="handleOpenCurso(curso)"
-            class="p-6 bg-slate-800/60 border border-slate-700/60 rounded-3xl hover:border-indigo-500/50 hover:bg-slate-800 transition cursor-pointer flex flex-col justify-between space-y-4 group"
+            class="p-6 bg-surface-alt border border-line rounded-3xl hover:border-accent hover:bg-surface-alt transition cursor-pointer flex flex-col justify-between space-y-4 group"
           >
             <div class="flex items-start justify-between">
-              <div class="w-12 h-12 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+              <div class="w-12 h-12 rounded-2xl bg-surface text-accent border border-line flex items-center justify-center">
                 <span class="material-icons text-2xl">{{ curso.icone || 'school' }}</span>
               </div>
-              <span class="material-icons text-slate-500 group-hover:text-white transition">arrow_forward</span>
+              <span class="material-icons text-secondary group-hover:text-primary transition">arrow_forward</span>
             </div>
 
             <div>
-              <h3 class="text-lg font-bold text-white group-hover:text-indigo-400 transition">{{ curso.nome }}</h3>
-              <p class="text-slate-400 text-xs line-clamp-2 mt-1">{{ curso.descricao }}</p>
+              <h3 class="text-lg font-bold text-primary group-hover:text-accent transition">{{ curso.nome }}</h3>
+              <p class="text-secondary text-xs line-clamp-2 mt-1">{{ curso.descricao }}</p>
             </div>
 
-            <div class="pt-4 border-t border-slate-700/40 flex items-center justify-between text-xs text-slate-400">
+            <div class="pt-4 border-t border-line flex items-center justify-between text-xs text-secondary">
               <span>{{ curso.total_disciplinas ?? 0 }} disciplinas</span>
             </div>
           </div>
@@ -245,22 +247,22 @@ function handleOpenRespostas(atividade: Atividade) {
       <section v-else-if="activeView === 'disciplinas'" class="space-y-6">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-4">
-            <button @click="goBack" class="p-2.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl text-slate-300 transition">
+            <button @click="goBack" class="p-2.5 bg-surface-alt border border-line hover:bg-surface rounded-xl text-secondary transition">
               <span class="material-icons text-sm">arrow_back</span>
             </button>
             <div>
-              <h2 class="text-2xl font-bold text-white">{{ selectedCurso?.nome }}</h2>
-              <p class="text-slate-400 text-xs mt-0.5">Gerencie as disciplinas associadas a este curso.</p>
+              <h2 class="text-2xl font-bold text-primary">{{ selectedCurso?.nome }}</h2>
+              <p class="text-secondary text-xs mt-0.5">Gerencie as disciplinas associadas a este curso.</p>
             </div>
           </div>
 
-          <button @click="handleOpenDisciplinaModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/25 text-xs transition flex items-center space-x-2">
+          <button @click="handleOpenDisciplinaModal()" class="px-4 py-2.5 bg-accent hover:opacity-90 text-primary font-bold rounded-xl shadow-lg shadow-accent text-xs transition flex items-center space-x-2">
             <span class="material-icons text-sm">add</span>
             <span>Nova Disciplina</span>
           </button>
         </div>
 
-        <div v-if="cursoStore.disciplinas.length === 0" class="p-12 text-center border border-slate-800 rounded-3xl bg-slate-950 text-slate-500">
+        <div v-if="cursoStore.disciplinas.length === 0" class="p-12 text-center border border-line rounded-3xl bg-surface text-secondary">
           Nenhuma disciplina cadastrada neste curso.
         </div>
 
@@ -268,28 +270,28 @@ function handleOpenRespostas(atividade: Atividade) {
           <div
             v-for="disciplina in cursoStore.disciplinas"
             :key="disciplina.id"
-            class="p-6 bg-slate-800/60 border border-slate-700/60 rounded-3xl flex flex-col justify-between space-y-4 hover:border-slate-600 transition"
+            class="p-6 bg-surface-alt border border-line rounded-3xl flex flex-col justify-between space-y-4 hover:border-secondary transition"
           >
             <div class="flex items-start justify-between">
-              <div class="w-12 h-12 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+              <div class="w-12 h-12 rounded-2xl bg-surface text-accent border border-line flex items-center justify-center">
                 <span class="material-icons text-2xl">{{ disciplina.icone || 'school' }}</span>
               </div>
               <div class="flex items-center space-x-1">
-                <button @click="handleOpenDisciplinaModal(disciplina)" class="p-2 text-slate-400 hover:text-white rounded-lg">
+                <button @click="handleOpenDisciplinaModal(disciplina)" title="Editar Disciplina" class="p-2 text-secondary hover:text-primary rounded-lg">
                   <span class="material-icons text-sm">edit</span>
                 </button>
-                <button @click="handleDeleteDisciplina(disciplina.id)" class="p-2 text-slate-400 hover:text-rose-400 rounded-lg">
+                <button @click="handleDeleteDisciplina(disciplina.id)" title="Excluir Disciplina" class="p-2 text-secondary hover:text-danger rounded-lg">
                   <span class="material-icons text-sm">delete</span>
                 </button>
               </div>
             </div>
 
             <div>
-              <h3 class="text-lg font-bold text-white">{{ disciplina.nome }}</h3>
-              <p class="text-slate-400 text-xs line-clamp-2 mt-1">{{ disciplina.descricao }}</p>
+              <h3 class="text-lg font-bold text-primary">{{ disciplina.nome }}</h3>
+              <p class="text-secondary text-xs line-clamp-2 mt-1">{{ disciplina.descricao }}</p>
             </div>
 
-            <button @click="handleOpenDisciplinaDetails(disciplina)" class="w-full py-2.5 bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white rounded-xl font-bold text-xs transition">
+            <button @click="handleOpenDisciplinaDetails(disciplina)" class="w-full py-2.5 bg-surface-alt hover:bg-accent text-secondary hover:text-primary rounded-xl font-bold text-xs transition">
               Gerenciar Aulas & Atividades
             </button>
           </div>
@@ -298,20 +300,20 @@ function handleOpenRespostas(atividade: Atividade) {
 
       <!-- Content View (Aulas e Atividades) -->
       <section v-else class="space-y-6">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-line pb-4 gap-4">
           <div class="flex items-center space-x-4">
-            <button @click="goBack" class="p-2.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl text-slate-300 transition">
+            <button @click="goBack" class="p-2.5 bg-surface-alt border border-line hover:bg-surface rounded-xl text-secondary transition">
               <span class="material-icons text-sm">arrow_back</span>
             </button>
             <div>
-              <h2 class="text-2xl font-bold text-white">{{ selectedDisciplina?.nome }}</h2>
-              <p class="text-slate-400 text-xs mt-0.5">{{ selectedDisciplina?.descricao }}</p>
+              <h2 class="text-2xl font-bold text-primary">{{ selectedDisciplina?.nome }}</h2>
+              <p class="text-secondary text-xs mt-0.5">{{ selectedDisciplina?.descricao }}</p>
             </div>
           </div>
 
           <button
             @click="showFeedbackConsolidadoModal = true"
-            class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/25 text-xs transition flex items-center space-x-2"
+            class="px-4 py-2.5 bg-accent hover:opacity-90 text-primary font-bold rounded-xl shadow-lg shadow-accent text-xs transition flex items-center space-x-2"
           >
             <span class="material-icons text-sm">mark_email_read</span>
             <span>Gerar Feedback da Disciplina</span>
@@ -321,39 +323,39 @@ function handleOpenRespostas(atividade: Atividade) {
         <!-- Aulas -->
         <div class="space-y-4">
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-bold text-white">Aulas (Marp Markdown)</h3>
-            <button @click="handleOpenMarpModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center space-x-1.5">
+            <h3 class="text-lg font-bold text-primary">Aulas (Marp Markdown)</h3>
+            <button @click="handleOpenMarpModal()" class="px-3.5 py-2 bg-accent hover:opacity-90 text-primary font-bold rounded-xl text-xs transition flex items-center space-x-1.5">
               <span class="material-icons text-sm">add</span>
               <span>Nova Aula</span>
             </button>
           </div>
 
-          <div v-if="cursoStore.aulas.length === 0" class="p-6 text-center border border-slate-800 rounded-2xl text-slate-500 text-xs">
+          <div v-if="cursoStore.aulas.length === 0" class="p-6 text-center border border-line rounded-2xl text-secondary text-xs">
             Nenhuma aula cadastrada nesta disciplina.
           </div>
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="(aula, idx) in cursoStore.aulas" :key="aula.id" class="p-4 bg-slate-800/40 border border-slate-700/50 rounded-2xl flex items-center justify-between">
+            <div v-for="(aula, idx) in cursoStore.aulas" :key="aula.id" class="p-4 bg-surface-alt border border-line rounded-2xl flex items-center justify-between">
               <div class="flex items-center space-x-3 truncate">
-                <span class="material-icons text-indigo-400 text-lg shrink-0">slideshow</span>
+                <span class="material-icons text-accent text-lg shrink-0">slideshow</span>
                 <div class="truncate">
-                  <p class="text-white text-xs font-bold truncate">{{ aula.titulo }}</p>
-                  <p class="text-slate-400 text-[10px] truncate">{{ aula.descricao }}</p>
+                  <p class="text-primary text-xs font-bold truncate">{{ aula.titulo }}</p>
+                  <p class="text-secondary text-[10px] truncate">{{ aula.descricao }}</p>
                 </div>
               </div>
               <div class="flex items-center space-x-1 shrink-0 ml-2">
                 <div class="flex flex-col mr-1">
-                  <button @click="moveAula(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:pointer-events-none">
+                  <button @click="moveAula(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
                     <span class="material-icons text-sm">keyboard_arrow_up</span>
                   </button>
-                  <button @click="moveAula(idx, 'down')" :disabled="idx === cursoStore.aulas.length - 1" title="Mover para baixo" class="text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:pointer-events-none">
+                  <button @click="moveAula(idx, 'down')" :disabled="idx === cursoStore.aulas.length - 1" title="Mover para baixo" class="text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
                     <span class="material-icons text-sm">keyboard_arrow_down</span>
                   </button>
                 </div>
-                <button @click="handleOpenMarpModal(aula)" class="p-1.5 text-slate-400 hover:text-white">
+                <button @click="handleOpenMarpModal(aula)" title="Editar Aula" class="p-1.5 text-secondary hover:text-primary">
                   <span class="material-icons text-sm">edit</span>
                 </button>
-                <button @click="handleDeleteAula(aula.id)" class="p-1.5 text-slate-400 hover:text-rose-400">
+                <button @click="handleDeleteAula(aula.id)" title="Excluir Aula" class="p-1.5 text-secondary hover:text-danger">
                   <span class="material-icons text-sm">delete</span>
                 </button>
               </div>
@@ -362,48 +364,48 @@ function handleOpenRespostas(atividade: Atividade) {
         </div>
 
         <!-- Atividades -->
-        <div class="space-y-4 pt-4 border-t border-slate-800">
+        <div class="space-y-4 pt-4 border-t border-line">
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-bold text-white">Atividades & Avaliações</h3>
-            <button @click="handleOpenActivityEditor()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center space-x-1.5">
+            <h3 class="text-lg font-bold text-primary">Atividades & Avaliações</h3>
+            <button @click="handleOpenActivityEditor()" class="px-3.5 py-2 bg-accent hover:opacity-90 text-primary font-bold rounded-xl text-xs transition flex items-center space-x-1.5">
               <span class="material-icons text-sm">add</span>
               <span>Nova Atividade</span>
             </button>
           </div>
 
-          <div v-if="cursoStore.atividades.length === 0" class="p-6 text-center border border-slate-800 rounded-2xl text-slate-500 text-xs">
+          <div v-if="cursoStore.atividades.length === 0" class="p-6 text-center border border-line rounded-2xl text-secondary text-xs">
             Nenhuma atividade cadastrada nesta disciplina.
           </div>
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="(atv, idx) in cursoStore.atividades" :key="atv.id" class="p-4 bg-slate-800/40 border border-slate-700/50 rounded-2xl flex flex-col justify-between space-y-3">
+            <div v-for="(atv, idx) in cursoStore.atividades" :key="atv.id" class="p-4 bg-surface-alt border border-line rounded-2xl flex flex-col justify-between space-y-3">
               <div class="flex items-start justify-between">
                 <div class="flex items-center space-x-3 truncate">
-                  <span class="material-icons text-indigo-400 text-lg shrink-0">assignment</span>
+                  <span class="material-icons text-accent text-lg shrink-0">assignment</span>
                   <div class="truncate">
-                    <p class="text-white text-xs font-bold truncate">{{ atv.titulo }}</p>
-                    <p class="text-slate-400 text-[10px] truncate">{{ atv.tipo || 'normal' }}</p>
+                    <p class="text-primary text-xs font-bold truncate">{{ atv.titulo }}</p>
+                    <p class="text-secondary text-[10px] truncate">{{ atv.tipo || 'normal' }}</p>
                   </div>
                 </div>
                 <div class="flex items-center space-x-1 shrink-0 ml-2">
                   <div class="flex flex-col mr-1">
-                    <button @click="moveAtividade(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:pointer-events-none">
+                    <button @click="moveAtividade(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
                       <span class="material-icons text-sm">keyboard_arrow_up</span>
                     </button>
-                    <button @click="moveAtividade(idx, 'down')" :disabled="idx === cursoStore.atividades.length - 1" title="Mover para baixo" class="text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:pointer-events-none">
+                    <button @click="moveAtividade(idx, 'down')" :disabled="idx === cursoStore.atividades.length - 1" title="Mover para baixo" class="text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
                       <span class="material-icons text-sm">keyboard_arrow_down</span>
                     </button>
                   </div>
-                  <button @click="handleOpenActivityEditor(atv)" class="p-1.5 text-slate-400 hover:text-white">
+                  <button @click="handleOpenActivityEditor(atv)" title="Editar Atividade" class="p-1.5 text-secondary hover:text-primary">
                     <span class="material-icons text-sm">edit</span>
                   </button>
-                  <button @click="handleDeleteActivity(atv.id)" class="p-1.5 text-slate-400 hover:text-rose-400">
+                  <button @click="handleDeleteActivity(atv.id)" title="Excluir Atividade" class="p-1.5 text-secondary hover:text-danger">
                     <span class="material-icons text-sm">delete</span>
                   </button>
                 </div>
               </div>
 
-              <button @click="handleOpenRespostas(atv)" class="w-full py-2 bg-slate-800 hover:bg-indigo-950/60 border border-slate-700 hover:border-indigo-500/50 text-indigo-300 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5">
+              <button @click="handleOpenRespostas(atv)" class="w-full py-2 bg-surface-alt hover:bg-accent border border-line hover:border-accent text-accent rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5">
                 <span class="material-icons text-xs">analytics</span>
                 <span>Ver Respostas dos Alunos</span>
               </button>
