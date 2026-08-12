@@ -37,6 +37,7 @@ export interface CreatedCurso {
   id: number;
   nome: string;
   slug: string;
+  senha?: string;
 }
 
 export interface CreatedMateria {
@@ -65,12 +66,18 @@ export async function createProfessor(request: APIRequestContext, adminToken: st
   return { id: body.id, nome: body.nome, email: body.email, password: prof.password };
 }
 
-export async function createCurso(request: APIRequestContext, adminToken: string, professorIds: number[] = []): Promise<CreatedCurso> {
+export async function createCurso(
+  request: APIRequestContext,
+  adminToken: string,
+  professorIds: number[] = [],
+  options?: { senha?: string }
+): Promise<CreatedCurso> {
   const curso = {
     nome: `Curso ${unique('E2E')}`,
     descricao: 'Curso criado pelo teste E2E',
     cor: 'bg-red-500',
-    icone: 'school'
+    icone: 'school',
+    senha: options?.senha || ''
   };
   const res = await api(request, 'post', '/cursos', adminToken, curso);
   expect([200, 201]).toContain(res.status());
@@ -79,7 +86,7 @@ export async function createCurso(request: APIRequestContext, adminToken: string
     const assign = await api(request, 'put', `/cursos/${body.id}/professores`, adminToken, { professor_ids: professorIds });
     expect(assign.ok()).toBeTruthy();
   }
-  return { id: body.id, nome: body.nome, slug: body.slug };
+  return { id: body.id, nome: body.nome, slug: body.slug, senha: options?.senha };
 }
 
 export async function createMateria(request: APIRequestContext, profToken: string, cursoId: number): Promise<CreatedMateria> {

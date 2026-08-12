@@ -46,7 +46,8 @@ test.describe('Aluno — Atividades Avançadas & Modalidades Interativas', () =>
     professorId = prof.id;
     profToken = await profLogin(request, prof.email, prof.password);
 
-    const curso = await createCurso(request, adminToken, [professorId]);
+    const cursoSenha = 'curso123';
+    const curso = await createCurso(request, adminToken, [professorId], { senha: cursoSenha });
     cursoId = curso.id;
     cursoNome = curso.nome;
 
@@ -130,11 +131,9 @@ test.describe('Aluno — Atividades Avançadas & Modalidades Interativas', () =>
   test('interage com atividade do tipo Reforço', async ({ page }) => {
     await page.goto('/');
     await page.locator('h3', { hasText: cursoNome }).click();
-    await page.locator('h3', { hasText: materiaNome }).click();
-
-    // Desbloqueia matéria
-    await page.getByPlaceholder('Digite a senha').fill('materia123');
+    await page.getByPlaceholder('Digite a senha').fill('curso123');
     await page.getByRole('button', { name: 'Confirmar' }).click();
+    await page.locator('h3', { hasText: materiaNome }).click();
 
     // Vai para aba Atividades
     await page.getByRole('button', { name: /Atividades/ }).click();
@@ -157,10 +156,9 @@ test.describe('Aluno — Atividades Avançadas & Modalidades Interativas', () =>
   test('interage com atividade protegida por Senha Individual', async ({ page }) => {
     await page.goto('/');
     await page.locator('h3', { hasText: cursoNome }).click();
-    await page.locator('h3', { hasText: materiaNome }).click();
-
-    await page.getByPlaceholder('Digite a senha').fill('materia123');
+    await page.getByPlaceholder('Digite a senha').fill('curso123');
     await page.getByRole('button', { name: 'Confirmar' }).click();
+    await page.locator('h3', { hasText: materiaNome }).click();
 
     await page.getByRole('button', { name: /Atividades/ }).click();
     await expect(page.locator('h3', { hasText: protectedAtv.titulo })).toBeVisible();
@@ -187,10 +185,9 @@ test.describe('Aluno — Atividades Avançadas & Modalidades Interativas', () =>
   test('interage com atividade tipo Minigame e envia/consulta Ranking', async ({ page, request }) => {
     await page.goto('/');
     await page.locator('h3', { hasText: cursoNome }).click();
-    await page.locator('h3', { hasText: materiaNome }).click();
-
-    await page.getByPlaceholder('Digite a senha').fill('materia123');
+    await page.getByPlaceholder('Digite a senha').fill('curso123');
     await page.getByRole('button', { name: 'Confirmar' }).click();
+    await page.locator('h3', { hasText: materiaNome }).click();
 
     await page.getByRole('button', { name: /Atividades/ }).click();
     await expect(page.locator('h3', { hasText: minigameAtv.titulo })).toBeVisible();
@@ -225,10 +222,9 @@ test.describe('Aluno — Atividades Avançadas & Modalidades Interativas', () =>
   test('interage com atividade tipo Roleta pela UI', async ({ page }) => {
     await page.goto('/');
     await page.locator('h3', { hasText: cursoNome }).click();
-    await page.locator('h3', { hasText: materiaNome }).click();
-
-    await page.getByPlaceholder('Digite a senha').fill('materia123');
+    await page.getByPlaceholder('Digite a senha').fill('curso123');
     await page.getByRole('button', { name: 'Confirmar' }).click();
+    await page.locator('h3', { hasText: materiaNome }).click();
 
     await page.getByRole('button', { name: /Atividades/ }).click();
     await expect(page.locator('h3', { hasText: roletaAtv.titulo })).toBeVisible();

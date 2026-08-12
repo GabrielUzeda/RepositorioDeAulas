@@ -40,7 +40,8 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
     const prof = await createProfessor(request, adminToken);
     professorId = prof.id;
     const profToken = await profLogin(request, prof.email, prof.password);
-    const curso = await createCurso(request, adminToken, [professorId]);
+    const cursoSenha = 'curso123';
+    const curso = await createCurso(request, adminToken, [professorId], { senha: cursoSenha });
     cursoId = curso.id;
     cursoNome = curso.nome;
     const materia = await createMateria(request, profToken, cursoId);
@@ -85,29 +86,29 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
     }
   });
 
-  test('aluno anônimo navega, desbloqueia com senha, vê aula e responde atividade', async ({ page, context }) => {
+  test('aluno anônimo navega, desbloqueia curso com senha, vê aula e responde atividade', async ({ page, context }) => {
     // --- HOME: lista cursos ---
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Área do Aluno' })).toBeVisible();
     await expect(page.locator('h3', { hasText: cursoNome })).toBeVisible();
 
-    // --- Seleciona curso → lista materias ---
+    // --- Seleciona curso com senha → modal de senha ---
     await page.locator('h3', { hasText: cursoNome }).click();
-    await expect(page.locator('h3', { hasText: materiaNome })).toBeVisible();
-
-    // --- Seleciona materia → modal de senha ---
-    await page.locator('h3', { hasText: materiaNome }).click();
     await expect(page.getByText('Acesso Restrito')).toBeVisible();
 
-    // --- Senha errada mostra alerta e continua no modal ---
+    // --- Senha errada mostra alerta/erro e continua no modal ---
     page.on('dialog', (d) => d.accept());
     await page.getByPlaceholder('Digite a senha').fill('senha-errada');
     await page.getByRole('button', { name: 'Confirmar' }).click();
     await expect(page.getByText('Acesso Restrito')).toBeVisible();
 
-    // --- Senha correta desbloqueia o conteúdo ---
-    await page.getByPlaceholder('Digite a senha').fill(materiaSenha);
+    // --- Senha correta desbloqueia o curso e mostra as matérias ---
+    await page.getByPlaceholder('Digite a senha').fill('curso123');
     await page.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(page.locator('h3', { hasText: materiaNome })).toBeVisible();
+
+    // --- Seleciona matéria ---
+    await page.locator('h3', { hasText: materiaNome }).click();
 
     // --- Aba Aulas: card da aula aparece e abre em nova aba (slides Marp) ---
     await expect(page.locator('h3', { hasText: aulaTitulo })).toBeVisible();
