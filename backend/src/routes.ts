@@ -503,7 +503,7 @@ app.put('/cursos/:id/professores', adminAuth, async (c) => {
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
 
-  if (Object.prototype.hasOwnProperty.call(body, 'professor_ids') && Array.isArray(body.professor_ids)) {
+  if (Object.hasOwn(body, 'professor_ids') && Array.isArray(body.professor_ids)) {
     const professorIds = body.professor_ids.map(Number).filter((n: number) => Number.isInteger(n));
     db.transaction(() => {
       dbq('DELETE FROM curso_professores WHERE curso_id = ?').run(id);
@@ -1137,7 +1137,7 @@ app.put('/professores/:id', adminAuth, async (c) => {
   if (!existing) return c.text('Professor not found', 404);
 
   const nome = typeof body.nome === 'string' && body.nome.trim() ? body.nome.trim() : existing.nome;
-  let email = typeof body.email === 'string' && body.email.trim() ? body.email.trim() : existing.email;
+  const email = typeof body.email === 'string' && body.email.trim() ? body.email.trim() : existing.email;
   if (email !== existing.email) {
     if (!isValidEmail(email)) return c.text('Email inválido', 400);
     const dup = dbq('SELECT id FROM professores WHERE email = ? AND id != ?').get(email, id);

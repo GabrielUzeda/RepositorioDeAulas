@@ -18,9 +18,7 @@ const props = withDefaults(defineProps<{
   senhaAtividade: '',
 });
 
-const emit = defineEmits<{
-  (e: 'close'): void;
-}>();
+const emit = defineEmits<(e: 'close') => void>();
 
 const currentIndex = ref(0);
 const selectedOptionIndex = ref<number | null>(null);

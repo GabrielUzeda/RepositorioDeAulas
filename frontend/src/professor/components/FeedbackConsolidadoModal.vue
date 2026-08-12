@@ -10,9 +10,7 @@ const props = defineProps<{
   disciplinaNome?: string;
 }>();
 
-const emit = defineEmits<{
-  (e: 'close'): void;
-}>();
+const emit = defineEmits<(e: 'close') => void>();
 
 const isLoading = ref(false);
 const feedbackTurma = ref('');

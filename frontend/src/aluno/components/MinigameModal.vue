@@ -13,9 +13,7 @@ const props = withDefaults(defineProps<{
   senhaAtividade: '',
 });
 
-const emit = defineEmits<{
-  (e: 'close'): void;
-}>();
+const emit = defineEmits<(e: 'close') => void>();
 
 const containerRef = ref<HTMLDivElement | null>(null);
 let player: MinigamePlayer | null = null;

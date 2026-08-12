@@ -7,9 +7,7 @@ const props = defineProps<{
   isLocked: boolean;
 }>();
 
-const emit = defineEmits<{
-  (e: 'click', atividade: Atividade): void;
-}>();
+const emit = defineEmits<(e: 'click', atividade: Atividade) => void>();
 
 const typeStyles = computed(() => {
   switch (props.atividade.tipo) {

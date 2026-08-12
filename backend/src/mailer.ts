@@ -17,7 +17,7 @@ interface MailJob {
 }
 
 const MAX_QUEUE = 100;
-let queue: MailJob[] = [];
+const queue: MailJob[] = [];
 let running = false;
 let templatesDirCache: string | null = null;
 let transporterCache: nodemailer.Transporter | null = null;

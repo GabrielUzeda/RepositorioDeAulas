@@ -6,9 +6,7 @@ const props = defineProps<{
   modelValue: string;
 }>();
 
-const emit = defineEmits<{
-  (e: 'update:modelValue', value: string): void;
-}>();
+const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
 
 const searchQuery = ref('');
 const { triggerRef, panelRef, isOpen, panelStyle, toggle, close } = useFloatingPanel();

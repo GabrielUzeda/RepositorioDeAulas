@@ -6,9 +6,7 @@ const props = defineProps<{
   aula: Aula;
 }>();
 
-const emit = defineEmits<{
-  (e: 'open', aula: Aula): void;
-}>();
+const emit = defineEmits<(e: 'open', aula: Aula) => void>();
 
 const isMatIcon = computed(() => {
   const icon = props.aula.icone;

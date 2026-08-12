@@ -73,7 +73,7 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
     const animAttr = slide.directives.animation ? `data-animation="${escapeHtml(slide.directives.animation)}"` : '';
     const staggerAttr = slide.directives['animation-stagger'] ? `data-anim-stagger="true"` : '';
 
-    let styleParts: string[] = [];
+    const styleParts: string[] = [];
     if (slide.directives.background) styleParts.push(`background:${slide.directives.background}`);
     if (slide.directives['animation-duration']) styleParts.push(`--anim-duration:${slide.directives['animation-duration']}`);
     if (slide.directives['animation-stagger']) styleParts.push(`--anim-stagger:${slide.directives['animation-stagger']}`);

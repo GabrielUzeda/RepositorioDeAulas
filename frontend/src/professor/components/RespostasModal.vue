@@ -9,9 +9,7 @@ const props = defineProps<{
   atividade: Atividade | null;
 }>();
 
-const emit = defineEmits<{
-  (e: 'close'): void;
-}>();
+const emit = defineEmits<(e: 'close') => void>();
 
 const respostas = ref<RespostaAluno[]>([]);
 const isLoading = ref(false);

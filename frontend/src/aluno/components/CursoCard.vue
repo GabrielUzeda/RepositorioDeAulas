@@ -6,9 +6,7 @@ const props = defineProps<{
   curso: Curso;
 }>();
 
-const emit = defineEmits<{
-  (e: 'select', curso: Curso): void;
-}>();
+const emit = defineEmits<(e: 'select', curso: Curso) => void>();
 
 const isMatIcon = computed(() => {
   const icon = props.curso.icone;

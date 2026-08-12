@@ -276,7 +276,7 @@ export class MinigamePlayer {
             }
 
             // Update UI Bar
-            let dangerPct = (this.currentEnemy.y / (this.player.y - 50)) * 100;
+            const dangerPct = (this.currentEnemy.y / (this.player.y - 50)) * 100;
             document.getElementById('mg-danger-bar').style.width = Math.min(100, dangerPct) + '%';
         }
 
@@ -308,7 +308,7 @@ export class MinigamePlayer {
 
         this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
         this.stars.forEach((s, i) => {
-            let warp = this.currentEnemy ? this.currentEnemy.speed * 2 : 1;
+            const warp = this.currentEnemy ? this.currentEnemy.speed * 2 : 1;
             s.y += s.s + warp;
             if (s.y > this.h) this.stars.splice(i, 1);
             this.ctx.fillRect(s.x, s.y, s.s, s.s);
@@ -367,7 +367,7 @@ export class MinigamePlayer {
             return;
         }
 
-        let difficulty = Math.floor(this.score / 500);
+        const difficulty = Math.floor(this.score / 500);
         // Dynamic speed based on screen height
         // Taller screens need faster speed to feel same "pressure", shorter screens slower
         const heightModifier = this.h / 800; // Normalized to 800px base

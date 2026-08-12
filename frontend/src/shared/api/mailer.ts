@@ -39,7 +39,7 @@ export class EmailSender {
     score: number,
     total: number
   ) {
-    return this.sendEmail({
+    return EmailSender.sendEmail({
       to,
       subject: `Resultado: ${activityTitle} - ${studentName}`,
       variables: {
