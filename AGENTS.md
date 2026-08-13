@@ -96,6 +96,35 @@ docker compose -f docker-compose.e2e.yml up -d  # e2e manual
 - `publicDir: 'src/public'`, alias `@→./src`.
 - Proxy: `/api` → `VITE_PROXY_TARGET||http://localhost:8080` (strip `/api`); `/cursos` e `/materias` → target. **NÃO cobre `/disciplinas`** (aulas são servidas sob `/materias`).
 
+### Componentes reutilizáveis (frontend) — `src/shared/components/`
+Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos usam tokens de tema** (`bg-surface`, `text-primary`, `bg-accent`, `border-line`, `ring-accent`, `bg-danger`, `text-secondary`, `bg-surface-alt`) — definidos em `tailwind.config.js` via `var(--c-*)` — e devem ser usados SEMPRE que a UI repetir um desses padrões, em vez de reescrever Tailwind literal por componente.
+
+**Componentes existentes:**
+
+| Componente | Props | Status de uso |
+|---|---|---|
+| `BaseButton.vue` | `variant: primary\|secondary\|danger\|ghost` · `size: sm\|md\|lg` · `type` · `disabled` · `block` | ✅ **em uso** (modais/formulários migrados passaram a usar o trio). |
+| `BaseCard.vue` | `title?` · `padded?` + slots `header`/`footer`/default | ⚠️ criado, **ainda não usado** (disponível p/ cards de curso/disciplina/aluno). |
+| `BaseInput.vue` | `v-model` · `label?` · `type` · `placeholder` · `error?` (border/msg de erro) · `disabled` · `id?` (autogerado) · `required?` | ✅ **em uso** (modais/formulários). |
+| `ThemeToggle.vue` | nenhuma (comuta claro/escuro) | ✅ em uso (App, Aluno, Professor, Admin, Login) |
+| `Toast.vue` | — | ✅ em uso (via `useToast`, App + vários modais) |
+
+**Catálogo de componentes reutilizáveis — criados e disponíveis** (commit deste trabalho; extraídos dos padrões repetidos verificados no código):
+
+| Componente | Justificativa (padrão origem) | Status de uso |
+|---|---|---|
+| `BaseModal.vue` | Shell de modal repetido (~13 modais). Overlay+container+header+close → `<BaseModal v-model @close>` com Teleport+Transition, overlay-click+Esc+X. | ✅ em uso nos 13 modais (exceto MarpEditor, que mantém layout fullscreen) |
+| `BaseSpinner.vue` | `material-icons animate-spin ... sync` repetido. | ✅ em uso (3 arquivos) |
+| `EmptyState.vue` | Vazios "Nenhum ..." repetidos. | ⚠️ criado, não usado ainda (disponível) |
+| `ConfirmDialog.vue` | `window.confirm` em exclusões/reenvio (LGPD). | ✅ em uso (substituiu todos os `window.confirm`: AdminView×2, ProfessorView×3, RespostasModal, FeedbackConsolidadoModal) |
+| `BaseBadge.vue` | Pill de cabeçalho repetida nos modais. | ✅ em uso (1 arquivo) |
+| `BaseTabs.vue` | Tabs de AlunoView (aulas/atividades). | ⚠️ criado, não usado (AlunoView fora do escopo de migração) |
+| `BaseSelect.vue` | `<select>` em formulários. | ✅ em uso (2 arquivos) |
+| `BaseTextarea.vue` | `<textarea>` em 7 arquivos. | ✅ em uso (6 arquivos) |
+| `FormField.vue` | Wrapper label+control+erro. | ⚠️ criado, não usado (builders usaram BaseInput/BaseSelect direto com label/erro embutidos) |
+
+**Regras:** para criar novo componente, siga a convenção PascalCase em `src/shared/components/`; use apenas classes literais de tokens (nunca classes dinâmicas); aproveite `BaseButton`/`BaseInput`/`BaseCard` em vez de botões/inputs novos; migrar o trio base para as views é trabalho pendente (não feito ainda).
+
 ---
 
 ## 4. Modelo de dados principal (SQLite — `db.ts`)
@@ -115,6 +144,7 @@ docker compose -f docker-compose.e2e.yml up -d  # e2e manual
 
 - **Sem comentários** no código (salvo quando o usuário pedir).
 - **Tailwind JIT** só gera classes **literais** — paletas de cores são escritas por extenso (ex.: `bg-indigo-600`); nunca monte strings de classe dinamicamente.
+- **Reuse de UI:** prefira os componentes de `src/shared/components/` (ver seção 3) a repetir Tailwind literal. Antes de escrever um botão/input/card/modal/spinner/empty novo, verifique se o componente base já existe ou se o padrão merece ser extraído para lá.
 - Nomes de arquivos: PascalCase para componentes (`.vue`), camelCase para stores/utilities.
 - Tipagem forte via TS em frontend e backend (Bun).
 - Conexões/erros de DB não usam ORM; SQLite cru com `dbq`.
@@ -210,3 +240,40 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 9. **`npm run build` no frontend pode falhar com EACCES** em `dist/assets` (dono root) — problema pré-existente do ambiente local.
 10. **Vite proxy não cobre `/disciplinas`** — aulas são servidas sob `/materias`.
 11. **Legado**: `frontend-vue/` é a app Vue antiga — não editar.
+
+---
+
+## 11. Design System — estado atual e débito técnico
+
+> Documento canônico e autossuficiente: **`debito.md`** (raiz). Esta seção é o espelho para IAs.
+
+### 11.1 Tokens de cor (fonte de verdade)
+Definidos em `frontend/src/shared/style.css` como CSS vars, mapeados em `tailwind.config.js` (`colors → var(--c-*)`): `surface, surface-alt, primary, secondary, line, accent, danger, success`. Dark mode via classe `.dark` (ThemeToggle). **Não há tokens** para raio/espaçamento/sombra/tipografia.
+
+### 11.2 Dois sistemas de cor paralelos (débito de padronização)
+- Componentes **base/modais** usam os tokens (`bg-surface`, `text-secondary`, `border-line`, `ring-accent`, `bg-accent`, `bg-danger`).
+- Componentes de **conteúdo** usam paleta Tailwind **crua e fixa**, que **não responde ao dark mode**: `AtividadeCard.vue:17-23` (`bg-purple-100 text-purple-600` etc.), `RoletaModal.vue` (~12 `bg-pink-*/text-pink-*`), `MinigameModal.vue:51` (`bg-cyan-900 text-cyan-300`), `AdminView.vue:259` (`bg-purple-950...`). `ColorPicker`/`IconPicker` são exceção legítima (paleta de seleção).
+- **Regra ao editar UI:** prefira os tokens `--c-*`; não introduza novas cores Tailwind literais fixas (quebram o dark mode).
+
+### 11.3 Contraste WCAG 2.1 AA 4.5:1 — NÃO garantido (débito de acessibilidade)
+Medido em 2026-08-13. Texto normal exige ≥4.5:1; não-texto (bordas) exige ≥3:1.
+
+| Par (texto/fundo) | Tema | Ratio | Status |
+|---|---|---|---|
+| primary / surface | ambos | 13–18 | ✅ |
+| secondary / surface | ambos | 7–12 | ✅ |
+| branco / accent | ambos | 6.29 | ✅ |
+| **branco / success (verde)** | light | 3.77 | ⚠️ |
+| **branco / success (verde)** | **dark** | **2.54** | ❌ FAIL |
+| **branco / danger (rosa)** | **dark** | 3.67 | ⚠️ |
+| **texto danger (erro) / surface** | light | 4.49 | ⚠️ (falha por 0.01) |
+| borda `line` / surface | ambos | 1.2–1.7 | ❌ FAIL (não-texto) |
+| chip categoria rosa/verde/azul (AtividadeCard) | — | 3.0–4.24 | ❌ 3 de 4 falham |
+
+**Ação ao mexer em botões/erros:** manter `--c-success`/`--c-danger` (ou o texto dos botões) com contraste ≥4.5:1 nos dois temas; subir `--c-line` para ≥3:1.
+
+### 11.4 Design system documentado
+Não há `DESIGN.md`/styleguide formal. O que existe: tokens em `style.css` + catálogo de componentes neste arquivo (seção 3) + `debito.md`. Ao criar componente, documente props/uso aqui e no `debito.md` quando for débito.
+
+### 11.5 Remediação pendente (ver `debito.md` item 8)
+1. Contraste de botões success/danger + erros (Alta). 2. Bordas ≥3:1 (Média). 3. Tokenizar cores fixas (Média). 4. Tokens de raio/espaçamento/sombra/tipografia (Baixa). 5. `DESIGN.md` (Média).

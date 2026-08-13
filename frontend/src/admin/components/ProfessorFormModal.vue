@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { apiClient } from '@/shared/api/client';
 import type { Professor, Curso } from '@/shared/types';
+import BaseModal from '@/shared/components/BaseModal.vue';
+import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseInput from '@/shared/components/BaseInput.vue';
+import BaseSelect from '@/shared/components/BaseSelect.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -121,51 +125,44 @@ function handleSubmit() {
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-6" @click.self="emit('close')">
-    <div class="bg-surface rounded-3xl w-full max-w-xl shadow-2xl border border-line flex flex-col max-h-[92vh] overflow-hidden">
-      <!-- Header with tight icon fit & generous horizontal padding -->
-      <div class="px-8 py-6 border-b border-line flex justify-between items-center bg-surface shrink-0">
-        <div class="flex items-center space-x-3.5">
-          <div class="w-11 h-11 shrink-0 bg-surface-alt text-accent rounded-2xl border border-line flex items-center justify-center shadow-inner">
-            <span class="material-icons text-xl">person</span>
-          </div>
-          <div>
-            <h3 class="text-xl font-bold text-primary leading-tight">{{ professor ? 'Editar Professor' : 'Novo Professor' }}</h3>
-            <p class="text-xs text-secondary mt-0.5">Gerencie credenciais e atribuições de disciplinas</p>
-          </div>
-        </div>
-        <button @click="emit('close')" class="p-2 text-secondary hover:text-primary hover:bg-surface rounded-xl transition-colors">
-          <span class="material-icons">close</span>
-        </button>
-      </div>
+  <BaseModal
+    :model-value="show"
+    :title="professor ? 'Editar Professor' : 'Novo Professor'"
+    max-width="max-w-xl"
+    @close="emit('close')"
+  >
+    <form @submit.prevent="handleSubmit" class="space-y-5">
+        <BaseInput
+          v-model="nome"
+          label="Nome Completo *"
+          type="text"
+          placeholder="Ex: Maria Silva"
+          :required="true"
+        />
 
-      <!-- Form Body with px-8 padding & custom scrollbar -->
-      <form @submit.prevent="handleSubmit" class="px-8 py-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
-        <div>
-          <label for="prof-nome" class="block text-sm font-semibold text-primary mb-1.5">Nome Completo *</label>
-          <input id="prof-nome" v-model="nome" type="text" required placeholder="Ex: Maria Silva" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
-        </div>
+        <BaseInput
+          v-model="email"
+          label="E-mail Corporativo *"
+          type="email"
+          placeholder="exemplo@escola.gov.br"
+          :required="true"
+        />
 
-        <div>
-          <label for="prof-email" class="block text-sm font-semibold text-primary mb-1.5">E-mail Corporativo *</label>
-          <input id="prof-email" v-model="email" type="email" required placeholder="exemplo@escola.gov.br" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
-        </div>
+        <BaseInput
+          v-model="password"
+          label="Senha"
+          type="password"
+          :placeholder="professor ? '•••••••• (deixe em branco para manter a atual)' : '••••••••'"
+        />
 
-        <div>
-          <label for="prof-senha" class="block text-sm font-semibold text-primary mb-1.5">
-            Senha
-            <span v-if="professor" class="text-secondary font-normal">(deixe em branco para manter a atual)</span>
-          </label>
-          <input id="prof-senha" v-model="password" type="password" placeholder="••••••••" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
-        </div>
-
-        <div>
-          <label for="prof-perfil" class="block text-sm font-semibold text-primary mb-1.5">Perfil de Acesso *</label>
-          <select id="prof-perfil" v-model="role" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent text-sm">
-            <option value="professor">Professor (Acesso Restrito aos Cursos Vinculados)</option>
-            <option value="admin">Administrador (Acesso Irrestrito ao Sistema)</option>
-          </select>
-        </div>
+        <BaseSelect
+          v-model="role"
+          label="Perfil de Acesso *"
+          :options="[
+            { label: 'Professor (Acesso Restrito aos Cursos Vinculados)', value: 'professor' },
+            { label: 'Administrador (Acesso Irrestrito ao Sistema)', value: 'admin' }
+          ]"
+        />
 
         <!-- Role = Admin Note -->
         <div v-if="role === 'admin'" class="p-4 bg-surface-alt border border-line rounded-2xl flex items-start space-x-3.5">
@@ -251,11 +248,11 @@ function handleSubmit() {
         </div>
       </form>
 
-      <!-- Footer with px-8 horizontal padding -->
-      <div class="px-8 py-4 border-t border-line flex justify-end space-x-3 bg-surface shrink-0">
-        <button @click="emit('close')" type="button" class="px-5 py-2.5 text-secondary hover:text-primary rounded-xl text-xs font-medium transition-colors">Cancelar</button>
-        <button @click="handleSubmit" type="button" class="px-6 py-2.5 bg-accent hover:opacity-90 text-white rounded-xl text-xs font-bold shadow-lg transition-all">Salvar Professor</button>
+    <template #footer>
+      <div class="flex justify-end gap-3 pt-4">
+        <BaseButton variant="ghost" @click="emit('close')">Cancelar</BaseButton>
+        <BaseButton variant="primary" @click="handleSubmit">Salvar Professor</BaseButton>
       </div>
-    </div>
-  </div>
+    </template>
+  </BaseModal>
 </template>

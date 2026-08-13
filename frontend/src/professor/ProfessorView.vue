@@ -10,6 +10,7 @@ import JsonActivityEditorModal from '@/professor/components/JsonActivityEditorMo
 import RespostasModal from '@/professor/components/RespostasModal.vue';
 import FeedbackConsolidadoModal from '@/professor/components/FeedbackConsolidadoModal.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
+import ConfirmDialog from '../shared/components/ConfirmDialog.vue';
 import type { Curso, Disciplina, Aula, Atividade } from '@/shared/types';
 
 const router = useRouter();
@@ -71,12 +72,21 @@ async function handleSaveDisciplina(data: Partial<Disciplina>) {
   await showDisciplinas();
 }
 
-async function handleDeleteDisciplina(disciplinaId: number) {
-  if (confirm('Tem certeza que deseja excluir esta disciplina?')) {
-    await apiClient.delete(`/disciplinas/${disciplinaId}`);
-    await showDisciplinas();
-  }
+const showDelDisc = ref(false);
+const delDiscId = ref<number | null>(null);
+
+function handleDeleteDisciplina(disciplinaId: number) {
+  delDiscId.value = disciplinaId;
+  showDelDisc.value = true;
 }
+
+async function onConfirmDelDisc() {
+  if (delDiscId.value == null) return;
+  await apiClient.delete(`/disciplinas/${delDiscId.value}`);
+  await showDisciplinas();
+}
+
+function onCancelDelDisc() {}
 
 async function handleOpenDisciplinaDetails(disciplina: Disciplina) {
   selectedDisciplina.value = disciplina;
@@ -119,12 +129,21 @@ async function handleSaveMarpAula(payload: { titulo: string; descricao: string; 
   await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
 }
 
-async function handleDeleteAula(aulaId: number) {
-  if (confirm('Tem certeza que deseja excluir esta aula?')) {
-    await apiClient.delete(`/aulas/${aulaId}`);
-    if (selectedDisciplina.value) await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
-  }
+const showDelAula = ref(false);
+const delAulaId = ref<number | null>(null);
+
+function handleDeleteAula(aulaId: number) {
+  delAulaId.value = aulaId;
+  showDelAula.value = true;
 }
+
+async function onConfirmDelAula() {
+  if (delAulaId.value == null) return;
+  await apiClient.delete(`/aulas/${delAulaId.value}`);
+  if (selectedDisciplina.value) await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+}
+
+function onCancelDelAula() {}
 
 function handleOpenActivityEditor(atividade?: Atividade) {
   editingActivity.value = atividade || null;
@@ -149,12 +168,21 @@ async function handleSaveActivity(payload: any) {
   await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
 }
 
-async function handleDeleteActivity(atividadeId: number) {
-  if (confirm('Tem certeza que deseja excluir esta atividade?')) {
-    await apiClient.delete(`/atividades/${atividadeId}`);
-    if (selectedDisciplina.value) await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
-  }
+const showDelAtiv = ref(false);
+const delAtivId = ref<number | null>(null);
+
+function handleDeleteActivity(atividadeId: number) {
+  delAtivId.value = atividadeId;
+  showDelAtiv.value = true;
 }
+
+async function onConfirmDelAtiv() {
+  if (delAtivId.value == null) return;
+  await apiClient.delete(`/atividades/${delAtivId.value}`);
+  if (selectedDisciplina.value) await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+}
+
+function onCancelDelAtiv() {}
 
 async function moveAula(index: number, direction: 'up' | 'down') {
   const list = cursoStore.aulas;
@@ -452,6 +480,36 @@ function handleOpenRespostas(atividade: Atividade) {
       :disciplina-id="selectedDisciplina?.id || null"
       :disciplina-nome="selectedDisciplina?.nome"
       @close="showFeedbackConsolidadoModal = false"
+    />
+
+    <ConfirmDialog
+      v-model="showDelDisc"
+      message="Tem certeza que deseja excluir esta disciplina?"
+      :danger="true"
+      confirm-text="Excluir"
+      cancel-text="Cancelar"
+      @confirm="onConfirmDelDisc"
+      @cancel="onCancelDelDisc"
+    />
+
+    <ConfirmDialog
+      v-model="showDelAula"
+      message="Tem certeza que deseja excluir esta aula?"
+      :danger="true"
+      confirm-text="Excluir"
+      cancel-text="Cancelar"
+      @confirm="onConfirmDelAula"
+      @cancel="onCancelDelAula"
+    />
+
+    <ConfirmDialog
+      v-model="showDelAtiv"
+      message="Tem certeza que deseja excluir esta atividade?"
+      :danger="true"
+      confirm-text="Excluir"
+      cancel-text="Cancelar"
+      @confirm="onConfirmDelAtiv"
+      @cancel="onCancelDelAtiv"
     />
   </div>
 </template>

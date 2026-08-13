@@ -7,10 +7,17 @@
   --c-surface-alt: #ffffff;
   --c-primary: #0f172a;
   --c-secondary: #475569;
-  --c-line: #e2e8f0;
+  --c-line: #64748b;
   --c-accent: #4f46e5;
   --c-danger: #e11d48;
   --c-success: #059669;
+  --c-on-success: #0f172a;
+  --c-on-danger: #ffffff;
+  --c-danger-text: #be123c;
+  --c-cat-minigame: #9333ea;   --c-cat-minigame-bg: #f3e8ff;
+  --c-cat-roleta: #be185d;     --c-cat-roleta-bg: #fce7f3;
+  --c-cat-reforco: #166534;    --c-cat-reforco-bg: #dcfce7;
+  --c-cat-default: #1d4ed8;    --c-cat-default-bg: #dbeafe;
 }
 
 .dark {
@@ -18,10 +25,17 @@
   --c-surface-alt: #1e293b;
   --c-primary: #f1f5f9;
   --c-secondary: #cbd5e1;
-  --c-line: #334155;
+  --c-line: #64748b;
   --c-accent: #4f46e5;
   --c-danger: #f43f5e;
   --c-success: #10b981;
+  --c-on-success: #0f172a;
+  --c-on-danger: #0f172a;
+  --c-danger-text: #fb7185;
+  --c-cat-minigame: #ede9fe;   --c-cat-minigame-bg: #4c1d95;
+  --c-cat-roleta: #fbcfe8;     --c-cat-roleta-bg: #831843;
+  --c-cat-reforco: #bbf7d0;    --c-cat-reforco-bg: #14532d;
+  --c-cat-default: #bfdbfe;    --c-cat-default-bg: #1e3a8a;
 }
 
 @layer utilities {

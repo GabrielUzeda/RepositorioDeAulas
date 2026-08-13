@@ -6,6 +6,7 @@ import { apiClient } from '@/shared/api/client';
 import ProfessorFormModal from '@/admin/components/ProfessorFormModal.vue';
 import CursoFormModal from '@/admin/components/CursoFormModal.vue';
 import ThemeToggle from '../shared/components/ThemeToggle.vue';
+import ConfirmDialog from '../shared/components/ConfirmDialog.vue';
 import type { Professor, Curso } from '@/shared/types';
 
 const router = useRouter();
@@ -90,8 +91,17 @@ async function handleSaveProfessor(payload: { nome: string; email: string; passw
   await fetchProfessores();
 }
 
-async function handleDeleteProfessor(prof: Professor) {
-  if (!confirm(`Tem certeza que deseja excluir "${prof.nome}"? As disciplinas associadas também serão removidas.`)) return;
+const showConfirmProf = ref(false);
+const deleteTargetProf = ref<Professor | null>(null);
+
+function onDeleteProfessorClick(prof: Professor) {
+  deleteTargetProf.value = prof;
+  showConfirmProf.value = true;
+}
+
+async function onConfirmProf() {
+  const prof = deleteTargetProf.value;
+  if (!prof) return;
   const res = await apiClient.delete(`/professores/${prof.id}`);
   if (!res.success) {
     error.value = res.error || 'Falha ao excluir professor.';
@@ -99,6 +109,8 @@ async function handleDeleteProfessor(prof: Professor) {
   }
   await fetchProfessores();
 }
+
+function onCancelProf() {}
 
 function openCreateCurso() {
   editingCurso.value = null;
@@ -139,8 +151,17 @@ async function handleSaveCurso(payload: { nome: string; descricao: string; cor: 
   await fetchCursos();
 }
 
-async function handleDeleteCurso(curso: Curso) {
-  if (!confirm(`Tem certeza que deseja excluir o curso "${curso.nome}"? As disciplinas dele também serão removidas.`)) return;
+const showConfirmCurso = ref(false);
+const deleteTargetCurso = ref<Curso | null>(null);
+
+function onDeleteCursoClick(curso: Curso) {
+  deleteTargetCurso.value = curso;
+  showConfirmCurso.value = true;
+}
+
+async function onConfirmCurso() {
+  const curso = deleteTargetCurso.value;
+  if (!curso) return;
   const res = await apiClient.delete(`/cursos/${curso.id}`);
   if (!res.success) {
     error.value = res.error || 'Falha ao excluir curso.';
@@ -148,6 +169,8 @@ async function handleDeleteCurso(curso: Curso) {
   }
   await fetchCursos();
 }
+
+function onCancelCurso() {}
 
 function logout() {
   authStore.logout();
@@ -233,7 +256,7 @@ function logout() {
                   </span>
                 </td>
                 <td class="px-6 py-3">
-                  <span v-if="prof.role === 'admin'" class="px-2.5 py-0.5 bg-purple-950/60 border border-purple-800/50 text-purple-300 text-xs font-bold rounded-md uppercase">
+                  <span v-if="prof.role === 'admin'" class="px-2.5 py-0.5 bg-surface-alt border border-line text-secondary text-xs font-bold rounded-md uppercase">
                     Acesso Total
                   </span>
                   <span v-else class="px-2.5 py-0.5 bg-surface border border-line text-accent text-xs font-bold rounded-md uppercase">
@@ -245,7 +268,7 @@ function logout() {
                     <button @click="openEditProfessor(prof)" class="p-2 text-secondary hover:text-primary hover:bg-surface rounded-lg">
                       <span class="material-icons text-sm">edit</span>
                     </button>
-                    <button @click="handleDeleteProfessor(prof)" class="p-2 text-danger hover:text-danger hover:bg-surface rounded-lg">
+                    <button @click="onDeleteProfessorClick(prof)" class="p-2 text-danger hover:text-danger hover:bg-surface rounded-lg">
                       <span class="material-icons text-sm">delete</span>
                     </button>
                   </div>
@@ -286,7 +309,7 @@ function logout() {
                   <button @click="openEditCurso(curso)" class="p-2 text-secondary hover:text-primary hover:bg-surface rounded-lg">
                     <span class="material-icons text-sm">edit</span>
                   </button>
-                  <button @click="handleDeleteCurso(curso)" class="p-2 text-danger hover:text-danger hover:bg-surface rounded-lg">
+                  <button @click="onDeleteCursoClick(curso)" class="p-2 text-danger hover:text-danger hover:bg-surface rounded-lg">
                     <span class="material-icons text-sm">delete</span>
                   </button>
                 </div>
@@ -306,5 +329,27 @@ function logout() {
 
     <ProfessorFormModal :show="showProfessorModal" :professor="editingProfessor" @close="showProfessorModal = false" @submit="handleSaveProfessor" />
     <CursoFormModal :show="showCursoModal" :curso="editingCurso" :professores="professores" @close="showCursoModal = false" @submit="handleSaveCurso" />
+
+    <ConfirmDialog
+      v-model="showConfirmProf"
+      title="Excluir Professor"
+      :message="`Tem certeza que deseja excluir &quot;${deleteTargetProf?.nome}&quot;? As disciplinas associadas também serão removidas.`"
+      :danger="true"
+      confirm-text="Excluir"
+      cancel-text="Cancelar"
+      @confirm="onConfirmProf"
+      @cancel="onCancelProf"
+    />
+
+    <ConfirmDialog
+      v-model="showConfirmCurso"
+      title="Excluir Curso"
+      :message="`Tem certeza que deseja excluir o curso &quot;${deleteTargetCurso?.nome}&quot;? As disciplinas dele também serão removidas.`"
+      :danger="true"
+      confirm-text="Excluir"
+      cancel-text="Cancelar"
+      @confirm="onConfirmCurso"
+      @cancel="onCancelCurso"
+    />
   </div>
 </template>

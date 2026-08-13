@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
+import BaseButton from '@/shared/components/BaseButton.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -1650,11 +1651,11 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- Action Buttons -->
-      <div class="flex items-center space-x-2 ml-auto">
-        <button @click="emit('close')" type="button" class="px-3 py-1.5 text-slate-400 hover:text-white text-xs font-medium rounded hover:bg-slate-800 transition">Cancelar</button>
-        <button @click="handleSave" type="button" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold shadow transition">Salvar Aula</button>
-      </div>
+        <!-- Action Buttons -->
+        <div class="flex items-center space-x-2 ml-auto">
+          <BaseButton variant="ghost" size="sm" @click="emit('close')">Cancelar</BaseButton>
+          <BaseButton variant="primary" size="sm" @click="handleSave">Salvar Aula</BaseButton>
+        </div>
     </div>
 
     <!-- MAIN SPLIT -->

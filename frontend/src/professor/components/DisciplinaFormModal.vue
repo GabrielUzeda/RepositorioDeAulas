@@ -3,6 +3,10 @@ import { ref, watch } from 'vue';
 import ColorPicker from './ColorPicker.vue';
 import IconPicker from './IconPicker.vue';
 import type { Disciplina } from '@/shared/types';
+import BaseModal from '@/shared/components/BaseModal.vue';
+import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseInput from '@/shared/components/BaseInput.vue';
+import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -49,54 +53,45 @@ function handleSubmit() {
 </script>
 
 <template>
-  <div v-if="props.show" class="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-50" @click.self="emit('close')">
-    <div class="bg-surface rounded-3xl w-full max-w-xl shadow-2xl border border-line flex flex-col max-h-[92vh] overflow-hidden">
-      <!-- Header with tight icon fit & generous horizontal padding -->
-      <div class="px-8 py-6 border-b border-line flex justify-between items-center bg-surface shrink-0">
-        <div class="flex items-center space-x-3.5">
-          <div class="w-11 h-11 shrink-0 bg-surface text-accent rounded-2xl border border-line flex items-center justify-center shadow-inner">
-            <span class="material-icons text-xl">{{ icone || 'school' }}</span>
-          </div>
-          <div>
-            <h3 class="text-xl font-bold text-primary leading-tight">{{ props.disciplina ? 'Editar Disciplina' : 'Nova Disciplina' }}</h3>
-            <p class="text-xs text-secondary mt-0.5">Configure título, ícone e cor de identificação da disciplina</p>
-          </div>
-        </div>
-        <button @click="emit('close')" class="p-2 text-secondary hover:text-primary hover:bg-surface rounded-xl transition-colors">
-          <span class="material-icons">close</span>
-        </button>
-      </div>
+  <BaseModal
+    :model-value="props.show"
+    :title="props.disciplina ? 'Editar Disciplina' : 'Nova Disciplina'"
+    max-width="max-w-xl"
+    @close="emit('close')"
+  >
+    <form @submit.prevent="handleSubmit" class="space-y-5">
+      <BaseInput
+        v-model="nome"
+        label="Nome da Disciplina *"
+        placeholder="Ex: Programação Web Mobile"
+        :required="true"
+      />
 
-      <!-- Form Body with px-8 padding & custom scrollbar -->
-      <form @submit.prevent="handleSubmit" class="px-8 py-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
+      <BaseTextarea
+        v-model="descricao"
+        label="Descrição da Disciplina"
+        :rows="3"
+        placeholder="Descreva os tópicos principais e plano de aula desta disciplina..."
+      />
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
         <div>
-          <label for="disciplina-nome" class="block text-sm font-semibold text-secondary mb-1.5">Nome da Disciplina *</label>
-          <input id="disciplina-nome" v-model="nome" required type="text" placeholder="Ex: Programação Web Mobile" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
+          <label class="block text-sm font-semibold text-secondary mb-1.5">Ícone da Disciplina</label>
+          <IconPicker v-model="icone" />
         </div>
 
         <div>
-          <label for="disciplina-desc" class="block text-sm font-semibold text-secondary mb-1.5">Descrição da Disciplina</label>
-          <textarea id="disciplina-desc" v-model="descricao" rows="3" placeholder="Descreva os tópicos principais e plano de aula desta disciplina..." class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm min-h-[90px] custom-scrollbar resize-y"></textarea>
+          <label class="block text-sm font-semibold text-secondary mb-1.5">Cor de Identificação</label>
+          <ColorPicker v-model="cor" />
         </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-          <div>
-            <label class="block text-sm font-semibold text-secondary mb-1.5">Ícone da Disciplina</label>
-            <IconPicker v-model="icone" />
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-secondary mb-1.5">Cor de Identificação</label>
-            <ColorPicker v-model="cor" />
-          </div>
-        </div>
-      </form>
-
-      <!-- Footer with px-8 horizontal padding -->
-      <div class="px-8 py-4 border-t border-line flex justify-end space-x-3 bg-surface shrink-0">
-        <button @click="emit('close')" type="button" class="px-5 py-2.5 text-secondary hover:text-primary rounded-xl text-xs font-medium transition-colors">Cancelar</button>
-        <button @click="handleSubmit" type="button" class="px-6 py-2.5 bg-accent hover:opacity-90 text-primary rounded-xl text-xs font-bold shadow-lg shadow-accent transition-all">Salvar Disciplina</button>
       </div>
-    </div>
-  </div>
+    </form>
+
+    <template #footer>
+      <div class="flex justify-end gap-3 pt-4">
+        <BaseButton variant="ghost" @click="emit('close')">Cancelar</BaseButton>
+        <BaseButton variant="primary" @click="handleSubmit">Salvar Disciplina</BaseButton>
+      </div>
+    </template>
+  </BaseModal>
 </template>

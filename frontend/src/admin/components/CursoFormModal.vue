@@ -4,6 +4,10 @@ import ColorPicker from '@/professor/components/ColorPicker.vue';
 import IconPicker from '@/professor/components/IconPicker.vue';
 import { apiClient } from '@/shared/api/client';
 import type { Curso, Professor } from '@/shared/types';
+import BaseModal from '@/shared/components/BaseModal.vue';
+import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseInput from '@/shared/components/BaseInput.vue';
+import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -107,133 +111,122 @@ function handleSubmit() {
 </script>
 
 <template>
-  <div v-if="props.show" class="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-50" @click.self="emit('close')">
-    <div class="bg-surface rounded-3xl w-full max-w-xl shadow-2xl border border-line flex flex-col max-h-[92vh] overflow-hidden">
-      <!-- Header -->
-      <div class="px-8 py-6 border-b border-line flex justify-between items-center bg-surface shrink-0">
-        <div class="flex items-center space-x-3.5">
-          <div class="w-11 h-11 shrink-0 bg-surface-alt text-accent rounded-2xl border border-line flex items-center justify-center shadow-inner">
-            <span class="material-icons text-xl">{{ icone || 'school' }}</span>
-          </div>
-          <div>
-            <h3 class="text-xl font-bold text-primary leading-tight">{{ props.curso ? 'Editar Curso' : 'Novo Curso' }}</h3>
-            <p class="text-xs text-secondary mt-0.5">Configure título, ícone, cor, senha e professores do curso</p>
-          </div>
+  <BaseModal
+    :model-value="show"
+    @close="emit('close')"
+    :title="curso ? 'Editar Curso' : 'Novo Curso'"
+    max-width="max-w-xl"
+  >
+    <form @submit.prevent="handleSubmit" class="space-y-5">
+      <BaseInput
+        v-model="nome"
+        label="Nome do Curso *"
+        placeholder="Ex: Engenharia de Software 2026"
+      />
+
+      <BaseTextarea
+        v-model="descricao"
+        label="Descrição do Curso"
+        :rows="3"
+        placeholder="Descreva os objetivos, ementa e público-alvo do curso..."
+      />
+
+      <BaseInput
+        v-model="senha"
+        label="Senha de Acesso dos Estudantes (deixe em branco se for de acesso livre)"
+        type="password"
+        placeholder="••••••••"
+      />
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+        <div>
+          <label class="block text-sm font-semibold text-primary mb-1.5">Ícone do Curso</label>
+          <IconPicker v-model="icone" />
         </div>
-        <button @click="emit('close')" class="p-2 text-secondary hover:text-primary hover:bg-surface rounded-xl transition-colors">
-          <span class="material-icons">close</span>
-        </button>
+
+        <div>
+          <label class="block text-sm font-semibold text-primary mb-1.5">Cor de Identificação</label>
+          <ColorPicker v-model="cor" />
+        </div>
       </div>
 
-      <!-- Form Body -->
-      <form @submit.prevent="handleSubmit" class="px-8 py-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
-        <div>
-          <label for="curso-nome" class="block text-sm font-semibold text-primary mb-1.5">Nome do Curso *</label>
-          <input id="curso-nome" v-model="nome" required type="text" placeholder="Ex: Engenharia de Software 2026" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
-        </div>
-
-        <div>
-          <label for="curso-desc" class="block text-sm font-semibold text-primary mb-1.5">Descrição do Curso</label>
-          <textarea id="curso-desc" v-model="descricao" rows="3" placeholder="Descreva os objetivos, ementa e público-alvo do curso..." class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm min-h-[90px] custom-scrollbar resize-y"></textarea>
-        </div>
-
-        <div>
-          <label for="curso-senha" class="block text-sm font-semibold text-primary mb-1.5">
-            Senha de Acesso dos Estudantes
-            <span class="text-secondary font-normal">(deixe em branco se for de acesso livre)</span>
+      <!-- Seleção de Professores -->
+      <div class="space-y-2.5 pt-2 border-t border-line">
+        <div class="flex items-center justify-between">
+          <label class="block text-sm font-semibold text-primary">
+            Professores Responsáveis
+            <span class="text-xs font-normal text-secondary ml-1">({{ selectedProfessorIds.length }} selecionados)</span>
           </label>
-          <input id="curso-senha" v-model="senha" type="password" placeholder="••••••••" class="w-full px-4 py-3 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary text-sm" />
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-          <div>
-            <label class="block text-sm font-semibold text-primary mb-1.5">Ícone do Curso</label>
-            <IconPicker v-model="icone" />
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-primary mb-1.5">Cor de Identificação</label>
-            <ColorPicker v-model="cor" />
+          <div class="flex items-center space-x-2 text-xs">
+            <button type="button" @click="selectAll" class="text-accent hover:text-accent font-medium">Selecionar Todos</button>
+            <span class="text-secondary">•</span>
+            <button type="button" @click="clearAll" class="text-secondary hover:text-primary font-medium">Limpar</button>
           </div>
         </div>
 
-        <!-- Seleção de Professores -->
-        <div class="space-y-2.5 pt-2 border-t border-line">
-          <div class="flex items-center justify-between">
-            <label class="block text-sm font-semibold text-primary">
-              Professores Responsáveis
-              <span class="text-xs font-normal text-secondary ml-1">({{ selectedProfessorIds.length }} selecionados)</span>
-            </label>
-            <div class="flex items-center space-x-2 text-xs">
-              <button type="button" @click="selectAll" class="text-accent hover:text-accent font-medium">Selecionar Todos</button>
-              <span class="text-secondary">•</span>
-              <button type="button" @click="clearAll" class="text-secondary hover:text-primary font-medium">Limpar</button>
-            </div>
-          </div>
-
-          <div v-if="selectedProfessoresObjects.length > 0" class="flex flex-wrap gap-2 p-2.5 bg-surface border border-line rounded-2xl max-h-28 overflow-y-auto custom-scrollbar">
-            <span
-              v-for="p in selectedProfessoresObjects"
-              :key="p.id"
-              class="inline-flex items-center space-x-1.5 px-3 py-1 bg-surface-alt border border-line text-accent text-xs rounded-xl font-medium shadow-sm"
-            >
-              <span>{{ p.nome }}</span>
-              <button type="button" @click="removeProfessor(p.id)" class="text-accent hover:text-primary ml-1">
-                <span class="material-icons text-sm leading-none">close</span>
-              </button>
-            </span>
-          </div>
-
-          <div class="relative">
-            <span class="material-icons absolute left-3.5 top-3 text-secondary text-base">search</span>
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Buscar professor por nome ou e-mail..."
-              class="w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-xl text-primary text-xs outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary"
-            />
-          </div>
-
-          <div v-if="professores.length === 0" class="text-xs text-secondary text-center py-5">
-            Nenhum professor cadastrado no sistema.
-          </div>
-          <div v-else-if="filteredProfessores.length === 0" class="text-xs text-secondary text-center py-5">
-            Nenhum professor encontrado para "{{ searchQuery }}".
-          </div>
-          <div v-else class="max-h-48 overflow-y-auto border border-line rounded-2xl p-2 bg-surface grid grid-cols-1 gap-1.5 custom-scrollbar">
-            <button
-              v-for="p in filteredProfessores"
-              :key="p.id"
-              type="button"
-              @click="toggleProfessor(p.id)"
-              :class="[
-                'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all text-left border',
-                selectedProfessorIds.includes(p.id)
-                  ? 'bg-accent border-accent text-white shadow-sm ring-1 ring-accent'
-                  : 'bg-surface-alt border-line text-secondary hover:bg-surface hover:text-primary'
-              ]"
-            >
-              <div class="flex items-center space-x-3 truncate">
-                <div class="w-7 h-7 rounded-full bg-surface-alt text-secondary flex items-center justify-center text-xs font-bold shrink-0">
-                  {{ p.nome.charAt(0).toUpperCase() }}
-                </div>
-                <div class="truncate">
-                  <p class="text-primary font-medium leading-tight truncate">{{ p.nome }}</p>
-                  <p class="text-secondary text-[10px] truncate">{{ p.email }}</p>
-                </div>
-              </div>
-              <span v-if="selectedProfessorIds.includes(p.id)" class="material-icons text-accent text-base shrink-0 ml-2">check_circle</span>
-              <span v-else class="material-icons text-secondary text-base shrink-0 ml-2">radio_button_unchecked</span>
+        <div v-if="selectedProfessoresObjects.length > 0" class="flex flex-wrap gap-2 p-2.5 bg-surface border border-line rounded-2xl max-h-28 overflow-y-auto custom-scrollbar">
+          <span
+            v-for="p in selectedProfessoresObjects"
+            :key="p.id"
+            class="inline-flex items-center space-x-1.5 px-3 py-1 bg-surface-alt border border-line text-accent text-xs rounded-xl font-medium shadow-sm"
+          >
+            <span>{{ p.nome }}</span>
+            <button type="button" @click="removeProfessor(p.id)" class="text-accent hover:text-primary ml-1">
+              <span class="material-icons text-sm leading-none">close</span>
             </button>
-          </div>
+          </span>
         </div>
-      </form>
 
-      <!-- Footer -->
-      <div class="px-8 py-4 border-t border-line flex justify-end space-x-3 bg-surface shrink-0">
-        <button @click="emit('close')" type="button" class="px-5 py-2.5 text-secondary hover:text-primary rounded-xl text-xs font-medium transition-colors">Cancelar</button>
-        <button @click="handleSubmit" type="button" class="px-6 py-2.5 bg-accent hover:opacity-90 text-white rounded-xl text-xs font-bold shadow-lg transition-all">Salvar Curso</button>
+        <div class="relative">
+          <span class="material-icons absolute left-3.5 top-3 text-secondary text-base">search</span>
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Buscar professor por nome ou e-mail..."
+            class="w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-xl text-primary text-xs outline-none focus:ring-2 focus:ring-accent placeholder:text-secondary"
+          />
+        </div>
+
+        <div v-if="professores.length === 0" class="text-xs text-secondary text-center py-5">
+          Nenhum professor cadastrado no sistema.
+        </div>
+        <div v-else-if="filteredProfessores.length === 0" class="text-xs text-secondary text-center py-5">
+          Nenhum professor encontrado para "{{ searchQuery }}".
+        </div>
+        <div v-else class="max-h-48 overflow-y-auto border border-line rounded-2xl p-2 bg-surface grid grid-cols-1 gap-1.5 custom-scrollbar">
+          <button
+            v-for="p in filteredProfessores"
+            :key="p.id"
+            type="button"
+            @click="toggleProfessor(p.id)"
+            :class="[
+              'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all text-left border',
+              selectedProfessorIds.includes(p.id)
+                ? 'bg-accent border-accent text-white shadow-sm ring-1 ring-accent'
+                : 'bg-surface-alt border-line text-secondary hover:bg-surface hover:text-primary'
+            ]"
+          >
+            <div class="flex items-center space-x-3 truncate">
+              <div class="w-7 h-7 rounded-full bg-surface-alt text-secondary flex items-center justify-center text-xs font-bold shrink-0">
+                {{ p.nome.charAt(0).toUpperCase() }}
+              </div>
+              <div class="truncate">
+                <p class="text-primary font-medium leading-tight truncate">{{ p.nome }}</p>
+                <p class="text-secondary text-[10px] truncate">{{ p.email }}</p>
+              </div>
+            </div>
+            <span v-if="selectedProfessorIds.includes(p.id)" class="material-icons text-accent text-base shrink-0 ml-2">check_circle</span>
+            <span v-else class="material-icons text-secondary text-base shrink-0 ml-2">radio_button_unchecked</span>
+          </button>
+        </div>
       </div>
-    </div>
-  </div>
+    </form>
+
+    <template #footer>
+      <div class="flex justify-end gap-3 pt-4">
+        <BaseButton variant="ghost" @click="emit('close')">Cancelar</BaseButton>
+        <BaseButton variant="primary" @click="handleSubmit">Salvar Curso</BaseButton>
+      </div>
+    </template>
+  </BaseModal>
 </template>

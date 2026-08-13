@@ -10,6 +10,8 @@ const props = withDefaults(
     error?: string;
     disabled?: boolean;
     id?: string;
+    required?: boolean;
+    autofocus?: boolean;
   }>(),
   {
     modelValue: '',
@@ -17,7 +19,9 @@ const props = withDefaults(
     placeholder: '',
     error: '',
     disabled: false,
-    id: ''
+    id: '',
+    required: false,
+    autofocus: false
   }
 );
 
@@ -37,9 +41,11 @@ const inputId = computed(
       v-model="model"
       :placeholder="placeholder"
       :disabled="disabled"
+      :required="required"
+      :autofocus="autofocus"
       class="rounded-md border bg-surface px-3 py-2 text-sm text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
       :class="error ? 'border-danger' : 'border-line'"
     />
-    <p v-if="error" class="text-xs text-danger">{{ error }}</p>
+    <p v-if="error" class="text-xs text-danger-text">{{ error }}</p>
   </div>
 </template>

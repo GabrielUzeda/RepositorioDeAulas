@@ -29,7 +29,7 @@ withDefaults(
       size === 'lg' ? 'px-5 py-2.5 text-base' : '',
       variant === 'primary' ? 'bg-accent text-white hover:opacity-90' : '',
       variant === 'secondary' ? 'border border-line bg-surface-alt text-primary hover:bg-surface' : '',
-      variant === 'danger' ? 'bg-danger text-white hover:opacity-90' : '',
+      variant === 'danger' ? 'bg-danger text-on-danger hover:opacity-90' : '',
       variant === 'ghost' ? 'bg-transparent text-secondary hover:bg-surface-alt' : ''
     ]"
   >

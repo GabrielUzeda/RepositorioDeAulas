@@ -14,13 +14,13 @@ const typeStyles = computed(() => {
     case 'prova':
       return { bg: 'bg-surface-alt', text: 'text-accent', cover: '/static/prova.webp' };
     case 'minigame':
-      return { bg: 'bg-purple-100', text: 'text-purple-600', cover: '/static/minigame.webp' };
+      return { bg: 'bg-cat-minigame-bg', text: 'text-cat-minigame', cover: '/static/minigame.webp' };
     case 'roleta':
-      return { bg: 'bg-pink-100', text: 'text-pink-600', cover: '/static/roleta.webp' };
+      return { bg: 'bg-cat-roleta-bg', text: 'text-cat-roleta', cover: '/static/roleta.webp' };
     case 'reforco':
-      return { bg: 'bg-green-100', text: 'text-green-600', cover: '/static/reforco.webp' };
+      return { bg: 'bg-cat-reforco-bg', text: 'text-cat-reforco', cover: '/static/reforco.webp' };
     default:
-      return { bg: 'bg-blue-100', text: 'text-blue-600', cover: '/static/normal.webp' };
+      return { bg: 'bg-cat-default-bg', text: 'text-cat-default', cover: '/static/normal.webp' };
   }
 });
 

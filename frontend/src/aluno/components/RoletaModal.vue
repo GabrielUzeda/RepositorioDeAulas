@@ -4,6 +4,9 @@ import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet } from '@/shared/utils/storage';
 import { useToast } from '@/shared/composables/useToast';
 import type { Question, Option, Atividade } from '@/shared/types';
+import BaseModal from '@/shared/components/BaseModal.vue';
+import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 
 const props = withDefaults(defineProps<{
   show: boolean;
@@ -200,36 +203,32 @@ function closeAfterSubmit() {
 </script>
 
 <template>
-  <div v-if="props.show" class="fixed inset-0 bg-surface backdrop-blur-md flex items-center justify-center p-4 z-50">
-    <div class="bg-surface-alt rounded-3xl p-6 max-w-4xl w-full shadow-2xl space-y-6 relative border border-line text-primary" @click.stop>
-      <!-- Header -->
-      <div class="flex justify-between items-center border-b border-line pb-4">
+  <BaseModal
+    :model-value="props.show"
+    @close="emit('close')"
+    :title="props.title || 'Roleta'"
+    max-width="max-w-4xl"
+  >
+    <div class="space-y-6 relative">
+      <!-- Badge + counters (moved from manual header) -->
+      <div class="flex justify-between items-center flex-wrap gap-3">
         <div class="flex items-center space-x-3">
-          <div class="p-3 bg-pink-500/20 text-pink-400 rounded-2xl flex items-center justify-center">
+          <div class="p-3 bg-cat-roleta-bg text-cat-roleta rounded-2xl flex items-center justify-center">
             <span class="material-icons leading-none">casino</span>
           </div>
-          <div>
-            <span class="px-3 py-1 bg-pink-900/60 text-pink-300 text-xs font-bold rounded-full uppercase tracking-wider">Roleta do Conhecimento</span>
-            <h2 class="text-xl font-bold text-primary mt-1">{{ props.title }}</h2>
-          </div>
+          <span class="px-3 py-1 bg-cat-roleta-bg text-cat-roleta text-xs font-bold rounded-full uppercase tracking-wider">Roleta do Conhecimento</span>
         </div>
 
-        <div class="flex items-center space-x-6">
-          <div class="flex items-center space-x-4 bg-surface px-4 py-2 rounded-xl text-xs font-bold">
-            <div class="flex items-center space-x-1 text-success" title="Respondidas">
-              <span class="material-icons text-sm">check_circle</span>
-              <span>{{ answeredCount }}</span>
-            </div>
-            <div class="w-px h-4 bg-line"></div>
-            <div class="flex items-center space-x-1 text-sky-400" title="Restantes">
-              <span class="material-icons text-sm">help</span>
-              <span>{{ remainingCount }}</span>
-            </div>
+        <div class="flex items-center space-x-4 bg-surface px-4 py-2 rounded-xl text-xs font-bold">
+          <div class="flex items-center space-x-1 text-success" title="Respondidas">
+            <span class="material-icons text-sm">check_circle</span>
+            <span>{{ answeredCount }}</span>
           </div>
-
-          <button @click="emit('close')" class="text-secondary hover:text-primary p-2 rounded-full hover:bg-surface transition">
-            <span class="material-icons">close</span>
-          </button>
+          <div class="w-px h-4 bg-line"></div>
+          <div class="flex items-center space-x-1 text-cat-roleta" title="Restantes">
+            <span class="material-icons text-sm">help</span>
+            <span>{{ remainingCount }}</span>
+          </div>
         </div>
       </div>
 
@@ -248,7 +247,7 @@ function closeAfterSubmit() {
             :class="[
               'p-6 rounded-2xl border-2 flex items-center justify-center aspect-square transition-all duration-200 shadow-md',
               highlightedIndex === idx
-                ? 'border-pink-500 bg-pink-950/60 text-pink-400 scale-105 shadow-pink-500/20'
+                ? 'border-cat-roleta bg-cat-roleta-bg text-cat-roleta scale-105 shadow-lg'
                 : 'border-line bg-surface text-secondary'
             ]"
           >
@@ -261,8 +260,8 @@ function closeAfterSubmit() {
         <!-- Completion View -->
         <div v-else class="text-center py-12 space-y-4">
           <template v-if="isSubmitting">
-            <span class="material-icons text-5xl text-secondary">sync</span>
-            <h3 class="text-3xl font-bold text-secondary">{{ isCompleted ? 'Sincronizando com o servidor...' : '' }}</h3>
+            <BaseSpinner size="lg" color-class="text-secondary" />
+            <h3 class="text-3xl font-bold text-secondary">Sincronizando com o servidor...</h3>
             <p class="text-secondary">Enviando suas respostas para correção no servidor.</p>
           </template>
           <template v-else>
@@ -273,32 +272,33 @@ function closeAfterSubmit() {
               <template v-if="resultPontuacao !== null"> — Pontuação: {{ resultPontuacao }}</template>
             </p>
             <p v-if="errorMessage" class="text-danger text-sm">{{ errorMessage }}</p>
-            <button
+            <BaseButton
               v-if="errorMessage"
+              variant="danger"
+              class="mt-3"
               @click="emit('close')"
-              class="mt-3 px-5 py-2 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-xl text-sm transition"
             >
               Fechar
-            </button>
+            </BaseButton>
           </template>
         </div>
 
         <!-- Action Button -->
-        <button
-          @click="animateSpin"
+        <BaseButton
+          size="lg"
           :disabled="isAnimating || isCompleted"
-          class="px-8 py-4 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-2xl shadow-lg transition flex items-center space-x-3 disabled:opacity-40 disabled:cursor-not-allowed"
+          @click="animateSpin"
         >
-          <span :class="['material-icons', isAnimating ? 'animate-spin' : '']">sync</span>
+          <BaseSpinner v-if="isAnimating" size="sm" />
           <span class="tracking-wider">{{ isCompleted ? 'CONCLUÍDO' : 'GIRAR ROLETA' }}</span>
-        </button>
+        </BaseButton>
       </div>
 
-      <!-- Question Modal Popup -->
+      <!-- Question Modal Popup (kept as raw nested overlay to preserve no-dismiss behavior) -->
       <div v-if="showQuestionModal && currentQuestion" class="fixed inset-0 bg-surface backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <div class="bg-surface-alt border border-line rounded-3xl p-6 max-w-2xl w-full space-y-6 shadow-2xl text-primary">
           <div class="flex justify-between items-center border-b border-line pb-3">
-            <h4 class="text-lg font-bold text-pink-400 flex items-center space-x-2">
+            <h4 class="text-lg font-bold text-cat-roleta flex items-center space-x-2">
               <span class="material-icons">quiz</span>
               <span>{{ currentQuestion.title }}</span>
             </h4>
@@ -320,7 +320,7 @@ function closeAfterSubmit() {
                 selectedOption === opt
                   ? isSubmitted
                     ? 'border-success bg-surface text-success'
-                    : 'border-pink-500 bg-pink-950/40 text-white'
+                    : 'border-cat-roleta bg-cat-roleta-bg text-cat-roleta'
                   : 'border-line bg-surface text-secondary hover:border-line'
               ]"
             >
@@ -345,7 +345,7 @@ function closeAfterSubmit() {
               v-if="!isSubmitted"
               @click="handleConfirmAnswer"
               :disabled="!selectedOption"
-              class="px-6 py-2.5 bg-pink-600 hover:bg-pink-500 disabled:opacity-40 font-bold rounded-xl text-sm transition"
+              class="px-6 py-2.5 bg-cat-roleta hover:opacity-90 text-on-danger font-bold rounded-xl text-sm transition"
             >
               Confirmar Resposta
             </button>
@@ -360,5 +360,5 @@ function closeAfterSubmit() {
         </div>
       </div>
     </div>
-  </div>
+  </BaseModal>
 </template>

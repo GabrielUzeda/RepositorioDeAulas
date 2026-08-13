@@ -2,6 +2,8 @@
 import { ref, watch, onUnmounted, nextTick } from 'vue';
 import { MinigamePlayer } from './minigame-player';
 import type { Atividade } from '@/shared/types';
+import BaseModal from '@/shared/components/BaseModal.vue';
+import BaseButton from '@/shared/components/BaseButton.vue';
 
 const props = withDefaults(defineProps<{
   show: boolean;
@@ -43,15 +45,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="props.show" class="fixed inset-0 bg-surface backdrop-blur-md flex items-center justify-center p-2 sm:p-6 z-50">
-    <div class="bg-surface-alt rounded-2xl overflow-hidden shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col border border-line" @click.stop>
-      <div class="flex justify-between items-center px-5 py-3 border-b border-line bg-surface">
-        <span class="px-3 py-1 bg-cyan-900/60 text-cyan-300 text-xs font-bold rounded-full uppercase tracking-wider">Simulação Tática</span>
-        <button @click="emit('close')" class="text-secondary hover:text-primary p-2 rounded-full hover:bg-surface transition">
+  <BaseModal :model-value="props.show" max-width="max-w-4xl" @close="emit('close')">
+    <template #header>
+      <div class="flex justify-between items-center w-full border-b border-line pb-3">
+        <span class="px-3 py-1 bg-cat-default-bg text-cat-default text-xs font-bold rounded-full uppercase tracking-wider">Simulação Tática</span>
+        <BaseButton variant="ghost" @click="emit('close')">
           <span class="material-icons">close</span>
-        </button>
+        </BaseButton>
       </div>
-      <div id="mg-modal-container" ref="containerRef" class="relative flex-1 min-h-0"></div>
-    </div>
-  </div>
+    </template>
+    <div id="mg-modal-container" ref="containerRef" class="relative h-[80vh] min-h-0"></div>
+  </BaseModal>
 </template>

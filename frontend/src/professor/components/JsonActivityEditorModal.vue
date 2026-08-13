@@ -2,6 +2,19 @@
 import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import type { Atividade, Question, QuestionOption } from '@/shared/types';
+import BaseModal from '@/shared/components/BaseModal.vue';
+import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseInput from '@/shared/components/BaseInput.vue';
+import BaseTextarea from '@/shared/components/BaseTextarea.vue';
+import BaseSelect from '@/shared/components/BaseSelect.vue';
+
+const tipoOptions = [
+  { label: 'Normal', value: 'normal' },
+  { label: 'Prova', value: 'prova' },
+  { label: 'Minigame Tático', value: 'minigame' },
+  { label: 'Roleta do Conhecimento', value: 'roleta' },
+  { label: 'Reforço (Modo Zen)', value: 'reforco' },
+];
 
 const props = defineProps<{
   show: boolean;
@@ -184,144 +197,152 @@ function handleImportJson(e: Event) {
 </script>
 
 <template>
-  <div v-if="props.show" class="fixed inset-0 bg-surface backdrop-blur-md flex flex-col z-50">
-    <!-- Header Toolbar -->
-    <div class="bg-surface px-6 py-4 border-b border-line flex justify-between items-center text-primary">
-      <div class="flex items-center space-x-3">
-        <span class="material-icons text-accent">quiz</span>
-        <h2 class="text-xl font-bold">{{ props.atividade ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
-      </div>
-
-      <div class="flex items-center space-x-3">
-        <label class="cursor-pointer px-3 py-1.5 bg-surface-alt hover:bg-surface text-secondary rounded-lg text-xs font-semibold flex items-center space-x-1">
-          <span class="material-icons text-sm">upload_file</span>
-          <span>Importar JSON</span>
-          <input type="file" accept=".json" @change="handleImportJson" class="hidden" />
-        </label>
-
-        <button @click="handleExportJson" type="button" class="px-3 py-1.5 bg-surface-alt hover:bg-surface text-secondary rounded-lg text-xs font-semibold flex items-center space-x-1">
-          <span class="material-icons text-sm">download</span>
-          <span>Exportar JSON</span>
-        </button>
-
-        <button @click="emit('close')" type="button" class="px-4 py-2 text-secondary hover:text-primary rounded-lg text-sm font-medium">Cancelar</button>
-        <button @click="handleSave" type="button" class="px-5 py-2 bg-accent hover:opacity-90 text-primary rounded-lg text-sm font-bold shadow-lg">Salvar Atividade</button>
-      </div>
-    </div>
-
-    <!-- Main Content Area -->
-    <div class="flex-1 overflow-y-auto p-8 bg-surface text-primary">
-      <div class="max-w-4xl mx-auto space-y-6">
-        <!-- Basic Info Box -->
-        <div class="bg-surface p-6 rounded-2xl border border-line space-y-4 shadow-lg">
-          <h3 class="text-lg font-bold text-primary border-b border-line pb-2">Informações Básicas</h3>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-secondary mb-1">Título da Atividade *</label>
-              <input v-model="titulo" required type="text" placeholder="Ex: Avaliação de Algoritmos" class="w-full px-4 py-2 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent" />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-secondary mb-1">Tipo de Atividade</label>
-              <select v-model="tipo" @change="handleTypeChange" class="w-full px-4 py-2 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent">
-                <option value="normal">Normal</option>
-                <option value="prova">Prova</option>
-                <option value="minigame">Minigame Tático</option>
-                <option value="roleta">Roleta do Conhecimento</option>
-                <option value="reforco">Reforço (Modo Zen)</option>
-              </select>
-            </div>
-
-            <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-secondary mb-1">Descrição</label>
-              <textarea v-model="descricao" rows="2" placeholder="Breve resumo da atividade..." class="w-full px-4 py-2 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent"></textarea>
-            </div>
-
-            <div class="md:col-span-2 flex items-center space-x-3 pt-2">
-              <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
-              <label for="allowPassword" class="text-sm font-medium text-secondary cursor-pointer">Exigir senha individual de acesso para os alunos</label>
-            </div>
-
-            <div v-if="allowPassword" class="md:col-span-2">
-              <label class="block text-sm font-medium text-secondary mb-1">Senha da Atividade *</label>
-              <input v-model="senha" required type="password" placeholder="Digite a senha exclusiva" class="w-full max-w-xs px-4 py-2 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent" />
-            </div>
-          </div>
+  <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-4xl">
+    <template #header>
+      <div class="flex items-center justify-between gap-4 w-full border-b border-line pb-4">
+        <div class="flex items-center space-x-3">
+          <span class="material-icons text-accent">quiz</span>
+          <h2 class="text-xl font-bold text-primary">{{ props.atividade ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
         </div>
 
-        <!-- Questions Section -->
-        <div class="space-y-4">
-          <div class="flex justify-between items-center">
-            <h3 class="text-xl font-bold text-primary">Perguntas ({{ questions.length }})</h3>
-            <button @click="addQuestion" type="button" class="px-4 py-2 bg-accent hover:opacity-90 text-primary font-bold rounded-xl text-sm shadow-md flex items-center space-x-2">
-              <span class="material-icons text-sm">add</span>
-              <span>Adicionar Pergunta</span>
-            </button>
+        <div class="flex items-center space-x-3">
+          <label class="cursor-pointer px-3 py-1.5 bg-surface-alt hover:bg-surface text-secondary rounded-lg text-xs font-semibold flex items-center space-x-1">
+            <span class="material-icons text-sm">upload_file</span>
+            <span>Importar JSON</span>
+            <input type="file" accept=".json" @change="handleImportJson" class="hidden" />
+          </label>
+
+          <BaseButton variant="secondary" size="sm" @click="handleExportJson">
+            <span class="material-icons text-sm">download</span>
+            <span>Exportar JSON</span>
+          </BaseButton>
+
+          <BaseButton variant="ghost" size="sm" @click="emit('close')">Cancelar</BaseButton>
+          <BaseButton variant="primary" size="sm" @click="handleSave">Salvar Atividade</BaseButton>
+        </div>
+      </div>
+    </template>
+
+    <div class="space-y-6">
+      <!-- Basic Info Box -->
+      <div class="bg-surface p-6 rounded-2xl border border-line space-y-4 shadow-lg">
+        <h3 class="text-lg font-bold text-primary border-b border-line pb-2">Informações Básicas</h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <BaseInput
+            v-model="titulo"
+            type="text"
+            label="Título da Atividade *"
+            placeholder="Ex: Avaliação de Algoritmos"
+          />
+
+          <BaseSelect
+            v-model="tipo"
+            :options="tipoOptions"
+            label="Tipo de Atividade"
+            @change="handleTypeChange"
+          />
+
+          <div class="md:col-span-2">
+            <BaseTextarea
+              v-model="descricao"
+              :rows="2"
+              label="Descrição"
+              placeholder="Breve resumo da atividade..."
+            />
           </div>
 
-          <div v-if="questions.length === 0" class="text-center py-12 bg-surface rounded-2xl border border-line text-secondary">
-            Nenhuma pergunta adicionada. Clique em "Adicionar Pergunta" para começar.
+          <div class="md:col-span-2 flex items-center space-x-3 pt-2">
+            <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
+            <label for="allowPassword" class="text-sm font-medium text-secondary cursor-pointer">Exigir senha individual de acesso para os alunos</label>
           </div>
 
-          <div v-if="!usesOptions" class="p-3 bg-surface border border-line rounded-xl text-secondary text-xs">
-            <span class="material-icons text-sm align-middle mr-1 text-accent">edit_note</span>
-            <span>Atividade do tipo <strong class="text-secondary">{{ tipo }}</strong>: as perguntas são <strong class="text-secondary">discursivas</strong> (resposta em texto). Não são exibidas alternativas.</span>
-          </div>
-
-          <div
-            v-for="(q, qIndex) in questions"
-            :key="qIndex"
-            class="bg-surface p-6 rounded-2xl border border-line space-y-4 shadow-md"
-          >
-            <div class="flex justify-between items-center border-b border-line pb-3">
-              <input v-model="q.title" placeholder="Título/Tema da Questão" class="bg-surface px-3 py-1.5 rounded-lg border border-line font-bold text-accent text-sm outline-none focus:ring-2 focus:ring-accent w-64" />
-              <div class="flex items-center space-x-1">
-                <button @click="moveQuestion(qIndex, 'up')" :disabled="qIndex === 0" class="p-1.5 text-secondary hover:text-primary disabled:opacity-30">
-                  <span class="material-icons text-sm">arrow_upward</span>
-                </button>
-                <button @click="moveQuestion(qIndex, 'down')" :disabled="qIndex === questions.length - 1" class="p-1.5 text-secondary hover:text-primary disabled:opacity-30">
-                  <span class="material-icons text-sm">arrow_downward</span>
-                </button>
-                <button @click="removeQuestion(qIndex)" class="p-1.5 text-danger hover:text-danger">
-                  <span class="material-icons text-sm">delete</span>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1">Enunciado da Pergunta *</label>
-              <textarea v-model="q.content" rows="2" placeholder="Digite a pergunta para o aluno..." class="w-full px-4 py-2 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent text-sm"></textarea>
-            </div>
-
-            <!-- Options Section (apenas para tipos objetivos: minigame/roleta/reforco) -->
-            <div v-if="usesOptions" class="space-y-2 pt-2">
-              <div class="flex justify-between items-center">
-                <label class="text-xs font-bold uppercase tracking-wider text-secondary">Alternativas de Resposta</label>
-                <button @click="addOption(qIndex)" type="button" class="text-xs text-accent hover:text-accent font-bold flex items-center">
-                  <span class="material-icons text-xs mr-1">add</span> + Opção
-                </button>
-              </div>
-
-              <div v-for="(opt, oIndex) in q.options" :key="oIndex" class="flex items-center space-x-3 bg-surface p-3 rounded-xl border border-line">
-                <input
-                  type="radio"
-                  :name="`correct_${qIndex}`"
-                  :checked="opt.correct"
-                  @change="setCorrectOption(qIndex, oIndex)"
-                  title="Marcar como alternativa correta"
-                  class="w-4 h-4 text-green-500 bg-surface border-line"
-                />
-                <input v-model="opt.text" placeholder="Texto da opção" class="flex-1 bg-transparent border-none text-primary text-sm outline-none" />
-                <input v-model="opt.feedback" placeholder="Feedback ao escolher" class="w-48 bg-surface px-3 py-1 rounded-lg text-xs text-secondary border border-line outline-none" />
-                <button @click="removeOption(qIndex, oIndex)" class="text-secondary hover:text-danger p-1">
-                  <span class="material-icons text-xs">close</span>
-                </button>
-              </div>
-            </div>
+          <div v-if="allowPassword" class="md:col-span-2">
+            <BaseInput
+              v-model="senha"
+              type="password"
+              label="Senha da Atividade *"
+              placeholder="Digite a senha exclusiva"
+            />
           </div>
         </div>
       </div>
+
+      <!-- Questions Section -->
+      <div class="space-y-4">
+        <div class="flex justify-between items-center">
+          <h3 class="text-xl font-bold text-primary">Perguntas ({{ questions.length }})</h3>
+          <BaseButton variant="primary" size="sm" @click="addQuestion">
+            <span class="material-icons text-sm">add</span>
+            <span>Adicionar Pergunta</span>
+          </BaseButton>
+        </div>
+
+        <div v-if="questions.length === 0" class="text-center py-12 bg-surface rounded-2xl border border-line text-secondary">
+          Nenhuma pergunta adicionada. Clique em "Adicionar Pergunta" para começar.
+        </div>
+
+        <div v-if="!usesOptions" class="p-3 bg-surface border border-line rounded-xl text-secondary text-xs">
+          <span class="material-icons text-sm align-middle mr-1 text-accent">edit_note</span>
+          <span>Atividade do tipo <strong class="text-secondary">{{ tipo }}</strong>: as perguntas são <strong class="text-secondary">discursivas</strong> (resposta em texto). Não são exibidas alternativas.</span>
+        </div>
+
+        <div
+          v-for="(q, qIndex) in questions"
+          :key="qIndex"
+          class="bg-surface p-6 rounded-2xl border border-line space-y-4 shadow-md"
+        >
+          <div class="flex justify-between items-center border-b border-line pb-3">
+            <input v-model="q.title" placeholder="Título/Tema da Questão" class="bg-surface px-3 py-1.5 rounded-lg border border-line font-bold text-accent text-sm outline-none focus:ring-2 focus:ring-accent w-64" />
+            <div class="flex items-center space-x-1">
+              <BaseButton variant="ghost" size="sm" :disabled="qIndex === 0" @click="moveQuestion(qIndex, 'up')">
+                <span class="material-icons text-sm">arrow_upward</span>
+              </BaseButton>
+              <BaseButton variant="ghost" size="sm" :disabled="qIndex === questions.length - 1" @click="moveQuestion(qIndex, 'down')">
+                <span class="material-icons text-sm">arrow_downward</span>
+              </BaseButton>
+              <BaseButton variant="danger" size="sm" @click="removeQuestion(qIndex)">
+                <span class="material-icons text-sm">delete</span>
+              </BaseButton>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1">Enunciado da Pergunta *</label>
+            <BaseTextarea
+              v-model="q.content"
+              :rows="2"
+              placeholder="Digite a pergunta para o aluno..."
+            />
+          </div>
+
+          <!-- Options Section (apenas para tipos objetivos: minigame/roleta/reforco) -->
+          <div v-if="usesOptions" class="space-y-2 pt-2">
+            <div class="flex justify-between items-center">
+              <label class="text-xs font-bold uppercase tracking-wider text-secondary">Alternativas de Resposta</label>
+              <BaseButton variant="ghost" size="sm" @click="addOption(qIndex)">
+                <span class="material-icons text-xs mr-1">add</span> + Opção
+              </BaseButton>
+            </div>
+
+            <div v-for="(opt, oIndex) in q.options" :key="oIndex" class="flex items-center space-x-3 bg-surface p-3 rounded-xl border border-line">
+              <input
+                type="radio"
+                :name="`correct_${qIndex}`"
+                :checked="opt.correct"
+                @change="setCorrectOption(qIndex, oIndex)"
+                title="Marcar como alternativa correta"
+                class="w-4 h-4 text-success bg-surface border-line"
+              />
+              <input v-model="opt.text" placeholder="Texto da opção" class="flex-1 bg-transparent border-none text-primary text-sm outline-none" />
+              <input v-model="opt.feedback" placeholder="Feedback ao escolher" class="w-48 bg-surface px-3 py-1 rounded-lg text-xs text-secondary border border-line outline-none" />
+              <BaseButton variant="ghost" size="sm" @click="removeOption(qIndex, oIndex)">
+                <span class="material-icons text-xs">close</span>
+              </BaseButton>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
+  </BaseModal>
 </template>
