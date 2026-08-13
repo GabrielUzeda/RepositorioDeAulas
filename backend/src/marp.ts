@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { sanitizeSlug } from './utils';
+import { THEME_LABELS, NEXT_THEME, normalizeTheme } from '../../frontend/src/shared/marpTheme';
 
 export function resolveFrontendDir(): string {
   if (process.env.FRONTEND_STATIC_DIR) return process.env.FRONTEND_STATIC_DIR;
@@ -65,7 +66,7 @@ function renderMarkdown(mdText: string): string {
 export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): string {
   const { slides, global } = parseSlides(mdContent);
   const docTitle = (global.title && String(global.title).trim()) ? String(global.title).trim() : (titulo || 'Apresentação — Marp Next');
-  const initialTheme = (global.theme && (global.theme === 'light' || global.theme === 'dark')) ? global.theme : 'dark';
+  const initialTheme = normalizeTheme(global.theme);
 
   let slidesHtml = '';
   slides.forEach((slide, i) => {
@@ -101,6 +102,7 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap');
 :root {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -127,6 +129,41 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
   --accent-dim: rgba(67, 56, 202, 0.12);
   --code-fg: #4338ca;
   --slide-bg: #ffffff;
+}
+
+[data-theme="default"], [data-theme="high-contrast"] {
+  --c-bg:#ffffff; --c-text:#2b2b2b; --c-heading:#1a3a6e; --c-strong:#d62828; --c-border:#1a3a6e; --c-code-bg:#f0f0f0; --c-link:#1a3a6e;
+  --bg-app:#ffffff;
+  --slide-bg:#ffffff;
+  --text-primary:#2b2b2b;
+  --text-secondary:#2b2b2b;
+  --text-muted:#2b2b2b;
+  --border:#1a3a6e;
+  --accent:#1a3a6e;
+  --accent-dim:rgba(26, 58, 110, 0.10);
+  --code-fg:#2b2b2b;
+  --font-sans:'Roboto', 'Roboto Slab', system-ui, sans-serif;
+  --font-mono:'Roboto', monospace;
+  background:#ffffff;
+  color:#2b2b2b;
+}
+[data-theme="default"], [data-theme="high-contrast"] body {
+  font-family:'Roboto', system-ui, sans-serif;
+}
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h1,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h2,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h3,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h4,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h5,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h6 {
+  font-family:'Roboto Slab', Georgia, serif;
+  color:var(--c-heading);
+}
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h2 {
+  border-bottom:2px solid #1a3a6e;
+}
+[data-theme="default"], [data-theme="high-contrast"] .slide-content strong {
+  color:#d62828;
 }
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -379,6 +416,15 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   #controls-bar, #progress-bar { display: none !important; }
   .slide { page-break-after: always !important; break-after: page !important; position: relative !important; opacity: 1 !important; width: 100vw !important; height: 100vh !important; }
   body.anim-mode .slide .slide-content > * { opacity: 1 !important; animation: none !important; }
+  html[data-theme="default"], html[data-theme="high-contrast"] body { color:#2b2b2b !important; }
+  html[data-theme="default"], html[data-theme="high-contrast"] .slide-content h1,
+  html[data-theme="default"], html[data-theme="high-contrast"] .slide-content h2,
+  html[data-theme="default"], html[data-theme="high-contrast"] .slide-content h3,
+  html[data-theme="default"], html[data-theme="high-contrast"] .slide-content h4,
+  html[data-theme="default"], html[data-theme="high-contrast"] .slide-content h5,
+  html[data-theme="default"], html[data-theme="high-contrast"] .slide-content h6 { color:#1a3a6e !important; }
+  html[data-theme="default"], html[data-theme="high-contrast"] .slide-content h2 { border-bottom:2px solid #1a3a6e !important; }
+  html[data-theme="default"], html[data-theme="high-contrast"] .slide-content strong { color:#d62828 !important; }
 }
 .mermaid-block {
   width: 100%;
@@ -446,7 +492,7 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   <button class="ctrl-btn" id="btn-next" title="Próximo (→ / ↓ / Espaço)">▶</button>
   <span id="counter" style="font-size:12px;font-family:var(--font-mono);color:var(--text-muted);padding:0 6px;">${slides.length > 0 ? '1/' + slides.length : '0/0'}</span>
   <div style="width:1px;height:16px;background:var(--border);"></div>
-  <button class="ctrl-btn" id="btn-theme" title="Alternar Tema (T)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Escuro</button>
+  <button class="ctrl-btn" id="btn-theme" title="Alternar Tema (T)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
   <button class="ctrl-btn" id="btn-font-dec" title="Diminuir Fonte (-)">A-</button>
   <button class="ctrl-btn" id="btn-font-reset" title="Resetar Fonte">100%</button>
   <button class="ctrl-btn" id="btn-font-inc" title="Aumentar Fonte (+)">A+</button>
@@ -457,6 +503,15 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
 <script>
 const sunSvg = \`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>\`;
 const moonSvg = \`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>\`;
+
+const themeLabels = ${JSON.stringify(THEME_LABELS)};
+const themeNext = ${JSON.stringify(NEXT_THEME)};
+const themeAliases = { 'high-contrast': 'default' };
+function normalizeTheme(input) {
+  if (themeAliases[input]) return themeAliases[input];
+  if (input === 'dark' || input === 'light') return input;
+  return 'default';
+}
 
 let currentSlide = 0;
 const totalSlides = ${slides.length};
@@ -474,16 +529,17 @@ document.querySelectorAll('.slide-content pre').forEach(pre => {
 
 function initMermaid(themeName) {
   if (window.mermaid) {
+    const theme = normalizeTheme(themeName);
     mermaid.initialize({
       startOnLoad: false,
-      theme: themeName === 'dark' ? 'dark' : 'default',
+      theme: theme === 'dark' ? 'dark' : 'default',
       securityLevel: 'loose',
       flowchart: { useMaxWidth: true, htmlLabels: true, padding: 20 },
       sequence: { useMaxWidth: true, wrap: true },
       themeVariables: {
         primaryColor: '#6366f1',
-        primaryTextColor: themeName === 'dark' ? '#f8fafc' : '#0f172a',
-        lineColor: themeName === 'dark' ? '#94a3b8' : '#475569',
+        primaryTextColor: theme === 'dark' ? '#f8fafc' : '#0f172a',
+        lineColor: theme === 'dark' ? '#94a3b8' : '#475569',
         fontSize: '15px'
       }
     });
@@ -492,9 +548,10 @@ function initMermaid(themeName) {
 
 function updateThemeUI(themeName) {
   const btn = document.getElementById('btn-theme');
-  if (btn) {
-    btn.innerHTML = themeName === 'dark' ? sunSvg + ' Claro' : moonSvg + ' Escuro';
-  }
+  if (!btn) return;
+  const theme = normalizeTheme(themeName);
+  const icons = { default: sunSvg, dark: moonSvg, light: sunSvg };
+  btn.innerHTML = (icons[theme] || sunSvg) + ' ' + (themeLabels[theme] || theme);
 }
 
 function activateSlide(idx) {
@@ -560,8 +617,8 @@ document.getElementById('btn-next').addEventListener('click', () => activateSlid
 
 document.getElementById('btn-theme').addEventListener('click', toggleTheme);
 function toggleTheme() {
-  const cur = document.documentElement.dataset.theme || 'dark';
-  const next = cur === 'dark' ? 'light' : 'dark';
+  const cur = normalizeTheme(document.documentElement.dataset.theme || 'default');
+  const next = themeNext[cur] || 'default';
   document.documentElement.dataset.theme = next;
   updateThemeUI(next);
   initMermaid(next);
@@ -641,7 +698,8 @@ function renderAllKaTeX() {
 
 activateSlide(0);
 renderAllKaTeX();
-initMermaid(document.documentElement.dataset.theme || 'dark');
+updateThemeUI('${initialTheme}');
+initMermaid('${initialTheme}');
 renderAllMermaid();
 </script>
 </body>

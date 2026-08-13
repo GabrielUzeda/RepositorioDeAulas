@@ -2,6 +2,7 @@
 import { ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import BaseButton from '@/shared/components/BaseButton.vue';
+import { THEME_LABELS, NEXT_THEME, normalizeTheme, type ThemeKey } from '@/shared/marpTheme';
 
 const props = defineProps<{
   show: boolean;
@@ -34,7 +35,7 @@ const statusBarRef = ref<HTMLDivElement | null>(null);
 // UI Toggle States
 const isPresentMode = ref(false);
 const isAnimMode = ref(true);
-const currentTheme = ref<'dark' | 'light'>('dark');
+const currentTheme = ref<ThemeKey>('default');
 const showThemeMenu = ref(false);
 const showExportMenu = ref(false);
 const showFindBar = ref(false);
@@ -90,7 +91,7 @@ function handleMouseMove() {
 
 // Default Markdown Template
 const DEFAULT_MD = `---
-theme: dark
+theme: default
 title: Marp Next
 animation: fade-up
 animation-stagger: 0.12s
@@ -183,19 +184,20 @@ function getMarkdownIt() {
 }
 
 // Mermaid Initialization
-function initMermaid(themeName: 'dark' | 'light') {
+function initMermaid(themeName: ThemeKey) {
   const w = window as any;
   if (w.mermaid) {
+    const theme = normalizeTheme(themeName);
     w.mermaid.initialize({
       startOnLoad: false,
-      theme: themeName === 'dark' ? 'dark' : 'default',
+      theme: theme === 'dark' ? 'dark' : 'default',
       securityLevel: 'loose',
       flowchart: { useMaxWidth: true, htmlLabels: true, padding: 20 },
       sequence: { useMaxWidth: true, wrap: true },
       themeVariables: {
         primaryColor: '#6366f1',
-        primaryTextColor: themeName === 'dark' ? '#f8fafc' : '#0f172a',
-        lineColor: themeName === 'dark' ? '#94a3b8' : '#475569',
+        primaryTextColor: theme === 'dark' ? '#f8fafc' : '#0f172a',
+        lineColor: theme === 'dark' ? '#94a3b8' : '#475569',
         fontSize: '15px',
       }
     });
@@ -262,9 +264,7 @@ function renderSlides(source: string) {
   slideCountText.value = `${totalSlidesNum} slides`;
   charCountText.value = `${source.length} caracteres`;
 
-  const targetTheme = (global.theme && (global.theme === 'light' || global.theme === 'dark'))
-    ? (global.theme as 'dark' | 'light')
-    : currentTheme.value;
+  const targetTheme = normalizeTheme(global.theme || currentTheme.value);
 
   if (currentTheme.value !== targetTheme) {
     currentTheme.value = targetTheme;
@@ -550,7 +550,7 @@ function setFrontmatterTheme(source: string, newTheme: string) {
   }
 }
 
-function applyTheme(newTheme: 'dark' | 'light', updateEditorText = true) {
+function applyTheme(newTheme: ThemeKey, updateEditorText = true) {
   currentTheme.value = newTheme;
   initMermaid(newTheme);
 
@@ -566,7 +566,7 @@ function applyTheme(newTheme: 'dark' | 'light', updateEditorText = true) {
 }
 
 function toggleTheme() {
-  const nextTheme = currentTheme.value === 'dark' ? 'light' : 'dark';
+  const nextTheme = NEXT_THEME[currentTheme.value];
   applyTheme(nextTheme, true);
 }
 
@@ -743,7 +743,7 @@ function handleTabKey(e: KeyboardEvent) {
 function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): string {
   const { slides, global } = parseSlides(mdContent);
   const docTitle = (global.title && String(global.title).trim()) ? String(global.title).trim() : (titulo || 'Apresentação — Marp Next');
-  const initialTheme = (global.theme && (global.theme === 'light' || global.theme === 'dark')) ? global.theme : 'dark';
+  const initialTheme = normalizeTheme(global.theme);
 
   const md = getMarkdownIt();
 
@@ -777,7 +777,7 @@ function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): stri
 <title>${escapeHtml(docTitle)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&family=JetBrains Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&family=JetBrains Mono:wght@400;500;700&family=Roboto:wght@400;500;700;900&family=Roboto+Slab:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"><${'/script'}>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><${'/script'}>
@@ -809,6 +809,32 @@ function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): stri
   --code-fg: #4338ca;
   --slide-bg: #ffffff;
 }
+
+[data-theme="default"], [data-theme="high-contrast"] {
+  --c-bg:#ffffff; --c-text:#2b2b2b; --c-heading:#1a3a6e; --c-strong:#d62828; --c-border:#1a3a6e; --c-code-bg:#f0f0f0; --c-link:#1a3a6e;
+  --bg-app: #ffffff;
+  --text-primary: #2b2b2b;
+  --text-secondary: #2b2b2b;
+  --text-muted: #2b2b2b;
+  --border: #1a3a6e;
+  --accent: #1a3a6e;
+  --accent-dim: rgba(26, 58, 110, 0.12);
+  --code-fg: #2b2b2b;
+  --slide-bg: #ffffff;
+  font-family: 'Roboto', var(--font-sans), sans-serif;
+}
+[data-theme="default"], [data-theme="high-contrast"] html, [data-theme="default"], [data-theme="high-contrast"] body { font-family: 'Roboto', var(--font-sans), sans-serif; }
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h1,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h2,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h3,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h4,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h5,
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h6 { font-family: 'Roboto Slab', var(--font-sans), serif; }
+[data-theme="default"], [data-theme="high-contrast"] .slide-content h2 { border-bottom: 2px solid #1a3a6e; }
+[data-theme="default"], [data-theme="high-contrast"] .slide-content strong { color: #d62828; }
+[data-theme="default"], [data-theme="high-contrast"] .slide-content code { background: #f0f0f0; color: #2b2b2b; }
+[data-theme="default"], [data-theme="high-contrast"] .slide-content a { color: #1a3a6e; }
+[data-theme="default"], [data-theme="high-contrast"] .slide-content li::marker { color: #1a3a6e; }
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -902,6 +928,9 @@ html, body {
   background: rgba(255, 255, 255, 0.03);
 }
 [data-theme="light"] .slide-content tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.03);
+}
+[data-theme="default"], [data-theme="high-contrast"] .slide-content tr:nth-child(even) {
   background: rgba(0, 0, 0, 0.03);
 }
 
@@ -1021,6 +1050,11 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 10px 30px rgba(0,0,0,0.12);
 }
+[data-theme="default"], [data-theme="high-contrast"] #controls-bar {
+  background: #ffffff;
+  border-color: #1a3a6e;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
 #controls-bar.idle { opacity: 0.15; }
 #controls-bar:hover, #controls-bar.idle:hover { opacity: 1; }
 
@@ -1060,6 +1094,8 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   #controls-bar, #progress-bar { display: none !important; }
   .slide { page-break-after: always !important; break-after: page !important; position: relative !important; opacity: 1 !important; width: 100vw !important; height: 100vh !important; }
   body.anim-mode .slide .slide-content > * { opacity: 1 !important; animation: none !important; }
+  [data-theme="default"], [data-theme="high-contrast"] html, [data-theme="default"], [data-theme="high-contrast"] body { background: #fff !important; color: #2b2b2b !important; }
+  [data-theme="default"], [data-theme="high-contrast"] .slide { background: #fff !important; }
 }
 .mermaid-block {
   width: 100%;
@@ -1127,7 +1163,7 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   <button class="ctrl-btn" id="btn-next" title="Próximo (→ / ↓ / Espaço)">▶</button>
   <span id="counter" style="font-size:12px;font-family:var(--font-mono);color:var(--text-muted);padding:0 6px;">${slides.length > 0 ? '1/' + slides.length : '0/0'}</span>
   <div style="width:1px;height:16px;background:var(--border);"></div>
-  <button class="ctrl-btn" id="btn-theme" title="Alternar Tema (T)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Escuro</button>
+  <button class="ctrl-btn" id="btn-theme" title="Alternar Tema (T)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
   <button class="ctrl-btn" id="btn-font-dec" title="Diminuir Fonte (-)">A-</button>
   <button class="ctrl-btn" id="btn-font-reset" title="Resetar Fonte">100%</button>
   <button class="ctrl-btn" id="btn-font-inc" title="Aumentar Fonte (+)">A+</button>
@@ -1138,6 +1174,14 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
 <script>
 const sunSvg = \`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>\`;
 const moonSvg = \`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>\`;
+
+const themeLabels = ${JSON.stringify(THEME_LABELS)};
+const themeNext = ${JSON.stringify(NEXT_THEME)};
+function normalizeTheme(input) {
+  if (input === 'high-contrast') return 'default';
+  if (input === 'dark' || input === 'light') return input;
+  return 'default';
+}
 
 let currentSlide = 0;
 const totalSlides = ${slides.length};
@@ -1155,16 +1199,17 @@ document.querySelectorAll('.slide-content pre').forEach(pre => {
 
 function initMermaid(themeName) {
   if (window.mermaid) {
+    const theme = normalizeTheme(themeName);
     mermaid.initialize({
       startOnLoad: false,
-      theme: themeName === 'dark' ? 'dark' : 'default',
+      theme: theme === 'dark' ? 'dark' : 'default',
       securityLevel: 'loose',
       flowchart: { useMaxWidth: true, htmlLabels: true, padding: 20 },
       sequence: { useMaxWidth: true, wrap: true },
       themeVariables: {
         primaryColor: '#6366f1',
-        primaryTextColor: themeName === 'dark' ? '#f8fafc' : '#0f172a',
-        lineColor: themeName === 'dark' ? '#94a3b8' : '#475569',
+        primaryTextColor: theme === 'dark' ? '#f8fafc' : '#0f172a',
+        lineColor: theme === 'dark' ? '#94a3b8' : '#475569',
         fontSize: '15px'
       }
     });
@@ -1173,9 +1218,10 @@ function initMermaid(themeName) {
 
 function updateThemeUI(themeName) {
   const btn = document.getElementById('btn-theme');
-  if (btn) {
-    btn.innerHTML = themeName === 'dark' ? sunSvg + ' Claro' : moonSvg + ' Escuro';
-  }
+  if (!btn) return;
+  const theme = normalizeTheme(themeName);
+  const icons = { default: sunSvg, dark: moonSvg, light: sunSvg };
+  btn.innerHTML = (icons[theme] || sunSvg) + ' ' + (themeLabels[theme] || theme);
 }
 
 function activateSlide(idx) {
@@ -1241,8 +1287,8 @@ document.getElementById('btn-next').addEventListener('click', () => activateSlid
 
 document.getElementById('btn-theme').addEventListener('click', toggleTheme);
 function toggleTheme() {
-  const cur = document.documentElement.dataset.theme || 'dark';
-  const next = cur === 'dark' ? 'light' : 'dark';
+  const cur = normalizeTheme(document.documentElement.dataset.theme || 'default');
+  const next = themeNext[cur] || 'default';
   document.documentElement.dataset.theme = next;
   updateThemeUI(next);
   initMermaid(next);
@@ -1322,7 +1368,8 @@ function renderAllKaTeX() {
 
 activateSlide(0);
 renderAllKaTeX();
-initMermaid(document.documentElement.dataset.theme || 'dark');
+updateThemeUI('${initialTheme}');
+initMermaid('${initialTheme}');
 renderAllMermaid();
 <${'/script'}>
 </body>
@@ -1629,7 +1676,7 @@ onBeforeUnmount(() => {
       <!-- Dropdown de Tema (Idêntico ao de Exportar) -->
       <div class="export-dropdown relative">
         <button class="tb-btn" @click.stop="showThemeMenu = !showThemeMenu; showExportMenu = false" title="Alternar tema da apresentação">
-          {{ currentTheme === 'dark' ? '🌙 Dark' : '☀️ Light' }} ▾
+          {{ currentTheme === 'dark' ? '🌙 Dark' : (currentTheme === 'light' ? '☀️ Light' : '☀️ Default') }} ▾
         </button>
         <div v-if="showThemeMenu" class="export-menu theme-menu">
           <button class="export-item" :class="{ active: currentTheme === 'dark' }" @click="applyTheme('dark', true); showThemeMenu = false">
@@ -1637,6 +1684,9 @@ onBeforeUnmount(() => {
           </button>
           <button class="export-item" :class="{ active: currentTheme === 'light' }" @click="applyTheme('light', true); showThemeMenu = false">
             ☀️ Light
+          </button>
+          <button class="export-item" :class="{ active: currentTheme === 'default' }" @click="applyTheme('default', true); showThemeMenu = false">
+            ☀️ Default
           </button>
         </div>
       </div>
@@ -1740,9 +1790,10 @@ onBeforeUnmount(() => {
       <span id="counter" style="font-size:12px;font-family:var(--font-mono);color:var(--text-muted);padding:0 6px;">{{ currentSlide + 1 }}/{{ totalSlides }}</span>
       <div style="width:1px;height:16px;background:var(--border);"></div>
       <button class="ctrl-btn" @click="toggleTheme" title="Alternar Tema (T)">
-        <svg v-if="currentTheme === 'dark'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        {{ currentTheme === 'dark' ? 'Claro' : 'Escuro' }}
+        <svg v-if="currentTheme === 'default'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg v-else-if="currentTheme === 'dark'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        {{ THEME_LABELS[currentTheme] }}
       </button>
       <button class="ctrl-btn" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
       <button class="ctrl-btn" @click="resetFont" title="Resetar Fonte">100%</button>
@@ -1792,6 +1843,36 @@ onBeforeUnmount(() => {
   --accent: #4f46e5;
   --accent-dim: rgba(79,70,229,0.1);
 }
+
+.marpnext-modal-root[data-theme="default"], .marpnext-modal-root[data-theme="high-contrast"] {
+  --c-bg:#ffffff; --c-text:#2b2b2b; --c-heading:#1a3a6e; --c-strong:#d62828; --c-border:#1a3a6e; --c-code-bg:#f0f0f0; --c-link:#1a3a6e;
+  --bg-app: #ffffff;
+  --bg-editor: #ffffff;
+  --bg-preview: #ffffff;
+  --bg-slide: #ffffff;
+  --border: #1a3a6e;
+  --text-primary: #2b2b2b;
+  --text-secondary: #2b2b2b;
+  --text-muted: #2b2b2b;
+  --accent: #1a3a6e;
+  --accent-dim: rgba(26,58,110,0.12);
+}
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content h1),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h1),
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content h2),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h2),
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content h3),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h3),
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content h4),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h4),
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content h5),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h5),
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content h6),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h6) { font-family:'Roboto Slab', var(--font-sans), serif; color:#1a3a6e; }
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content h2),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h2) { border-bottom:2px solid #1a3a6e; }
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content strong),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content strong) { color:#d62828; }
 
 #topbar {
   height: var(--topbar-h);
@@ -1979,6 +2060,8 @@ onBeforeUnmount(() => {
 :deep(.slide-content strong) { color:var(--text-primary); }
 :deep(.slide-content em) { color:var(--yellow); }
 .marpnext-modal-root[data-theme="light"] :deep(.slide-content em) { color:#b45309; }
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content em),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content em) { color:#d62828; }
 :deep(.slide-content blockquote) { border-left:3px solid var(--accent); padding-left:16px; color:var(--text-muted); font-style:italic; }
 :deep(.slide-content hr) { border:none; height:1px; background:var(--border); margin:1rem 0; }
 :deep(.slide-content img) { max-width:100%; border-radius:8px; }
@@ -1988,6 +2071,8 @@ onBeforeUnmount(() => {
 :deep(.slide-content th) { background:var(--accent-dim); font-weight:600; }
 :deep(.slide-content tr:nth-child(even)) { background: rgba(255, 255, 255, 0.03); }
 .marpnext-modal-root[data-theme="light"] :deep(.slide-content tr:nth-child(even)) { background: rgba(0, 0, 0, 0.03); }
+.marpnext-modal-root[data-theme="default"] :deep(.slide-content tr:nth-child(even)),
+.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content tr:nth-child(even)) { background: rgba(0, 0, 0, 0.03); }
 :deep(.slide.centered .slide-content) { align-items:center; text-align:center; }
 
 /* MERMAID STYLING */
@@ -2089,6 +2174,12 @@ onBeforeUnmount(() => {
 .marpnext-modal-root[data-theme="light"] #controls-bar {
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+}
+.marpnext-modal-root[data-theme="default"] #controls-bar,
+.marpnext-modal-root[data-theme="high-contrast"] #controls-bar {
+  background: #ffffff;
+  border-color: #1a3a6e;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
 
 #controls-bar.idle {
