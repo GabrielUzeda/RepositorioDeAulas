@@ -8,6 +8,7 @@ import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
+import BaseBadge from '@/shared/components/BaseBadge.vue';
 
 const props = withDefaults(defineProps<{
   show: boolean;
@@ -145,21 +146,26 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <BaseModal :model-value="props.show && !!props.atividade" @close="emit('close')" max-width="max-w-3xl">
+  <BaseModal
+    :model-value="props.show && !!props.atividade"
+    max-width="max-w-3xl"
+    @close="emit('close')"
+  >
     <template v-if="props.atividade" #header>
-      <div class="flex items-start justify-between gap-4 w-full border-b border-line pb-4">
-        <div>
-          <span class="px-3 py-1 bg-surface-alt text-accent text-xs font-bold rounded-full uppercase tracking-wider">Atividade</span>
-          <h2 class="text-2xl font-bold text-primary mt-2">{{ props.atividade.titulo }}</h2>
-          <p class="text-secondary text-sm mt-1">{{ props.atividade.descricao }}</p>
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-cat-default text-white rounded-md flex items-center justify-center shrink-0 shadow-xs">
+          <span class="material-icons text-[18px]">{{ props.atividade.tipo === 'prova' ? 'quiz' : 'edit_note' }}</span>
         </div>
-        <button @click="emit('close')" type="button" class="text-secondary hover:text-primary p-2 rounded-full hover:bg-surface transition shrink-0">
-          <span class="material-icons">close</span>
-        </button>
+        <h2 class="text-base font-semibold text-primary leading-snug">
+          {{ props.atividade.titulo }}
+        </h2>
       </div>
     </template>
-
     <template v-if="props.atividade">
+      <p v-if="props.atividade.descricao" class="text-secondary text-sm mb-6 leading-relaxed">
+        {{ props.atividade.descricao }}
+      </p>
+
       <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Identificação do Aluno -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-line">

@@ -14,6 +14,8 @@ import RoletaModal from '@/aluno/components/RoletaModal.vue';
 import MinigameModal from '@/aluno/components/MinigameModal.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
+import BackButton from '@/shared/components/BackButton.vue';
 import type { Curso, Disciplina, Aula, Atividade, Question } from '@/shared/types';
 import { useToast } from '@/shared/composables/useToast';
 
@@ -60,7 +62,6 @@ async function handleSelectCurso(curso: Curso) {
 async function handleSelectDisciplina(disciplina: Disciplina) {
   selectedDisciplina.value = disciplina;
 
-  // Verificar se o curso exige senha e se já está concedido
   if (selectedCurso.value?.senha) {
     const savedToken = await secureGet(`curso_access_${selectedCurso.value.id}`);
     if (savedToken !== 'granted') {
@@ -96,7 +97,6 @@ async function handlePasswordSubmit(password: string) {
       const curso = pendingCurso.value;
       pendingCurso.value = null;
 
-      // Se já estava selecionando uma disciplina específica
       if (selectedDisciplina.value && selectedDisciplina.value.curso_id === curso.id) {
         await handleSelectDisciplina(selectedDisciplina.value);
       } else {
@@ -177,41 +177,87 @@ function goBack() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-surface">
-    <!-- Header -->
-    <header class="bg-accent text-white shadow-lg py-6 px-4 sm:px-8">
-      <div class="max-w-6xl mx-auto flex justify-between items-center">
-        <div class="flex items-center space-x-3">
-          <span class="material-icons text-3xl">school</span>
-          <span>
-            <h1 class="text-2xl font-bold tracking-tight">Área do Aluno</h1>
-            <p class="text-secondary text-xs mt-0.5">Repositório de Aulas e Atividades Interativas</p>
-          </span>
+  <div class="min-h-screen bg-canvas">
+
+    <!-- ── Header ──────────────────────────────────────── -->
+    <header class="sticky top-0 z-30 border-b border-line bg-surface-alt/80 backdrop-blur-md">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+
+        <!-- Logo -->
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="flex-shrink-0 w-8 h-8 rounded-md bg-accent flex items-center justify-center">
+            <span class="material-icons text-white text-[18px]">school</span>
+          </div>
+          <div class="min-w-0 hidden sm:block">
+            <p class="text-sm font-semibold text-primary leading-none truncate">Área do Aluno</p>
+            <p class="text-xs text-muted leading-none mt-0.5 truncate">Repositório de Aulas</p>
+          </div>
         </div>
-        <div class="flex items-center space-x-2">
+
+        <!-- Breadcrumb de navegação — visibilidade do estado (NNGroup heurística #1) -->
+        <nav
+          v-if="activeView !== 'cursos'"
+          class="flex-1 flex items-center gap-1.5 text-xs text-muted overflow-hidden px-2"
+          aria-label="Navegação"
+        >
+          <button
+            @click="() => { activeView = 'cursos'; selectedCurso = null; selectedDisciplina = null; }"
+            class="hover:text-accent transition-colors duration-base truncate flex-shrink-0"
+          >Cursos</button>
+
+          <span class="material-icons text-[14px] flex-shrink-0" aria-hidden="true">chevron_right</span>
+
+          <template v-if="selectedCurso">
+            <button
+              v-if="activeView === 'content'"
+              @click="() => { activeView = 'disciplinas'; selectedDisciplina = null; }"
+              class="hover:text-accent transition-colors duration-base truncate"
+            >{{ selectedCurso.nome }}</button>
+            <span v-else class="truncate text-primary font-medium">{{ selectedCurso.nome }}</span>
+          </template>
+
+          <template v-if="activeView === 'content' && selectedDisciplina">
+            <span class="material-icons text-[14px] flex-shrink-0" aria-hidden="true">chevron_right</span>
+            <span class="truncate text-primary font-medium">{{ selectedDisciplina.nome }}</span>
+          </template>
+        </nav>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-2 flex-shrink-0">
           <ThemeToggle />
-          <router-link to="/login" class="px-4 py-2 bg-accent hover:opacity-90 rounded-xl text-white text-sm font-semibold transition flex items-center space-x-2">
-          <span class="material-icons text-sm">admin_panel_settings</span>
-          <span>Área Restrita</span>
-        </router-link>
-      </div>
+          <router-link
+            to="/login"
+            class="inline-flex items-center gap-1.5 rounded-sm border border-line bg-surface px-3 py-1.5 text-xs font-medium text-secondary hover:border-line-strong hover:text-primary transition-all duration-base"
+          >
+            <span class="material-icons text-[14px]">lock</span>
+            <span class="hidden sm:inline">Área Restrita</span>
+          </router-link>
+        </div>
       </div>
     </header>
 
-    <!-- Main Container -->
-    <main class="max-w-6xl mx-auto px-4 sm:px-8 py-8">
-      <!-- Cursos View -->
-      <section v-if="activeView === 'cursos'" class="space-y-6">
-        <h2 class="text-2xl font-bold text-primary">Selecione seu Curso</h2>
+    <!-- ── Main ───────────────────────────────────────── -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
 
-        <div v-if="cursoStore.isLoading" class="text-center py-12 text-secondary">
-          <span class="material-icons animate-spin text-3xl">sync</span>
-          <p class="mt-2 text-sm">Carregando cursos...</p>
+      <!-- ─ Cursos ─ -->
+      <section v-if="activeView === 'cursos'" class="space-y-6">
+        <div>
+          <h1 class="text-xl font-bold text-primary tracking-tight">Selecione seu Curso</h1>
+          <p class="text-sm text-muted mt-0.5">Escolha o curso que deseja acessar</p>
         </div>
 
-        <EmptyState v-else-if="cursoStore.cursos.length === 0" message="Nenhum curso disponível no momento." />
+        <div v-if="cursoStore.isLoading" class="flex justify-center py-16">
+          <BaseSpinner label="Carregando cursos..." />
+        </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <EmptyState
+          v-else-if="cursoStore.cursos.length === 0"
+          icon="school"
+          title="Nenhum curso disponível"
+          message="Não há cursos publicados no momento. Verifique com seu professor."
+        />
+
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <CursoCard
             v-for="curso in cursoStore.cursos"
             :key="curso.id"
@@ -221,26 +267,29 @@ function goBack() {
         </div>
       </section>
 
-      <!-- Disciplinas View -->
+      <!-- ─ Disciplinas ─ -->
       <section v-else-if="activeView === 'disciplinas'" class="space-y-6">
-        <div class="flex items-center space-x-4 border-b pb-4">
-          <button @click="goBack" class="p-2 bg-surface-alt border border-line hover:bg-surface rounded-xl text-secondary transition flex items-center">
-            <span class="material-icons">arrow_back</span>
-          </button>
-          <div>
-            <h2 class="text-2xl font-bold text-primary">{{ selectedCurso?.nome }}</h2>
-            <p class="text-secondary text-xs mt-0.5">{{ selectedCurso?.descricao }}</p>
+        <!-- Cabeçalho da seção com botão voltar -->
+        <div class="flex items-center gap-3">
+          <BackButton @click="goBack" />
+          <div class="min-w-0">
+            <h1 class="text-xl font-bold text-primary tracking-tight truncate">{{ selectedCurso?.nome }}</h1>
+            <p v-if="selectedCurso?.descricao" class="text-xs text-muted mt-0.5 line-clamp-1">{{ selectedCurso.descricao }}</p>
           </div>
         </div>
 
-        <div v-if="cursoStore.isLoading" class="text-center py-12 text-secondary">
-          <span class="material-icons animate-spin text-3xl">sync</span>
-          <p class="mt-2 text-sm">Carregando disciplinas...</p>
+        <div v-if="cursoStore.isLoading" class="flex justify-center py-16">
+          <BaseSpinner label="Carregando disciplinas..." />
         </div>
 
-        <EmptyState v-else-if="cursoStore.disciplinas.length === 0" message="Nenhuma disciplina disponível neste curso." />
+        <EmptyState
+          v-else-if="cursoStore.disciplinas.length === 0"
+          icon="menu_book"
+          title="Nenhuma disciplina"
+          message="Este curso ainda não possui disciplinas publicadas."
+        />
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <DisciplinaCard
             v-for="disciplina in cursoStore.disciplinas"
             :key="disciplina.id"
@@ -250,40 +299,72 @@ function goBack() {
         </div>
       </section>
 
-      <!-- Content View (Aulas & Atividades) -->
+      <!-- ─ Conteúdo (Aulas & Atividades) ─ -->
       <section v-else class="space-y-6">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
-          <div class="flex items-center space-x-4">
-          <button @click="goBack" class="p-2 bg-surface-alt border border-line hover:bg-surface rounded-xl text-secondary transition flex items-center">
-              <span class="material-icons">arrow_back</span>
-            </button>
-            <div>
-            <h2 class="text-2xl font-bold text-primary">{{ selectedDisciplina?.nome }}</h2>
-            <p class="text-secondary text-xs mt-0.5">{{ selectedDisciplina?.descricao }}</p>
+        <!-- Header com tabs -->
+        <div class="flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
+          <div class="flex items-center gap-3">
+            <BackButton @click="goBack" />
+            <div class="min-w-0">
+              <h1 class="text-xl font-bold text-primary tracking-tight truncate">{{ selectedDisciplina?.nome }}</h1>
+              <p v-if="selectedDisciplina?.descricao" class="text-xs text-muted mt-0.5 line-clamp-1">{{ selectedDisciplina.descricao }}</p>
             </div>
           </div>
 
-          <!-- Tabs -->
-          <div class="flex bg-surface-alt p-1 rounded-xl">
+          <!-- Tab bar — destaque de aba ativo com underline (mais claro que bg) -->
+          <div
+            class="flex items-center gap-1 bg-surface rounded-md p-1 border border-line self-start sm:self-auto flex-shrink-0"
+            role="tablist"
+            aria-label="Tipo de conteúdo"
+          >
             <button
-              @click="activeTab = 'aulas'"
-              :class="['px-5 py-2 rounded-lg text-sm font-bold transition', activeTab === 'aulas' ? 'bg-surface-alt text-accent shadow-sm' : 'text-secondary hover:text-primary']"
+              role="tab"
+              :aria-selected="activeTab === 'aulas'"
+              @click="activeTab = 'atividades' === activeTab ? 'aulas' : 'aulas'"
+              class="relative px-4 py-1.5 rounded text-xs font-semibold transition-all duration-base"
+              :class="activeTab === 'aulas'
+                ? 'bg-surface-alt text-primary shadow-xs'
+                : 'text-muted hover:text-secondary'"
             >
-              Aulas ({{ cursoStore.aulas.length }})
+              Aulas
+              <span
+                class="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                :class="activeTab === 'aulas'
+                  ? 'bg-accent-light text-accent-text'
+                  : 'bg-surface text-muted'"
+              >{{ cursoStore.aulas.length }}</span>
             </button>
+
             <button
+              role="tab"
+              :aria-selected="activeTab === 'atividades'"
               @click="activeTab = 'atividades'"
-              :class="['px-5 py-2 rounded-lg text-sm font-bold transition', activeTab === 'atividades' ? 'bg-surface-alt text-accent shadow-sm' : 'text-secondary hover:text-primary']"
+              class="relative px-4 py-1.5 rounded text-xs font-semibold transition-all duration-base"
+              :class="activeTab === 'atividades'
+                ? 'bg-surface-alt text-primary shadow-xs'
+                : 'text-muted hover:text-secondary'"
             >
-              Atividades ({{ cursoStore.atividades.length }})
+              Atividades
+              <span
+                class="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                :class="activeTab === 'atividades'
+                  ? 'bg-accent-light text-accent-text'
+                  : 'bg-surface text-muted'"
+              >{{ cursoStore.atividades.length }}</span>
             </button>
           </div>
         </div>
 
-        <!-- Aulas Tab -->
-        <div v-if="activeTab === 'aulas'">
-          <EmptyState v-if="cursoStore.aulas.length === 0" message="Nenhuma aula disponível nesta disciplina." />
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Aba: Aulas -->
+        <div v-if="activeTab === 'aulas'" role="tabpanel" aria-label="Aulas">
+          <EmptyState
+            v-if="cursoStore.aulas.length === 0"
+            icon="play_lesson"
+            title="Nenhuma aula"
+            message="Ainda não há aulas publicadas nesta disciplina."
+          />
+          <!-- Grid de cards para aulas -->
+          <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <AulaCard
               v-for="aula in cursoStore.aulas"
               :key="aula.id"
@@ -293,10 +374,15 @@ function goBack() {
           </div>
         </div>
 
-        <!-- Atividades Tab -->
-        <div v-else>
-          <EmptyState v-if="cursoStore.atividades.length === 0" message="Nenhuma atividade disponível nesta disciplina." />
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Aba: Atividades -->
+        <div v-else role="tabpanel" aria-label="Atividades">
+          <EmptyState
+            v-if="cursoStore.atividades.length === 0"
+            icon="assignment"
+            title="Nenhuma atividade"
+            message="Ainda não há atividades publicadas nesta disciplina."
+          />
+          <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <AtividadeCard
               v-for="atividade in cursoStore.atividades"
               :key="atividade.id"
@@ -309,7 +395,7 @@ function goBack() {
       </section>
     </main>
 
-    <!-- Modals -->
+    <!-- ── Modals ─────────────────────────────────────── -->
     <PasswordModal
       :show="showPasswordModal"
       @close="showPasswordModal = false"

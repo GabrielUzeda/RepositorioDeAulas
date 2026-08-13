@@ -42,13 +42,22 @@ export class MinigamePlayer {
             // The game expects: { enunciado, alternativas }
 
             if (data.questions) {
-                this.questions = data.questions.map(q => ({
-                    enunciado: q.content || q.title,
-                    alternativas: q.options.map(o => o.text),
-                    feedbacks: q.options.map(o => o.feedback || '')
-                }));
+                this.questions = data.questions.map(q => {
+                    const correctOpt = (q.options || []).find(o => o.isCorrect) || (q.options ? q.options[0] : null);
+                    return {
+                        enunciado: q.content || q.title,
+                        alternativas: (q.options || []).map(o => o.text),
+                        respostaCorreta: correctOpt ? correctOpt.text : '',
+                        feedbacks: (q.options || []).map(o => o.feedback || '')
+                    };
+                });
             } else if (data.perguntas) {
-                this.questions = data.perguntas;
+                this.questions = data.perguntas.map(p => ({
+                    enunciado: p.enunciado || p.pergunta,
+                    alternativas: p.alternativas || [],
+                    respostaCorreta: p.respostaCorreta || p.correta || (p.alternativas ? p.alternativas[0] : ''),
+                    feedbacks: p.feedbacks || []
+                }));
             }
         } catch (e) {
             console.error("Error parsing minigame data", e);
@@ -71,14 +80,14 @@ export class MinigamePlayer {
                     <h1 id="mg-phase-title" class="text-4xl text-white text-center mb-10 shadow-cyan-500/50 drop-shadow-[0_0_10px_rgba(0,212,255,0.8)] max-w-2xl px-4">
                         __MG_PHASE_TITLE__
                     </h1>
-                    <button id="mg-btn-start" class="px-10 py-4 bg-transparent border-2 border-[#00d4ff] text-[#00d4ff] text-xl font-bold uppercase cursor-pointer transition-all hover:bg-[#00d4ff] hover:text-black hover:shadow-[0_0_30px_#00d4ff] hover:scale-105">
+                    <button id="mg-btn-start" class="px-10 py-4 bg-transparent border-2 border-[#00d4ff] text-[#00d4ff] text-xl font-bold uppercase cursor-pointer transition-all hover:bg-[#00d4ff] hover:text-black hover:shadow-[0_0_30px_#00d4ff] hover:scale-105 mb-6">
                         INICIAR SISTEMA
                     </button>
-                    <button id="mg-btn-close-start" class="mt-8 text-gray-500 hover:text-white transition text-sm">
-                        Sair da Simulação
+                    <button id="mg-btn-rank" class="mb-4 text-[#00d4ff] hover:text-white transition text-sm uppercase tracking-wider border-b border-transparent hover:border-[#00d4ff]">
+                        EXIBIR RANKING
                     </button>
-                    <button id="mg-btn-rank" class="mt-4 text-[#00d4ff] hover:text-white transition text-sm uppercase tracking-wider border-b border-transparent hover:border-[#00d4ff]">
-                        Exibir Ranking
+                    <button id="mg-btn-close-start" class="text-gray-400 hover:text-red-400 transition text-sm uppercase tracking-wider border-b border-transparent hover:border-red-400">
+                        SAIR DA SIMULAÇÃO
                     </button>
                 </div>
 
@@ -86,11 +95,11 @@ export class MinigamePlayer {
                 <div id="mg-game-over" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/95">
                     <h1 class="text-6xl text-red-600 mb-2 drop-shadow-[0_0_20px_red] tracking-tighter">DESTRUÍDO</h1>
                     <p class="text-gray-400 text-xl mb-8">Falha Lógica Fatal.</p>
-                    <button id="mg-btn-restart" class="px-10 py-4 bg-transparent border-2 border-[#00d4ff] text-[#00d4ff] text-xl font-bold uppercase cursor-pointer transition-all hover:bg-[#00d4ff] hover:text-black hover:shadow-[0_0_30px_#00d4ff]">
-                        Reiniciar
+                    <button id="mg-btn-restart" class="px-10 py-4 bg-transparent border-2 border-[#00d4ff] text-[#00d4ff] text-xl font-bold uppercase cursor-pointer transition-all hover:bg-[#00d4ff] hover:text-black hover:shadow-[0_0_30px_#00d4ff] mb-6">
+                        REINICIAR
                     </button>
-                    <button id="mg-btn-close-over" class="mt-6 text-gray-500 hover:text-white transition">
-                        Sair
+                    <button id="mg-btn-close-over" class="text-gray-400 hover:text-red-400 transition text-sm uppercase tracking-wider border-b border-transparent hover:border-red-400">
+                        SAIR DA SIMULAÇÃO
                     </button>
                 </div>
 
@@ -101,8 +110,7 @@ export class MinigamePlayer {
                     <div id="mg-final-score" class="text-5xl text-white font-bold mb-8">0000</div>
                     
                     <div class="flex flex-col gap-4 items-center w-4/5 max-w-xs mb-8">
-                        <input type="text" id="mg-player-name" class="w-full p-4 bg-[#111] border-2 border-[#333] text-[#00ff66] font-mono text-center text-xl uppercase outline-none focus:border-[#00ff66] focus:shadow-[0_0_15px_rgba(0,255,102,0.2)] transition-all placeholder-gray-700" placeholder="SEU NOME" maxlength="12" autocomplete="off">
-                        <input type="email" id="mg-player-email" class="w-full p-4 bg-[#111] border-2 border-[#333] text-[#00ff66] font-mono text-center text-xl outline-none focus:border-[#00ff66] focus:shadow-[0_0_15px_rgba(0,255,102,0.2)] transition-all placeholder-gray-700" placeholder="SEU E-MAIL" autocomplete="email">
+                        <input type="text" id="mg-player-name" class="w-full p-4 bg-[#111] border-2 border-[#333] text-[#00ff66] font-mono text-center text-xl uppercase outline-none focus:border-[#00ff66] focus:shadow-[0_0_15px_rgba(0,255,102,0.2)] transition-all placeholder-gray-700" placeholder="NOME DE BATALHA" maxlength="16" autocomplete="off">
                         <button id="mg-btn-submit" class="w-full px-10 py-4 bg-transparent border-2 border-[#00ff66] text-[#00ff66] text-xl font-bold uppercase cursor-pointer transition-all hover:bg-[#00ff66] hover:text-black hover:shadow-[0_0_30px_#00ff66] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#444] disabled:hover:shadow-none">
                             REGISTRAR MARCO
                         </button>
@@ -116,8 +124,8 @@ export class MinigamePlayer {
                         <button id="mg-btn-rank-victory" class="px-6 py-3 border border-purple-500 text-purple-500 text-sm font-bold uppercase hover:bg-purple-500 hover:text-white transition-colors">
                             EXIBIR RANKING
                         </button>
-                         <button id="mg-btn-finish" class="px-6 py-3 border border-gray-600 text-gray-400 text-sm font-bold uppercase hover:bg-white hover:text-black transition-colors">
-                            Finalizar
+                        <button id="mg-btn-finish" class="px-6 py-3 border border-gray-600 text-gray-400 text-sm font-bold uppercase hover:bg-red-600 hover:border-red-600 hover:text-white transition-colors">
+                            SAIR DA SIMULAÇÃO
                         </button>
                     </div>
                 </div>
@@ -147,8 +155,6 @@ export class MinigamePlayer {
                     </div>
                 </div>
 
-                <!-- Feedback da opção escolhida (toast) -->
-                <div id="mg-feedback" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-surface-alt border-l-4 border-accent p-3 text-sm text-secondary rounded-r max-w-md pointer-events-none text-left shadow-lg"></div>
             </div>
             
             <style>
@@ -248,25 +254,36 @@ export class MinigamePlayer {
         this.stars = [];
         this.currentEnemy = null;
         this.laser = null;
+        this.lastTime = 0;
 
-        this.loop();
+        this.loop(performance.now());
     }
 
-    loop() {
+    loop(timestamp?: number) {
         if (!this.isPlaying) return;
-        this.update();
+
+        const now = timestamp || performance.now();
+        if (!this.lastTime) this.lastTime = now;
+        let dt = (now - this.lastTime) / 1000;
+        this.lastTime = now;
+
+        // Limita o dt para evitar saltos bruscos se o jogador alternar de aba
+        if (dt > 0.05) dt = 0.05;
+        const dtFactor = dt * 60;
+
+        this.update(dtFactor);
         this.draw();
-        this.animationFrameId = requestAnimationFrame(() => this.loop());
+        this.animationFrameId = requestAnimationFrame((ts) => this.loop(ts));
     }
 
-    update() {
+    update(dtFactor: number = 1) {
         if (this.gameOver) return;
 
         // Enemy Logic
         if (!this.currentEnemy) {
             this.spawnEnemy();
         } else {
-            this.currentEnemy.update();
+            this.currentEnemy.update(dtFactor);
 
             // Check Collision / Game Over
             const dist = Math.hypot(this.player.x - this.currentEnemy.x, this.player.y - this.currentEnemy.y);
@@ -277,11 +294,12 @@ export class MinigamePlayer {
 
             // Update UI Bar
             const dangerPct = (this.currentEnemy.y / (this.player.y - 50)) * 100;
-            document.getElementById('mg-danger-bar').style.width = Math.min(100, dangerPct) + '%';
+            const bar = document.getElementById('mg-danger-bar');
+            if (bar) bar.style.width = Math.min(100, dangerPct) + '%';
         }
 
         // Player Logic
-        this.player.x += (this.player.targetX - this.player.x) * 0.15;
+        this.player.x += (this.player.targetX - this.player.x) * (0.15 * dtFactor);
 
         // Laser Logic
         if (this.laser) {
@@ -368,75 +386,114 @@ export class MinigamePlayer {
         }
 
         const difficulty = Math.floor(this.score / 500);
-        // Dynamic speed based on screen height
-        // Taller screens need faster speed to feel same "pressure", shorter screens slower
-        const heightModifier = this.h / 800; // Normalized to 800px base
-        this.currentEnemy = new Enemy(difficulty, this.w, heightModifier);
+        this.currentEnemy = new Enemy(difficulty, this.w);
 
+        this.enemyMistakes = 0;
         this.controlsLocked = false;
 
         const qBox = document.getElementById('mg-q-box');
         const errBanner = document.getElementById('mg-error-banner');
-        qBox.classList.remove('opacity-0', 'translate-y-[100px]');
-        errBanner.classList.add('hidden');
-        document.getElementById('mg-impact-overlay').classList.remove('opacity-30');
+        if (qBox) {
+            qBox.classList.remove('opacity-0', 'translate-y-[100px]', '!border-[#ffaa00]', '!shadow-[0_0_25px_rgba(255,170,0,0.5)]', '!border-red-600', '!shadow-[0_0_30px_rgba(255,0,0,0.7)]');
+            qBox.classList.add('border-[#00d4ff]', 'shadow-[0_0_20px_rgba(0,212,255,0.2)]');
+        }
+        if (errBanner) {
+            errBanner.className = 'hidden bg-[#ffaa00] text-black font-black text-sm uppercase p-2 animate-pulse';
+            errBanner.innerText = '';
+        }
+        const impact = document.getElementById('mg-impact-overlay');
+        if (impact) impact.classList.remove('opacity-30');
 
         // Option Buttons Reset
         const opts = document.getElementById('mg-options-area');
-        if (opts) Array.from(opts.children).forEach(b => b.classList.remove('opacity-40', 'pointer-events-none'));
+        if (opts) Array.from(opts.children).forEach(b => b.classList.remove('opacity-40', 'pointer-events-none', '!bg-[#aa0000]', '!border-red-600', '!text-white'));
 
         this.loadNextQuestion();
     }
 
     loadNextQuestion() {
         const q = this.availableQuestions.pop();
+        if (!q) return;
+
         document.getElementById('mg-q-text').innerText = q.enunciado;
         const area = document.getElementById('mg-options-area');
         area.innerHTML = '';
 
-        // If no options? (Robustness)
         const opts = q.alternativas && q.alternativas.length > 0 ? [...q.alternativas] : ['Verdadeiro', 'Falso'];
         opts.sort(() => Math.random() - 0.5);
 
         this.currentOpts = opts;
-        this.currentFeedbacks = q.feedbacks || [];
-        const fbEl = document.getElementById('mg-feedback');
-        if (fbEl) fbEl.classList.add('hidden');
 
         opts.forEach(opt => {
             const btn = document.createElement('button');
-            // Tailwind + Custom Style mix
-            btn.className = 'w-full bg-[#1a1a1a] border border-[#444] p-3 text-[#00d4ff] font-bold text-base cursor-pointer font-mono hover:bg-[#2a2a2a] hover:border-white hover:text-white hover:scale-[1.02] hover:shadow-[0_0_10px_rgba(0,212,255,0.3)] transition-all active:scale-95';
+            btn.className = 'opt-btn w-full bg-[#1a1a1a] border border-[#444] p-3 text-[#00d4ff] font-bold text-base cursor-pointer font-mono hover:bg-[#2a2a2a] hover:border-white hover:text-white hover:scale-[1.02] hover:shadow-[0_0_10px_rgba(0,212,255,0.3)] transition-all active:scale-95';
             btn.textContent = opt;
             btn.onpointerdown = (e) => {
                 e.preventDefault();
-                this.answerChosen(opt);
+                this.answerChosen(opt, q.respostaCorreta, btn);
             };
             area.appendChild(btn);
         });
     }
 
-    answerChosen(selected) {
-        if (this.controlsLocked || this.gameOver) return;
+    answerChosen(selected, correct, btnElement) {
+        if (this.controlsLocked || this.gameOver || !this.currentEnemy) return;
 
-        // A correção NÃO depende do gabarito local (anti-cheat). A resposta do aluno é
-        // registrada/confirmada já no servidor; aqui apenas registramos a escolha para
-        // o contexto do jogador e seguimos a mecânica de tempo (pontuação por desempenho
-        // de posição, não por acerto local).
-        this.lastChosenAnswer = selected;
-        document.getElementById('mg-q-box').classList.add('opacity-0', 'translate-y-[100px]');
-        this.player.targetX = this.currentEnemy.x;
-        setTimeout(() => this.shootLaser(), 250);
+        const isCorrect = correct !== '' && (
+            selected === correct ||
+            selected.trim().toLowerCase() === correct.trim().toLowerCase()
+        );
 
-        // Mostra o feedback da opção escolhida (texto informativo do professor)
-        const idx = this.currentOpts.indexOf(selected);
-        const fb = idx >= 0 ? (this.currentFeedbacks[idx] || '') : '';
-        const fbEl = document.getElementById('mg-feedback');
-        if (fb && fbEl) {
-            fbEl.textContent = fb;
-            fbEl.classList.remove('hidden');
-            clearTimeout(this.feedbackTimer);
-            this.feedbackTimer = setTimeout(() => fbEl.classList.add('hidden'), 2000);
+        if (isCorrect) {
+            this.lastChosenAnswer = selected;
+            document.getElementById('mg-q-box').classList.add('opacity-0', 'translate-y-[100px]');
+            this.player.targetX = this.currentEnemy.x;
+            setTimeout(() => this.shootLaser(), 200);
+        } else {
+            this.enemyMistakes++;
+            this.handleMistake(btnElement);
+        }
+    }
+
+    handleMistake(btnElement) {
+        if (btnElement) {
+            btnElement.classList.add('!bg-[#aa0000]', '!border-red-600', '!text-white', 'pointer-events-none');
+        }
+
+        const qBox = document.getElementById('mg-q-box');
+        const banner = document.getElementById('mg-error-banner');
+
+        if (qBox) {
+            qBox.classList.remove('mg-shake');
+            void qBox.offsetWidth;
+            qBox.classList.add('mg-shake');
+        }
+
+        if (this.enemyMistakes === 1 && this.currentEnemy) {
+            this.currentEnemy.speed *= 2.0;
+            this.currentEnemy.color = '#ffff00';
+            if (qBox) {
+                qBox.classList.remove('border-[#00d4ff]', 'shadow-[0_0_20px_rgba(0,212,255,0.2)]', '!border-red-600', '!shadow-[0_0_30px_rgba(255,0,0,0.7)]');
+                qBox.classList.add('!border-[#ffaa00]', '!shadow-[0_0_25px_rgba(255,170,0,0.5)]');
+            }
+            if (banner) {
+                banner.innerText = "ALERTA: VELOCIDADE CRÍTICA!";
+                banner.className = "bg-[#ffaa00] text-black font-black text-sm uppercase p-2 text-center animate-pulse block";
+            }
+        } else if (this.enemyMistakes >= 2 && this.currentEnemy) {
+            this.controlsLocked = true;
+            this.currentEnemy.speed = Math.max(this.currentEnemy.speed * 5.0, 14);
+            if (qBox) {
+                qBox.classList.remove('border-[#00d4ff]', '!border-[#ffaa00]', 'shadow-[0_0_20px_rgba(0,212,255,0.2)]', '!shadow-[0_0_25px_rgba(255,170,0,0.5)]');
+                qBox.classList.add('!border-red-600', '!shadow-[0_0_30px_rgba(255,0,0,0.7)]');
+            }
+            if (banner) {
+                banner.innerText = "ERRO FATAL! CONTROLES TRAVADOS!";
+                banner.className = "bg-red-600 text-white font-black text-sm uppercase p-2 text-center animate-pulse block";
+            }
+            document.querySelectorAll('#mg-options-area button').forEach(b => b.classList.add('opacity-40', 'pointer-events-none'));
+            const impact = document.getElementById('mg-impact-overlay');
+            if (impact) impact.classList.add('opacity-30');
         }
     }
 
@@ -501,14 +558,15 @@ export class MinigamePlayer {
 
         // Reset inputs
         const nameIn = document.getElementById('mg-player-name');
-        const emailIn = document.getElementById('mg-player-email');
+        if (nameIn) {
+            nameIn.value = '';
+            nameIn.disabled = false;
+        }
         const submitBtn = document.getElementById('mg-btn-submit');
-        nameIn.value = '';
-        if (emailIn) emailIn.value = '';
-        nameIn.disabled = false;
-        if (emailIn) emailIn.disabled = false;
-        submitBtn.disabled = false;
-        submitBtn.innerText = "REGISTRAR MARCO";
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "REGISTRAR MARCO";
+        }
     }
 
     resetGame() {
@@ -521,37 +579,31 @@ export class MinigamePlayer {
         this.currentEnemy = null;
         this.particles = [];
         this.isPlaying = false;
-        const fbEl = document.getElementById('mg-feedback');
-        if (fbEl) fbEl.classList.add('hidden');
     }
 
     submitScore() {
         if (this.isSubmitting) return;
 
         const nameInput = document.getElementById('mg-player-name');
-        const emailInput = document.getElementById('mg-player-email');
         const submitBtn = document.getElementById('mg-btn-submit');
         const rankMsg = document.getElementById('mg-rank-msg');
-        const playerName = nameInput.value.trim();
-        const playerEmail = emailInput ? emailInput.value.trim() : '';
+        const playerName = nameInput ? nameInput.value.trim() : '';
 
-        if (playerName === "") {
-            rankMsg.style.color = "red";
-            rankMsg.innerText = "NOME INVÁLIDO";
-            return;
-        }
-        if (playerEmail === "") {
-            rankMsg.style.color = "red";
-            rankMsg.innerText = "E-MAIL INVÁLIDO";
+        if (!playerName) {
+            if (rankMsg) {
+                rankMsg.style.color = "#ff4444";
+                rankMsg.innerText = "INFORME SEU NOME DE BATALHA";
+            }
             return;
         }
 
         this.isSubmitting = true;
-        nameInput.disabled = true;
-        if (emailInput) emailInput.disabled = true;
-        submitBtn.disabled = true;
-        submitBtn.innerText = "TRANSMITINDO...";
-        rankMsg.innerText = "";
+        if (nameInput) nameInput.disabled = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerText = "TRANSMITINDO...";
+        }
+        if (rankMsg) rankMsg.innerText = "";
 
         const headers = { 'Content-Type': 'application/json' };
 
@@ -566,35 +618,27 @@ export class MinigamePlayer {
             }),
             headers
         })
-            .then(() => {
-                return fetch('/api/submeter-resposta', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        atividade_id: this.activityData.id,
-                        aluno_nome: playerName,
-                        aluno_email: playerEmail,
-                        respostas: JSON.stringify({ tipo: 'minigame', pontuacao: this.score }),
-                        senha_curso: this.senhaCurso,
-                        senha_atividade: this.senhaAtividade
-                    }),
-                    headers
-                });
-            })
-            .then(() => {
-                submitBtn.innerText = "DADOS ENVIADOS";
+        .then(res => res.json())
+        .then(() => {
+            if (submitBtn) submitBtn.innerText = "MARCO REGISTRADO!";
+            if (rankMsg) {
                 rankMsg.style.color = "#00ff66";
-                rankMsg.innerText = "UPLOAD CONCLUÍDO";
-            })
-            .catch((error) => {
-                console.error('Erro no envio:', error);
-                submitBtn.innerText = "ERRO";
-                rankMsg.style.color = "red";
-                rankMsg.innerText = "FALHA NA TRANSMISSÃO";
-                this.isSubmitting = false;
+                rankMsg.innerText = "NOME DE BATALHA REGISTRADO NO RANKING!";
+            }
+        })
+        .catch(err => {
+            console.error("Erro ao registrar ranking", err);
+            this.isSubmitting = false;
+            if (nameInput) nameInput.disabled = false;
+            if (submitBtn) {
                 submitBtn.disabled = false;
-                nameInput.disabled = false;
-                if (emailInput) emailInput.disabled = false;
-            });
+                submitBtn.innerText = "REGISTRAR MARCO";
+            }
+            if (rankMsg) {
+                rankMsg.style.color = "#ff4444";
+                rankMsg.innerText = "FALHA NA CONEXÃO. TENTE NOVAMENTE.";
+            }
+        });
     }
 
     showRanking() {
@@ -670,20 +714,20 @@ export class MinigamePlayer {
 
 // --- HELPER CLASSES ---
 class Enemy {
-    constructor(difficultyMod, w, heightModifier) {
+    constructor(difficultyMod, w) {
         this.size = 60;
         this.x = Math.random() * (w - 120) + 60;
         this.y = -70;
-        // Adjust speed based on screen height so difficulty feels relative
-        this.baseSpeed = (0.5 + (difficultyMod * 0.1)) * heightModifier;
+        // Velocidade base absoluta padronizada, independente da altura/resolução da tela
+        this.baseSpeed = 0.5 + (difficultyMod * 0.1);
         this.speed = this.baseSpeed;
         this.color = '#ff0055';
         this.wobble = Math.random() * Math.PI;
     }
-    update() {
-        this.y += this.speed;
-        this.wobble += 0.05;
-        this.x += Math.sin(this.wobble) * 0.5;
+    update(dtFactor: number = 1) {
+        this.y += this.speed * dtFactor;
+        this.wobble += 0.05 * dtFactor;
+        this.x += Math.sin(this.wobble) * (0.5 * dtFactor);
     }
     draw(ctx) {
         ctx.save();

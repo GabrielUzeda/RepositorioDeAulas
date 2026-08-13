@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Atividade } from '@/shared/types';
+import BaseContentCard from '@/shared/components/BaseContentCard.vue';
 
 const props = defineProps<{
   atividade: Atividade;
@@ -9,62 +10,58 @@ const props = defineProps<{
 
 const emit = defineEmits<(e: 'click', atividade: Atividade) => void>();
 
-const typeStyles = computed(() => {
+const typeConfig = computed(() => {
   switch (props.atividade.tipo) {
     case 'prova':
-      return { bg: 'bg-surface-alt', text: 'text-accent', cover: '/static/prova.webp' };
+      return {
+        color: 'bg-cat-default',
+        icon: 'quiz',
+        label: 'Prova',
+        badgeVariant: 'accent' as const,
+      };
     case 'minigame':
-      return { bg: 'bg-cat-minigame-bg', text: 'text-cat-minigame', cover: '/static/minigame.webp' };
+      return {
+        color: 'bg-cat-minigame',
+        icon: 'sports_esports',
+        label: 'Minigame',
+        badgeVariant: 'warning' as const,
+      };
     case 'roleta':
-      return { bg: 'bg-cat-roleta-bg', text: 'text-cat-roleta', cover: '/static/roleta.webp' };
+      return {
+        color: 'bg-cat-roleta',
+        icon: 'casino',
+        label: 'Roleta',
+        badgeVariant: 'warning' as const,
+      };
     case 'reforco':
-      return { bg: 'bg-cat-reforco-bg', text: 'text-cat-reforco', cover: '/static/reforco.webp' };
+      return {
+        color: 'bg-cat-reforco',
+        icon: 'fitness_center',
+        label: 'Reforço',
+        badgeVariant: 'success' as const,
+      };
     default:
-      return { bg: 'bg-cat-default-bg', text: 'text-cat-default', cover: '/static/normal.webp' };
+      return {
+        color: 'bg-cat-default',
+        icon: 'assignment',
+        label: 'Discursiva',
+        badgeVariant: 'accent' as const,
+      };
   }
-});
-
-const isMatIcon = computed(() => {
-  const icon = props.atividade.icone;
-  return icon && (isNaN(Number(icon)) || icon.length > 2);
 });
 </script>
 
 <template>
-  <div
+  <BaseContentCard
+    :title="props.atividade.titulo"
+    :description="props.atividade.descricao || 'Atividade interativa disponível.'"
+    :icon="props.atividade.icone || typeConfig.icon"
+    :color="typeConfig.color"
+    :badge-text="typeConfig.label"
+    :badge-variant="typeConfig.badgeVariant"
+    action-text="Iniciar atividade"
+    action-icon="arrow_forward"
+    :is-locked="props.isLocked"
     @click="emit('click', props.atividade)"
-    class="bg-surface-alt rounded-2xl overflow-hidden shadow-md hover:shadow-xl cursor-pointer card-hover relative border border-line flex flex-col justify-between"
-  >
-    <!-- Cover Header -->
-    <div class="h-28 bg-surface-alt relative overflow-hidden">
-      <img
-        :src="typeStyles.cover"
-        :alt="props.atividade.titulo"
-        class="w-full h-full object-cover opacity-90 hover:scale-105 transition-transform duration-500"
-        @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
-      />
-      <div class="absolute top-3 left-3">
-        <div :class="[typeStyles.bg, 'p-2 rounded-xl shadow-md flex items-center justify-center']">
-          <span v-if="props.isLocked" :class="['material-icons text-sm', typeStyles.text]">lock</span>
-          <span v-else-if="isMatIcon" :class="['material-icons text-sm', typeStyles.text]">{{ props.atividade.icone }}</span>
-          <span v-else :class="[typeStyles.text, 'font-bold text-xs']">{{ props.atividade.icone || '00' }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Content Area -->
-    <div class="p-5 space-y-2 flex-1 flex flex-col justify-between">
-      <div>
-        <h3 class="text-base font-bold text-primary line-clamp-1">{{ props.atividade.titulo }}</h3>
-        <p class="text-secondary text-xs mt-1 line-clamp-2">
-          {{ props.isLocked ? 'Conteúdo protegido por senha.' : (props.atividade.descricao || 'Atividade interativa.') }}
-        </p>
-      </div>
-
-      <div class="flex items-center justify-between pt-3 border-t border-line text-xs font-semibold text-accent">
-        <span>Acessar Atividade</span>
-        <span class="material-icons text-sm">arrow_forward</span>
-      </div>
-    </div>
-  </div>
+  />
 </template>

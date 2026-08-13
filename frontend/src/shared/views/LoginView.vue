@@ -3,6 +3,8 @@ import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/shared/stores/auth';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
+import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseInput from '@/shared/components/BaseInput.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -32,43 +34,95 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="relative min-h-screen bg-surface text-primary flex items-center justify-center p-4">
+  <div class="relative min-h-screen bg-canvas flex items-center justify-center p-4">
+
+    <!-- Theme toggle — top right -->
     <div class="absolute top-4 right-4">
       <ThemeToggle />
     </div>
-    <div class="bg-surface-alt rounded-3xl p-8 max-w-md w-full shadow-2xl border border-line space-y-6">
-      <div class="text-center space-y-2">
-        <span class="material-icons text-5xl text-accent">admin_panel_settings</span>
-        <h2 class="text-2xl font-bold text-primary">Painel de Acesso</h2>
-        <p class="text-secondary text-sm">Digite suas credenciais para acessar o painel do professor ou do administrador.</p>
+
+    <!-- Decorative background shape -->
+    <div
+      class="absolute inset-0 overflow-hidden pointer-events-none"
+      aria-hidden="true"
+    >
+      <div class="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-accent opacity-5" />
+      <div class="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-accent opacity-5" />
+    </div>
+
+    <!-- Card de login -->
+    <div class="relative w-full max-w-sm">
+      <!-- Logo / Identidade -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-accent shadow-lg mb-4">
+          <span class="material-icons text-white text-2xl">school</span>
+        </div>
+        <h1 class="text-xl font-bold text-primary tracking-tight">RepositorioDeAulas</h1>
+        <p class="text-xs text-muted mt-1">Área restrita — professores e administradores</p>
       </div>
 
-      <form @submit.prevent="handleLogin" class="space-y-4">
-        <div v-if="route.query.expired" class="p-3.5 bg-surface-alt border border-line text-danger text-xs rounded-xl flex items-center space-x-2.5">
-          <span class="material-icons text-danger text-base shrink-0">schedule</span>
-          <span class="text-secondary">Sua sessão expirou por razões de segurança. Por favor, entre novamente.</span>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-secondary mb-1">E-mail</label>
-          <input v-model="emailInput" required type="email" placeholder="professor@local" class="w-full px-4 py-2.5 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent" />
-        </div>
+      <!-- Sessão expirada -->
+      <div
+        v-if="route.query.expired"
+        class="mb-5 flex items-start gap-2.5 rounded-md border border-warning bg-warning-light px-4 py-3 text-xs text-warning-text"
+        role="alert"
+      >
+        <span class="material-icons text-[16px] flex-shrink-0 mt-0.5">schedule</span>
+        <span>Sua sessão expirou por razões de segurança. Por favor, entre novamente.</span>
+      </div>
 
-        <div>
-          <label class="block text-sm font-medium text-secondary mb-1">Senha</label>
-          <input v-model="passwordInput" required type="password" placeholder="••••••••" class="w-full px-4 py-2.5 bg-surface border border-line rounded-xl text-primary outline-none focus:ring-2 focus:ring-accent" />
-        </div>
+      <!-- Form Card -->
+      <div class="bg-surface-alt rounded-xl border border-line shadow-lg p-6">
+        <form @submit.prevent="handleLogin" class="space-y-4" novalidate>
+          <BaseInput
+            v-model="emailInput"
+            label="E-mail"
+            type="email"
+            placeholder="professor@escola.edu"
+            icon="mail"
+            required
+          />
 
-        <div v-if="loginError" class="p-3 bg-surface-alt border border-danger text-danger text-sm rounded-xl">
-          {{ loginError }}
-        </div>
+          <BaseInput
+            v-model="passwordInput"
+            label="Senha"
+            type="password"
+            placeholder="••••••••"
+            icon="lock"
+            required
+          />
 
-        <button type="submit" :disabled="authStore.isLoading" class="w-full py-3 bg-accent hover:opacity-90 text-white font-bold rounded-xl shadow-lg transition">
-          {{ authStore.isLoading ? 'Entrando...' : 'Entrar' }}
-        </button>
-      </form>
+          <!-- Erro de login -->
+          <div
+            v-if="loginError"
+            class="flex items-start gap-2 rounded-md border border-danger bg-danger-light px-3.5 py-3 text-xs text-danger-text"
+            role="alert"
+          >
+            <span class="material-icons text-[16px] flex-shrink-0 mt-0.5 text-danger">error</span>
+            {{ loginError }}
+          </div>
 
-      <div class="text-center pt-2">
-        <router-link to="/" class="text-accent hover:opacity-80 text-sm font-medium">← Voltar para Área do Aluno</router-link>
+          <BaseButton
+            type="submit"
+            variant="primary"
+            size="md"
+            block
+            :loading="authStore.isLoading"
+          >
+            {{ authStore.isLoading ? 'Entrando...' : 'Entrar' }}
+          </BaseButton>
+        </form>
+      </div>
+
+      <!-- Link de volta -->
+      <div class="text-center mt-5">
+        <router-link
+          to="/"
+          class="inline-flex items-center gap-1.5 text-xs text-muted hover:text-accent transition-colors duration-base"
+        >
+          <span class="material-icons text-[14px]">arrow_back</span>
+          Voltar para Área do Aluno
+        </router-link>
       </div>
     </div>
   </div>

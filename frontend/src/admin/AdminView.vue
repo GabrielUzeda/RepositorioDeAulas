@@ -5,9 +5,13 @@ import { useAuthStore } from '@/shared/stores/auth';
 import { apiClient } from '@/shared/api/client';
 import ProfessorFormModal from '@/admin/components/ProfessorFormModal.vue';
 import CursoFormModal from '@/admin/components/CursoFormModal.vue';
-import ThemeToggle from '../shared/components/ThemeToggle.vue';
-import ConfirmDialog from '../shared/components/ConfirmDialog.vue';
-import EmptyState from '../shared/components/EmptyState.vue';
+import ThemeToggle from '@/shared/components/ThemeToggle.vue';
+import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
+import EmptyState from '@/shared/components/EmptyState.vue';
+import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseBadge from '@/shared/components/BaseBadge.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
+import BackButton from '@/shared/components/BackButton.vue';
 import type { Professor, Curso } from '@/shared/types';
 
 const router = useRouter();
@@ -147,7 +151,6 @@ async function handleSaveCurso(payload: { nome: string; descricao: string; cor: 
       return;
     }
   }
-
   showCursoModal.value = false;
   await fetchCursos();
 }
@@ -180,97 +183,128 @@ function logout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-surface text-primary">
-    <header class="bg-surface-alt border-b border-line py-4 px-8">
-      <div class="max-w-6xl mx-auto flex justify-between items-center">
-        <div class="flex items-center space-x-3">
-          <span class="material-icons text-accent text-3xl">shield</span>
+  <div class="min-h-screen bg-canvas text-primary">
+    <!-- Header -->
+    <header class="sticky top-0 z-30 border-b border-line bg-surface-alt/80 backdrop-blur-md">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-md bg-accent flex items-center justify-center text-white">
+            <span class="material-icons text-[18px]">shield</span>
+          </div>
           <div>
-            <h1 class="text-xl font-bold">Painel do Administrador</h1>
-            <p class="text-secondary text-xs">{{ authStore.professor?.email || 'Administrador' }}</p>
+            <h1 class="text-sm font-semibold text-primary leading-none">Painel Administrador</h1>
+            <p class="text-xs text-muted leading-none mt-0.5">{{ authStore.professor?.email || 'Administrador' }}</p>
           </div>
         </div>
 
-        <div class="flex items-center space-x-4">
-          <router-link to="/" class="text-secondary hover:text-primary text-sm font-medium">Ver Área do Aluno</router-link>
-          <button @click="logout" class="px-4 py-2 bg-surface hover:bg-surface-alt rounded-xl text-sm font-semibold transition text-primary">Sair</button>
+        <div class="flex items-center gap-3">
+          <BackButton label="Área do Aluno" @click="router.push('/')" />
           <ThemeToggle />
+          <BaseButton variant="secondary" size="xs" @click="logout">
+            <span class="material-icons text-[14px]">logout</span>
+            <span>Sair</span>
+          </BaseButton>
         </div>
       </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-8 py-8">
-      <div v-if="error" class="mb-6 p-3 bg-surface-alt border border-danger text-danger text-sm rounded-xl">
-        {{ error }}
+    <!-- Main Container -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <div v-if="error" class="mb-6 p-3.5 bg-danger-light border border-danger text-danger-text text-xs rounded-md flex items-center gap-2" role="alert">
+        <span class="material-icons text-[16px]">error</span>
+        <span>{{ error }}</span>
       </div>
 
-      <!-- Tabs -->
-      <div class="flex bg-surface-alt p-1 rounded-xl mb-6 w-fit border border-line">
+      <!-- Tabs Bar -->
+      <div class="flex items-center gap-1 bg-surface-alt rounded-md p-1 border border-line mb-6 w-fit" role="tablist">
         <button
+          role="tab"
+          :aria-selected="activeTab === 'professores'"
           @click="activeTab = 'professores'"
-          :class="['px-5 py-2 rounded-lg text-sm font-bold transition', activeTab === 'professores' ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary']"
+          class="px-4 py-1.5 rounded text-xs font-semibold transition-all duration-base"
+          :class="activeTab === 'professores' ? 'bg-surface text-primary shadow-xs' : 'text-muted hover:text-secondary'"
         >
-          Professores
+          Professores ({{ professores.length }})
         </button>
+
         <button
+          role="tab"
+          :aria-selected="activeTab === 'cursos'"
           @click="activeTab = 'cursos'"
-          :class="['px-5 py-2 rounded-lg text-sm font-bold transition', activeTab === 'cursos' ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary']"
+          class="px-4 py-1.5 rounded text-xs font-semibold transition-all duration-base"
+          :class="activeTab === 'cursos' ? 'bg-surface text-primary shadow-xs' : 'text-muted hover:text-secondary'"
         >
-          Cursos
+          Cursos ({{ cursos.length }})
         </button>
       </div>
 
       <!-- Professores Tab -->
-      <div v-if="activeTab === 'professores'">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-2xl font-bold text-primary">Professores</h2>
-          <button @click="openCreateProfessor" class="px-5 py-2.5 bg-accent hover:opacity-90 text-white font-bold rounded-xl shadow-lg flex items-center space-x-2">
-            <span class="material-icons text-sm">add</span>
+      <div v-if="activeTab === 'professores'" class="space-y-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-xl font-bold text-primary tracking-tight">Professores Cadastrados</h2>
+            <p class="text-xs text-muted mt-0.5">Gerencie os acessos e permissões da equipe docente</p>
+          </div>
+          <BaseButton variant="primary" size="sm" @click="openCreateProfessor">
+            <span class="material-icons text-[16px]">add</span>
             <span>Novo Professor</span>
-          </button>
+          </BaseButton>
         </div>
 
-        <div class="bg-surface-alt rounded-2xl border border-line overflow-hidden">
-          <table class="w-full text-sm">
+        <div v-if="loading" class="flex justify-center py-16">
+          <BaseSpinner label="Carregando professores..." />
+        </div>
+
+        <EmptyState
+          v-else-if="professores.length === 0"
+          icon="people"
+          title="Nenhum professor cadastrado"
+          message="Clique no botão acima para adicionar o primeiro professor."
+        />
+
+        <div v-else class="bg-surface-alt rounded-md border border-line overflow-hidden shadow-xs">
+          <table class="w-full text-xs text-left">
             <thead>
-              <tr class="bg-surface text-left text-secondary">
-                <th class="px-6 py-3 font-semibold">Nome</th>
-                <th class="px-6 py-3 font-semibold">E-mail</th>
-                <th class="px-6 py-3 font-semibold">Perfil</th>
-                <th class="px-6 py-3 font-semibold">Cursos</th>
-                <th class="px-6 py-3 font-semibold text-right">Ações</th>
+              <tr class="bg-surface border-b border-line text-muted font-semibold uppercase tracking-wider">
+                <th class="px-5 py-3">Nome</th>
+                <th class="px-5 py-3">E-mail</th>
+                <th class="px-5 py-3">Perfil</th>
+                <th class="px-5 py-3">Cursos</th>
+                <th class="px-5 py-3 text-right">Ações</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-if="loading">
-                <td colspan="5" class="px-6 py-8 text-center text-secondary">Carregando...</td>
-              </tr>
-              <tr v-else-if="professores.length === 0">
-                <td colspan="5" class="px-6 py-8 text-center text-secondary">Nenhum professor cadastrado.</td>
-              </tr>
-              <tr v-for="prof in professores" :key="prof.id" class="border-t border-line hover:bg-surface">
-                <td class="px-6 py-3 text-primary font-medium">{{ prof.nome }}</td>
-                <td class="px-6 py-3 text-secondary">{{ prof.email }}</td>
-                <td class="px-6 py-3">
-                  <span :class="prof.role === 'admin' ? 'bg-accent text-white' : 'bg-surface text-secondary'" class="px-2.5 py-0.5 rounded-md text-xs font-bold uppercase">
+            <tbody class="divide-y divide-line">
+              <tr v-for="prof in professores" :key="prof.id" class="hover:bg-surface/50 transition-colors">
+                <td class="px-5 py-3 font-semibold text-primary">{{ prof.nome }}</td>
+                <td class="px-5 py-3 text-secondary">{{ prof.email }}</td>
+                <td class="px-5 py-3">
+                  <BaseBadge :variant="prof.role === 'admin' ? 'accent' : 'secondary'">
                     {{ prof.role }}
-                  </span>
+                  </BaseBadge>
                 </td>
-                <td class="px-6 py-3">
-                  <span v-if="prof.role === 'admin'" class="px-2.5 py-0.5 bg-surface-alt border border-line text-secondary text-xs font-bold rounded-md uppercase">
+                <td class="px-5 py-3">
+                  <BaseBadge v-if="prof.role === 'admin'" variant="accent" :dot="true">
                     Acesso Total
-                  </span>
-                  <span v-else class="px-2.5 py-0.5 bg-surface border border-line text-accent text-xs font-bold rounded-md uppercase">
+                  </BaseBadge>
+                  <BaseBadge v-else variant="neutral">
                     {{ prof.total_cursos ?? 0 }} {{ prof.total_cursos === 1 ? 'curso' : 'cursos' }}
-                  </span>
+                  </BaseBadge>
                 </td>
-                <td class="px-6 py-3">
-                  <div class="flex justify-end space-x-1">
-                    <button @click="openEditProfessor(prof)" class="p-2 text-secondary hover:text-primary hover:bg-surface rounded-lg">
-                      <span class="material-icons text-sm">edit</span>
+                <td class="px-5 py-3 text-right">
+                  <div class="flex justify-end gap-1">
+                    <button
+                      @click="openEditProfessor(prof)"
+                      class="p-1.5 rounded text-muted hover:text-primary hover:bg-surface transition-colors"
+                      title="Editar professor"
+                    >
+                      <span class="material-icons text-[16px]">edit</span>
                     </button>
-                    <button @click="onDeleteProfessorClick(prof)" class="p-2 text-danger hover:text-danger hover:bg-surface rounded-lg">
-                      <span class="material-icons text-sm">delete</span>
+                    <button
+                      @click="onDeleteProfessorClick(prof)"
+                      class="p-1.5 rounded text-muted hover:text-danger hover:bg-surface transition-colors"
+                      title="Excluir professor"
+                    >
+                      <span class="material-icons text-[16px]">delete</span>
                     </button>
                   </div>
                 </td>
@@ -281,51 +315,81 @@ function logout() {
       </div>
 
       <!-- Cursos Tab -->
-      <div v-else>
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-2xl font-bold text-primary">Cursos</h2>
-          <button @click="openCreateCurso" class="px-5 py-2.5 bg-accent hover:opacity-90 text-white font-bold rounded-xl shadow-lg flex items-center space-x-2">
-            <span class="material-icons text-sm">add</span>
+      <div v-else class="space-y-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-xl font-bold text-primary tracking-tight">Cursos Disponíveis</h2>
+            <p class="text-xs text-muted mt-0.5">Gerencie os cursos e atribua professores responsáveis</p>
+          </div>
+          <BaseButton variant="primary" size="sm" @click="openCreateCurso">
+            <span class="material-icons text-[16px]">add</span>
             <span>Novo Curso</span>
-          </button>
+          </BaseButton>
         </div>
 
-        <div v-if="loading" class="text-center py-12 text-secondary">Carregando...</div>
-        <EmptyState v-else-if="cursos.length === 0" message="Nenhum curso cadastrado." />
+        <div v-if="loading" class="flex justify-center py-16">
+          <BaseSpinner label="Carregando cursos..." />
+        </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <EmptyState
+          v-else-if="cursos.length === 0"
+          icon="school"
+          title="Nenhum curso cadastrado"
+          message="Clique no botão acima para criar o primeiro curso."
+        />
+
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div
             v-for="curso in cursos"
             :key="curso.id"
-            class="bg-surface-alt rounded-2xl p-6 border border-line hover:border-accent transition shadow-lg flex flex-col justify-between"
+            class="bg-surface-alt rounded-md border border-line p-5 shadow-xs card-hover flex flex-col justify-between"
           >
             <div>
-              <div class="flex justify-between items-start mb-4">
-                <div :class="[curso.cor || 'bg-accent', 'p-3 rounded-full w-12 h-12 flex items-center justify-center text-white font-bold']">
-                  <span class="material-icons">{{ curso.icone || 'school' }}</span>
+              <div class="flex justify-between items-start mb-3">
+                <div
+                  class="w-10 h-10 rounded-md flex items-center justify-center text-white shadow-xs"
+                  :class="curso.cor || 'bg-accent'"
+                >
+                  <span class="material-icons text-[20px]">{{ curso.icone || 'school' }}</span>
                 </div>
-                <div class="flex space-x-1">
-                  <button @click="openEditCurso(curso)" class="p-2 text-secondary hover:text-primary hover:bg-surface rounded-lg">
-                    <span class="material-icons text-sm">edit</span>
+                <div class="flex gap-1">
+                  <button
+                    @click="openEditCurso(curso)"
+                    class="p-1.5 rounded text-muted hover:text-primary hover:bg-surface transition-colors"
+                    title="Editar curso"
+                  >
+                    <span class="material-icons text-[16px]">edit</span>
                   </button>
-                  <button @click="onDeleteCursoClick(curso)" class="p-2 text-danger hover:text-danger hover:bg-surface rounded-lg">
-                    <span class="material-icons text-sm">delete</span>
+                  <button
+                    @click="onDeleteCursoClick(curso)"
+                    class="p-1.5 rounded text-muted hover:text-danger hover:bg-surface transition-colors"
+                    title="Excluir curso"
+                  >
+                    <span class="material-icons text-[16px]">delete</span>
                   </button>
                 </div>
               </div>
 
-              <h3 class="text-lg font-bold text-primary">{{ curso.nome }}</h3>
-              <p class="text-secondary text-sm mt-1 line-clamp-2">{{ curso.descricao || 'Sem descrição.' }}</p>
-              <div class="flex items-center space-x-4 mt-3 text-xs text-secondary">
-                <span>{{ curso.total_disciplinas ?? 0 }} disciplinas</span>
-                <span>{{ curso.total_professores ?? 0 }} professores</span>
-              </div>
+              <h3 class="text-sm font-semibold text-primary line-clamp-1">{{ curso.nome }}</h3>
+              <p class="text-xs text-muted mt-1 line-clamp-2 leading-relaxed">{{ curso.descricao || 'Sem descrição.' }}</p>
+            </div>
+
+            <div class="flex items-center gap-3 pt-3 mt-3 border-t border-line text-xs text-muted">
+              <span class="flex items-center gap-1">
+                <span class="material-icons text-[14px]">menu_book</span>
+                {{ curso.total_disciplinas ?? 0 }} disciplinas
+              </span>
+              <span class="flex items-center gap-1">
+                <span class="material-icons text-[14px]">person</span>
+                {{ curso.total_professores ?? 0 }} professores
+              </span>
             </div>
           </div>
         </div>
       </div>
     </main>
 
+    <!-- Modals -->
     <ProfessorFormModal :show="showProfessorModal" :professor="editingProfessor" @close="showProfessorModal = false" @submit="handleSaveProfessor" />
     <CursoFormModal :show="showCursoModal" :curso="editingCurso" :professores="professores" @close="showCursoModal = false" @submit="handleSaveCurso" />
 

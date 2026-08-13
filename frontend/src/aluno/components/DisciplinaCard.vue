@@ -1,39 +1,22 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { Disciplina } from '@/shared/types';
+import BaseContentCard from '@/shared/components/BaseContentCard.vue';
 
 const props = defineProps<{
   disciplina: Disciplina;
 }>();
 
 const emit = defineEmits<(e: 'select', disciplina: Disciplina) => void>();
-
-const isMatIcon = computed(() => {
-  const icon = props.disciplina.icone;
-  return icon && (isNaN(Number(icon)) || icon.length > 2);
-});
 </script>
 
 <template>
-  <div
+  <BaseContentCard
+    :title="props.disciplina.nome"
+    :description="props.disciplina.descricao || 'Clique para visualizar as aulas e atividades.'"
+    :icon="props.disciplina.icone || 'menu_book'"
+    :color="props.disciplina.cor || 'bg-accent'"
+    action-text="Ver conteúdo"
+    action-icon="arrow_forward"
     @click="emit('select', props.disciplina)"
-    class="bg-surface-alt rounded-2xl p-6 shadow-md hover:shadow-xl cursor-pointer card-hover relative flex flex-col justify-between border border-line"
-  >
-    <div class="absolute top-0 left-0 transform -translate-x-1/4 -translate-y-1/4">
-      <div :class="[props.disciplina.cor || 'bg-accent', 'p-3 rounded-full w-12 h-12 flex items-center justify-center text-white shadow-md']">
-        <span v-if="isMatIcon" class="material-icons">{{ props.disciplina.icone }}</span>
-        <b v-else class="text-lg">{{ props.disciplina.icone || '00' }}</b>
-      </div>
-    </div>
-
-    <div class="mt-4">
-      <div class="flex justify-between items-start">
-        <h3 class="text-xl font-semibold text-primary tracking-tight">{{ props.disciplina.nome }}</h3>
-        <span class="material-icons text-secondary">chevron_right</span>
-      </div>
-      <p class="text-secondary text-sm mt-2 line-clamp-3 whitespace-pre-line">
-        {{ props.disciplina.descricao || 'Clique para visualizar as aulas e atividades.' }}
-      </p>
-    </div>
-  </div>
+  />
 </template>

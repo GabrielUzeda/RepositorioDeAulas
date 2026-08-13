@@ -1,24 +1,19 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import { apiClient } from '@/shared/api/client';
-import { secureGet, secureSet } from '@/shared/utils/storage';
 import { useToast } from '@/shared/composables/useToast';
 import type { Question, Option, Atividade } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
+import BaseBadge from '@/shared/components/BaseBadge.vue';
 
 const props = withDefaults(defineProps<{
   show: boolean;
   questions: Question[];
   title?: string;
   atividade?: Atividade | null;
-  senhaCurso?: string;
-  senhaAtividade?: string;
 }>(), {
   title: '',
-  senhaCurso: '',
-  senhaAtividade: '',
 });
 
 const emit = defineEmits<{
@@ -26,28 +21,20 @@ const emit = defineEmits<{
   (e: 'complete'): void;
 }>();
 
+const { success } = useToast();
+
 const availableQuestions = ref<Question[]>([]);
 const currentQuestion = ref<Question | null>(null);
-const currentQuestionIndex = ref(-1);
 const selectedOption = ref<Option | null>(null);
 
 const answeredCount = ref(0);
+const acertosCount = ref(0);
 
 const isAnimating = ref(false);
 const highlightedIndex = ref(-1);
 
 const showQuestionModal = ref(false);
-const isSubmitted = ref(false);
-
-const isSubmitting = ref(false);
-const isCorrectionDone = ref(false);
-const errorMessage = ref('');
-const { success } = useToast();
-const resultAcertos = ref<number | null>(null);
-const resultTotal = ref<number | null>(null);
-const resultPontuacao = ref<number | null>(null);
-
-const answers = ref<Record<number, number>>({});
+const isAnswerConfirmed = ref(false);
 
 watch(
   () => props.show,
@@ -61,144 +48,84 @@ watch(
 );
 
 function resetGame() {
-  availableQuestions.value = [...props.questions];
+  availableQuestions.value = [...(props.questions || [])];
   currentQuestion.value = null;
-  currentQuestionIndex.value = -1;
   selectedOption.value = null;
   answeredCount.value = 0;
+  acertosCount.value = 0;
   isAnimating.value = false;
   highlightedIndex.value = -1;
   showQuestionModal.value = false;
-  isSubmitted.value = false;
-  isSubmitting.value = false;
-  isCorrectionDone.value = false;
-  errorMessage.value = '';
-  resultAcertos.value = null;
-  resultTotal.value = null;
-  resultPontuacao.value = null;
+  isAnswerConfirmed.value = false;
 }
 
 const remainingCount = computed(() => availableQuestions.value.length);
-const isCompleted = computed(() => availableQuestions.value.length === 0);
+const isCompleted = computed(() => props.questions.length > 0 && availableQuestions.value.length === 0);
+
+function isOptCorrect(opt: any): boolean {
+  if (!opt) return false;
+  return Boolean(opt.correct || opt.isCorrect || opt.correta);
+}
 
 function animateSpin() {
   if (availableQuestions.value.length === 0 || isAnimating.value) return;
 
   isAnimating.value = true;
   const total = availableQuestions.value.length;
-
   let currentIndex = Math.floor(Math.random() * total);
-  let delay = 50;
-  const maxDelay = 400;
-  const acceleration = 1.1;
-  const minIterations = Math.max(25, total * 3);
-  let iterations = 0;
+  let delay = 40;
+  let steps = 0;
+  const maxSteps = Math.min(18, total * 4 + 8);
 
-  function loop() {
+  function step() {
     highlightedIndex.value = currentIndex;
-    iterations++;
+    steps++;
 
-    if (iterations < minIterations || delay < maxDelay) {
+    if (steps < maxSteps) {
       currentIndex = (currentIndex + 1) % total;
-      delay = Math.min(delay * acceleration, maxDelay);
-      setTimeout(loop, delay);
+      delay = Math.min(delay * 1.12, 220);
+      setTimeout(step, delay);
     } else {
       setTimeout(() => {
-        currentQuestion.value = availableQuestions.value[currentIndex];
-        currentQuestionIndex.value = props.questions.indexOf(availableQuestions.value[currentIndex]);
+        const selectedQuestion = availableQuestions.value[currentIndex];
+        currentQuestion.value = selectedQuestion;
         selectedOption.value = null;
-        isSubmitted.value = false;
-        showQuestionModal.value = true;
+        isAnswerConfirmed.value = false;
         isAnimating.value = false;
-      }, 500);
+        showQuestionModal.value = true;
+      }, 250);
     }
   }
 
-  loop();
+  step();
 }
 
 function handleSelectOption(opt: Option) {
-  if (isSubmitted.value) return;
+  if (isAnswerConfirmed.value) return;
   selectedOption.value = opt;
 }
 
 function handleConfirmAnswer() {
   if (!selectedOption.value || !currentQuestion.value) return;
-  isSubmitted.value = true;
+  isAnswerConfirmed.value = true;
 
-  if (currentQuestionIndex.value >= 0) {
-    const optIndex = currentQuestion.value.options?.indexOf(selectedOption.value) ?? -1;
-    if (optIndex >= 0) answers.value[currentQuestionIndex.value] = optIndex;
+  if (isOptCorrect(selectedOption.value)) {
+    acertosCount.value++;
   }
 
-  // Question is always removed from the pool after the student answers;
-  // correctness is determined server-side, not via a local gabarito.
+  // Remove a pergunta sorteada do pool disponível
   availableQuestions.value = availableQuestions.value.filter(
     (q) => q !== currentQuestion.value
   );
   answeredCount.value++;
 }
 
-async function handleNextQuestion() {
+function handleNextQuestion() {
   showQuestionModal.value = false;
   if (availableQuestions.value.length === 0) {
-    await submitAnswers();
-  }
-}
-
-async function submitAnswers() {
-  if (isSubmitting.value) return;
-  if (!props.atividade) {
+    success(`Roleta Concluída! Acertos: ${acertosCount.value} / ${props.questions.length}`);
     emit('complete');
-    return;
   }
-  isSubmitting.value = true;
-  errorMessage.value = '';
-
-  const [nome, email] = await Promise.all([
-    secureGet('alunoNome'),
-    secureGet('alunoEmail'),
-  ]);
-
-  const respostas = props.questions.map((q, idx) => ({
-    questao: q.title || q.content,
-    resposta: answers.value[idx] !== undefined ? q.options?.[answers.value[idx]]?.text : null
-  }));
-
-  const res = await apiClient.post('/submeter-resposta', {
-    atividade_id: props.atividade.id,
-    aluno_nome: nome,
-    aluno_email: email,
-    respostas: JSON.stringify(respostas).trim(),
-    senha_curso: props.senhaCurso,
-    senha_atividade: props.senhaAtividade
-  });
-
-  isSubmitting.value = false;
-
-  if (res.success) {
-    isCorrectionDone.value = true;
-    if (res.data && res.data.consulta_token) {
-      secureSet(`consulta_token_${props.atividade.id}`, String(res.data.consulta_token));
-    }
-    if (res.data && res.data.acertos !== undefined) resultAcertos.value = res.data.acertos;
-    if (res.data && res.data.total !== undefined) resultTotal.value = res.data.total;
-    if (res.data && res.data.pontuacao !== undefined) resultPontuacao.value = res.data.pontuacao;
-    let msg = 'Atividade concluída!';
-    if (resultAcertos.value !== null) {
-      const total = resultTotal.value ?? props.questions.length;
-      msg += ` Acertos: ${resultAcertos.value} / ${total}`;
-      if (resultPontuacao.value !== null) msg += ` — Pontuação: ${resultPontuacao.value}%`;
-    }
-    success(msg);
-    emit('complete');
-  } else {
-    errorMessage.value = res.error || 'Erro ao registrar respostas.';
-  }
-}
-
-function closeAfterSubmit() {
-  emit('close');
 }
 </script>
 
@@ -206,37 +133,41 @@ function closeAfterSubmit() {
   <BaseModal
     :model-value="props.show"
     @close="emit('close')"
-    :title="props.title || 'Roleta'"
     max-width="max-w-4xl"
   >
-    <div class="space-y-6 relative">
-      <!-- Badge + counters (moved from manual header) -->
-      <div class="flex justify-between items-center flex-wrap gap-3">
-        <div class="flex items-center space-x-3">
-          <div class="p-3 bg-cat-roleta-bg text-cat-roleta rounded-2xl flex items-center justify-center">
-            <span class="material-icons leading-none">casino</span>
-          </div>
-          <span class="px-3 py-1 bg-cat-roleta-bg text-cat-roleta text-xs font-bold rounded-full uppercase tracking-wider">Roleta do Conhecimento</span>
+    <template #header>
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-cat-roleta-bg text-cat-roleta rounded-md flex items-center justify-center shrink-0 shadow-xs">
+          <span class="material-icons text-[18px]">casino</span>
         </div>
+        <h2 class="text-base font-semibold text-primary leading-snug">
+          {{ props.atividade?.titulo || props.title || 'Roleta do Conhecimento' }}
+        </h2>
+      </div>
+    </template>
 
-        <div class="flex items-center space-x-4 bg-surface px-4 py-2 rounded-xl text-xs font-bold">
-          <div class="flex items-center space-x-1 text-success" title="Respondidas">
-            <span class="material-icons text-sm">check_circle</span>
-            <span>{{ answeredCount }}</span>
-          </div>
-          <div class="w-px h-4 bg-line"></div>
-          <div class="flex items-center space-x-1 text-cat-roleta" title="Restantes">
-            <span class="material-icons text-sm">help</span>
-            <span>{{ remainingCount }}</span>
-          </div>
+    <div class="space-y-6 relative">
+      <!-- Counters bar -->
+      <div class="flex justify-between items-center flex-wrap gap-3 pb-2 border-b border-line">
+        <span class="text-xs text-secondary font-medium">
+          Sorteio interativo de perguntas para fixação e prática.
+        </span>
+        <div class="flex items-center space-x-3 text-xs font-bold">
+          <BaseBadge variant="success">
+            Respondidas: {{ answeredCount }}
+          </BaseBadge>
+
+          <BaseBadge variant="accent">
+            Restantes: {{ remainingCount }}
+          </BaseBadge>
         </div>
       </div>
 
       <!-- Main Wheel Area -->
-      <div class="py-8 flex flex-col items-center justify-center space-y-6">
+      <div class="py-6 flex flex-col items-center justify-center space-y-6">
         <div v-if="!isCompleted" class="text-center space-y-1">
-          <h3 class="text-2xl font-bold text-primary">Sua Vez de Jogar</h3>
-          <p class="text-secondary text-sm">Clique no botão para sortear uma pergunta no painel.</p>
+          <h3 class="text-xl font-bold text-primary">Painel de Sorteio</h3>
+          <p class="text-secondary text-sm">Clique em "Girar Roleta" para sortear uma questão do painel.</p>
         </div>
 
         <!-- Wheel Grid -->
@@ -245,9 +176,9 @@ function closeAfterSubmit() {
             v-for="(q, idx) in availableQuestions"
             :key="idx"
             :class="[
-              'p-6 rounded-2xl border-2 flex items-center justify-center aspect-square transition-all duration-200 shadow-md',
+              'p-6 rounded-2xl border-2 flex items-center justify-center aspect-square transition-all duration-150 shadow-sm',
               highlightedIndex === idx
-                ? 'border-cat-roleta bg-cat-roleta-bg text-cat-roleta scale-105 shadow-lg'
+                ? 'border-cat-roleta bg-cat-roleta-bg text-cat-roleta scale-105 shadow-md ring-2 ring-cat-roleta/50'
                 : 'border-line bg-surface text-secondary'
             ]"
           >
@@ -257,105 +188,138 @@ function closeAfterSubmit() {
           </div>
         </div>
 
-        <!-- Completion View -->
-        <div v-else class="text-center py-12 space-y-4">
-          <template v-if="isSubmitting">
-            <BaseSpinner size="lg" color-class="text-secondary" />
-            <h3 class="text-3xl font-bold text-secondary">Sincronizando com o servidor...</h3>
-            <p class="text-secondary">Enviando suas respostas para correção no servidor.</p>
-          </template>
-          <template v-else>
-            <h3 class="text-3xl font-bold text-success">Parabéns! Atividade Concluída!</h3>
-            <p class="text-secondary">Você respondeu todas as perguntas disponíveis nesta roleta.</p>
-            <p v-if="isCorrectionDone && resultAcertos !== null" class="text-secondary">
-              Acertos: {{ resultAcertos }} / {{ resultTotal ?? props.questions.length }}
-              <template v-if="resultPontuacao !== null"> — Pontuação: {{ resultPontuacao }}</template>
-            </p>
-            <p v-if="errorMessage" class="text-danger text-sm">{{ errorMessage }}</p>
-            <BaseButton
-              v-if="errorMessage"
-              variant="danger"
-              class="mt-3"
-              @click="emit('close')"
-            >
-              Fechar
-            </BaseButton>
-          </template>
+        <!-- Completion View (Clean, non-punitive, no backend errors!) -->
+        <div v-else class="text-center py-10 space-y-4 max-w-md mx-auto">
+          <div class="w-16 h-16 bg-success-light text-success-text rounded-full flex items-center justify-center mx-auto shadow-sm">
+            <span class="material-icons text-3xl">emoji_events</span>
+          </div>
+          <h3 class="text-2xl font-extrabold text-primary">🎉 Parabéns! Roleta Concluída!</h3>
+          <p class="text-secondary text-sm leading-relaxed">
+            Você respondeu a todas as perguntas sorteadas nesta atividade.
+          </p>
+          <div class="inline-block bg-surface px-6 py-3 rounded-2xl border border-line shadow-xs">
+            <span class="text-2xl font-bold text-success">{{ acertosCount }}</span>
+            <span class="text-secondary text-base"> / {{ props.questions.length }} acertos</span>
+          </div>
         </div>
 
         <!-- Action Button -->
-        <BaseButton
-          size="lg"
-          :disabled="isAnimating || isCompleted"
-          @click="animateSpin"
-        >
-          <BaseSpinner v-if="isAnimating" size="sm" />
-          <span class="tracking-wider">{{ isCompleted ? 'CONCLUÍDO' : 'GIRAR ROLETA' }}</span>
-        </BaseButton>
+        <div class="pt-2">
+          <BaseButton
+            v-if="!isCompleted"
+            size="lg"
+            variant="primary"
+            :disabled="isAnimating"
+            @click="animateSpin"
+          >
+            <BaseSpinner v-if="isAnimating" size="sm" />
+            <span class="material-icons text-base" v-else>autorenew</span>
+            <span class="tracking-wider">{{ isAnimating ? 'SORTEANDO...' : 'GIRAR ROLETA' }}</span>
+          </BaseButton>
+
+          <BaseButton
+            v-else
+            size="md"
+            variant="success"
+            @click="emit('close')"
+          >
+            <span class="material-icons text-sm">check</span>
+            <span>Concluir</span>
+          </BaseButton>
+        </div>
       </div>
 
-      <!-- Question Modal Popup (kept as raw nested overlay to preserve no-dismiss behavior) -->
-      <div v-if="showQuestionModal && currentQuestion" class="fixed inset-0 bg-surface backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div class="bg-surface-alt border border-line rounded-3xl p-6 max-w-2xl w-full space-y-6 shadow-2xl text-primary">
+      <!-- Question Modal Popup Overlay -->
+      <div v-if="showQuestionModal && currentQuestion" class="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div class="bg-surface-alt border border-line rounded-2xl p-6 max-w-xl w-full space-y-5 shadow-modal text-primary">
           <div class="flex justify-between items-center border-b border-line pb-3">
-            <h4 class="text-lg font-bold text-cat-roleta flex items-center space-x-2">
-              <span class="material-icons">quiz</span>
-              <span>{{ currentQuestion.title }}</span>
+            <h4 class="text-base font-bold text-cat-roleta flex items-center gap-2">
+              <span class="material-icons text-lg">quiz</span>
+              <span>{{ currentQuestion.title || 'Pergunta Sorteada' }}</span>
             </h4>
           </div>
 
-          <div class="text-lg font-medium text-primary">
+          <div class="text-base font-semibold text-primary leading-relaxed">
             {{ currentQuestion.content }}
           </div>
 
           <!-- Options -->
-          <div class="space-y-3">
+          <div class="space-y-2.5">
             <button
               v-for="(opt, idx) in currentQuestion.options"
               :key="idx"
               @click="handleSelectOption(opt)"
-              :disabled="isSubmitted"
+              :disabled="isAnswerConfirmed"
               :class="[
-                'w-full text-left p-4 rounded-xl border transition flex flex-col space-y-1',
+                'w-full text-left p-3.5 rounded-xl border transition-all flex items-start space-x-3 text-sm font-medium',
                 selectedOption === opt
-                  ? isSubmitted
-                    ? 'border-success bg-surface text-success'
-                    : 'border-cat-roleta bg-cat-roleta-bg text-cat-roleta'
-                  : 'border-line bg-surface text-secondary hover:border-line'
+                  ? isAnswerConfirmed
+                    ? isOptCorrect(opt)
+                      ? 'border-success bg-success-light text-success-text shadow-xs ring-1 ring-success'
+                      : 'border-danger bg-danger-light text-danger-text shadow-xs ring-1 ring-danger'
+                    : 'border-cat-roleta bg-cat-roleta-bg text-cat-roleta shadow-xs ring-1 ring-cat-roleta'
+                  : 'border-line bg-surface text-primary hover:bg-surface-alt hover:border-line-strong'
               ]"
             >
-              <div class="flex justify-between items-center font-medium">
-                <span>{{ opt.text }}</span>
-                <span class="material-icons text-sm">
-                  {{ selectedOption === opt ? (isSubmitted ? 'check_circle' : 'radio_button_checked') : 'radio_button_unchecked' }}
-                </span>
-              </div>
+              <span
+                :class="[
+                  'w-5 h-5 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 mt-0.5',
+                  selectedOption === opt
+                    ? isAnswerConfirmed
+                      ? isOptCorrect(opt) ? 'border-success bg-success text-white' : 'border-danger bg-danger text-white'
+                      : 'border-cat-roleta bg-cat-roleta text-white'
+                    : 'border-line text-secondary'
+                ]"
+              >
+                {{ String.fromCharCode(65 + idx) }}
+              </span>
+              <span class="flex-1 leading-relaxed">{{ opt.text }}</span>
             </button>
           </div>
 
-          <!-- Feedback da opção escolhida -->
-          <div v-if="isSubmitted && selectedOption?.feedback" class="p-4 bg-surface-alt border-l-4 border-accent rounded-r-xl text-sm text-secondary flex items-start space-x-2">
-            <span class="material-icons text-base text-accent mt-0.5">info</span>
-            <span>{{ selectedOption.feedback }}</span>
+          <!-- Instant Feedback for selected option -->
+          <div v-if="isAnswerConfirmed && selectedOption" class="pt-1">
+            <div
+              v-if="isOptCorrect(selectedOption)"
+              class="p-3.5 bg-success-light border-l-4 border-success text-success-text rounded-r-xl text-xs font-semibold flex items-center gap-2.5"
+            >
+              <span class="material-icons text-lg">check_circle</span>
+              <span>Resposta Correta! 🎉 {{ selectedOption.feedback || '' }}</span>
+            </div>
+
+            <div
+              v-else
+              class="p-3.5 bg-danger-light border-l-4 border-danger text-danger-text rounded-r-xl text-xs flex items-start gap-2.5"
+            >
+              <span class="material-icons text-lg mt-0.5 shrink-0">error_outline</span>
+              <div class="space-y-0.5">
+                <span class="font-bold block uppercase tracking-wide text-[10px]">Resposta Incorreta</span>
+                <p>{{ selectedOption.feedback || 'Revise o conteúdo para compreender a opção correta.' }}</p>
+              </div>
+            </div>
           </div>
 
           <!-- Modal Action -->
-          <div class="flex justify-end pt-4 border-t border-line">
-            <button
-              v-if="!isSubmitted"
-              @click="handleConfirmAnswer"
+          <div class="flex justify-end pt-3 border-t border-line">
+            <BaseButton
+              v-if="!isAnswerConfirmed"
+              variant="primary"
+              size="sm"
               :disabled="!selectedOption"
-              class="px-6 py-2.5 bg-cat-roleta hover:opacity-90 text-on-danger font-bold rounded-xl text-sm transition"
+              @click="handleConfirmAnswer"
             >
               Confirmar Resposta
-            </button>
-            <button
+            </BaseButton>
+
+            <BaseButton
               v-else
+              variant="success"
+              size="sm"
               @click="handleNextQuestion"
-              class="px-6 py-2.5 bg-success hover:opacity-90 font-bold rounded-xl text-sm transition"
             >
-              Continuar
-            </button>
+              <span>Continuar</span>
+              <span class="material-icons text-sm">arrow_forward</span>
+            </BaseButton>
           </div>
         </div>
       </div>

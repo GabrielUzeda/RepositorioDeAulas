@@ -2,7 +2,6 @@
 import { ref, watch, onUnmounted, nextTick } from 'vue';
 import { MinigamePlayer } from './minigame-player';
 import type { Atividade } from '@/shared/types';
-import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 
 const props = withDefaults(defineProps<{
@@ -45,15 +44,30 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <BaseModal :model-value="props.show" max-width="max-w-4xl" @close="emit('close')">
-    <template #header>
-      <div class="flex justify-between items-center w-full border-b border-line pb-3">
-        <span class="px-3 py-1 bg-cat-default-bg text-cat-default text-xs font-bold rounded-full uppercase tracking-wider">Simulação Tática</span>
-        <BaseButton variant="ghost" @click="emit('close')">
-          <span class="material-icons">close</span>
-        </BaseButton>
+  <Teleport to="body">
+    <Transition name="modal-fade">
+      <div
+        v-if="props.show"
+        class="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+      >
+        <!-- Floating Close Button at Top Right -->
+        <div class="absolute top-4 right-4 z-50">
+          <BaseButton
+            variant="ghost"
+            size="sm"
+            @click="emit('close')"
+            class="!text-white hover:!bg-white/20"
+            aria-label="Fechar simulação tática"
+          >
+            <span class="material-icons text-xl">close</span>
+          </BaseButton>
+        </div>
+
+        <!-- Fullscreen Arcade Canvas Container -->
+        <div id="mg-modal-container" ref="containerRef" class="relative w-full h-full flex-1"></div>
       </div>
-    </template>
-    <div id="mg-modal-container" ref="containerRef" class="relative h-[80vh] min-h-0"></div>
-  </BaseModal>
+    </Transition>
+  </Teleport>
 </template>

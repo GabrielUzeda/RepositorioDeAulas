@@ -1,225 +1,263 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import { apiClient } from '@/shared/api/client';
-import { secureGet, secureSet } from '@/shared/utils/storage';
 import { useToast } from '@/shared/composables/useToast';
 import type { Question, Atividade } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseBadge from '@/shared/components/BaseBadge.vue';
 
 const props = withDefaults(defineProps<{
   show: boolean;
   questions: Question[];
   title?: string;
   atividade?: Atividade | null;
-  senhaCurso?: string;
-  senhaAtividade?: string;
 }>(), {
   title: '',
-  senhaCurso: '',
-  senhaAtividade: '',
 });
 
 const emit = defineEmits<(e: 'close') => void>();
-
-const currentIndex = ref(0);
-const selectedOptionIndex = ref<number | null>(null);
-const answeredQuestions = ref<Set<number>>(new Set());
-const answers = ref<Record<number, number>>({});
-const isSubmitting = ref(false);
-const isSubmitted = ref(false);
-const errorMessage = ref('');
 const { success } = useToast();
-const resultAcertos = ref<number | null>(null);
-const resultTotal = ref<number | null>(null);
-const resultPontuacao = ref<number | null>(null);
+
+const started = ref(false);
+const currentIndex = ref(0);
+const selectedOptions = ref<Record<number, number>>({});
+const answeredCorrectly = ref<Set<number>>(new Set());
+
+const currentQuestion = computed<Question | null>(() => {
+  if (!props.questions || props.questions.length === 0) return null;
+  return props.questions[currentIndex.value] || null;
+});
+
+const currentSelectedOptionIndex = computed<number | null>(() => {
+  return selectedOptions.value[currentIndex.value] ?? null;
+});
+
+const currentSelectedOption = computed(() => {
+  if (!currentQuestion.value || currentSelectedOptionIndex.value === null) return null;
+  return currentQuestion.value.options?.[currentSelectedOptionIndex.value] || null;
+});
+
+const acertosCount = computed(() => answeredCorrectly.value.size);
+const isCompleted = computed(() => {
+  return props.questions.length > 0 && acertosCount.value === props.questions.length;
+});
+
+function isOptCorrect(opt: any): boolean {
+  if (!opt) return false;
+  return Boolean(opt.correct || opt.isCorrect || opt.correta);
+}
 
 watch(
   () => props.show,
   (val) => {
     if (val) {
+      started.value = false;
       currentIndex.value = 0;
-      selectedOptionIndex.value = null;
-      answeredQuestions.value = new Set();
-      answers.value = {};
-      isSubmitting.value = false;
-      isSubmitted.value = false;
-      errorMessage.value = '';
-      resultAcertos.value = null;
-      resultTotal.value = null;
-      resultPontuacao.value = null;
+      selectedOptions.value = {};
+      answeredCorrectly.value = new Set();
     }
   }
 );
 
-const currentQuestion = computed(() => {
-  return props.questions[currentIndex.value] || null;
-});
+function selectOption(optIndex: number) {
+  if (!currentQuestion.value) return;
+  selectedOptions.value[currentIndex.value] = optIndex;
+  
+  const opt = currentQuestion.value.options?.[optIndex];
+  if (isOptCorrect(opt)) {
+    const newSet = new Set(answeredCorrectly.value);
+    newSet.add(currentIndex.value);
+    answeredCorrectly.value = newSet;
 
-const currentAnswered = computed(() => answeredQuestions.value.has(currentIndex.value));
-const allAnswered = computed(() => answeredQuestions.value.size >= props.questions.length);
-const selectedFeedback = computed(() => {
-  if (selectedOptionIndex.value === null || !currentQuestion.value) return null;
-  return currentQuestion.value.options?.[selectedOptionIndex.value]?.feedback || null;
-});
-
-function handleSelectOption(optionIndex: number) {
-  if (answeredQuestions.value.has(currentIndex.value) || !currentQuestion.value) return;
-
-  selectedOptionIndex.value = optionIndex;
-  answers.value[currentIndex.value] = optionIndex;
-  answeredQuestions.value.add(currentIndex.value);
-}
-
-async function submitAnswers() {
-  if (isSubmitting.value) return;
-  if (!props.atividade) {
-    emit('close');
-    return;
-  }
-  isSubmitting.value = true;
-  errorMessage.value = '';
-
-  const [nome, email] = await Promise.all([
-    secureGet('alunoNome'),
-    secureGet('alunoEmail'),
-  ]);
-
-  const respostas = props.questions.map((q, idx) => ({
-    questao: q.title || q.content,
-    resposta: answers.value[idx] !== undefined ? q.options?.[answers.value[idx]]?.text : null
-  }));
-
-  const res = await apiClient.post('/submeter-resposta', {
-    atividade_id: props.atividade.id,
-    aluno_nome: nome,
-    aluno_email: email,
-    respostas: JSON.stringify(respostas).trim(),
-    senha_curso: props.senhaCurso,
-    senha_atividade: props.senhaAtividade
-  });
-
-  isSubmitting.value = false;
-
-  if (res.success) {
-    isSubmitted.value = true;
-    if (res.data && res.data.consulta_token) {
-      secureSet(`consulta_token_${props.atividade.id}`, String(res.data.consulta_token));
+    if (newSet.size === props.questions.length) {
+      success('Parabéns! Você acertou todas as questões de reforço! 🎉');
     }
-    if (res.data && res.data.acertos !== undefined) resultAcertos.value = res.data.acertos;
-    if (res.data && res.data.total !== undefined) resultTotal.value = res.data.total;
-    if (res.data && res.data.pontuacao !== undefined) resultPontuacao.value = res.data.pontuacao;
-    let msg = 'Respostas registradas!';
-    if (resultAcertos.value !== null) {
-      const total = resultTotal.value ?? props.questions.length;
-      msg += ` Acertos: ${resultAcertos.value} / ${total}`;
-      if (resultPontuacao.value !== null) msg += ` — Pontuação: ${resultPontuacao.value}%`;
-    }
-    success(msg);
-  } else {
-    errorMessage.value = res.error || 'Erro ao registrar respostas.';
   }
 }
 
-function closeAfterSubmit() {
-  emit('close');
+function getOptionFeedback(opt: any, question: Question): string {
+  if (opt && opt.feedback && opt.feedback.trim()) {
+    return opt.feedback;
+  }
+  const just = (question as any).justificativas;
+  if (just && opt && opt.letra && just[opt.letra]) {
+    return just[opt.letra];
+  }
+  return 'Incorreto. Revise o conceito apresentado para identificar a alternativa correta.';
 }
 
 function nextQuestion() {
-  if (currentIndex.value === props.questions.length - 1) {
-    if (allAnswered.value) submitAnswers();
-  } else {
+  if (currentIndex.value < props.questions.length - 1) {
     currentIndex.value++;
-    selectedOptionIndex.value = answers.value[currentIndex.value] ?? null;
   }
 }
 
 function prevQuestion() {
   if (currentIndex.value > 0) {
     currentIndex.value--;
-    selectedOptionIndex.value = answers.value[currentIndex.value] ?? null;
   }
 }
 </script>
 
 <template>
-  <BaseModal :model-value="props.show" max-width="max-w-2xl" @close="emit('close')">
+  <BaseModal
+    :model-value="props.show"
+    max-width="max-w-2xl"
+    @close="emit('close')"
+  >
     <template #header>
-      <div class="flex justify-between items-center w-full border-b border-line pb-4">
-        <div>
-          <span class="px-3 py-1 bg-surface-alt text-success text-xs font-bold rounded-full uppercase tracking-wider">Modo Reforço</span>
-          <h2 class="text-2xl font-bold text-primary mt-1">{{ props.title }}</h2>
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-cat-reforco-bg text-cat-reforco rounded-md flex items-center justify-center shrink-0 shadow-xs">
+          <span class="material-icons text-[18px]">fitness_center</span>
         </div>
-        <BaseButton variant="ghost" @click="emit('close')">
-          <span class="material-icons">close</span>
-        </BaseButton>
+        <h2 class="text-base font-semibold text-primary leading-snug">
+          {{ props.atividade?.titulo || props.title || 'Atividade de Reforço' }}
+        </h2>
       </div>
     </template>
 
-    <!-- Question Counter -->
-    <div class="flex justify-between items-center text-sm font-semibold text-secondary">
-      <span>Questão {{ currentIndex + 1 }} de {{ props.questions.length }}</span>
-      <span class="text-accent">Respondidas: {{ answeredQuestions.size }} / {{ props.questions.length }}</span>
+    <!-- Tela Inicial de Apresentação (Exibida apenas antes de iniciar) -->
+    <div v-if="!started" class="py-8 px-4 flex flex-col items-center text-center space-y-6">
+      <div class="w-16 h-16 bg-accent-light text-accent rounded-2xl flex items-center justify-center shadow-sm">
+        <span class="material-icons text-3xl">school</span>
+      </div>
+
+      <div class="space-y-2 max-w-lg">
+        <h3 class="text-xl font-bold text-primary">Aprendizado Livre e Sem Avaliação</h3>
+        <p class="text-secondary text-sm leading-relaxed">
+          Responda todas as questões sem medo de errar! O objetivo desta atividade é fixar os conceitos com feedback imediato a cada escolha.
+        </p>
+      </div>
+
+      <BaseButton variant="primary" size="md" @click="started = true">
+        <span>Começar Atividade</span>
+        <span class="material-icons text-sm">arrow_forward</span>
+      </BaseButton>
     </div>
 
-    <!-- Submission Status -->
-    <div v-if="isSubmitting" class="p-4 bg-surface-alt border border-accent text-accent rounded-xl text-sm font-medium text-center">
-      Enviando respostas para correção do servidor...
+    <!-- Tela Principal com as Questões e Feedbacks -->
+    <div v-else class="space-y-5">
+      <!-- Header & Progress Counter -->
+      <div class="flex justify-between items-center text-sm font-semibold text-secondary pb-1">
+        <span>Questão {{ currentIndex + 1 }} de {{ props.questions.length }}</span>
+        <div class="flex items-center gap-2">
+          <BaseBadge variant="success">
+            Acertos: {{ acertosCount }} / {{ props.questions.length }}
+          </BaseBadge>
+        </div>
+      </div>
+
+      <!-- Victory Celebration Banner -->
+      <div v-if="isCompleted" class="p-4 bg-success-light border border-success/30 text-success-text rounded-xl text-sm font-bold flex items-center gap-3 animate-fade-in">
+        <span class="material-icons text-2xl">emoji_events</span>
+        <div>
+          <h4 class="text-base font-extrabold">🎉 Parabéns!</h4>
+          <p class="text-xs font-normal opacity-90">Você acertou todas as questões da atividade de reforço!</p>
+        </div>
+      </div>
+
+      <!-- Question Body -->
+      <div v-if="currentQuestion" class="space-y-4 pt-1">
+        <h4 v-if="currentQuestion.title" class="text-base font-semibold text-accent">{{ currentQuestion.title }}</h4>
+        <p class="text-primary text-base font-medium leading-relaxed">{{ currentQuestion.content }}</p>
+
+        <!-- Option Buttons -->
+        <div class="space-y-3 pt-2">
+          <button
+            v-for="(opt, idx) in currentQuestion.options"
+            :key="idx"
+            @click="selectOption(idx)"
+            type="button"
+            :class="[
+              'w-full text-left p-4 rounded-xl border transition-all flex items-start space-x-3 text-sm font-medium',
+              currentSelectedOptionIndex === idx
+                ? isOptCorrect(opt)
+                  ? 'bg-success-light border-success text-success-text shadow-sm ring-1 ring-success'
+                  : 'bg-danger-light border-danger text-danger-text shadow-sm ring-1 ring-danger'
+                : 'bg-surface-alt border-line text-primary hover:bg-surface hover:border-line-strong'
+            ]"
+          >
+            <!-- Letter / Circle Icon -->
+            <span
+              :class="[
+                'w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 transition-colors',
+                currentSelectedOptionIndex === idx
+                  ? isOptCorrect(opt)
+                    ? 'border-success bg-success text-white'
+                    : 'border-danger bg-danger text-white'
+                  : 'border-line text-secondary'
+              ]"
+            >
+              <span v-if="currentSelectedOptionIndex === idx" class="material-icons text-[14px]">
+                {{ isOptCorrect(opt) ? 'check' : 'close' }}
+              </span>
+              <span v-else>{{ String.fromCharCode(65 + idx) }}</span>
+            </span>
+
+            <span class="flex-1 leading-relaxed">{{ opt.text }}</span>
+          </button>
+        </div>
+
+        <!-- Instant Feedback Box for Selected Option -->
+        <div v-if="currentSelectedOption" class="pt-2">
+          <!-- Correct Feedback -->
+          <div
+            v-if="isOptCorrect(currentSelectedOption)"
+            class="p-4 bg-success-light border-l-4 border-success text-success-text rounded-r-xl text-sm font-semibold flex items-center gap-3 animate-fade-in"
+          >
+            <span class="material-icons text-xl">check_circle</span>
+            <span>Resposta Correta! 🎉</span>
+          </div>
+
+          <!-- Incorrect Feedback with Explanation -->
+          <div
+            v-else
+            class="p-4 bg-danger-light border-l-4 border-danger text-danger-text rounded-r-xl text-sm flex items-start gap-3 animate-fade-in"
+          >
+            <span class="material-icons text-xl mt-0.5 shrink-0">error_outline</span>
+            <div class="space-y-1">
+              <h5 class="font-bold text-xs uppercase tracking-wide">Resposta Incorreta</h5>
+              <p class="leading-relaxed text-xs">
+                {{ getOptionFeedback(currentSelectedOption, currentQuestion) }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Error -->
-    <div v-if="errorMessage && !isSubmitted" class="p-3 bg-danger border border-danger text-danger text-sm rounded-xl">
-      {{ errorMessage }}
-    </div>
-
-    <!-- Question Body -->
-    <div v-if="currentQuestion && !isSubmitting && !isSubmitted" class="space-y-4">
-      <h4 v-if="currentQuestion.title" class="text-lg font-semibold text-accent">{{ currentQuestion.title }}</h4>
-      <p class="text-secondary text-base leading-relaxed">{{ currentQuestion.content }}</p>
-
-      <!-- Options -->
-      <div class="space-y-3 pt-2">
-        <button
-          v-for="(option, idx) in currentQuestion.options"
-          :key="idx"
-          type="button"
-          @click="handleSelectOption(idx)"
-          :disabled="answeredQuestions.has(currentIndex)"
-          :class="[
-            'w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between font-medium',
-            selectedOptionIndex === idx
-              ? 'border-accent bg-surface-alt text-accent shadow-md'
-              : 'border-line hover:border-accent hover:bg-surface text-secondary'
-          ]"
+    <!-- Footer Controls -->
+    <template v-if="started" #footer>
+      <div class="flex justify-between items-center pt-1">
+        <BaseButton
+          variant="secondary"
+          size="sm"
+          :disabled="currentIndex === 0"
+          @click="prevQuestion"
         >
-          <span>{{ option.text }}</span>
-          <span v-if="selectedOptionIndex === idx" class="material-icons text-xl ml-2">radio_button_checked</span>
-        </button>
-      </div>
+          <span class="material-icons text-sm">arrow_back</span>
+          <span>Anterior</span>
+        </BaseButton>
 
-      <!-- Feedback da opção selecionada -->
-      <div v-if="selectedFeedback" class="p-4 bg-surface-alt border-l-4 border-accent rounded-r-xl text-sm text-secondary flex items-start space-x-2">
-        <span class="material-icons text-base text-accent mt-0.5">info</span>
-        <span>{{ selectedFeedback }}</span>
-      </div>
-    </div>
+        <BaseButton
+          v-if="currentIndex < props.questions.length - 1"
+          variant="primary"
+          size="sm"
+          @click="nextQuestion"
+        >
+          <span>Próxima</span>
+          <span class="material-icons text-sm">arrow_forward</span>
+        </BaseButton>
 
-    <!-- Footer Navigation -->
-    <div v-if="!isSubmitting && !isSubmitted" class="flex justify-between items-center pt-4 border-t">
-      <BaseButton
-        variant="secondary"
-        :disabled="currentIndex === 0"
-        @click="prevQuestion"
-      >
-        Anterior
-      </BaseButton>
-      <BaseButton
-        variant="primary"
-        :disabled="currentIndex === props.questions.length - 1 ? !allAnswered : !currentAnswered"
-        @click="nextQuestion"
-      >
-        {{ currentIndex === props.questions.length - 1 ? 'Finalizar' : 'Próxima' }}
-      </BaseButton>
-    </div>
+        <BaseButton
+          v-else
+          variant="ghost"
+          size="sm"
+          @click="emit('close')"
+        >
+          <span>Concluir</span>
+        </BaseButton>
+      </div>
+    </template>
   </BaseModal>
 </template>

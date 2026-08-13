@@ -10,6 +10,8 @@ import JsonActivityEditorModal from '@/professor/components/JsonActivityEditorMo
 import RespostasModal from '@/professor/components/RespostasModal.vue';
 import FeedbackConsolidadoModal from '@/professor/components/FeedbackConsolidadoModal.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
+import BaseButton from '@/shared/components/BaseButton.vue';
+import BackButton from '@/shared/components/BackButton.vue';
 import ConfirmDialog from '../shared/components/ConfirmDialog.vue';
 import EmptyState from '../shared/components/EmptyState.vue';
 import type { Curso, Disciplina, Aula, Atividade } from '@/shared/types';
@@ -273,20 +275,18 @@ function handleOpenRespostas(atividade: Atividade) {
       <!-- Disciplinas View -->
       <section v-else-if="activeView === 'disciplinas'" class="space-y-6">
         <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-4">
-            <button @click="goBack" class="p-2.5 bg-surface-alt border border-line hover:bg-surface rounded-xl text-secondary transition">
-              <span class="material-icons text-sm">arrow_back</span>
-            </button>
+          <div class="flex items-center gap-3">
+            <BackButton @click="goBack" />
             <div>
               <h2 class="text-2xl font-bold text-primary">{{ selectedCurso?.nome }}</h2>
               <p class="text-secondary text-xs mt-0.5">Gerencie as disciplinas associadas a este curso.</p>
             </div>
           </div>
 
-          <button @click="handleOpenDisciplinaModal()" class="px-4 py-2.5 bg-accent hover:opacity-90 text-primary font-bold rounded-xl shadow-lg shadow-accent text-xs transition flex items-center space-x-2">
+          <BaseButton variant="primary" size="sm" @click="handleOpenDisciplinaModal()">
             <span class="material-icons text-sm">add</span>
             <span>Nova Disciplina</span>
-          </button>
+          </BaseButton>
         </div>
 
         <EmptyState v-if="cursoStore.disciplinas.length === 0" message="Nenhuma disciplina cadastrada neste curso." />
@@ -316,9 +316,9 @@ function handleOpenRespostas(atividade: Atividade) {
               <p class="text-secondary text-xs line-clamp-2 mt-1">{{ disciplina.descricao }}</p>
             </div>
 
-            <button @click="handleOpenDisciplinaDetails(disciplina)" class="w-full py-2.5 bg-surface-alt hover:bg-accent text-secondary hover:text-primary rounded-xl font-bold text-xs transition">
+            <BaseButton variant="secondary" size="xs" block @click="handleOpenDisciplinaDetails(disciplina)">
               Gerenciar Aulas & Atividades
-            </button>
+            </BaseButton>
           </div>
         </div>
       </section>
@@ -326,33 +326,32 @@ function handleOpenRespostas(atividade: Atividade) {
       <!-- Content View (Aulas e Atividades) -->
       <section v-else class="space-y-6">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-line pb-4 gap-4">
-          <div class="flex items-center space-x-4">
-            <button @click="goBack" class="p-2.5 bg-surface-alt border border-line hover:bg-surface rounded-xl text-secondary transition">
-              <span class="material-icons text-sm">arrow_back</span>
-            </button>
+          <div class="flex items-center gap-3">
+            <BackButton @click="goBack" />
             <div>
               <h2 class="text-2xl font-bold text-primary">{{ selectedDisciplina?.nome }}</h2>
               <p class="text-secondary text-xs mt-0.5">{{ selectedDisciplina?.descricao }}</p>
             </div>
           </div>
 
-          <button
+          <BaseButton
+            variant="primary"
+            size="sm"
             @click="showFeedbackConsolidadoModal = true"
-            class="px-4 py-2.5 bg-accent hover:opacity-90 text-primary font-bold rounded-xl shadow-lg shadow-accent text-xs transition flex items-center space-x-2"
           >
             <span class="material-icons text-sm">mark_email_read</span>
             <span>Gerar Feedback da Disciplina</span>
-          </button>
+          </BaseButton>
         </div>
 
         <!-- Aulas -->
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-bold text-primary">Aulas (Marp Markdown)</h3>
-            <button @click="handleOpenMarpModal()" class="px-3.5 py-2 bg-accent hover:opacity-90 text-primary font-bold rounded-xl text-xs transition flex items-center space-x-1.5">
+            <BaseButton variant="primary" size="sm" @click="handleOpenMarpModal()">
               <span class="material-icons text-sm">add</span>
               <span>Nova Aula</span>
-            </button>
+            </BaseButton>
           </div>
 
           <EmptyState v-if="cursoStore.aulas.length === 0" message="Nenhuma aula cadastrada nesta disciplina." />
@@ -390,10 +389,10 @@ function handleOpenRespostas(atividade: Atividade) {
         <div class="space-y-4 pt-4 border-t border-line">
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-bold text-primary">Atividades & Avaliações</h3>
-            <button @click="handleOpenActivityEditor()" class="px-3.5 py-2 bg-accent hover:opacity-90 text-primary font-bold rounded-xl text-xs transition flex items-center space-x-1.5">
+            <BaseButton variant="primary" size="sm" @click="handleOpenActivityEditor()">
               <span class="material-icons text-sm">add</span>
               <span>Nova Atividade</span>
-            </button>
+            </BaseButton>
           </div>
 
           <EmptyState v-if="cursoStore.atividades.length === 0" message="Nenhuma atividade cadastrada nesta disciplina." />
@@ -426,10 +425,10 @@ function handleOpenRespostas(atividade: Atividade) {
                 </div>
               </div>
 
-              <button @click="handleOpenRespostas(atv)" class="w-full py-2 bg-surface-alt hover:bg-accent border border-line hover:border-accent text-accent rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5">
+              <BaseButton variant="secondary" size="xs" block @click="handleOpenRespostas(atv)">
                 <span class="material-icons text-xs">analytics</span>
                 <span>Ver Respostas dos Alunos</span>
-              </button>
+              </BaseButton>
             </div>
           </div>
         </div>
