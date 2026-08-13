@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { sanitizeSlug } from './utils';
-import { THEME_LABELS, NEXT_THEME, normalizeTheme } from '../../frontend/src/shared/marpTheme';
+import { THEME_LABELS, NEXT_THEME, normalizeTheme } from './marpTheme';
 
 export function resolveFrontendDir(): string {
   if (process.env.FRONTEND_STATIC_DIR) return process.env.FRONTEND_STATIC_DIR;
