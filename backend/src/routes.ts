@@ -3,7 +3,7 @@ import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { existsSync, statSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
-import { db } from './db';
+import { db, purgeOldRanking } from './db';
 import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail } from './utils';
 import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter, extractClientIp } from './auth';
 import { sendMail, type MailRequest } from './mailer';
@@ -867,6 +867,9 @@ app.post('/ranking', submissionLimiter, async (c) => {
   const pontuacaoCap = Math.min(Math.max(pontuacaoInt, 0), MAX_RANKING_PONTUACAO);
 
   try {
+    // Purga automática de registros de ranking com mais de 30 dias
+    purgeOldRanking(30);
+
     const r = db
       .query(
         `INSERT INTO ranking (atividade_id, nome_jogador, pontuacao)
@@ -883,10 +886,22 @@ app.get('/ranking/:atividade_id', (c) => {
   const id = parseId(c.req.param('atividade_id'));
   if (id === null) return c.text('', 400);
   try {
+    // Purga automática de registros de ranking com mais de 30 dias
+    purgeOldRanking(30);
+
     const rows = dbq('SELECT id, atividade_id, nome_jogador, pontuacao, data_envio FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(id);
     return c.json(rows);
   } catch (e: any) {
     return c.text('Erro interno ao listar ranking', 500);
+  }
+});
+
+app.post('/admin/expurgar-ranking', adminAuth, (c) => {
+  try {
+    const deletados = purgeOldRanking(30);
+    return c.json({ mensagem: `Expurgo concluído. ${deletados} registros antigos ( > 30 dias) foram removidos do ranking.`, deletados });
+  } catch (e: any) {
+    return c.text('Erro ao expurgar registros do ranking', 500);
   }
 });
 
@@ -943,8 +958,8 @@ app.post('/submeter-resposta', submissionLimiter, async (c) => {
     let r: any;
     if (existente) {
       dbq(
-        'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ? WHERE id = ?'
-      ).run(encNome, encEmail, encRespostas, existente.id);
+        'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ?, consulta_token_hash = ? WHERE id = ?'
+      ).run(encNome, encEmail, encRespostas, tokenHash, existente.id);
       r = { id: existente.id, atividade_id: atividadeId, criado_em: existente.criado_em };
     } else {
       r = db

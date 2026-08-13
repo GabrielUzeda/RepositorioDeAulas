@@ -213,8 +213,8 @@ export async function seedDemoData() {
   const atividades = [
     {
       external_id: 'demo-minigame',
-      titulo: 'Minigame: Batalha Naval de Redes (Exemplo)',
-      descricao: 'Teste seus conhecimentos táticos em Redes de Computadores eliminando navios inimigos!',
+      titulo: 'Minigame: Simulação Tática (Exemplo)',
+      descricao: 'Teste seus conhecimentos táticos em Redes de Computadores abatendo ameaças virtuais!',
       caminho: '/static/atividades/minigame.html',
       icone: 'sports_esports',
       tipo: 'minigame',
@@ -222,7 +222,7 @@ export async function seedDemoData() {
       senha: null,
       allow_password: 0,
       json_data:
-        '{"meta":{"type":"minigame","title":"Batalha Naval de Redes"},"questions":[{"content":"Qual protocolo é utilizado para transferência segura de arquivos cifrados via SSH?","options":[{"text":"FTP","correct":false,"feedback":"FTP é inseguro (texto claro)."},{"text":"SFTP","correct":true,"feedback":"Excelente! SFTP roda sobre SSH (porta 22)."},{"text":"HTTP","correct":false,"feedback":"HTTP não usa criptografia por padrão."}]},{"content":"Qual tecnologia cria um túnel criptografado sobre uma rede pública?","options":[{"text":"NAT","correct":false,"feedback":"NAT apenas traduz endereços IP."},{"text":"VPN","correct":true,"feedback":"Perfeito! VPN provê confidencialidade e integridade."}]}]}',
+        '{"meta":{"type":"minigame","title":"Simulação Tática: Defesa de Redes"},"questions":[{"content":"Qual protocolo é utilizado para transferência segura de arquivos cifrados via SSH?","options":[{"text":"SFTP","correct":true,"feedback":"Excelente! SFTP roda sobre SSH (porta 22)."},{"text":"FTP","correct":false,"feedback":"FTP transmite dados em texto claro (inseguro)."},{"text":"HTTP","correct":false,"feedback":"HTTP não utiliza criptografia por padrão."},{"text":"Telnet","correct":false,"feedback":"Telnet é não criptografado."}]},{"content":"Qual tecnologia cria um túnel criptografado seguro sobre uma rede pública?","options":[{"text":"VPN","correct":true,"feedback":"Perfeito! VPN provê confidencialidade e integridade."},{"text":"NAT","correct":false,"feedback":"NAT apenas traduz endereços IP."},{"text":"DNS","correct":false,"feedback":"DNS apenas resolve nomes de domínio."},{"text":"DHCP","correct":false,"feedback":"DHCP distribui endereços IP dinamicamente."}]},{"content":"Qual porta padrão é utilizada pelo protocolo seguro HTTPS?","options":[{"text":"443","correct":true,"feedback":"Correto! HTTPS opera por padrão na porta 443 com TLS/SSL."},{"text":"80","correct":false,"feedback":"Porta 80 é utilizada pelo HTTP não criptografado."},{"text":"21","correct":false,"feedback":"Porta 21 é utilizada pelo FTP."},{"text":"22","correct":false,"feedback":"Porta 22 é utilizada pelo SSH."}]}]}',
     },
     {
       external_id: 'demo-roleta',
@@ -235,33 +235,33 @@ export async function seedDemoData() {
       senha: null,
       allow_password: 0,
       json_data:
-        '{"meta":{"type":"roleta","title":"Roleta do Conhecimento"},"questions":[{"content":"Qual é a função da memória cache L1/L2/L3 na CPU?","options":[{"text":"Reduzir o tempo de acesso a dados frequentes da RAM","correct":true,"feedback":"Correto! A cache é extremamente rápida e fica próxima dos núcleos."},{"text":"Armazenar arquivos permanentemente","correct":false,"feedback":"Incorreto. Cache é volátil e temporária."}]},{"content":"Qual componente é responsável pelo processamento gráfico vetorial em paralelo?","options":[{"text":"GPU","correct":true,"feedback":"Exato! Placa de vídeo/GPU possui milhares de núcleos para cálculo paralelo."},{"text":"Fonte ATX","correct":false,"feedback":"A fonte apenas fornece energia elétrica."}]}]}',
+        '{"meta":{"type":"roleta","title":"Roleta do Conhecimento: Hardware"},"questions":[{"content":"Qual é a principal função da memória cache L1/L2/L3 na CPU?","options":[{"text":"Reduzir o tempo de acesso a dados frequentes da RAM","correct":true,"feedback":"Correto! A cache é extremamente rápida e fica próxima dos núcleos."},{"text":"Armazenar arquivos permanentemente após desligar","correct":false,"feedback":"Incorreto. A memória cache é volátil."},{"text":"Gerenciar o tráfego da placa de rede local","correct":false,"feedback":"Incorreto. Tráfego de rede é gerenciado pela NIC/Kernel."},{"text":"Resfriar os núcleos do processador sob alta carga","correct":false,"feedback":"Incorreto. O resfriamento é realizado pelo cooler."}]},{"content":"Qual componente é responsável pelo processamento gráfico vetorial em paralelo?","options":[{"text":"GPU","correct":true,"feedback":"Exato! A GPU possui milhares de núcleos para cálculo paralelo."},{"text":"Fonte ATX","correct":false,"feedback":"A fonte de alimentação apenas fornece energia elétrica."},{"text":"Chipset Ponte Sul (Southbridge)","correct":false,"feedback":"O chipset ponte sul gerencia barramentos de I/O lentos."},{"text":"Memória ROM","correct":false,"feedback":"A ROM armazena firmware como a BIOS/UEFI."}]},{"content":"O que significa a sigla SSD em dispositivos de armazenamento de dados?","options":[{"text":"Solid State Drive","correct":true,"feedback":"Perfeito! SSD utiliza memória flash sem partes mecânicas."},{"text":"Super Speed Disk","correct":false,"feedback":"Incorreto. Trata-se de Solid State Drive."},{"text":"System Storage Data","correct":false,"feedback":"Incorreto. Trata-se de Solid State Drive."},{"text":"Synchronous Serial Device","correct":false,"feedback":"Incorreto. Trata-se de Solid State Drive."}]}]}',
     },
     {
       external_id: 'demo-prova',
       titulo: 'Prova 01: Fundamentos de TI (Exemplo)',
       descricao: 'Avaliação formal cobrindo conceitos de Sistemas Operacionais, Hardware e Redes.',
       caminho: '/static/atividades/prova.html',
-      icone: 'assignment_turned_in',
+      icone: 'quiz',
       tipo: 'prova',
       ordem: 3,
       senha: '123',
       allow_password: 1,
       json_data:
-        '{"meta":{"type":"prova","title":"Prova 01: Fundamentos de TI"},"questions":[{"content":"Qual sistema operacional é baseado no Kernel Linux?","options":[{"text":"Ubuntu","correct":true,"feedback":"Correto! Ubuntu é uma distribuição Linux."},{"text":"Windows 11","correct":false,"feedback":"Windows possui kernel próprio (NT)."}]}]}',
+        '{"meta":{"type":"prova","title":"Prova 01: Fundamentos de TI"},"questions":[{"content":"Qual sistema operacional de código aberto é baseado no Kernel Linux?","options":[{"text":"Ubuntu","correct":true,"feedback":"Correto! Ubuntu é uma distribuição Linux."},{"text":"Windows 11","correct":false,"feedback":"Windows utiliza o kernel proprietário Windows NT."},{"text":"macOS Sonoma","correct":false,"feedback":"macOS é baseado na família BSD/Darwin."},{"text":"MS-DOS","correct":false,"feedback":"MS-DOS é um sistema legado monocamada."}]},{"content":"Em arquitetura de computadores, o que caracteriza a memória RAM?","options":[{"text":"Leitura/escrita rápida e volatilidade ao desligar","correct":true,"feedback":"Correto! A RAM perde todo o conteúdo sem alimentação elétrica."},{"text":"Armazenamento óptico não gravável","correct":false,"feedback":"Incorreto. Mídias ópticas são CDs/DVDs."},{"text":"Armazenamento magnético permanente","correct":false,"feedback":"Incorreto. Discos rígidos (HDDs) utilizam armazenamento magnético."},{"text":"Execução exclusiva de instruções da BIOS","correct":false,"feedback":"Incorreto. A BIOS é mantida em memória ROM/Flash."}]}]}',
     },
     {
       external_id: 'demo-reforco',
       titulo: 'Reforço: Prática de Fixação (Exemplo)',
-      descricao: 'Exercícios práticos adaptativos para consolidar o aprendizado.',
+      descricao: 'Exercícios práticos adaptativos com feedback explicativo imediato para consolidar o aprendizado.',
       caminho: '/static/atividades/reforco.html',
-      icone: 'psychology',
+      icone: 'fitness_center',
       tipo: 'reforco',
       ordem: 4,
       senha: null,
       allow_password: 0,
       json_data:
-        '{"meta":{"type":"reforco","title":"Prática de Fixação"},"questions":[{"content":"Hardware é a parte física, Software é a parte lógica.","options":[{"text":"Verdadeiro","correct":true,"feedback":"Isso mesmo! Hardware é tocável, software não."},{"text":"Falso","correct":false,"feedback":"Incorreto. A definição de HW/SW segue essa base."}]},{"content":"A Memória RAM é não-volátil (não perde dados se faltar energia).","options":[{"text":"Falso","correct":true,"feedback":"Correto! A RAM é volátil."},{"text":"Verdadeiro","correct":false,"feedback":"Incorreto. A memória não-volátil é a ROM ou o Disco."}]}]}',
+        '{"meta":{"type":"reforco","title":"Reforço: Prática de Fixação"},"questions":[{"content":"Qual é a diferença fundamental entre Hardware e Software em um sistema computacional?","options":[{"text":"Hardware é a parte física (equipamentos); Software é a parte lógica (programas)","correct":true,"feedback":"Isso mesmo! Hardware é a infraestrutura tangível, enquanto o Software consiste nas instruções de código."},{"text":"Hardware executa apenas arquivos de texto; Software gerencia a memória física","correct":false,"feedback":"Incorreto. Hardware refere-se aos componentes físicos do computador."},{"text":"Software é o gabinete e periféricos; Hardware são os algoritmos da aplicação","correct":false,"feedback":"Incorreto. Os papéis estão invertidos nessa afirmação."},{"text":"Não há diferença; ambos representam o mesmo conceito em TI","correct":false,"feedback":"Incorreto. Trata-se de conceitos distintos mas complementares."}]},{"content":"A memória RAM é classificada como volátil porque:","options":[{"text":"Perde todo o seu conteúdo armazenado ao interromper o fornecimento de energia","correct":true,"feedback":"Correto! Por ser volátil, exige corrente contínua para preservar o estado dos transistores."},{"text":"Armazena dados indefinidamente em chips semicondutores selados","correct":false,"feedback":"Incorreto. Dispositivos não-voláteis como SSDs mantêm dados sem energia."},{"text":"Pode ser lida apenas uma vez durante a inicialização do sistema","correct":false,"feedback":"Incorreto. A RAM permite leitura e escrita ilimitadas enquanto energizada."},{"text":"É imune a falhas elétricas ou quedas de tensão","correct":false,"feedback":"Incorreto. Qualquer interrupção elétrica apaga a RAM."}]}]}',
     },
     {
       external_id: 'demo-normal',
@@ -297,7 +297,33 @@ export async function seedDemoData() {
 
 await seedDemoData().catch((e) => console.error('seed failed:', e));
 
-// [4] Retenção LGPD (Art. 15/16): purga de dados pessoais antigos.
+// [4] Expurgo de ranking antigo (Gatilho automático de 30 dias)
+export function purgeOldRanking(days: number = 30): number {
+  const rawRankingDays = Number(process.env.RANKING_RETENTION_DAYS);
+  const targetDays = Number.isInteger(rawRankingDays) && rawRankingDays > 0 ? rawRankingDays : days;
+  try {
+    const cutoffRow = db
+      .query(`SELECT strftime('%Y-%m-%dT%H:%M:%SZ','now', ?) AS c`)
+      .get(`-${targetDays} days`) as { c: string };
+    const cutoff = cutoffRow?.c;
+    if (!cutoff) return 0;
+
+    let totalDeleted = 0;
+    while (true) {
+      const res = db
+        .query(`DELETE FROM ranking WHERE id IN (SELECT id FROM ranking WHERE data_envio < ? LIMIT 500)`)
+        .run(cutoff);
+      totalDeleted += res.changes;
+      if (res.changes < 500) break;
+    }
+    return totalDeleted;
+  } catch (e) {
+    console.error('Erro ao expurgar ranking antigo:', e);
+    return 0;
+  }
+}
+
+// [5] Retenção LGPD (Art. 15/16): purga de dados pessoais antigos e ranking (30 dias).
 export function runDataRetentionPurge(): { respostas: number; ranking: number } {
   const result = { respostas: 0, ranking: 0 };
   const raw = Number(process.env.RETENTION_DAYS);
@@ -308,24 +334,18 @@ export function runDataRetentionPurge(): { respostas: number; ranking: number } 
       .query(`SELECT strftime('%Y-%m-%dT%H:%M:%SZ','now', ?) AS c`)
       .get(`-${days} days`) as { c: string };
     const cutoff = cutoffRow?.c;
-    if (!cutoff) return result;
 
-    while (true) {
-      const res = db
-        .query(`DELETE FROM respostas_alunos WHERE id IN (SELECT id FROM respostas_alunos WHERE criado_em < ? LIMIT 500)`)
-        .run(cutoff);
-      result.respostas += res.changes;
-      if (res.changes < 500) break;
+    if (cutoff) {
+      while (true) {
+        const res = db
+          .query(`DELETE FROM respostas_alunos WHERE id IN (SELECT id FROM respostas_alunos WHERE criado_em < ? LIMIT 500)`)
+          .run(cutoff);
+        result.respostas += res.changes;
+        if (res.changes < 500) break;
+      }
     }
 
-    while (true) {
-      const res = db
-        .query(`DELETE FROM ranking WHERE id IN (SELECT id FROM ranking WHERE data_envio < ? LIMIT 500)`)
-        .run(cutoff);
-      result.ranking += res.changes;
-      if (res.changes < 500) break;
-    }
-
+    result.ranking = purgeOldRanking(30);
     return result;
   } catch (e) {
     console.error('Erro no expurgo LGPD:', e);

@@ -3,7 +3,7 @@ import { unlinkSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword, verifyPassword, signJwt, verifyJwt } from './auth';
 import { resolveFrontendDir } from './marp';
-import { db, runDataRetentionPurge } from './db';
+import { db, runDataRetentionPurge, purgeOldRanking } from './db';
 import app from './routes';
 
 const ADMIN_SEED_PASSWORD = process.env.PROFESSOR_PASSWORD || 'MudeEstaSenha!';
@@ -436,6 +436,30 @@ describe('Auth Module & Multi-Professor System', () => {
 
     expect(db.query('SELECT id FROM respostas_alunos WHERE id = ?').get(old.id)).toBeNull();
     expect(db.query('SELECT id FROM respostas_alunos WHERE id = ?').get(fresh.id)).toBeDefined();
+  });
+
+  test('Retenção de Ranking: expurga registros com mais de 30 dias', async () => {
+    const atv = db.query('SELECT id FROM atividades LIMIT 1').get() as any;
+    const atvId = atv ? atv.id : 1;
+
+    const oldRank = db
+      .query(
+        `INSERT INTO ranking (atividade_id, nome_jogador, pontuacao, data_envio)
+         VALUES (?, ?, ?, datetime('now','-35 days')) RETURNING id`
+      )
+      .get(atvId, 'Piloto Antigo', 1500) as any;
+
+    const freshRank = db
+      .query(
+        `INSERT INTO ranking (atividade_id, nome_jogador, pontuacao)
+         VALUES (?, ?, ?) RETURNING id`
+      )
+      .get(atvId, 'Piloto Recente', 2000) as any;
+
+    purgeOldRanking(30);
+
+    expect(db.query('SELECT id FROM ranking WHERE id = ?').get(oldRank.id)).toBeNull();
+    expect(db.query('SELECT id FROM ranking WHERE id = ?').get(freshRank.id)).toBeDefined();
   });
 
   test('Correção objetiva no servidor retorna acertos/total/pontuacao (item 3.6)', async () => {
