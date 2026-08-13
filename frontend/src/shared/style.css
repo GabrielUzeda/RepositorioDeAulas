@@ -2,88 +2,226 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────
+   Design Tokens — RepositorioDeAulas
+   Princípios: Refactoring UI (Schoger) · NNGroup
+   ───────────────────────────────────────────────── */
+
 :root {
-  --c-surface: #f8fafc;
-  --c-surface-alt: #ffffff;
-  --c-primary: #0f172a;
-  --c-secondary: #475569;
-  --c-line: #64748b;
-  --c-accent: #4f46e5;
-  --c-danger: #e11d48;
-  --c-success: #059669;
-  --c-on-success: #0f172a;
-  --c-on-danger: #ffffff;
-  --c-danger-text: #be123c;
-  --c-cat-minigame: #9333ea;   --c-cat-minigame-bg: #f3e8ff;
-  --c-cat-roleta: #be185d;     --c-cat-roleta-bg: #fce7f3;
-  --c-cat-reforco: #166534;    --c-cat-reforco-bg: #dcfce7;
-  --c-cat-default: #1d4ed8;    --c-cat-default-bg: #dbeafe;
+  /* Surfaces — três camadas de elevação */
+  --c-canvas:       #f0f4f8;   /* página, fundo mais distante */
+  --c-surface:      #f8fafc;   /* painéis intermediários     */
+  --c-surface-alt:  #ffffff;   /* cards, modais, inputs       */
+
+  /* Tipografia — escala de contraste deliberada (Schoger: use gray, not black) */
+  --c-primary:      #1e2b3c;   /* headings, texto de alta prio — Slate 900+ azulado */
+  --c-secondary:    #4a6280;   /* body, rótulos, metadados   */
+  --c-muted:        #8ba2bc;   /* placeholders, hints        */
+
+  /* Bordas — contraste ≥ 3:1 contra surface */
+  --c-line:         #c5d4e3;   /* divisores sutis             */
+  --c-line-strong:  #8ba2bc;   /* bordas de input em foco    */
+
+  /* Accent / Ação primária — Azul Royal */
+  --c-accent:       #1d4ed8;   /* indigo-700 → royal blue    */
+  --c-accent-hover: #1e40af;   /* indigo-800                 */
+  --c-accent-light: #dbeafe;   /* fundo suave de destaque    */
+  --c-accent-text:  #1d4ed8;   /* texto de link              */
+
+  /* Estados semânticos */
+  --c-danger:       #dc2626;   /* red-600                    */
+  --c-danger-hover: #b91c1c;   /* red-700                    */
+  --c-danger-light: #fee2e2;   /* fundo suave de erro        */
+  --c-danger-text:  #991b1b;   /* red-800 — ≥ 4.5:1          */
+
+  --c-success:      #059669;   /* emerald-600                */
+  --c-success-light:#d1fae5;   /* fundo suave de sucesso     */
+  --c-success-text: #065f46;   /* emerald-800 — ≥ 4.5:1      */
+
+  --c-warning:      #d97706;   /* amber-600                  */
+  --c-warning-light:#fef3c7;
+  --c-warning-text: #92400e;   /* amber-800                  */
+
+  /* On-colors — texto SOBRE fundo colorido */
+  --c-on-accent:    #ffffff;
+  --c-on-danger:    #ffffff;
+  --c-on-success:   #ffffff;
+
+  /* Categorias de atividade — pares texto/fundo */
+  --c-cat-minigame:    #6d28d9;  --c-cat-minigame-bg:  #ede9fe;
+  --c-cat-roleta:      #9d174d;  --c-cat-roleta-bg:    #fce7f3;
+  --c-cat-reforco:     #065f46;  --c-cat-reforco-bg:   #d1fae5;
+  --c-cat-default:     #1d4ed8;  --c-cat-default-bg:   #dbeafe;
+
+  /* Sombras — elevação como linguagem (Schoger: shadows add depth) */
+  --shadow-xs:  0 1px 2px 0 rgb(0 40 80 / 0.06);
+  --shadow-sm:  0 1px 3px 0 rgb(0 40 80 / 0.08), 0 1px 2px -1px rgb(0 40 80 / 0.08);
+  --shadow-md:  0 4px 6px -1px rgb(0 40 80 / 0.08), 0 2px 4px -2px rgb(0 40 80 / 0.06);
+  --shadow-lg:  0 10px 15px -3px rgb(0 40 80 / 0.10), 0 4px 6px -4px rgb(0 40 80 / 0.08);
+  --shadow-xl:  0 20px 25px -5px rgb(0 40 80 / 0.12), 0 8px 10px -6px rgb(0 40 80 / 0.08);
+  --shadow-card:  var(--shadow-sm);
+  --shadow-modal: var(--shadow-xl);
+
+  /* Raios — linguagem de arredondamento consistente */
+  --radius-xs:  0.25rem;   /* 4px  — chips pequenos          */
+  --radius-sm:  0.375rem;  /* 6px  — controles (input/btn)  */
+  --radius-md:  0.5rem;    /* 8px  — cards                  */
+  --radius-lg:  0.75rem;   /* 12px — cards destaque         */
+  --radius-xl:  1rem;      /* 16px — painéis internos       */
+  --radius-2xl: 1.5rem;    /* 24px — modais                 */
+  --radius-full:9999px;    /* pill                          */
+
+  /* Tipografia — Inter como base (Schoger: system font pairs) */
+  --font-sans:  'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  /* Animações */
+  --transition-fast:   150ms ease;
+  --transition-base:   200ms ease;
+  --transition-slow:   300ms ease;
 }
 
+/* ── Dark Mode ───────────────────────────────────── */
 .dark {
-  --c-surface: #0f172a;
-  --c-surface-alt: #1e293b;
-  --c-primary: #f1f5f9;
-  --c-secondary: #cbd5e1;
-  --c-line: #64748b;
-  --c-accent: #4f46e5;
-  --c-danger: #f43f5e;
-  --c-success: #10b981;
-  --c-on-success: #0f172a;
-  --c-on-danger: #0f172a;
-  --c-danger-text: #fb7185;
-  --c-cat-minigame: #ede9fe;   --c-cat-minigame-bg: #4c1d95;
-  --c-cat-roleta: #fbcfe8;     --c-cat-roleta-bg: #831843;
-  --c-cat-reforco: #bbf7d0;    --c-cat-reforco-bg: #14532d;
-  --c-cat-default: #bfdbfe;    --c-cat-default-bg: #1e3a8a;
+  /* Superfícies NEUTRAS (sem matiz azul no fundo) */
+  --c-canvas:       #121212;
+  --c-surface:      #1e1e1e;
+  --c-surface-alt:  #242424;
+
+  --c-primary:      #e8f0fc;
+  --c-secondary:    #8ba8cc;
+  --c-muted:        #4a6280;
+
+  --c-line:         #1e3048;
+  --c-line-strong:  #2e4a6a;
+
+  /* Cores de MATIZ (accent + semânticas + categorias) — CONSTANTES nos dois temas.
+     Só os neutros (superfícies/texto/bordas/sombras) variam no modo escuro. */
+  --c-accent:       #1d4ed8;
+  --c-accent-hover: #1e40af;
+  --c-accent-light: #dbeafe;
+  --c-accent-text:  #1d4ed8;
+  --c-on-accent:    #ffffff;
+
+  --c-danger:       #dc2626;
+  --c-danger-hover: #b91c1c;
+  --c-danger-light: #fee2e2;
+  --c-danger-text:  #991b1b;
+  --c-on-danger:    #ffffff;
+
+  --c-success:      #059669;
+  --c-success-light:#d1fae5;
+  --c-success-text: #065f46;
+  --c-on-success:   #ffffff;
+
+  --c-warning:      #d97706;
+  --c-warning-light:#fef3c7;
+  --c-warning-text: #92400e;
+
+  --c-cat-minigame:    #6d28d9;  --c-cat-minigame-bg:  #ede9fe;
+  --c-cat-roleta:      #9d174d;  --c-cat-roleta-bg:    #fce7f3;
+  --c-cat-reforco:     #065f46;  --c-cat-reforco-bg:   #d1fae5;
+  --c-cat-default:     #1d4ed8;  --c-cat-default-bg:   #dbeafe;
+
+  --shadow-xs:  0 1px 2px 0 rgb(0 0 0 / 0.30);
+  --shadow-sm:  0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.25);
+  --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.40), 0 2px 4px -2px rgb(0 0 0 / 0.30);
+  --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / 0.45), 0 4px 6px -4px rgb(0 0 0 / 0.30);
+  --shadow-xl:  0 20px 25px -5px rgb(0 0 0 / 0.50), 0 8px 10px -6px rgb(0 0 0 / 0.35);
 }
 
-@layer utilities {
-  .card-hover {
-    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;
+/* ── Base Layer ──────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--c-canvas);
+    color: var(--c-primary);
+    line-height: 1.6;
   }
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar,
-.custom-scrollbar::-webkit-scrollbar {
+/* ── Utilities ───────────────────────────────────── */
+@layer utilities {
+  /* Hover de cards — elevação suave (Schoger: não só cor, use movimento) */
+  .card-hover {
+    @apply transition-all duration-200;
+    box-shadow: var(--shadow-card);
+  }
+  .card-hover:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+
+  /* Focus ring consistente e legível */
+  .focus-ring {
+    @apply outline-none;
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+  }
+
+  /* Gradiente sutil de header */
+  .header-gradient {
+    background: linear-gradient(135deg, var(--c-accent) 0%, var(--c-accent-hover) 100%);
+  }
+}
+
+/* ── Custom Scrollbars ───────────────────────────── */
+::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-::-webkit-scrollbar-track,
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--c-line-strong);
   border-radius: 9999px;
 }
-::-webkit-scrollbar-thumb,
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.8);
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover,
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.8);
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-accent);
 }
 
-/* Marp Slide styles */
+/* ── Marp Slide Styles ───────────────────────────── */
 .marp-slide section {
-  font-family: 'Inter', sans-serif;
-  background-color: #f4f6fb;
-  color: #2b2b2b;
+  font-family: var(--font-sans);
+  background-color: #f4f7fb;
+  color: #1e2b3c;
   font-size: 28px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 .marp-slide h1,
 .marp-slide h2,
 .marp-slide h3 {
-  font-family: 'Inter', serif;
-  color: #1a3a6e;
+  font-family: var(--font-sans);
+  color: #1d4ed8;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .marp-slide h2 {
-  border-bottom: 2px solid #1a3a6e;
-  padding-bottom: 5px;
+  border-bottom: 2px solid #dbeafe;
+  padding-bottom: 6px;
 }
 .marp-slide strong {
-  color: #d62828;
+  color: #dc2626;
   font-weight: 700;
+}
+
+/* ── Modal Transition ────────────────────────────── */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.97) translateY(4px);
 }

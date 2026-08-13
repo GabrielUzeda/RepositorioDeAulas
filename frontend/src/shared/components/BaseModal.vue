@@ -5,6 +5,7 @@ const props = defineProps<{
   modelValue: boolean
   title?: string
   maxWidth?: string
+  noPadding?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -18,18 +19,11 @@ function fechar() {
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') {
-    fechar()
-  }
+  if (event.key === 'Escape') fechar()
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', onKeydown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', onKeydown)
-})
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
@@ -37,32 +31,52 @@ onUnmounted(() => {
     <Transition name="modal-fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 bg-surface backdrop-blur-md flex items-center justify-center p-4 z-50"
-        @click.self="fechar"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        :aria-labelledby="title ? 'modal-title' : undefined"
       >
+        <!-- Backdrop — sutil blur com opacidade (Schoger: don't use pure black) -->
         <div
-          class="bg-surface-alt rounded-modal p-6 sm:p-8 w-full max-h-[90vh] flex flex-col shadow-modal relative border border-line"
+          class="absolute inset-0 bg-primary/30 backdrop-blur-sm"
+          @click="fechar"
+          aria-hidden="true"
+        />
+
+        <!-- Panel -->
+        <div
+          class="relative z-10 w-full flex flex-col bg-surface-alt border border-line rounded-2xl shadow-modal max-h-[90vh]"
           :class="maxWidth || 'max-w-2xl'"
         >
-          <div class="shrink-0">
+          <!-- Header -->
+          <div class="shrink-0 flex items-center justify-between gap-4 px-6 pt-5 pb-4 border-b border-line">
             <slot name="header">
-              <div class="flex justify-between items-start border-b pb-4">
-                <h2 v-if="title" class="text-2xl font-bold text-primary">{{ title }}</h2>
-                <button
-                  class="ml-auto text-secondary hover:text-primary p-2 rounded-full hover:bg-surface transition"
-                  @click="fechar"
-                >
-                  <span class="material-icons">close</span>
-                </button>
-              </div>
+              <h2
+                v-if="title"
+                id="modal-title"
+                class="text-h3 font-semibold text-primary leading-snug"
+              >{{ title }}</h2>
             </slot>
+
+            <button
+              class="ml-auto flex-shrink-0 -mt-0.5 p-1.5 rounded-md text-muted hover:text-primary hover:bg-surface transition-colors duration-base"
+              @click="fechar"
+              aria-label="Fechar modal"
+            >
+              <span class="material-icons text-[20px]">close</span>
+            </button>
           </div>
 
-          <div class="flex-1 min-h-0 overflow-y-auto pt-4">
+          <!-- Body -->
+          <div
+            class="flex-1 min-h-0 overflow-y-auto"
+            :class="noPadding ? '' : 'px-6 py-5'"
+          >
             <slot />
           </div>
 
-          <div class="shrink-0">
+          <!-- Footer -->
+          <div v-if="$slots.footer" class="shrink-0 border-t border-line px-6 py-4">
             <slot name="footer" />
           </div>
         </div>
@@ -70,15 +84,3 @@ onUnmounted(() => {
     </Transition>
   </Teleport>
 </template>
-
-<style scoped>
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
-}
-</style>
