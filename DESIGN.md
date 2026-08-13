@@ -78,7 +78,6 @@ Decisões de remediação aplicadas:
 | `ConfirmDialog.vue` | Diálogo de confirmação substituindo `window.confirm` (exclusões/reenvio LGPD). |
 | `BaseBadge.vue` | Pílula/chip de cabeçalho (ex.: status de e-mail enviado/pendente). |
 | `BaseTabs.vue` | Navegação por abas (ex.: Aulas/Atividades do Aluno). |
-| `FormField.vue` | Wrapper label + control + erro (disponível para formulários). |
 
 *(Auxiliares também presentes: `Toast.vue`, `ThemeToggle.vue` — não listados acima por estarem fora do escopo deste catálogo, mas seguem os mesmos tokens.)*
 

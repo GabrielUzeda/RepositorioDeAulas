@@ -11,6 +11,7 @@ import RespostasModal from '@/professor/components/RespostasModal.vue';
 import FeedbackConsolidadoModal from '@/professor/components/FeedbackConsolidadoModal.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
 import ConfirmDialog from '../shared/components/ConfirmDialog.vue';
+import EmptyState from '../shared/components/EmptyState.vue';
 import type { Curso, Disciplina, Aula, Atividade } from '@/shared/types';
 
 const router = useRouter();
@@ -241,9 +242,7 @@ function handleOpenRespostas(atividade: Atividade) {
           </div>
         </div>
 
-        <div v-if="cursoStore.cursos.length === 0" class="p-12 text-center border border-line rounded-3xl bg-surface text-secondary">
-          Você não possui acesso a nenhum curso no momento.
-        </div>
+        <EmptyState v-if="cursoStore.cursos.length === 0" message="Você não possui acesso a nenhum curso no momento." />
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div
@@ -290,9 +289,7 @@ function handleOpenRespostas(atividade: Atividade) {
           </button>
         </div>
 
-        <div v-if="cursoStore.disciplinas.length === 0" class="p-12 text-center border border-line rounded-3xl bg-surface text-secondary">
-          Nenhuma disciplina cadastrada neste curso.
-        </div>
+        <EmptyState v-if="cursoStore.disciplinas.length === 0" message="Nenhuma disciplina cadastrada neste curso." />
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div
@@ -358,9 +355,7 @@ function handleOpenRespostas(atividade: Atividade) {
             </button>
           </div>
 
-          <div v-if="cursoStore.aulas.length === 0" class="p-6 text-center border border-line rounded-2xl text-secondary text-xs">
-            Nenhuma aula cadastrada nesta disciplina.
-          </div>
+          <EmptyState v-if="cursoStore.aulas.length === 0" message="Nenhuma aula cadastrada nesta disciplina." />
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div v-for="(aula, idx) in cursoStore.aulas" :key="aula.id" class="p-4 bg-surface-alt border border-line rounded-2xl flex items-center justify-between">
@@ -401,9 +396,7 @@ function handleOpenRespostas(atividade: Atividade) {
             </button>
           </div>
 
-          <div v-if="cursoStore.atividades.length === 0" class="p-6 text-center border border-line rounded-2xl text-secondary text-xs">
-            Nenhuma atividade cadastrada nesta disciplina.
-          </div>
+          <EmptyState v-if="cursoStore.atividades.length === 0" message="Nenhuma atividade cadastrada nesta disciplina." />
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div v-for="(atv, idx) in cursoStore.atividades" :key="atv.id" class="p-4 bg-surface-alt border border-line rounded-2xl flex flex-col justify-between space-y-3">

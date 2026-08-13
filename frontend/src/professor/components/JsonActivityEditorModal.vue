@@ -7,6 +7,7 @@ import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 import BaseSelect from '@/shared/components/BaseSelect.vue';
+import EmptyState from '@/shared/components/EmptyState.vue';
 
 const tipoOptions = [
   { label: 'Normal', value: 'normal' },
@@ -278,9 +279,7 @@ function handleImportJson(e: Event) {
           </BaseButton>
         </div>
 
-        <div v-if="questions.length === 0" class="text-center py-12 bg-surface rounded-2xl border border-line text-secondary">
-          Nenhuma pergunta adicionada. Clique em "Adicionar Pergunta" para começar.
-        </div>
+        <EmptyState v-if="questions.length === 0" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
 
         <div v-if="!usesOptions" class="p-3 bg-surface border border-line rounded-xl text-secondary text-xs">
           <span class="material-icons text-sm align-middle mr-1 text-accent">edit_note</span>

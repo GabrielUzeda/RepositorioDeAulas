@@ -9,6 +9,7 @@ import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
+import EmptyState from '@/shared/components/EmptyState.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -169,10 +170,7 @@ function formatDate(isoStr: string) {
         <p class="mt-2 text-sm">Carregando relatório consolidado...</p>
       </div>
 
-      <div v-else-if="alunos.length === 0" class="text-center py-12 bg-surface rounded-2xl border border-line text-secondary">
-        <span class="material-icons text-4xl text-secondary">inbox</span>
-        <p class="mt-2 text-sm">Nenhuma resposta enviada por alunos nesta disciplina ainda.</p>
-      </div>
+      <EmptyState v-else-if="alunos.length === 0" icon="inbox" message="Nenhuma resposta enviada por alunos nesta disciplina ainda." />
 
       <div v-else class="space-y-6">
         <!-- 1. Feedback Geral da Turma -->

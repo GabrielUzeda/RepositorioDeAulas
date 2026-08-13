@@ -13,6 +13,7 @@ import ReforcoModal from '@/aluno/components/ReforcoModal.vue';
 import RoletaModal from '@/aluno/components/RoletaModal.vue';
 import MinigameModal from '@/aluno/components/MinigameModal.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
+import EmptyState from '@/shared/components/EmptyState.vue';
 import type { Curso, Disciplina, Aula, Atividade, Question } from '@/shared/types';
 import { useToast } from '@/shared/composables/useToast';
 
@@ -208,9 +209,7 @@ function goBack() {
           <p class="mt-2 text-sm">Carregando cursos...</p>
         </div>
 
-        <div v-else-if="cursoStore.cursos.length === 0" class="text-center py-12 bg-surface-alt rounded-2xl border border-line">
-          <p class="text-secondary">Nenhum curso disponível no momento.</p>
-        </div>
+        <EmptyState v-else-if="cursoStore.cursos.length === 0" message="Nenhum curso disponível no momento." />
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <CursoCard
@@ -239,9 +238,7 @@ function goBack() {
           <p class="mt-2 text-sm">Carregando disciplinas...</p>
         </div>
 
-        <div v-else-if="cursoStore.disciplinas.length === 0" class="text-center py-12 bg-surface-alt rounded-2xl border border-line">
-          <p class="text-secondary">Nenhuma disciplina disponível neste curso.</p>
-        </div>
+        <EmptyState v-else-if="cursoStore.disciplinas.length === 0" message="Nenhuma disciplina disponível neste curso." />
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <DisciplinaCard
@@ -285,9 +282,7 @@ function goBack() {
 
         <!-- Aulas Tab -->
         <div v-if="activeTab === 'aulas'">
-          <div v-if="cursoStore.aulas.length === 0" class="text-center py-12 bg-surface-alt rounded-2xl border border-line text-secondary">
-            Nenhuma aula disponível nesta disciplina.
-          </div>
+          <EmptyState v-if="cursoStore.aulas.length === 0" message="Nenhuma aula disponível nesta disciplina." />
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <AulaCard
               v-for="aula in cursoStore.aulas"
@@ -300,9 +295,7 @@ function goBack() {
 
         <!-- Atividades Tab -->
         <div v-else>
-          <div v-if="cursoStore.atividades.length === 0" class="text-center py-12 bg-surface-alt rounded-2xl border border-line text-secondary">
-            Nenhuma atividade disponível nesta disciplina.
-          </div>
+          <EmptyState v-if="cursoStore.atividades.length === 0" message="Nenhuma atividade disponível nesta disciplina." />
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <AtividadeCard
               v-for="atividade in cursoStore.atividades"

@@ -10,6 +10,7 @@ import BaseTextarea from '../../shared/components/BaseTextarea.vue';
 import BaseBadge from '../../shared/components/BaseBadge.vue';
 import BaseSpinner from '../../shared/components/BaseSpinner.vue';
 import ConfirmDialog from '../../shared/components/ConfirmDialog.vue';
+import EmptyState from '../../shared/components/EmptyState.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -200,10 +201,7 @@ function formatDate(isoStr: string) {
         <p class="text-sm font-semibold">{{ errorMessage }}</p>
       </div>
 
-      <div v-else-if="respostas.length === 0" class="text-center py-12 bg-surface rounded-2xl border border-line text-secondary">
-        <span class="material-icons text-4xl text-secondary">inbox</span>
-        <p class="mt-2 text-sm">Nenhuma resposta registrada para esta atividade até o momento.</p>
-      </div>
+      <EmptyState v-else-if="respostas.length === 0" icon="inbox" message="Nenhuma resposta registrada para esta atividade até o momento." />
 
       <div v-else class="space-y-4">
         <!-- Submission Details & Evaluation Section if selected -->

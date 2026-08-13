@@ -7,6 +7,7 @@ import ProfessorFormModal from '@/admin/components/ProfessorFormModal.vue';
 import CursoFormModal from '@/admin/components/CursoFormModal.vue';
 import ThemeToggle from '../shared/components/ThemeToggle.vue';
 import ConfirmDialog from '../shared/components/ConfirmDialog.vue';
+import EmptyState from '../shared/components/EmptyState.vue';
 import type { Professor, Curso } from '@/shared/types';
 
 const router = useRouter();
@@ -290,9 +291,7 @@ function logout() {
         </div>
 
         <div v-if="loading" class="text-center py-12 text-secondary">Carregando...</div>
-        <div v-else-if="cursos.length === 0" class="text-center py-12 bg-surface-alt rounded-2xl border border-line text-secondary">
-          Nenhum curso cadastrado.
-        </div>
+        <EmptyState v-else-if="cursos.length === 0" message="Nenhum curso cadastrado." />
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div

@@ -115,13 +115,12 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 |---|---|---|
 | `BaseModal.vue` | Shell de modal repetido (~13 modais). Overlay+container+header+close → `<BaseModal v-model @close>` com Teleport+Transition, overlay-click+Esc+X. | ✅ em uso nos 13 modais (exceto MarpEditor, que mantém layout fullscreen) |
 | `BaseSpinner.vue` | `material-icons animate-spin ... sync` repetido. | ✅ em uso (3 arquivos) |
-| `EmptyState.vue` | Vazios "Nenhum ..." repetidos. | ⚠️ criado, não usado ainda (disponível) |
+| `EmptyState.vue` | Vazios "Nenhum ..." repetidos. | ✅ **em uso** (AlunoView×4, AdminView, ProfessorView×4, JsonActivityEditorModal, RespostasModal, FeedbackConsolidadoModal) |
 | `ConfirmDialog.vue` | `window.confirm` em exclusões/reenvio (LGPD). | ✅ em uso (substituiu todos os `window.confirm`: AdminView×2, ProfessorView×3, RespostasModal, FeedbackConsolidadoModal) |
 | `BaseBadge.vue` | Pill de cabeçalho repetida nos modais. | ✅ em uso (1 arquivo) |
 | `BaseTabs.vue` | Tabs de AlunoView (aulas/atividades). | ⚠️ criado, não usado (AlunoView fora do escopo de migração) |
 | `BaseSelect.vue` | `<select>` em formulários. | ✅ em uso (2 arquivos) |
 | `BaseTextarea.vue` | `<textarea>` em 7 arquivos. | ✅ em uso (6 arquivos) |
-| `FormField.vue` | Wrapper label+control+erro. | ⚠️ criado, não usado (builders usaram BaseInput/BaseSelect direto com label/erro embutidos) |
 
 **Regras:** para criar novo componente, siga a convenção PascalCase em `src/shared/components/`; use apenas classes literais de tokens (nunca classes dinâmicas); aproveite `BaseButton`/`BaseInput`/`BaseCard` em vez de botões/inputs novos; migrar o trio base para as views é trabalho pendente (não feito ainda).
 
