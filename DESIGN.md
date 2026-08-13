@@ -105,4 +105,4 @@ Decisões de remediação aplicadas:
    ```
 3. Usar via classes literais (`bg-meu-token`, `text-meu-token`, `border-meu-token`).
 4. Para raio/sombra, seguir o mesmo padrão em `theme.extend.borderRadius` / `theme.extend.boxShadow` (ver seção 2).
-5. Documentar novo token/components neste `DESIGN.md` e no `debito.md` quando aplicável.
+5. Documentar novo token/components neste `DESIGN.md` quando aplicável.

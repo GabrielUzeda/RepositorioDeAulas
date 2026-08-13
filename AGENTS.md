@@ -243,37 +243,27 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 
 ---
 
-## 11. Design System — estado atual e débito técnico
+## 11. Design System — estado atual (débito técnico resolvido)
 
-> Documento canônico e autossuficiente: **`debito.md`** (raiz). Esta seção é o espelho para IAs.
+> Débito de design system resolvido em 2026-08-13 (ver histórico de commit). Documentação canônica de tokens/escalas/contraste: **`DESIGN.md`** (raiz). Esta seção é o espelho para IAs.
 
 ### 11.1 Tokens de cor (fonte de verdade)
-Definidos em `frontend/src/shared/style.css` como CSS vars, mapeados em `tailwind.config.js` (`colors → var(--c-*)`): `surface, surface-alt, primary, secondary, line, accent, danger, success`. Dark mode via classe `.dark` (ThemeToggle). **Não há tokens** para raio/espaçamento/sombra/tipografia.
+Definidos em `frontend/src/shared/style.css` como CSS vars, mapeados em `tailwind.config.js` (`colors → var(--c-*)`): `surface, surface-alt, primary, secondary, line, accent, danger, success` (+ `on-success, on-danger, danger-text` e `cat-{minigame,roleta,reforco,default}`/`-bg`). Dark mode via classe `.dark` (ThemeToggle). Tokens de raio (`rounded-control/card/modal/pill`), sombra (`shadow-card/modal`) e tipografia (`text-display/h1/h2/caption`) também definidos em `tailwind.config.js`; espaçamento segue a escala padrão do Tailwind.
 
-### 11.2 Dois sistemas de cor paralelos (débito de padronização)
-- Componentes **base/modais** usam os tokens (`bg-surface`, `text-secondary`, `border-line`, `ring-accent`, `bg-accent`, `bg-danger`).
-- Componentes de **conteúdo** usam paleta Tailwind **crua e fixa**, que **não responde ao dark mode**: `AtividadeCard.vue:17-23` (`bg-purple-100 text-purple-600` etc.), `RoletaModal.vue` (~12 `bg-pink-*/text-pink-*`), `MinigameModal.vue:51` (`bg-cyan-900 text-cyan-300`), `AdminView.vue:259` (`bg-purple-950...`). `ColorPicker`/`IconPicker` são exceção legítima (paleta de seleção).
+### 11.2 Padronização de cor (resolvido)
+- Todos os componentes (**base/modais** e **conteúdo**) usam os tokens `--c-*`; não há mais sistemas de cor paralelos. Chips de categoria de atividade usam `cat-*`, e `RoletaModal`/`MinigameModal`/`AdminView`/`AtividadeCard` migraram de cores Tailwind fixas (`purple-/pink-/cyan-/sky-`) para tokens. `ColorPicker`/`IconPicker` continuam exceção legítima (paleta de seleção).
 - **Regra ao editar UI:** prefira os tokens `--c-*`; não introduza novas cores Tailwind literais fixas (quebram o dark mode).
 
-### 11.3 Contraste WCAG 2.1 AA 4.5:1 — NÃO garantido (débito de acessibilidade)
-Medido em 2026-08-13. Texto normal exige ≥4.5:1; não-texto (bordas) exige ≥3:1.
+### 11.3 Contraste WCAG 2.1 AA 4.5:1 — resolvido
+Texto normal exige ≥4.5:1; não-texto (bordas) exige ≥3:1. Resolvido via tokens dedicados:
+- Botões de **sucesso/danger** e mensagens de **erro** usam `--c-on-success` / `--c-on-danger` / `--c-danger-text` (garante ≥4.5:1 nos dois temas).
+- Bordas/separadores usam `--c-line:#64748b` (≥3:1 contra `surface` em ambos os temas).
+- Texto principal/secundário e chips de categoria (`cat-*`) já atingiam ≥4.5:1.
 
-| Par (texto/fundo) | Tema | Ratio | Status |
-|---|---|---|---|
-| primary / surface | ambos | 13–18 | ✅ |
-| secondary / surface | ambos | 7–12 | ✅ |
-| branco / accent | ambos | 6.29 | ✅ |
-| **branco / success (verde)** | light | 3.77 | ⚠️ |
-| **branco / success (verde)** | **dark** | **2.54** | ❌ FAIL |
-| **branco / danger (rosa)** | **dark** | 3.67 | ⚠️ |
-| **texto danger (erro) / surface** | light | 4.49 | ⚠️ (falha por 0.01) |
-| borda `line` / surface | ambos | 1.2–1.7 | ❌ FAIL (não-texto) |
-| chip categoria rosa/verde/azul (AtividadeCard) | — | 3.0–4.24 | ❌ 3 de 4 falham |
-
-**Ação ao mexer em botões/erros:** manter `--c-success`/`--c-danger` (ou o texto dos botões) com contraste ≥4.5:1 nos dois temas; subir `--c-line` para ≥3:1.
+**Ao mexer em botões/erros:** usar os tokens `--c-on-success`/`--c-on-danger`/`--c-danger-text` (garante ≥4.5:1 nos dois temas); manter `--c-line` em ≥3:1.
 
 ### 11.4 Design system documentado
-Não há `DESIGN.md`/styleguide formal. O que existe: tokens em `style.css` + catálogo de componentes neste arquivo (seção 3) + `debito.md`. Ao criar componente, documente props/uso aqui e no `debito.md` quando for débito.
+Há `DESIGN.md` na raiz documentando tokens de cor, escalas de raio/sombra/tipografia, regra de contraste WCAG AA e catálogo de componentes. Ao criar componente, documente props/uso aqui e no `DESIGN.md`.
 
-### 11.5 Remediação pendente (ver `debito.md` item 8)
-1. Contraste de botões success/danger + erros (Alta). 2. Bordas ≥3:1 (Média). 3. Tokenizar cores fixas (Média). 4. Tokens de raio/espaçamento/sombra/tipografia (Baixa). 5. `DESIGN.md` (Média).
+### 11.5 Remediação — concluída (2026-08-13)
+1. ✅ Contraste de botões success/danger + erros (tokens `on-*`/`danger-text`). 2. ✅ Bordas ≥3:1 (`--c-line:#64748b`). 3. ✅ Tokenizar cores fixas (`cat-*`). 4. ✅ Tokens de raio/sombra/tipografia. 5. ✅ `DESIGN.md` criado.
