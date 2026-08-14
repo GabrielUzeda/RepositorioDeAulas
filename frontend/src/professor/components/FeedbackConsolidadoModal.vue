@@ -44,10 +44,11 @@ async function fetchRelatorio() {
   if (!props.disciplinaId) return;
   isLoading.value = true;
   try {
-    const res = await apiClient.get<DisciplinaFeedbackRelatorio>(`/disciplinas/${props.disciplinaId}/relatorio-feedback`);
+    const res = await apiClient.get<any>(`/disciplinas/${props.disciplinaId}/relatorio-feedback`);
     if (res.success && res.data) {
-      feedbackTurma.value = res.data.feedback_turma || '';
-      alunos.value = res.data.alunos || [];
+      const payload = res.data.data || res.data;
+      feedbackTurma.value = payload.feedback_turma || '';
+      alunos.value = payload.alunos || [];
     } else {
       useToast().error(res.error || 'Erro ao carregar relatório de feedback.');
     }

@@ -83,21 +83,20 @@
 
 /* ── Dark Mode ───────────────────────────────────── */
 .dark {
-  /* Superfícies NEUTRAS (sem matiz azul no fundo) */
-  --c-canvas:       #121212;
-  --c-surface:      #1e1e1e;
-  --c-surface-alt:  #242424;
-  --c-header-bg:    0 0 0;
+  /* Superfícies Slate/Zinc (Dark Mode Premium) */
+  --c-canvas:       #090d16;
+  --c-surface:      #111827;
+  --c-surface-alt:  #1f2937;
+  --c-header-bg:    17 24 39;
 
-  --c-primary:      #e8f0fc;
-  --c-secondary:    #8ba8cc;
-  --c-muted:        #4a6280;
+  --c-primary:      #f9fafb;
+  --c-secondary:    #9ca3af;
+  --c-muted:        #6b7280;
 
-  --c-line:         #1e3048;
-  --c-line-strong:  #2e4a6a;
+  --c-line:         #374151;
+  --c-line-strong:  #4b5563;
 
-  /* Cores de MATIZ (accent + semânticas + categorias) — CONSTANTES nos dois temas.
-     Só os neutros (superfícies/texto/bordas/sombras) variam no modo escuro. */
+  /* Cores de MATIZ (mantidas intactas conforme solicitado) */
   --c-accent:       #1d4ed8;
   --c-accent-hover: #1e40af;
   --c-accent-light: #dbeafe;

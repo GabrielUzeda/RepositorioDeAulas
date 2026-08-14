@@ -33,6 +33,15 @@ watch(
   }
 );
 
+watch(
+  () => props.loading,
+  (loading) => {
+    if (!loading) {
+      isSubmitting.value = false;
+    }
+  }
+);
+
 function handleSubmit() {
   if (isSubmitting.value || props.loading) return;
   if (passwordInput.value) {

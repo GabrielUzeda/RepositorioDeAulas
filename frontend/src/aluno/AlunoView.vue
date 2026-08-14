@@ -71,7 +71,7 @@ async function handleSelectDisciplina(disciplina: Disciplina) {
     }
   }
 
-  let cursoPwd = selectedCurso.value?.senha || '';
+  let cursoPwd = cursoSenha.value || selectedCurso.value?.senha || '';
   if (!cursoPwd && selectedCurso.value?.id) {
     cursoPwd = (await secureGet(`curso_senha_${selectedCurso.value.id}`)) || '';
   }
@@ -103,7 +103,7 @@ async function handlePasswordSubmit(password: string) {
         const curso = pendingCurso.value;
         pendingCurso.value = null;
 
-        if (selectedDisciplina.value && selectedDisciplina.value.curso_id === curso.id) {
+        if (selectedDisciplina.value && (selectedDisciplina.value.curso_id === curso.id || selectedCurso.value?.id === curso.id)) {
           await handleSelectDisciplina(selectedDisciplina.value);
         } else {
           await handleSelectCurso(curso);

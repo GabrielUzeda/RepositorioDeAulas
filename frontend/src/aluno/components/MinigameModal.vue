@@ -53,7 +53,7 @@ onUnmounted(() => {
         aria-modal="true"
       >
         <!-- Floating Close Button at Top Right -->
-        <div class="absolute top-4 right-4 z-50">
+        <div class="absolute top-4 right-4 z-[60]">
           <BaseButton
             variant="ghost"
             size="sm"

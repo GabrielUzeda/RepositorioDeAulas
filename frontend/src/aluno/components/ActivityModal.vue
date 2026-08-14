@@ -98,15 +98,21 @@ function selectOption(key: string, optionText: string) {
 }
 
 async function handleSubmit() {
-  if (!props.atividade || isSubmitting.value) return;
+  if (isSubmitting.value) return;
+  if (!alunoNome.value || !alunoEmail.value) {
+    errorMessage.value = 'Preencha seu nome e e-mail antes de enviar.';
+    return;
+  }
+  if (Object.keys(respostasMap.value).length === 0) {
+    errorMessage.value = 'Responda pelo menos uma questão antes de enviar.';
+    return;
+  }
+
   isSubmitting.value = true;
   errorMessage.value = '';
 
-  handleSaveDraft();
-
   try {
-    const res = await apiClient.post('/submeter-resposta', {
-      atividade_id: props.atividade.id,
+    const res = await apiClient.post(`/atividades/${props.atividade.id}/respostas`, {
       aluno_nome: alunoNome.value,
       aluno_email: alunoEmail.value,
       respostas: respostasMap.value,
