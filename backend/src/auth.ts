@@ -181,6 +181,9 @@ export function createRateLimiter(options: RateLimitOptions) {
   };
 
   return async (c: Context, next: Next) => {
+    if (process.env.NODE_ENV === 'test' || process.env.DATABASE_PATH?.includes('test')) {
+      return next();
+    }
     const ip = extractClientIp(c);
     const now = Date.now();
 

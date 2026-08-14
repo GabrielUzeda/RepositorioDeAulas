@@ -668,7 +668,7 @@ app.get('/cursos/:id/disciplinas', async (c) => {
       }
     }
   }
-  const rows = dbq('SELECT id, slug, nome, cor, icone, descricao FROM disciplinas WHERE curso_id = ? ORDER BY nome').all(id);
+  const rows = dbq('SELECT id, curso_id, slug, nome, cor, icone, descricao FROM disciplinas WHERE curso_id = ? ORDER BY nome').all(id);
   return c.json(rows);
 });
 
@@ -935,10 +935,10 @@ function generateConsultaToken(): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-app.post('/submeter-resposta', submissionLimiter, async (c) => {
+async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
   const body = await parseBody(c);
   if (!body) return c.text('Dados inválidos', 400);
-  const atividadeId = parseId(String(body.atividade_id));
+  const atividadeId = overrideAtividadeId ?? parseId(String(body.atividade_id));
   if (atividadeId === null) return c.text('ID de atividade inválido', 400);
   if (!body.aluno_nome || !body.aluno_email || !isValidEmail(body.aluno_email) || body.respostas === undefined) {
     return c.text('Informe nome, e-mail válido e respostas.', 400);
@@ -1003,6 +1003,14 @@ app.post('/submeter-resposta', submissionLimiter, async (c) => {
   } catch (e: any) {
     return c.text('Erro interno ao salvar resposta', 500);
   }
+}
+
+app.post('/submeter-resposta', submissionLimiter, async (c) => handleSubmeterResposta(c));
+
+app.post('/atividades/:id/respostas', submissionLimiter, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('ID inválido', 400);
+  return handleSubmeterResposta(c, id);
 });
 
 // Direitos do Titular (Art. 18 LGPD) - Consulta e exclusão de respostas próprias do aluno.
@@ -1597,6 +1605,34 @@ app.use('*', async (c, next) => {
       return;
     }
   }
+});
+
+app.post('/ranking', async (c) => {
+  const body = await parseBody(c);
+  if (!body || !body.atividade_id || !body.nome_jogador || body.pontuacao == null) {
+    return c.json({ success: false, error: 'Dados inválidos' }, 400);
+  }
+  const atividadeId = parseId(body.atividade_id);
+  if (atividadeId === null) return c.json({ success: false, error: 'ID de atividade inválido' }, 400);
+
+  const atv = dbq('SELECT * FROM atividades WHERE id = ?').get(atividadeId) as any;
+  if (!atv) return c.json({ success: false, error: 'Atividade não encontrada' }, 404);
+
+  const errSenha = validarSenhasSubmissao(body, atv);
+  if (errSenha) return c.json({ success: false, erro: errSenha }, 403);
+
+  const nomeJogador = String(body.nome_jogador).trim().slice(0, 30);
+  const pontuacao = Number(body.pontuacao);
+
+  dbq('INSERT INTO ranking (atividade_id, nome_jogador, pontuacao) VALUES (?, ?, ?)').run(atividadeId, nomeJogador, pontuacao);
+  return c.json({ success: true, message: 'Pontuação salva no ranking!' });
+});
+
+app.get('/ranking/:atividade_id', (c) => {
+  const atividadeId = parseId(c.req.param('atividade_id'));
+  if (atividadeId === null) return c.json([], 400);
+  const rows = dbq('SELECT id, atividade_id, nome_jogador, pontuacao, data_envio FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(atividadeId);
+  return c.json(rows);
 });
 
 export default app;
