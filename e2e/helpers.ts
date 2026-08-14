@@ -13,6 +13,9 @@ async function loginApi(request: APIRequestContext, email: string, password: str
   const res = await request.post(`${E2E_BACKEND_URL}/auth/login`, {
     data: { email, password }
   });
+  if (!res.ok()) {
+    console.error(`[loginApi error] Status: ${res.status()}, Body: ${await res.text()}`);
+  }
   expect(res.ok()).toBeTruthy();
   const body = await res.json();
   return body.token as string;
@@ -119,7 +122,7 @@ export async function cleanupEntities(request: APIRequestContext, adminToken: st
 /** Faz login pela UI no /login e espera a rota destino. */
 export async function loginViaUI(page: Page, email: string, password: string, expectedUrl: RegExp | string) {
   await page.goto('/login');
-  await page.getByPlaceholder('professor@local').fill(email);
+  await page.getByPlaceholder('professor@escola.edu').fill(email);
   await page.getByPlaceholder('••••••••').fill(password);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await page.waitForURL(expectedUrl);

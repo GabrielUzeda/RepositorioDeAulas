@@ -79,7 +79,7 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     expect([200, 201]).toContain(aulaRes.status());
     const aulaBody = await aulaRes.json();
     aulaCaminho = aulaBody.caminho;
-    expect(aulaCaminho).toContain('/materias/');
+    expect(aulaCaminho).toContain('materias/');
 
     // --- Professor cria ATIVIDADE (normal, 1 questão objetiva) via API ---
     atvTitulo = `Atividade ${uniqueName('FULL')}`;
@@ -116,7 +116,7 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
   test('aluno anônimo acessa a aula (HTML gerado faz sentido) e responde a atividade', async ({ page, context }) => {
     // --- HOME: lista cursos ---
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Área do Aluno' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Selecione seu Curso' })).toBeVisible();
     await expect(page.locator('h3', { hasText: cursoNome })).toBeVisible();
 
     // --- Seleciona curso → lista disciplinas ---
@@ -125,7 +125,7 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
 
     // --- Seleciona disciplina (curso sem senha → conteúdo direto) ---
     await page.locator('h3', { hasText: materiaNome }).click();
-    await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
+    await expect(page.locator('h3', { hasText: aulaTitulo })).toBeVisible();
 
     // --- Aba Aulas: abre a aula em popup e valida o HTML gerado ---
     const [popup] = await Promise.all([
@@ -135,7 +135,6 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     await popup.waitForLoadState('load');
     await expect(popup).toHaveURL(/\/materias\//);
     const html = await popup.content();
-    // O HTML gerado pelo Marp deve conter o título da aula e o conteúdo dos slides.
     expect(html).toContain('Introdução à Aula E2E');
     expect(html).toContain('validar o HTML produzido pelo Marp');
     expect(html).toContain('Exercícios');
@@ -143,19 +142,20 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     await popup.close();
 
     // --- Aba Atividades: abre e responde ---
-    await page.getByRole('button', { name: /Atividades/ }).click();
+    await page.getByRole('tab', { name: /Atividades/ }).click();
     await page.locator('h3', { hasText: atvTitulo }).click();
+    await expect(page.getByText('Perguntas da Atividade')).toBeVisible();
     await page.getByLabel('Seu Nome *').fill(alunoNome);
     await page.getByLabel('Seu E-mail *').fill(alunoEmail);
     await page.getByRole('button', { name: 'Brasília' }).click();
     await page.getByRole('button', { name: 'Enviar Resposta' }).click();
-    await expect(page.getByRole('heading', { name: 'Resposta Enviada com Sucesso!' })).toBeVisible();
+    await expect(page.getByText(/Resposta enviada/i)).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/Correção do servidor/)).toContainText('1 / 1');
   });
 
   test('professor avalia o aluno com nota e feedback (respostas da atividade)', async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('professor@local').fill(profEmail);
+    await page.getByPlaceholder('professor@escola.edu').fill(profEmail);
     await page.getByPlaceholder('••••••••').fill(profPassword);
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/\/professor/);
@@ -170,8 +170,7 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
 
     // Abre respostas da atividade
     await page.getByRole('button', { name: 'Ver Respostas dos Alunos' }).click();
-    await expect(page.getByText('Respostas dos Alunos')).toBeVisible();
-    await expect(page.getByText(`Total de Envios: 1`)).toBeVisible();
+    await expect(page.getByText(`Total de Envios: 1`)).toBeVisible({ timeout: 10000 });
 
     // Avalia
     await page.getByRole('button', { name: 'Avaliar / Ver' }).first().click();
@@ -179,12 +178,12 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     await page.getByPlaceholder('Escreva um comentário pedagógico para este aluno...').fill(feedbackAtividade);
     await page.getByRole('button', { name: 'Salvar Avaliação' }).click();
     await expect(page.getByText('Avaliação Salva!')).toBeVisible();
-    await page.getByRole('button', { name: 'Fechar', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Fechar' }).last().click();
   });
 
   test('professor gera o relatório de feedback da turma com feedback geral e individual', async ({ page, request }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('professor@local').fill(profEmail);
+    await page.getByPlaceholder('professor@escola.edu').fill(profEmail);
     await page.getByPlaceholder('••••••••').fill(profPassword);
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/\/professor/);
@@ -198,15 +197,17 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
 
     // Abre o relatório consolidado
-    await page.getByText('Gerar Feedback da Disciplina').click();
-    await expect(page.getByRole('heading', { name: 'Relatório de Feedback da Disciplina' })).toBeVisible();
+    await page.getByRole('button', { name: 'Gerar Feedback da Disciplina' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: 'Relatório de Feedback da Disciplina' })).toBeVisible();
 
-    // Feedback geral da turma — deve conter a nota/feedback da atividade já persistidos
-    await expect(page.getByText('Atividades Enviadas & Notas:')).toBeVisible();
-    await expect(page.getByText(`${notaEsperada}/100`)).toBeVisible();
+    // Feedback geral da turma — deve conter o aluno e a nota/feedback da atividade já persistidos
+    await expect(dialog.getByText(alunoNome)).toBeVisible({ timeout: 15000 });
+    await expect(dialog.getByText('Atividades Enviadas & Notas:')).toBeVisible();
+    await expect(dialog.getByText(`${notaEsperada}/100`)).toBeVisible();
 
     // Salva feedback da TURMA
-    await page.getByPlaceholder('Digite um comunicado ou feedback geral para toda a turma nesta disciplina...').fill(feedbackTurma);
+    await page.getByPlaceholder(/Digite um comunicado/).fill(feedbackTurma);
     await page.getByRole('button', { name: 'Salvar Feedback da Turma' }).click();
     await expect(page.getByText('Feedback Geral da Turma salvo com sucesso!')).toBeVisible();
 

@@ -93,8 +93,8 @@ test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
     await expect(page.locator('p', { hasText: aulaEditada }).first()).toBeVisible();
 
     // ---------- Aula: DELETE ----------
-    await acceptDialogs(page);
     await page.locator('p', { hasText: aulaEditada }).locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]').locator('button[title="Excluir Aula"]').click();
+    await page.getByRole('button', { name: 'Excluir' }).click();
     await expect(page.locator('p', { hasText: aulaEditada })).toHaveCount(0);
 
     // ---------- Atividade: CREATE ----------
@@ -120,14 +120,16 @@ test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
 
     // ---------- Atividade: DELETE ----------
     await page.locator('p', { hasText: atvEditada }).locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]').locator('button[title="Excluir Atividade"]').click();
+    await page.getByRole('button', { name: 'Excluir' }).click();
     await expect(page.locator('p', { hasText: atvEditada })).toHaveCount(0);
 
     // ---------- Volta para lista de disciplinas e exclui ----------
-    await page.getByRole('button', { name: 'arrow_back' }).click();
+    await page.getByRole('button', { name: /Voltar/i }).click();
     await expect(page.getByRole('button', { name: 'Nova Disciplina' })).toBeVisible();
     const discCardFinal = page.locator('h3', { hasText: discEditada }).locator('xpath=ancestor::div[contains(@class,"rounded") or contains(@class,"card")][1]');
     await expect(discCardFinal).toBeVisible();
     await discCardFinal.locator('button[title="Excluir Disciplina"]').click();
+    await page.getByRole('button', { name: 'Excluir' }).click();
     await expect(discCardFinal).toHaveCount(0);
   });
 });

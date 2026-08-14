@@ -1,20 +1,13 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
-  createCurso,
-  createProfessor,
   setupAdminContext,
+  createProfessor,
   cleanupEntities,
   loginViaUI,
   uniqueName
 } from '../helpers';
-
-async function acceptDialogs(page: Page) {
-  page.on('dialog', (d) => {
-    d.accept().catch(() => {});
-  });
-}
 
 test.describe('Admin — CRUD de Professores', () => {
   let adminToken: string;
@@ -26,7 +19,7 @@ test.describe('Admin — CRUD de Professores', () => {
 
   test('cria, edita e exclui um professor pela UI', async ({ page }) => {
     await loginViaUI(page, ADMIN_EMAIL, ADMIN_PASSWORD, /\/admin/);
-    await expect(page.getByRole('heading', { name: 'Painel do Administrador' })).toBeVisible();
+    await expect(page.getByText('Painel Administrador')).toBeVisible();
 
     const nome = uniqueName('ProfUI');
     profEmail = `${uniqueName('profui')}@local`;
@@ -37,7 +30,7 @@ test.describe('Admin — CRUD de Professores', () => {
     await page.locator('form').getByLabel('E-mail').fill(profEmail);
     await page.locator('form').getByLabel('Senha').fill('senha12345');
     await page.locator('form').getByLabel('Perfil').selectOption('professor');
-    await page.getByRole('button', { name: 'Criar', exact: true }).click();
+    await page.getByRole('button', { name: 'Salvar Professor' }).click();
     await expect(page.locator('tbody', { hasText: profEmail })).toBeVisible();
 
     // --- UPDATE ---
@@ -45,18 +38,17 @@ test.describe('Admin — CRUD de Professores', () => {
     const novoNome = `${nome} Editado`;
     await row.locator('button', { hasText: 'edit' }).click();
     await page.locator('form').getByLabel('Nome').fill(novoNome);
-    await page.getByRole('button', { name: 'Salvar', exact: true }).click();
+    await page.getByRole('button', { name: 'Salvar Professor' }).click();
     await expect(page.locator('tr', { hasText: novoNome })).toBeVisible();
 
     // --- DELETE ---
-    await acceptDialogs(page);
     await page.locator('tr', { hasText: novoNome }).locator('button', { hasText: 'delete' }).click();
+    await page.getByRole('button', { name: 'Excluir', exact: true }).click();
     await expect(page.locator('tr', { hasText: novoNome })).toHaveCount(0);
   });
 
   test.afterEach(async ({ request }) => {
-    if (adminToken) {
-      // Tenta limpar por API caso o DELETE da UI não tenha acontecido
+    if (adminToken && profEmail) {
       const res = await request.get(`${process.env.E2E_BACKEND_URL || 'http://localhost:18080'}/professores`, {
         headers: { Authorization: `Bearer ${adminToken}` }
       });
@@ -94,7 +86,7 @@ test.describe('Admin — CRUD de Cursos', () => {
 
   test('cria, edita e exclui um curso pela UI atribuindo um professor', async ({ page }) => {
     await loginViaUI(page, ADMIN_EMAIL, ADMIN_PASSWORD, /\/admin/);
-    await page.getByRole('button', { name: 'Cursos', exact: true }).click();
+    await page.getByRole('tab', { name: /Cursos/ }).click();
 
     const nome = uniqueName('CursoUI');
 
@@ -102,23 +94,23 @@ test.describe('Admin — CRUD de Cursos', () => {
     await page.getByRole('button', { name: 'Novo Curso' }).click();
     await page.locator('form').getByLabel('Nome do Curso *').fill(nome);
     await page.locator('form').getByLabel('Descrição').fill('Curso criado pela UI de teste');
-    await page.locator('label', { hasText: professorEmail }).locator('input[type="checkbox"]').check();
+    await page.locator('button', { hasText: professorEmail }).click();
     await page.getByRole('button', { name: 'Salvar Curso' }).click();
-    const card = page.locator('h3', { hasText: nome }).locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]');
+    const card = page.locator('div.bg-surface-alt', { has: page.locator('h3', { hasText: nome }) });
     await expect(card).toBeVisible();
     await expect(card).toContainText('1 professores');
 
     // --- UPDATE ---
-    const novoNome = `${nome} Editado`;
+    const novoNome = `${nome} Alt`;
     await card.locator('button', { hasText: 'edit' }).click();
     await page.locator('form').getByLabel('Nome do Curso *').fill(novoNome);
     await page.getByRole('button', { name: 'Salvar Curso' }).click();
-    const cardUpdated = page.locator('h3', { hasText: novoNome }).locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]');
-    await expect(cardUpdated).toBeVisible();
+    const cardNovo = page.locator('div.bg-surface-alt', { has: page.locator('h3', { hasText: novoNome }) });
+    await expect(cardNovo).toBeVisible();
 
     // --- DELETE ---
-    await acceptDialogs(page);
-    await cardUpdated.locator('button', { hasText: 'delete' }).click();
-    await expect(cardUpdated).toHaveCount(0);
+    await cardNovo.locator('button', { hasText: 'delete' }).click();
+    await page.getByRole('button', { name: 'Excluir', exact: true }).click();
+    await expect(page.locator('h3', { hasText: novoNome })).toHaveCount(0);
   });
 });

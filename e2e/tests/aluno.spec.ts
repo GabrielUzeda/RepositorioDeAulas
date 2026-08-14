@@ -89,26 +89,27 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
   test('aluno anônimo navega, desbloqueia curso com senha, vê aula e responde atividade', async ({ page, context }) => {
     // --- HOME: lista cursos ---
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Área do Aluno' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Selecione seu Curso' })).toBeVisible();
     await expect(page.locator('h3', { hasText: cursoNome })).toBeVisible();
 
-    // --- Seleciona curso com senha → modal de senha ---
+    // --- Seleciona curso ---
     await page.locator('h3', { hasText: cursoNome }).click();
+    await expect(page.locator('h3', { hasText: materiaNome })).toBeVisible();
+
+    // --- Seleciona disciplina de curso com senha → modal de senha ---
+    await page.locator('h3', { hasText: materiaNome }).click();
     await expect(page.getByText('Acesso Restrito')).toBeVisible();
 
     // --- Senha errada mostra alerta/erro e continua no modal ---
-    page.on('dialog', (d) => d.accept());
     await page.getByPlaceholder('Digite a senha').fill('senha-errada');
     await page.getByRole('button', { name: 'Confirmar' }).click();
     await expect(page.getByText('Acesso Restrito')).toBeVisible();
 
-    // --- Senha correta desbloqueia o curso e mostra as matérias ---
+    // --- Senha correta desbloqueia e entra no conteúdo da disciplina ---
     await page.getByPlaceholder('Digite a senha').fill('curso123');
     await page.getByRole('button', { name: 'Confirmar' }).click();
-    await expect(page.locator('h3', { hasText: materiaNome })).toBeVisible();
-
-    // --- Seleciona matéria ---
-    await page.locator('h3', { hasText: materiaNome }).click();
+    await expect(page.getByText('Acesso Restrito')).toBeHidden();
+    await expect(page.locator('h3', { hasText: aulaTitulo })).toBeVisible({ timeout: 15000 });
 
     // --- Aba Aulas: card da aula aparece e abre em nova aba (slides Marp) ---
     await expect(page.locator('h3', { hasText: aulaTitulo })).toBeVisible();
@@ -120,7 +121,7 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
     await aulaPage.close();
 
     // --- Aba Atividades: abre a atividade e responde ---
-    await page.getByRole('button', { name: /Atividades/ }).click();
+    await page.getByRole('tab', { name: /Atividades/ }).click();
     await expect(page.locator('h3', { hasText: atvTitulo })).toBeVisible();
     await page.locator('h3', { hasText: atvTitulo }).click();
     await expect(page.getByText('Perguntas da Atividade')).toBeVisible();
@@ -128,7 +129,7 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
 
     await page.getByLabel('Seu Nome *').fill('Aluno E2E');
     await page.getByLabel('Seu E-mail *').fill('aluno.e2e@local');
-    await page.getByLabel('Suas Respostas *').fill('Brasília');
+    await page.getByRole('button', { name: 'Brasília' }).click();
     await page.getByRole('button', { name: 'Enviar Resposta' }).click();
   });
 });

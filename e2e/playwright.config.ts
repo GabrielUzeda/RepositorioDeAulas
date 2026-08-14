@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export const E2E_FRONTEND_URL = process.env.E2E_FRONTEND_URL || 'http://localhost:15173';
 export const E2E_BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://localhost:18080';
-export const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@escola.com';
+export const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || process.env.PROFESSOR_EMAIL || 'admin@escola.com';
 const E2E_PASSWORD = process.env.E2E_ADMIN_PASSWORD || process.env.PROFESSOR_PASSWORD;
 if (!E2E_PASSWORD) {
   throw new Error('E2E_ADMIN_PASSWORD (ou PROFESSOR_PASSWORD) deve ser definido para rodar os testes E2E.');
