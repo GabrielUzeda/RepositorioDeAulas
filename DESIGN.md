@@ -15,6 +15,7 @@ Documento canônico do design system do frontend. Stack: **Vue 3 + Vite + Tailwi
 | `--c-canvas` | `bg-canvas` | `#f0f4f8` | `#121212` | Fundo da página (mais distante) |
 | `--c-surface` | `bg-surface` | `#f8fafc` | `#1e1e1e` | Painéis intermediários |
 | `--c-surface-alt` | `bg-surface-alt` | `#ffffff` | `#242424` | Cards, modais, inputs (mais perto do usuário) |
+| `--c-header-bg` | `bg-header-bg` | `#ffffff` | `#000000` | Header do topo da página |
 
 > **Schoger:** Três camadas de superfície criam profundidade real sem usar bordas pesadas.
 >

@@ -12,6 +12,7 @@
   --c-canvas:       #f0f4f8;   /* página, fundo mais distante */
   --c-surface:      #f8fafc;   /* painéis intermediários     */
   --c-surface-alt:  #ffffff;   /* cards, modais, inputs       */
+  --c-header-bg:    255 255 255;/* topo da página (header) em RGB */
 
   /* Tipografia — escala de contraste deliberada (Schoger: use gray, not black) */
   --c-primary:      #1e2b3c;   /* headings, texto de alta prio — Slate 900+ azulado */
@@ -86,6 +87,7 @@
   --c-canvas:       #121212;
   --c-surface:      #1e1e1e;
   --c-surface-alt:  #242424;
+  --c-header-bg:    0 0 0;
 
   --c-primary:      #e8f0fc;
   --c-secondary:    #8ba8cc;
@@ -146,6 +148,13 @@
     background-color: var(--c-canvas);
     color: var(--c-primary);
     line-height: 1.6;
+    transition: background-color var(--transition-base), color var(--transition-base);
+  }
+
+  .bg-surface,
+  .bg-surface-alt,
+  .bg-canvas {
+    transition: background-color var(--transition-base), border-color var(--transition-base), color var(--transition-base);
   }
 }
 
@@ -224,4 +233,15 @@
 .modal-fade-leave-to {
   opacity: 0;
   transform: scale(0.97) translateY(4px);
+}
+
+/* ── Page Transition ─────────────────────────────── */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
 }

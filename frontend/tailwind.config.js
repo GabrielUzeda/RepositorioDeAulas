@@ -16,6 +16,7 @@ export default {
         canvas:       'var(--c-canvas)',
         surface:      'var(--c-surface)',
         'surface-alt':'var(--c-surface-alt)',
+        'header-bg':  'rgb(var(--c-header-bg) / <alpha-value>)',
 
         /* Text */
         primary:      'var(--c-primary)',
