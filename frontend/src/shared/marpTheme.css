@@ -353,18 +353,29 @@
 [data-theme="default"] #controls-bar #counter,
 [data-theme="default"] #controls-bar #zoom-level,
 [data-theme="default"] #controls-bar .zoom-indicator,
+[data-theme="default"] #controls-bar .clock-display,
 [data-theme="light"] #controls-bar .slide-counter,
 [data-theme="light"] #controls-bar #counter,
 [data-theme="light"] #controls-bar #zoom-level,
-[data-theme="light"] #controls-bar .zoom-indicator {
+[data-theme="light"] #controls-bar .zoom-indicator,
+[data-theme="light"] #controls-bar .clock-display {
   color: #475569;
 }
 
 [data-theme="dark"] #controls-bar .slide-counter,
 [data-theme="dark"] #controls-bar #counter,
 [data-theme="dark"] #controls-bar #zoom-level,
-[data-theme="dark"] #controls-bar .zoom-indicator {
+[data-theme="dark"] #controls-bar .zoom-indicator,
+[data-theme="dark"] #controls-bar .clock-display {
   color: #94a3b8;
+}
+
+#controls-bar .clock-display {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 0 4px;
 }
 
 #controls-bar .ctrl-btn svg {
