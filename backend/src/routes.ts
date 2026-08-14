@@ -7,7 +7,7 @@ import { db, purgeOldRanking } from './db';
 import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail } from './utils';
 import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter, extractClientIp } from './auth';
 import { sendMail, type MailRequest } from './mailer';
-import { processMarpContent, resolveFrontendDir } from './marp';
+import { processMarpContent, resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
 
 const app = new Hono();
 
@@ -548,6 +548,17 @@ app.delete('/aulas/:id', professorAuth, async (c) => {
   dbq('DELETE FROM aulas WHERE id = ?').run(id);
   removeAulaFiles(aula.caminho);
   return c.body(null, 204);
+});
+
+app.post('/marp/render', professorAuth, async (c) => {
+  const body = await parseBody(c);
+  if (!body) return c.text('', 400);
+  const { titulo, markdown } = body as { titulo?: unknown; markdown?: unknown };
+  if (typeof titulo !== 'string' || typeof markdown !== 'string' || markdown.trim() === '') {
+    return c.json({ error: 'invalid body' }, 400);
+  }
+  const html = generateMarpNextStandaloneHtml(titulo, markdown);
+  return c.json({ html });
 });
 
 app.post('/atividades', professorAuth, createAtividade);
