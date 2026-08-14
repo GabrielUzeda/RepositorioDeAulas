@@ -98,12 +98,17 @@ async function fetchRespostas() {
   if (!props.atividade) return;
   isLoading.value = true;
   errorMessage.value = '';
-  const res = await apiClient.get<RespostaAluno[]>(`/atividades/${props.atividade.id}/respostas`);
-  isLoading.value = false;
-  if (res.success && res.data) {
-    respostas.value = res.data;
-  } else {
-    errorMessage.value = res.error || 'Erro ao carregar as respostas dos alunos.';
+  try {
+    const res = await apiClient.get<RespostaAluno[]>(`/atividades/${props.atividade.id}/respostas`);
+    if (res.success && res.data) {
+      respostas.value = res.data;
+    } else {
+      errorMessage.value = res.error || 'Erro ao carregar as respostas dos alunos.';
+    }
+  } catch (err: any) {
+    errorMessage.value = err.message || 'Erro ao carregar as respostas dos alunos.';
+  } finally {
+    isLoading.value = false;
   }
 }
 
@@ -114,29 +119,32 @@ function handleSelectResposta(resp: RespostaAluno) {
 }
 
 async function handleSaveAvaliacao() {
-  if (!selectedResposta.value) return;
+  if (!selectedResposta.value || isSavingAvaliacao.value) return;
   isSavingAvaliacao.value = true;
-  
 
-  const res = await apiClient.put(`/respostas/${selectedResposta.value.id}/avaliacao`, {
-    nota: editingNota.value,
-    feedback: editingFeedback.value
-  });
+  try {
+    const res = await apiClient.put(`/respostas/${selectedResposta.value.id}/avaliacao`, {
+      nota: editingNota.value,
+      feedback: editingFeedback.value
+    });
 
-  isSavingAvaliacao.value = false;
-
-  if (res.success) {
-    useToast().success('Avaliação Salva!');
-    selectedResposta.value.nota = editingNota.value;
-    selectedResposta.value.feedback = editingFeedback.value;
-    
-    const idx = respostas.value.findIndex(r => r.id === selectedResposta.value?.id);
-    if (idx !== -1) {
-      respostas.value[idx].nota = editingNota.value;
-      respostas.value[idx].feedback = editingFeedback.value;
+    if (res.success) {
+      useToast().success('Avaliação Salva!');
+      selectedResposta.value.nota = editingNota.value;
+      selectedResposta.value.feedback = editingFeedback.value;
+      
+      const idx = respostas.value.findIndex(r => r.id === selectedResposta.value?.id);
+      if (idx !== -1) {
+        respostas.value[idx].nota = editingNota.value;
+        respostas.value[idx].feedback = editingFeedback.value;
+      }
+    } else {
+      useToast().error(res.error || 'Erro ao salvar avaliação.');
     }
-  } else {
-    useToast().error(res.error || 'Erro ao salvar avaliação.');
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao salvar avaliação.');
+  } finally {
+    isSavingAvaliacao.value = false;
   }
 }
 
@@ -146,14 +154,18 @@ function requestDeleteResposta(id: number) {
 }
 
 async function handleDeleteResposta(id: number) {
-  const res = await apiClient.delete(`/respostas/${id}`);
-  if (res.success) {
-    respostas.value = respostas.value.filter((r) => r.id !== id);
-    if (selectedResposta.value?.id === id) {
-      selectedResposta.value = null;
+  try {
+    const res = await apiClient.delete(`/respostas/${id}`);
+    if (res.success) {
+      respostas.value = respostas.value.filter((r) => r.id !== id);
+      if (selectedResposta.value?.id === id) {
+        selectedResposta.value = null;
+      }
+    } else {
+      useToast().error('Erro ao excluir resposta.');
     }
-  } else {
-    useToast().error('Erro ao excluir resposta.');
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao excluir resposta.');
   }
 }
 
@@ -248,11 +260,10 @@ function formatDate(isoStr: string) {
               <BaseButton
                 variant="primary"
                 size="sm"
-                :disabled="isSavingAvaliacao"
+                :loading="isSavingAvaliacao"
                 @click="handleSaveAvaliacao"
               >
-                <span v-if="isSavingAvaliacao" class="material-icons text-xs animate-spin">sync</span>
-                <span v-else class="material-icons text-xs">save</span>
+                <span class="material-icons text-xs">save</span>
                 <span>Salvar Avaliação</span>
               </BaseButton>
             </div>

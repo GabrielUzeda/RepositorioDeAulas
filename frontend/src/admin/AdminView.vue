@@ -10,7 +10,7 @@ import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseBadge from '@/shared/components/BaseBadge.vue';
-import BaseSpinner from '@/shared/components/BaseSpinner.vue';
+import BaseSkeleton from '@/shared/components/BaseSkeleton.vue';
 import BackButton from '@/shared/components/BackButton.vue';
 import type { Professor, Curso } from '@/shared/types';
 
@@ -21,7 +21,8 @@ const activeTab = ref<'professores' | 'cursos'>('professores');
 
 const professores = ref<Professor[]>([]);
 const cursos = ref<Curso[]>([]);
-const loading = ref(false);
+const loadingProfessores = ref(false);
+const loadingCursos = ref(false);
 const error = ref('');
 
 const showProfessorModal = ref(false);
@@ -36,26 +37,32 @@ onMounted(() => {
 });
 
 async function fetchProfessores() {
-  loading.value = true;
+  loadingProfessores.value = true;
   error.value = '';
-  const res = await apiClient.get<Professor[]>('/professores');
-  loading.value = false;
-  if (res.success && res.data) {
-    professores.value = res.data;
-  } else {
-    error.value = res.error || 'Falha ao carregar professores.';
+  try {
+    const res = await apiClient.get<Professor[]>('/professores');
+    if (res.success && res.data) {
+      professores.value = res.data;
+    } else {
+      error.value = res.error || 'Falha ao carregar professores.';
+    }
+  } finally {
+    loadingProfessores.value = false;
   }
 }
 
 async function fetchCursos() {
-  loading.value = true;
+  loadingCursos.value = true;
   error.value = '';
-  const res = await apiClient.get<Curso[]>('/cursos');
-  loading.value = false;
-  if (res.success && res.data) {
-    cursos.value = res.data;
-  } else {
-    error.value = res.error || 'Falha ao carregar cursos.';
+  try {
+    const res = await apiClient.get<Curso[]>('/cursos');
+    if (res.success && res.data) {
+      cursos.value = res.data;
+    } else {
+      error.value = res.error || 'Falha ao carregar cursos.';
+    }
+  } finally {
+    loadingCursos.value = false;
   }
 }
 
@@ -185,7 +192,7 @@ function logout() {
 <template>
   <div class="min-h-screen bg-canvas text-primary">
     <!-- Header -->
-    <header class="sticky top-0 z-30 border-b border-line bg-surface-alt/80 backdrop-blur-md">
+    <header class="sticky top-0 z-30 border-b border-line bg-header-bg/80 backdrop-blur-md">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-md bg-accent flex items-center justify-center text-white">
@@ -251,8 +258,33 @@ function logout() {
           </BaseButton>
         </div>
 
-        <div v-if="loading" class="flex justify-center py-16">
-          <BaseSpinner label="Carregando professores..." />
+        <!-- Skeleton da tabela de professores durante o carregamento -->
+        <div v-if="loadingProfessores" class="bg-surface-alt rounded-md border border-line overflow-hidden shadow-xs" aria-busy="true" aria-label="Carregando professores">
+          <table class="w-full text-xs text-left">
+            <thead>
+              <tr class="bg-surface border-b border-line text-muted font-semibold uppercase tracking-wider">
+                <th class="px-5 py-3">Nome</th>
+                <th class="px-5 py-3">E-mail</th>
+                <th class="px-5 py-3">Perfil</th>
+                <th class="px-5 py-3">Cursos</th>
+                <th class="px-5 py-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-line">
+              <tr v-for="n in 5" :key="n">
+                <td class="px-5 py-3.5"><BaseSkeleton height="h-3.5" width="w-28" /></td>
+                <td class="px-5 py-3.5"><BaseSkeleton height="h-3.5" width="w-40" /></td>
+                <td class="px-5 py-3.5"><BaseSkeleton height="h-5" width="w-16" rounded="rounded-full" /></td>
+                <td class="px-5 py-3.5"><BaseSkeleton height="h-5" width="w-20" rounded="rounded-full" /></td>
+                <td class="px-5 py-3.5 text-right">
+                  <div class="flex justify-end gap-1">
+                    <BaseSkeleton height="h-6" width="w-6" rounded="rounded-md" />
+                    <BaseSkeleton height="h-6" width="w-6" rounded="rounded-md" />
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <EmptyState
@@ -327,8 +359,32 @@ function logout() {
           </BaseButton>
         </div>
 
-        <div v-if="loading" class="flex justify-center py-16">
-          <BaseSpinner label="Carregando cursos..." />
+        <!-- Skeleton dos cards de cursos durante o carregamento -->
+        <div v-if="loadingCursos" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true" aria-label="Carregando cursos">
+          <div
+            v-for="n in 6"
+            :key="n"
+            class="bg-surface-alt rounded-md border border-line p-5 shadow-xs flex flex-col justify-between"
+          >
+            <div>
+              <div class="flex justify-between items-start mb-3">
+                <BaseSkeleton width="w-10" height="h-10" rounded="rounded-md" />
+                <div class="flex gap-1">
+                  <BaseSkeleton width="w-6" height="h-6" rounded="rounded-md" />
+                  <BaseSkeleton width="w-6" height="h-6" rounded="rounded-md" />
+                </div>
+              </div>
+              <div class="space-y-2">
+                <BaseSkeleton height="h-4" width="w-3/4" />
+                <BaseSkeleton height="h-3" width="w-full" />
+                <BaseSkeleton height="h-3" width="w-2/3" />
+              </div>
+            </div>
+            <div class="flex items-center gap-3 pt-3 mt-4 border-t border-line">
+              <BaseSkeleton height="h-3" width="w-20" />
+              <BaseSkeleton height="h-3" width="w-20" />
+            </div>
+          </div>
         </div>
 
         <EmptyState

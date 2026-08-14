@@ -60,6 +60,7 @@ function resetGame() {
 }
 
 const remainingCount = computed(() => availableQuestions.value.length);
+const errosCount = computed(() => answeredCount.value - acertosCount.value);
 const isCompleted = computed(() => props.questions.length > 0 && availableQuestions.value.length === 0);
 
 function isOptCorrect(opt: any): boolean {
@@ -106,7 +107,7 @@ function handleSelectOption(opt: Option) {
 }
 
 function handleConfirmAnswer() {
-  if (!selectedOption.value || !currentQuestion.value) return;
+  if (isAnswerConfirmed.value || !selectedOption.value || !currentQuestion.value) return;
   isAnswerConfirmed.value = true;
 
   if (isOptCorrect(selectedOption.value)) {
@@ -146,28 +147,12 @@ function handleNextQuestion() {
       </div>
     </template>
 
-    <div class="space-y-6 relative">
-      <!-- Counters bar -->
-      <div class="flex justify-between items-center flex-wrap gap-3 pb-2 border-b border-line">
-        <span class="text-xs text-secondary font-medium">
-          Sorteio interativo de perguntas para fixação e prática.
-        </span>
-        <div class="flex items-center space-x-3 text-xs font-bold">
-          <BaseBadge variant="success">
-            Respondidas: {{ answeredCount }}
-          </BaseBadge>
-
-          <BaseBadge variant="accent">
-            Restantes: {{ remainingCount }}
-          </BaseBadge>
-        </div>
-      </div>
-
+    <div class="py-2 space-y-6 relative">
       <!-- Main Wheel Area -->
-      <div class="py-6 flex flex-col items-center justify-center space-y-6">
+      <div class="flex flex-col items-center justify-center space-y-5">
         <div v-if="!isCompleted" class="text-center space-y-1">
-          <h3 class="text-xl font-bold text-primary">Painel de Sorteio</h3>
-          <p class="text-secondary text-sm">Clique em "Girar Roleta" para sortear uma questão do painel.</p>
+          <h3 class="text-xl font-bold text-primary">Sua Vez de Jogar</h3>
+          <p class="text-secondary text-sm">Clique no botão para sortear uma pergunta no painel.</p>
         </div>
 
         <!-- Wheel Grid -->
@@ -188,7 +173,7 @@ function handleNextQuestion() {
           </div>
         </div>
 
-        <!-- Completion View (Clean, non-punitive, no backend errors!) -->
+        <!-- Completion View -->
         <div v-else class="text-center py-10 space-y-4 max-w-md mx-auto">
           <div class="w-16 h-16 bg-success-light text-success-text rounded-full flex items-center justify-center mx-auto shadow-sm">
             <span class="material-icons text-3xl">emoji_events</span>
@@ -210,10 +195,10 @@ function handleNextQuestion() {
             size="lg"
             variant="primary"
             :disabled="isAnimating"
+            :loading="isAnimating"
             @click="animateSpin"
           >
-            <BaseSpinner v-if="isAnimating" size="sm" />
-            <span class="material-icons text-base" v-else>autorenew</span>
+            <span class="material-icons text-base" v-if="!isAnimating">autorenew</span>
             <span class="tracking-wider">{{ isAnimating ? 'SORTEANDO...' : 'GIRAR ROLETA' }}</span>
           </BaseButton>
 

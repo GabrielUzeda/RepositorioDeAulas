@@ -27,11 +27,13 @@ const icone = ref('school');
 const senha = ref('');
 const selectedProfessorIds = ref<number[]>([]);
 const searchQuery = ref('');
+const isSubmitting = ref(false);
 
 watch(
   () => props.show,
   (val) => {
     if (val) {
+      isSubmitting.value = false;
       if (props.curso) {
         nome.value = props.curso.nome || '';
         descricao.value = props.curso.descricao || '';
@@ -98,15 +100,21 @@ function clearAll() {
   selectedProfessorIds.value = [];
 }
 
-function handleSubmit() {
-  emit('submit', {
-    nome: nome.value,
-    descricao: descricao.value,
-    cor: cor.value,
-    icone: icone.value,
-    senha: senha.value,
-    professor_ids: selectedProfessorIds.value
-  });
+async function handleSubmit() {
+  if (isSubmitting.value) return;
+  isSubmitting.value = true;
+  try {
+    await emit('submit', {
+      nome: nome.value,
+      descricao: descricao.value,
+      cor: cor.value,
+      icone: icone.value,
+      senha: senha.value,
+      professor_ids: selectedProfessorIds.value
+    });
+  } finally {
+    isSubmitting.value = false;
+  }
 }
 </script>
 
@@ -224,8 +232,8 @@ function handleSubmit() {
 
     <template #footer>
       <div class="flex justify-end gap-3 pt-4">
-        <BaseButton variant="ghost" @click="emit('close')">Cancelar</BaseButton>
-        <BaseButton variant="primary" @click="handleSubmit">Salvar Curso</BaseButton>
+        <BaseButton variant="ghost" :disabled="isSubmitting" @click="emit('close')">Cancelar</BaseButton>
+        <BaseButton variant="primary" :loading="isSubmitting" @click="handleSubmit">Salvar Curso</BaseButton>
       </div>
     </template>
   </BaseModal>

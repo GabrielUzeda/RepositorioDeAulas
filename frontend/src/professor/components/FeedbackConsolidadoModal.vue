@@ -20,23 +20,22 @@ const props = defineProps<{
 const emit = defineEmits<(e: 'close') => void>();
 
 const isLoading = ref(false);
+const isSavingTurma = ref(false);
+const savingAlunoEmail = ref<string | null>(null);
 const feedbackTurma = ref('');
 const alunos = ref<AlunoFeedbackConsolidado[]>([]);
 const isSendingAll = ref(false);
 const sendingEmailFor = ref<string | null>(null);
 const confirmReenvioOpen = ref(false);
 
-
 watch(
   () => props.show,
   async (val) => {
     if (val && props.disciplinaId) {
-      
       await fetchRelatorio();
     } else {
       feedbackTurma.value = '';
       alunos.value = [];
-      
     }
   }
 );
@@ -44,64 +43,86 @@ watch(
 async function fetchRelatorio() {
   if (!props.disciplinaId) return;
   isLoading.value = true;
-  const res = await apiClient.get<DisciplinaFeedbackRelatorio>(`/disciplinas/${props.disciplinaId}/relatorio-feedback`);
-  isLoading.value = false;
-  if (res.success && res.data) {
-    feedbackTurma.value = res.data.feedback_turma || '';
-    alunos.value = res.data.alunos || [];
-  } else {
-    useToast().error(res.error || 'Erro ao carregar relatório de feedback.');
+  try {
+    const res = await apiClient.get<DisciplinaFeedbackRelatorio>(`/disciplinas/${props.disciplinaId}/relatorio-feedback`);
+    if (res.success && res.data) {
+      feedbackTurma.value = res.data.feedback_turma || '';
+      alunos.value = res.data.alunos || [];
+    } else {
+      useToast().error(res.error || 'Erro ao carregar relatório de feedback.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao carregar relatório de feedback.');
+  } finally {
+    isLoading.value = false;
   }
 }
 
 async function handleSaveFeedbackTurma() {
-  if (!props.disciplinaId) return;
+  if (!props.disciplinaId || isSavingTurma.value) return;
+  isSavingTurma.value = true;
   
-  const res = await apiClient.post(`/disciplinas/${props.disciplinaId}/salvar-feedback-geral`, {
-    aluno_email: null,
-    feedback_geral: feedbackTurma.value
-  });
-  if (res.success) {
-    useToast().success('Feedback Geral da Turma salvo com sucesso!');
-  } else {
-    useToast().error(res.error || 'Erro ao salvar feedback da turma.');
+  try {
+    const res = await apiClient.post(`/disciplinas/${props.disciplinaId}/salvar-feedback-geral`, {
+      aluno_email: null,
+      feedback_geral: feedbackTurma.value
+    });
+    if (res.success) {
+      useToast().success('Feedback Geral da Turma salvo com sucesso!');
+    } else {
+      useToast().error(res.error || 'Erro ao salvar feedback da turma.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao salvar feedback da turma.');
+  } finally {
+    isSavingTurma.value = false;
   }
 }
 
 async function handleSaveFeedbackAluno(aluno: AlunoFeedbackConsolidado) {
-  if (!props.disciplinaId) return;
+  if (!props.disciplinaId || savingAlunoEmail.value === aluno.aluno_email) return;
+  savingAlunoEmail.value = aluno.aluno_email;
   
-  const res = await apiClient.post(`/disciplinas/${props.disciplinaId}/salvar-feedback-geral`, {
-    aluno_email: aluno.aluno_email,
-    feedback_geral: aluno.feedback_geral
-  });
-  if (res.success) {
-    useToast().success(`Feedback para ${aluno.aluno_nome} salvo!`);
-  } else {
-    useToast().error(res.error || 'Erro ao salvar feedback do aluno.');
+  try {
+    const res = await apiClient.post(`/disciplinas/${props.disciplinaId}/salvar-feedback-geral`, {
+      aluno_email: aluno.aluno_email,
+      feedback_geral: aluno.feedback_geral
+    });
+    if (res.success) {
+      useToast().success(`Feedback para ${aluno.aluno_nome} salvo!`);
+    } else {
+      useToast().error(res.error || 'Erro ao salvar feedback do aluno.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao salvar feedback do aluno.');
+  } finally {
+    savingAlunoEmail.value = null;
   }
 }
 
 async function handleSendEmailIndividual(aluno: AlunoFeedbackConsolidado) {
-  if (!props.disciplinaId) return;
+  if (!props.disciplinaId || sendingEmailFor.value === aluno.aluno_email) return;
   sendingEmailFor.value = aluno.aluno_email;
-  
 
-  // Salva o feedback do aluno antes de enviar
-  await handleSaveFeedbackAluno(aluno);
+  try {
+    // Salva o feedback do aluno antes de enviar
+    await handleSaveFeedbackAluno(aluno);
 
-  const res = await apiClient.post<{ enviados: number }>(`/disciplinas/${props.disciplinaId}/enviar-emails-feedback`, {
-    aluno_email: aluno.aluno_email,
-    forcar_reenvio: true
-  });
+    const res = await apiClient.post<{ enviados: number }>(`/disciplinas/${props.disciplinaId}/enviar-emails-feedback`, {
+      aluno_email: aluno.aluno_email,
+      forcar_reenvio: true
+    });
 
-  sendingEmailFor.value = null;
-
-  if (res.success) {
-    aluno.ja_enviado = true;
-    useToast().success(`E-mail enviado para ${aluno.aluno_email} com sucesso!`);
-  } else {
-    useToast().error(res.error || 'Erro ao enviar e-mail.');
+    if (res.success) {
+      aluno.ja_enviado = true;
+      useToast().success(`E-mail enviado para ${aluno.aluno_email} com sucesso!`);
+    } else {
+      useToast().error(res.error || 'Erro ao enviar e-mail.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao enviar e-mail.');
+  } finally {
+    sendingEmailFor.value = null;
   }
 }
 
@@ -109,19 +130,22 @@ async function doSendEmailTodos(forcarReenvio: boolean) {
   if (!props.disciplinaId || isSendingAll.value) return;
 
   isSendingAll.value = true;
-  
 
-  const res = await apiClient.post<{ enviados: number }>(`/disciplinas/${props.disciplinaId}/enviar-emails-feedback`, {
-    forcar_reenvio: forcarReenvio
-  });
+  try {
+    const res = await apiClient.post<{ enviados: number }>(`/disciplinas/${props.disciplinaId}/enviar-emails-feedback`, {
+      forcar_reenvio: forcarReenvio
+    });
 
-  isSendingAll.value = false;
-
-  if (res.success) {
-    useToast().success(`${res.data?.enviados || 0} e-mails de feedback enviados com sucesso!`);
-    await fetchRelatorio();
-  } else {
-    useToast().error(res.error || 'Erro ao enviar e-mails.');
+    if (res.success) {
+      useToast().success(`${res.data?.enviados || 0} e-mails de feedback enviados com sucesso!`);
+      await fetchRelatorio();
+    } else {
+      useToast().error(res.error || 'Erro ao enviar e-mails.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao enviar e-mails.');
+  } finally {
+    isSendingAll.value = false;
   }
 }
 
@@ -180,7 +204,7 @@ function formatDate(isoStr: string) {
               <span class="material-icons text-sm text-accent">campaign</span>
               <span>Feedback Geral da Turma (Recado Coletivo)</span>
             </label>
-            <BaseButton variant="primary" size="sm" @click="handleSaveFeedbackTurma">
+            <BaseButton variant="primary" size="sm" :loading="isSavingTurma" @click="handleSaveFeedbackTurma">
               <span class="material-icons text-xs">save</span>
               <span>Salvar Feedback da Turma</span>
             </BaseButton>
@@ -235,11 +259,10 @@ function formatDate(isoStr: string) {
                 <BaseButton
                   variant="primary"
                   size="sm"
-                  :disabled="sendingEmailFor === aluno.aluno_email"
+                  :loading="sendingEmailFor === aluno.aluno_email"
                   @click="handleSendEmailIndividual(aluno)"
                 >
-                  <BaseSpinner v-if="sendingEmailFor === aluno.aluno_email" size="sm" color-class="text-current" />
-                  <span v-else class="material-icons text-xs">send</span>
+                  <span class="material-icons text-xs">send</span>
                   <span>Enviar E-mail Individual</span>
                 </BaseButton>
               </div>
@@ -273,7 +296,12 @@ function formatDate(isoStr: string) {
               <div class="space-y-1.5 pt-1">
                 <div class="flex justify-between items-center">
                   <label class="block text-[11px] font-bold text-secondary uppercase tracking-wider">Feedback Individual do Aluno na Disciplina:</label>
-                  <BaseButton variant="ghost" size="sm" @click="handleSaveFeedbackAluno(aluno)">
+                  <BaseButton
+                    variant="ghost"
+                    size="sm"
+                    :loading="savingAlunoEmail === aluno.aluno_email"
+                    @click="handleSaveFeedbackAluno(aluno)"
+                  >
                     Salvar Feedback
                   </BaseButton>
                 </div>
@@ -301,11 +329,11 @@ function formatDate(isoStr: string) {
           
           <BaseButton
             variant="primary"
-            :disabled="isSendingAll || alunos.length === 0"
+            :loading="isSendingAll"
+            :disabled="alunos.length === 0"
             @click="handleSendEmailTodos"
           >
-            <BaseSpinner v-if="isSendingAll" size="sm" color-class="text-current" />
-            <span v-else class="material-icons text-sm">forward_to_inbox</span>
+            <span class="material-icons text-sm">forward_to_inbox</span>
             <span>Enviar para Todos os Pendentes</span>
           </BaseButton>
         </div>

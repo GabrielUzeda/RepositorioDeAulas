@@ -25,11 +25,13 @@ const cursos = ref<Curso[]>([]);
 const selectedCursoIds = ref<number[]>([]);
 const searchQuery = ref('');
 const error = ref('');
+const isSubmitting = ref(false);
 
 watch(
   () => props.show,
   async (open) => {
     if (open) {
+      isSubmitting.value = false;
       nome.value = props.professor?.nome || '';
       email.value = props.professor?.email || '';
       password.value = '';
@@ -104,7 +106,8 @@ function clearAll() {
   }
 }
 
-function handleSubmit() {
+async function handleSubmit() {
+  if (isSubmitting.value) return;
   error.value = '';
   if (!nome.value.trim() || !email.value.trim()) {
     error.value = 'Informe nome e email.';
@@ -114,13 +117,18 @@ function handleSubmit() {
     error.value = 'Informe uma senha.';
     return;
   }
-  emit('submit', {
-    nome: nome.value.trim(),
-    email: email.value.trim(),
-    password: password.value,
-    role: role.value,
-    curso_ids: role.value === 'admin' ? [] : selectedCursoIds.value
-  });
+  isSubmitting.value = true;
+  try {
+    await emit('submit', {
+      nome: nome.value.trim(),
+      email: email.value.trim(),
+      password: password.value,
+      role: role.value,
+      curso_ids: role.value === 'admin' ? [] : selectedCursoIds.value
+    });
+  } finally {
+    isSubmitting.value = false;
+  }
 }
 </script>
 
@@ -250,8 +258,8 @@ function handleSubmit() {
 
     <template #footer>
       <div class="flex justify-end gap-3 pt-4">
-        <BaseButton variant="ghost" @click="emit('close')">Cancelar</BaseButton>
-        <BaseButton variant="primary" @click="handleSubmit">Salvar Professor</BaseButton>
+        <BaseButton variant="ghost" :disabled="isSubmitting" @click="emit('close')">Cancelar</BaseButton>
+        <BaseButton variant="primary" :loading="isSubmitting" @click="handleSubmit">Salvar Professor</BaseButton>
       </div>
     </template>
   </BaseModal>

@@ -104,43 +104,47 @@ async function handleSubmit() {
 
   handleSaveDraft();
 
-  const res = await apiClient.post('/submeter-resposta', {
-    atividade_id: props.atividade.id,
-    aluno_nome: alunoNome.value,
-    aluno_email: alunoEmail.value,
-    respostas: respostasMap.value,
-    senha_curso: props.senhaCurso,
-    senha_atividade: props.senhaAtividade
-  });
-
-  isSubmitting.value = false;
-
-  if (res.success) {
-    submitSuccess.value = true;
-    secureRemove(`draft_${props.atividade.id}`);
-    if (res.data && res.data.consulta_token) {
-      secureSet(`consulta_token_${props.atividade.id}`, String(res.data.consulta_token));
-    }
-    if (res.data && res.data.acertos !== undefined) serverAcertos.value = res.data.acertos;
-    if (res.data && res.data.total !== undefined) serverTotal.value = res.data.total;
-    if (res.data && res.data.pontuacao !== undefined) serverPontuacao.value = res.data.pontuacao;
-    let msg = 'Resposta enviada!';
-    if (serverAcertos.value !== null) {
-      const total = serverTotal.value ?? questionsList.value.length;
-      msg += ` Correção do servidor: ${serverAcertos.value} / ${total} acertos`;
-      if (serverPontuacao.value !== null) msg += ` (Pontuação: ${serverPontuacao.value}%)`;
-    }
-    success(msg);
-    emit('submit', {
-      nome: alunoNome.value,
-      email: alunoEmail.value,
-      respostas: respostasMap.value
+  try {
+    const res = await apiClient.post('/submeter-resposta', {
+      atividade_id: props.atividade.id,
+      aluno_nome: alunoNome.value,
+      aluno_email: alunoEmail.value,
+      respostas: respostasMap.value,
+      senha_curso: props.senhaCurso,
+      senha_atividade: props.senhaAtividade
     });
-    setTimeout(() => {
-      emit('close');
-    }, serverAcertos.value !== null ? 6000 : 2000);
-  } else {
-    errorMessage.value = res.error || 'Erro ao enviar resposta. Tente novamente.';
+
+    if (res.success) {
+      submitSuccess.value = true;
+      secureRemove(`draft_${props.atividade.id}`);
+      if (res.data && res.data.consulta_token) {
+        secureSet(`consulta_token_${props.atividade.id}`, String(res.data.consulta_token));
+      }
+      if (res.data && res.data.acertos !== undefined) serverAcertos.value = res.data.acertos;
+      if (res.data && res.data.total !== undefined) serverTotal.value = res.data.total;
+      if (res.data && res.data.pontuacao !== undefined) serverPontuacao.value = res.data.pontuacao;
+      let msg = 'Resposta enviada!';
+      if (serverAcertos.value !== null) {
+        const total = serverTotal.value ?? questionsList.value.length;
+        msg += ` Correção do servidor: ${serverAcertos.value} / ${total} acertos`;
+        if (serverPontuacao.value !== null) msg += ` (Pontuação: ${serverPontuacao.value}%)`;
+      }
+      success(msg);
+      emit('submit', {
+        nome: alunoNome.value,
+        email: alunoEmail.value,
+        respostas: respostasMap.value
+      });
+      setTimeout(() => {
+        emit('close');
+      }, serverAcertos.value !== null ? 6000 : 2000);
+    } else {
+      errorMessage.value = res.error || 'Erro ao enviar resposta. Tente novamente.';
+    }
+  } catch (err: any) {
+    errorMessage.value = err.message || 'Erro ao enviar resposta. Tente novamente.';
+  } finally {
+    isSubmitting.value = false;
   }
 }
 </script>
@@ -245,9 +249,9 @@ async function handleSubmit() {
         </div>
 
         <div class="flex justify-end space-x-3 pt-4 border-t border-line">
-          <BaseButton variant="ghost" type="button" @click="emit('close')">Cancelar</BaseButton>
-          <BaseButton type="submit" :disabled="isSubmitting">
-            {{ isSubmitting ? 'Enviando...' : 'Enviar Resposta' }}
+          <BaseButton variant="ghost" type="button" :disabled="isSubmitting" @click="emit('close')">Cancelar</BaseButton>
+          <BaseButton type="submit" variant="primary" :loading="isSubmitting">
+            <span>{{ isSubmitting ? 'Enviando...' : 'Enviar Resposta' }}</span>
           </BaseButton>
         </div>
       </form>

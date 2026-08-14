@@ -8,10 +8,16 @@ import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 
-const props = defineProps<{
-  show: boolean;
-  disciplina: Disciplina | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    show: boolean;
+    disciplina: Disciplina | null;
+    loading?: boolean;
+  }>(),
+  {
+    loading: false,
+  }
+);
 
 const emit = defineEmits<{
   (e: 'close'): void;
@@ -22,10 +28,12 @@ const nome = ref('');
 const descricao = ref('');
 const cor = ref('bg-accent');
 const icone = ref('school');
+const isSubmitting = ref(false);
 
 watch(
   () => props.show,
   (val) => {
+    isSubmitting.value = false;
     if (val) {
       if (props.disciplina) {
         nome.value = props.disciplina.nome || '';
@@ -43,6 +51,8 @@ watch(
 );
 
 function handleSubmit() {
+  if (isSubmitting.value || props.loading) return;
+  isSubmitting.value = true;
   emit('submit', {
     nome: nome.value,
     descricao: descricao.value,
@@ -65,6 +75,7 @@ function handleSubmit() {
         label="Nome da Disciplina *"
         placeholder="Ex: Programação Web Mobile"
         :required="true"
+        :disabled="props.loading || isSubmitting"
       />
 
       <BaseTextarea
@@ -72,6 +83,7 @@ function handleSubmit() {
         label="Descrição da Disciplina"
         :rows="3"
         placeholder="Descreva os tópicos principais e plano de aula desta disciplina..."
+        :disabled="props.loading || isSubmitting"
       />
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
@@ -89,9 +101,10 @@ function handleSubmit() {
 
     <template #footer>
       <div class="flex justify-end gap-3 pt-4">
-        <BaseButton variant="ghost" @click="emit('close')">Cancelar</BaseButton>
-        <BaseButton variant="primary" @click="handleSubmit">Salvar Disciplina</BaseButton>
+        <BaseButton variant="ghost" :disabled="props.loading || isSubmitting" @click="emit('close')">Cancelar</BaseButton>
+        <BaseButton variant="primary" :loading="props.loading || isSubmitting" @click="handleSubmit">Salvar Disciplina</BaseButton>
       </div>
     </template>
   </BaseModal>
 </template>
+

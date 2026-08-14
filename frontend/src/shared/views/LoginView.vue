@@ -13,22 +13,29 @@ const authStore = useAuthStore();
 const emailInput = ref('');
 const passwordInput = ref('');
 const loginError = ref('');
+const isSubmitting = ref(false);
 
 async function handleLogin() {
+  if (isSubmitting.value) return;
   loginError.value = '';
-  const result = await authStore.login(emailInput.value, passwordInput.value);
-  if (!result.success) {
-    loginError.value = result.error || 'Falha na autenticação';
-    return;
-  }
-  const role = authStore.professor?.role;
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '';
-  if (redirect && !(role === 'admin' && redirect === '/professor')) {
-    router.push(redirect);
-  } else if (role === 'admin') {
-    router.push('/admin');
-  } else {
-    router.push('/professor');
+  isSubmitting.value = true;
+  try {
+    const result = await authStore.login(emailInput.value, passwordInput.value);
+    if (!result.success) {
+      loginError.value = result.error || 'Falha na autenticação';
+      return;
+    }
+    const role = authStore.professor?.role;
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '';
+    if (redirect && !(role === 'admin' && redirect === '/professor')) {
+      router.push(redirect);
+    } else if (role === 'admin') {
+      router.push('/admin');
+    } else {
+      router.push('/professor');
+    }
+  } finally {
+    isSubmitting.value = false;
   }
 }
 </script>
@@ -107,9 +114,9 @@ async function handleLogin() {
             variant="primary"
             size="md"
             block
-            :loading="authStore.isLoading"
+            :loading="isSubmitting"
           >
-            {{ authStore.isLoading ? 'Entrando...' : 'Entrar' }}
+            {{ isSubmitting ? 'Entrando...' : 'Entrar' }}
           </BaseButton>
         </form>
       </div>

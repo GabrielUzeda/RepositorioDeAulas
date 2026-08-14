@@ -17,10 +17,16 @@ const tipoOptions = [
   { label: 'Reforço (Modo Zen)', value: 'reforco' },
 ];
 
-const props = defineProps<{
-  show: boolean;
-  atividade?: Atividade | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    show: boolean;
+    atividade?: Atividade | null;
+    loading?: boolean;
+  }>(),
+  {
+    loading: false,
+  }
+);
 
 const emit = defineEmits<{
   (e: 'close'): void;
@@ -33,6 +39,7 @@ const tipo = ref<'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco'>('normal
 const allowPassword = ref(false);
 const senha = ref('');
 const questions = ref<Question[]>([]);
+const isSaving = ref(false);
 
 const usesOptions = computed(() => tipo.value !== 'normal' && tipo.value !== 'prova');
 
@@ -57,6 +64,7 @@ function normalizeQuestion(q: any): Question {
 watch(
   () => props.show,
   (val) => {
+    isSaving.value = false;
     if (val) {
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
@@ -145,6 +153,8 @@ function setCorrectOption(qIndex: number, oIndex: number) {
 }
 
 function handleSave() {
+  if (isSaving.value || props.loading) return;
+  isSaving.value = true;
   const payload: Partial<Atividade> = {
     titulo: titulo.value,
     descricao: descricao.value,
@@ -218,8 +228,8 @@ function handleImportJson(e: Event) {
             <span>Exportar JSON</span>
           </BaseButton>
 
-          <BaseButton variant="ghost" size="sm" @click="emit('close')">Cancelar</BaseButton>
-          <BaseButton variant="primary" size="sm" @click="handleSave">Salvar Atividade</BaseButton>
+          <BaseButton variant="ghost" size="sm" :disabled="props.loading || isSaving" @click="emit('close')">Cancelar</BaseButton>
+          <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">Salvar Atividade</BaseButton>
         </div>
       </div>
     </template>
