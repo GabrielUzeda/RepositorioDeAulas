@@ -3,7 +3,7 @@ import { ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import { apiClient } from '@/shared/api/client';
 import BaseButton from '@/shared/components/BaseButton.vue';
-import { THEME_LABELS, NEXT_THEME, normalizeTheme, type ThemeKey } from '@/shared/marpTheme';
+import { THEME_LABELS, NEXT_THEME, normalizeTheme, type ThemeKey, THEME_KEYS } from '@/shared/marpTheme';
 // CSS canônico de tema (marpTheme.css). Injetado no <head> de forma NÃO-scoped
 // (onMounted) porque o preview renderiza o DOM do slide dinamicamente e <style scoped>
 // não alcança conteúdo injetado. Os seletores [data-theme=...] só ativam dentro do
@@ -48,7 +48,6 @@ const statusBarRef = ref<HTMLDivElement | null>(null);
 const isPresentMode = ref(false);
 const isAnimMode = ref(true);
 const currentTheme = ref<ThemeKey>('default');
-const showThemeMenu = ref(false);
 const showExportMenu = ref(false);
 const showFindBar = ref(false);
 const showReplaceRow = ref(false);
@@ -1064,7 +1063,6 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 }
 
 function handleWindowClick() {
-  showThemeMenu.value = false;
   showExportMenu.value = false;
 }
 
@@ -1103,7 +1101,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="props.show" class="marpnext-modal-root fixed inset-0 bg-slate-950 flex flex-col z-50 overflow-hidden" :class="{ 'present-mode': isPresentMode, 'anim-mode': isAnimMode }" :data-theme="currentTheme">
+  <div v-if="props.show" class="marpnext-modal-root fixed inset-0 bg-canvas flex flex-col z-50 overflow-hidden" :class="{ 'present-mode': isPresentMode, 'anim-mode': isAnimMode }">
     <!-- TOPBAR -->
     <div id="topbar">
       <div class="logo">marp-next <span>/ editor</span></div>
@@ -1126,28 +1124,20 @@ onBeforeUnmount(() => {
       <div class="sep"></div>
       <BaseButton :variant="isPresentMode ? 'primary' : 'secondary'" size="sm" @click="togglePresentMode" title="Apresentar (F)">▶ Apresentar</BaseButton>
       <BaseButton :variant="isAnimMode ? 'primary' : 'secondary'" size="sm" @click="isAnimMode = !isAnimMode" title="Toggle animações">✦ Animação</BaseButton>
-
-      <!-- Dropdown de Tema (Idêntico ao de Exportar) -->
-      <div class="export-dropdown relative">
-        <BaseButton variant="secondary" size="sm" @click.stop="showThemeMenu = !showThemeMenu; showExportMenu = false" title="Alternar tema da apresentação">
-          {{ currentTheme === 'dark' ? '🌙 Dark' : (currentTheme === 'light' ? '☀️ Light' : '☀️ Default') }} ▾
-        </BaseButton>
-        <div v-if="showThemeMenu" class="export-menu theme-menu">
-          <button class="export-item" :class="{ active: currentTheme === 'dark' }" @click="applyTheme('dark', true); showThemeMenu = false">
-            🌙 Dark
-          </button>
-          <button class="export-item" :class="{ active: currentTheme === 'light' }" @click="applyTheme('light', true); showThemeMenu = false">
-            ☀️ Light
-          </button>
-          <button class="export-item" :class="{ active: currentTheme === 'default' }" @click="applyTheme('default', true); showThemeMenu = false">
-            ☀️ Default
-          </button>
-        </div>
-      </div>
+      <select
+        v-model="currentTheme"
+        @change="applyTheme(currentTheme, true)"
+        class="tb-input font-medium"
+        title="Tema do Slide Preview"
+      >
+        <option v-for="tKey in THEME_KEYS" :key="tKey" :value="tKey">
+          Tema: {{ THEME_LABELS[tKey] }}
+        </option>
+      </select>
 
       <!-- Dropdown de Exportar -->
       <div class="export-dropdown relative">
-        <BaseButton variant="secondary" size="sm" @click.stop="showExportMenu = !showExportMenu; showThemeMenu = false" title="Exportar Apresentação">📥 Exportar ▾</BaseButton>
+        <BaseButton variant="secondary" size="sm" @click.stop="showExportMenu = !showExportMenu" title="Exportar Apresentação">📥 Exportar ▾</BaseButton>
         <div v-if="showExportMenu" class="export-menu">
           <button class="export-item" @click="exportHtml(); showExportMenu = false">🌐 HTML Autossuficiente (.html)</button>
           <button class="export-item" @click="exportPdf(); showExportMenu = false">📄 Documento PDF (.pdf)</button>
@@ -1231,7 +1221,7 @@ onBeforeUnmount(() => {
 
       <div id="resizer" @mousedown="onResizerMouseDown"></div>
 
-      <div id="preview-pane" ref="previewPaneRef" @click="handlePreviewClick" @scroll="handlePreviewScroll"></div>
+      <div id="preview-pane" ref="previewPaneRef" :data-theme="currentTheme" @click="handlePreviewClick" @scroll="handlePreviewScroll"></div>
     </div>
 
     <div id="progress-bar" ref="progressBarRef"></div>
@@ -1260,21 +1250,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .marpnext-modal-root {
-  --bg-app: #09090b;
-  --bg-editor: #111113;
-  --bg-preview: #0f0f12;
-  --bg-slide: #16161d;
-  --border: #27272a;
-  --text-primary: #fafafa;
-  --text-secondary: #a1a1aa;
-  --text-muted: #86868f;
-  --accent: #818cf8;
-  --accent-dim: rgba(129,140,248,0.12);
-  --green: #34d399;
-  --red: #f87171;
-  --yellow: #fbbf24;
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
   --slide-w: 960px;
   --slide-h: 540px;
   --anim-duration: 0.5s;
@@ -1282,40 +1257,38 @@ onBeforeUnmount(() => {
   --radius: 10px;
   --topbar-h: 48px;
   font-family: var(--font-sans);
-  color: var(--text-primary);
+  color: var(--c-primary);
 }
 
 #topbar {
   height: var(--topbar-h);
   display: flex; align-items: center; gap: 12px;
   padding: 0 16px;
-  background: var(--bg-editor);
-  border-bottom: 1px solid var(--border);
+  background: var(--c-surface-alt);
+  border-bottom: 1px solid var(--c-line);
   flex-shrink: 0;
   z-index: 100;
 }
-#topbar .logo { font-weight:800; font-size:14px; color:var(--accent); letter-spacing:-0.5px; }
-#topbar .logo span { color:var(--text-muted); font-weight:400; }
-#topbar .sep { width:1px; height:20px; background:var(--border); }
+#topbar .logo { font-weight:800; font-size:14px; color:var(--c-accent); letter-spacing:-0.5px; }
+#topbar .logo span { color:var(--c-muted); font-weight:400; }
+#topbar .sep { width:1px; height:20px; background:var(--c-line); }
 
 .tb-btn {
   display:inline-flex; align-items:center; justify-content:center; gap:5px;
-  height: 32px; padding: 0 12px; border-radius:6px; border:1px solid var(--border);
-  background:transparent; color:var(--text-secondary); font-size:12px; font-weight: 500;
+  height: 32px; padding: 0 12px; border-radius:6px; border:1px solid var(--c-line);
+  background:transparent; color:var(--c-secondary); font-size:12px; font-weight: 500;
   font-family:var(--font-sans); cursor:pointer; transition:all .15s;
   box-sizing: border-box; outline: none; white-space: nowrap; flex-shrink: 0;
 }
-.tb-btn:hover { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
-.tb-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
-
-
+.tb-btn:hover { background:var(--c-accent-light); color:var(--c-accent); border-color:var(--c-accent); }
+.tb-btn.active { background:var(--c-accent); color:var(--c-on-accent); border-color:var(--c-accent); }
 
 .tb-input {
   height: 32px;
   padding: 0 12px;
-  background: var(--bg-app);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  color: var(--c-primary);
   font-size: 12px;
   font-family: var(--font-sans);
   border-radius: 6px;
@@ -1323,39 +1296,39 @@ onBeforeUnmount(() => {
   transition: all .15s ease;
 }
 .tb-input::placeholder {
-  color: var(--text-muted);
+  color: var(--c-muted);
   opacity: 0.8;
 }
 .tb-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-dim);
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px var(--c-accent-light);
 }
 
 #editor-pane {
   width: 42%; min-width: 320px;
   display:flex; flex-direction:column;
-  background: var(--bg-editor);
-  border-right: 1px solid var(--border);
+  background: var(--c-surface-alt);
+  border-right: 1px solid var(--c-line);
   position: relative;
 }
 
 #editor-header {
   display:flex; align-items:center; justify-content:space-between;
   padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
-  font-size: 11px; color: var(--text-muted);
+  border-bottom: 1px solid var(--c-line);
+  font-size: 11px; color: var(--c-muted);
   text-transform: uppercase; letter-spacing: 0.5px;
 }
 
 #resizer {
-  width: 5px; cursor: col-resize; background: var(--border);
+  width: 5px; cursor: col-resize; background: var(--c-line);
   transition: background .2s; flex-shrink:0;
 }
-#resizer:hover { background: var(--accent); }
+#resizer:hover { background: var(--c-accent); }
 
 #preview-pane {
   flex:1; overflow-y:auto; overflow-x:hidden;
-  background: var(--bg-preview);
+  background: var(--c-canvas);
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
   padding: 32px;
@@ -1364,8 +1337,8 @@ onBeforeUnmount(() => {
 
 /* FIND BAR */
 #find-bar {
-  background: var(--bg-editor);
-  border-bottom: 1px solid var(--border);
+  background: var(--c-surface-alt);
+  border-bottom: 1px solid var(--c-line);
   padding: 8px 12px;
   display: flex;
   flex-direction: column;
@@ -1376,50 +1349,46 @@ onBeforeUnmount(() => {
 .find-row, .replace-row { display: flex; align-items: center; gap: 8px; width: 100%; }
 .find-input-group {
   position: relative; flex: 1; display: flex; align-items: center;
-  background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+  background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 6px; padding: 2px 6px;
 }
 #find-input, #replace-input {
   flex: 1; background: transparent; border: none; outline: none;
-  color: var(--text-primary); font-family: var(--font-mono); font-size: 12px; padding: 4px 6px;
+  color: var(--c-primary); font-family: var(--font-mono); font-size: 12px; padding: 4px 6px;
 }
-#find-count { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); padding: 0 6px; white-space: nowrap; }
+#find-count { font-size: 11px; color: var(--c-muted); font-family: var(--font-mono); padding: 0 6px; white-space: nowrap; }
 .find-option-btn {
-  background: transparent; border: 1px solid transparent; color: var(--text-muted);
+  background: transparent; border: 1px solid transparent; color: var(--c-muted);
   font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 2px 5px; border-radius: 4px; cursor: pointer;
 }
-.find-option-btn.active { background: var(--accent); color: #fff; }
+.find-option-btn.active { background: var(--c-accent); color: var(--c-on-accent); }
 .find-actions { display: flex; align-items: center; gap: 4px; }
 .find-btn {
   display: inline-flex; align-items: center; justify-content: center; padding: 4px 8px;
-  border-radius: 4px; border: 1px solid var(--border); background: transparent;
-  color: var(--text-secondary); font-size: 11px; cursor: pointer;
+  border-radius: 4px; border: 1px solid var(--c-line); background: transparent;
+  color: var(--c-secondary); font-size: 11px; cursor: pointer;
 }
-.find-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.find-btn.primary { background: var(--c-accent); color: var(--c-on-accent); border-color: var(--c-accent); font-weight: 600; }
 .tb-btn-xs {
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
-  border-radius: 4px; border: 1px solid var(--border); background: transparent;
-  color: var(--text-muted); font-size: 11px; cursor: pointer;
+  border-radius: 4px; border: 1px solid var(--c-line); background: transparent;
+  color: var(--c-muted); font-size: 11px; cursor: pointer;
 }
 
 /* EXPORT DROPDOWN */
 .export-menu {
   position: absolute; top: 100%; right: 0; margin-top: 4px;
-  background: var(--bg-editor); border: 1px solid var(--border);
-  border-radius: 6px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  background: var(--c-surface-alt); border: 1px solid var(--c-line);
+  border-radius: 6px; box-shadow: var(--shadow-modal);
   z-index: 100; min-width: 240px; padding: 4px 0;
-}
-.export-menu.theme-menu {
-  min-width: 100%;
-  white-space: nowrap;
 }
 .export-item {
   display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px;
-  border: none; background: transparent; color: var(--text-primary);
+  border: none; background: transparent; color: var(--c-primary);
   font-size: 12px; cursor: pointer; text-align: left; transition: background 0.15s;
   white-space: nowrap;
 }
-.export-item:hover { background: var(--accent-dim); color: var(--accent); }
-.export-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+.export-item:hover { background: var(--c-accent-light); color: var(--c-accent); }
+.export-item.active { background: var(--c-accent-light); color: var(--c-accent); font-weight: 600; }
 
 /* EDITOR HIGHLIGHTS BACKDROP */
 #editor-wrapper { position: relative; flex: 1; width: 100%; height: 100%; overflow: hidden; display: flex; }
@@ -1436,7 +1405,7 @@ onBeforeUnmount(() => {
 #editor-highlights { width: 100%; min-height: 100%; color: transparent; background: transparent; }
 #editor {
   position: relative; z-index: 2; flex: 1; width: 100%; height: 100%;
-  resize: none; outline: none; background: transparent; color: var(--text-primary); overflow-y: scroll;
+  resize: none; outline: none; background: transparent; color: var(--c-primary); overflow-y: scroll;
 }
 :deep(mark.find-match) {
   background-color: rgba(234, 179, 8, 0.35); color: transparent !important; border-radius: 2px;
@@ -1444,7 +1413,7 @@ onBeforeUnmount(() => {
   outline: 1px solid rgba(234, 179, 8, 0.5);
 }
 :deep(mark.find-match.active) {
-  background-color: rgba(129, 140, 248, 0.6); color: transparent !important; outline: 2px solid var(--accent);
+  background-color: rgba(129, 140, 248, 0.6); color: transparent !important; outline: 2px solid var(--c-accent);
 }
 
 /* SLIDES STYLING (card 960x540 = layout do preview; cores do slide vêm de marpTheme.css via --slide-bg) */
@@ -1452,10 +1421,10 @@ onBeforeUnmount(() => {
   width: var(--slide-w); max-width:100%; min-height: var(--slide-h);
   padding: 48px 56px; background: var(--slide-bg); border-radius: var(--radius);
   scroll-snap-align: center; position:relative; overflow:visible;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 0 1px var(--border); flex-shrink: 0;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 0 1px var(--c-line); flex-shrink: 0;
 }
-:deep(.slide.active) { box-shadow: 0 8px 48px rgba(129,140,248,0.12), 0 0 0 2px var(--accent); }
-:deep(.slide-number) { position:absolute; top:16px; right:20px; font-size:11px; color:var(--text-muted); font-weight:600; }
+:deep(.slide.active) { box-shadow: 0 8px 48px rgba(129,140,248,0.12), 0 0 0 2px var(--c-accent); }
+:deep(.slide-number) { position:absolute; top:16px; right:20px; font-size:11px; color:var(--c-muted); font-weight:600; }
 :deep(.slide-content) { width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; gap:1.2rem; }
 :deep(.slide-content h1) { font-size: calc(2.8rem * var(--font-scale, 1)); font-weight:900; letter-spacing:-1px; line-height:1.1; }
 :deep(.slide-content h2) { font-size: calc(2rem * var(--font-scale, 1)); font-weight:700; letter-spacing:-0.5px; }
@@ -1467,7 +1436,7 @@ onBeforeUnmount(() => {
 :deep(.slide-content ul ul) { list-style-type: circle; }
 :deep(.slide-content ul ul ul) { list-style-type: square; }
 :deep(.slide-content ol) { list-style-type: decimal; }
-:deep(.table-wrap) { margin: 1.2em 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+:deep(.table-wrap) { margin: 1.2em 0; border: 1px solid var(--c-line); border-radius: 8px; overflow: hidden; }
 :deep(.slide-content table) { width:100%; border-collapse:collapse; font-size: calc(0.95rem * var(--font-scale, 1)); margin:0; }
 :deep(.slide.centered .slide-content) { align-items:center; text-align:center; }
 
@@ -1535,9 +1504,9 @@ onBeforeUnmount(() => {
 .marpnext-modal-root.anim-mode :deep(.slide.active[data-anim-stagger] .slide-content>*:nth-child(7)) { animation-delay:calc(var(--anim-stagger)*6); }
 .marpnext-modal-root.anim-mode :deep(.slide.active[data-anim-stagger] .slide-content>*:nth-child(8)) { animation-delay:calc(var(--anim-stagger)*7); }
 
-#progress-bar { position:fixed; bottom:0; left:0; height:3px; background:linear-gradient(90deg, var(--accent), #a855f7); transition:width .3s; z-index:999; }
-#status-bar { position:fixed; bottom:8px; right:16px; font-size:11px; color:var(--text-muted); font-family:var(--font-mono); z-index:999; }
-.slide-count-text { font-size:11px; color:var(--text-muted); font-family:var(--font-mono); }
+#progress-bar { position:fixed; bottom:0; left:0; height:3px; background:linear-gradient(90deg, var(--c-accent), #a855f7); transition:width .3s; z-index:999; }
+#status-bar { position:fixed; bottom:8px; right:16px; font-size:11px; color:var(--c-muted); font-family:var(--font-mono); z-index:999; }
+.slide-count-text { font-size:11px; color:var(--c-muted); font-family:var(--font-mono); }
 
 /* PRESENT MODE */
 .present-mode #topbar, .present-mode #editor-pane, .present-mode #resizer { display:none !important; }
