@@ -237,50 +237,6 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(6) { 
 body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(7) { animation-delay:calc(var(--anim-stagger)*6); }
 body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { animation-delay:calc(var(--anim-stagger)*7); }
 
-#controls-bar {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 30px;
-  padding: 6px 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 1000;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-  transition: opacity 0.3s ease;
-}
-[data-theme="light"] #controls-bar {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-}
-#controls-bar.idle { opacity: 0.15; }
-#controls-bar:hover, #controls-bar.idle:hover { opacity: 1; }
-
-.ctrl-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-}
-.ctrl-btn:hover {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
 .mermaid-block {
   width: 100%;
   display: flex;
@@ -345,13 +301,13 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
 <div id="controls-bar">
   <button class="ctrl-btn" id="btn-prev" title="Anterior (← / ↑)">◀</button>
   <button class="ctrl-btn" id="btn-next" title="Próximo (→ / ↓ / Espaço)">▶</button>
-  <span id="counter" style="font-size:12px;font-family:var(--font-mono);color:var(--text-muted);padding:0 6px;">${slides.length > 0 ? '1/' + slides.length : '0/0'}</span>
-  <div style="width:1px;height:16px;background:var(--border);"></div>
+  <span id="counter" class="slide-counter">${slides.length > 0 ? '1/' + slides.length : '0/0'}</span>
+  <div class="divider"></div>
   <button class="ctrl-btn" id="btn-theme" title="Alternar Tema (T)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
   <button class="ctrl-btn" id="btn-font-dec" title="Diminuir Fonte (-)">A-</button>
   <button class="ctrl-btn" id="btn-font-reset" title="Resetar Fonte">100%</button>
   <button class="ctrl-btn" id="btn-font-inc" title="Aumentar Fonte (+)">A+</button>
-  <div style="width:1px;height:16px;background:var(--border);"></div>
+  <div class="divider"></div>
   <button class="ctrl-btn" id="btn-fs" title="Tela Cheia (F)">⛶ Fullscreen</button>
 </div>
 

@@ -794,7 +794,7 @@ async function exportHtml() {
   });
   const html = res.data?.html;
   if (!res.success || res.status === 0 || !html) {
-    useToast().error('backend indisponível');
+    useToast().error(res.error || 'backend indisponível');
     return;
   }
   downloadFile(html, 'apresentacao-marp-next.html', 'text/html;charset=utf-8;');
@@ -809,7 +809,7 @@ async function exportPdf() {
   });
   const htmlContent = res.data?.html;
   if (!res.success || res.status === 0 || !htmlContent) {
-    useToast().error('backend indisponível');
+    useToast().error(res.error || 'backend indisponível');
     return;
   }
   const iframe = document.createElement('iframe');
@@ -1124,14 +1124,14 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="sep"></div>
-      <button class="tb-btn" :class="{ active: isPresentMode }" @click="togglePresentMode" title="Apresentar (F)">▶ Apresentar</button>
-      <button class="tb-btn" :class="{ active: isAnimMode }" @click="isAnimMode = !isAnimMode" title="Toggle animações">✦ Animação</button>
+      <BaseButton :variant="isPresentMode ? 'primary' : 'secondary'" size="sm" @click="togglePresentMode" title="Apresentar (F)">▶ Apresentar</BaseButton>
+      <BaseButton :variant="isAnimMode ? 'primary' : 'secondary'" size="sm" @click="isAnimMode = !isAnimMode" title="Toggle animações">✦ Animação</BaseButton>
 
       <!-- Dropdown de Tema (Idêntico ao de Exportar) -->
       <div class="export-dropdown relative">
-        <button class="tb-btn" @click.stop="showThemeMenu = !showThemeMenu; showExportMenu = false" title="Alternar tema da apresentação">
+        <BaseButton variant="secondary" size="sm" @click.stop="showThemeMenu = !showThemeMenu; showExportMenu = false" title="Alternar tema da apresentação">
           {{ currentTheme === 'dark' ? '🌙 Dark' : (currentTheme === 'light' ? '☀️ Light' : '☀️ Default') }} ▾
-        </button>
+        </BaseButton>
         <div v-if="showThemeMenu" class="export-menu theme-menu">
           <button class="export-item" :class="{ active: currentTheme === 'dark' }" @click="applyTheme('dark', true); showThemeMenu = false">
             🌙 Dark
@@ -1147,7 +1147,7 @@ onBeforeUnmount(() => {
 
       <!-- Dropdown de Exportar -->
       <div class="export-dropdown relative">
-        <button class="tb-btn" @click.stop="showExportMenu = !showExportMenu; showThemeMenu = false" title="Exportar Apresentação">📥 Exportar ▾</button>
+        <BaseButton variant="secondary" size="sm" @click.stop="showExportMenu = !showExportMenu; showThemeMenu = false" title="Exportar Apresentação">📥 Exportar ▾</BaseButton>
         <div v-if="showExportMenu" class="export-menu">
           <button class="export-item" @click="exportHtml(); showExportMenu = false">🌐 HTML Autossuficiente (.html)</button>
           <button class="export-item" @click="exportPdf(); showExportMenu = false">📄 Documento PDF (.pdf)</button>
@@ -1241,8 +1241,8 @@ onBeforeUnmount(() => {
     <div v-if="isPresentMode" id="controls-bar" :class="{ idle: isIdle }">
       <button class="ctrl-btn" @click="prevSlide" title="Anterior (← / ↑)">◀</button>
       <button class="ctrl-btn" @click="nextSlide" title="Próximo (→ / ↓ / Espaço)">▶</button>
-      <span id="counter" style="font-size:12px;font-family:var(--font-mono);color:var(--text-muted);padding:0 6px;">{{ currentSlide + 1 }}/{{ totalSlides }}</span>
-      <div style="width:1px;height:16px;background:var(--border);"></div>
+      <span id="counter" class="slide-counter">{{ currentSlide + 1 }}/{{ totalSlides }}</span>
+      <div class="divider"></div>
       <button class="ctrl-btn" @click="toggleTheme" title="Alternar Tema (T)">
         <svg v-if="currentTheme === 'default'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         <svg v-else-if="currentTheme === 'dark'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -1252,7 +1252,7 @@ onBeforeUnmount(() => {
       <button class="ctrl-btn" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
       <button class="ctrl-btn" @click="resetFont" title="Resetar Fonte">100%</button>
       <button class="ctrl-btn" @click="adjustFont(1.1)" title="Aumentar Fonte (+)">A+</button>
-      <div style="width:1px;height:16px;background:var(--border);"></div>
+      <div class="divider"></div>
       <button class="ctrl-btn" @click="toggleFullscreen" title="Tela Cheia (F)">⛶ Fullscreen</button>
     </div>
   </div>
@@ -1546,51 +1546,5 @@ onBeforeUnmount(() => {
   width:100vw!important; height:100vh!important; min-height:100vh!important;
   max-width:none!important; max-height:none!important; border-radius:0!important;
   box-shadow:none!important; border:none!important; padding:60px 80px!important; margin:0!important;
-}
-
-/* Floating Presentation Controls Overlay */
-#controls-bar {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 30px;
-  padding: 6px 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 1000;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-  transition: opacity 0.3s ease, background 0.3s ease, border-color 0.3s ease;
-}
-
-#controls-bar.idle {
-  opacity: 0.15;
-}
-#controls-bar:hover, #controls-bar.idle:hover {
-  opacity: 1;
-}
-
-.ctrl-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-}
-.ctrl-btn:hover {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: var(--accent);
 }
 </style>

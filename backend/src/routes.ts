@@ -117,6 +117,8 @@ function stripGabarito(row: any): any {
   const out = { ...row };
   try {
     const parsed = typeof out.json_data === 'string' ? JSON.parse(out.json_data) : out.json_data;
+    const type = row.tipo || parsed?.meta?.type || parsed?.type;
+    if (type === 'reforco' || type === 'roleta' || type === 'minigame') return row;
     if (parsed && Array.isArray(parsed.questions)) {
       for (const q of parsed.questions) {
         if (q && Array.isArray(q.options)) {
@@ -550,7 +552,7 @@ app.delete('/aulas/:id', professorAuth, async (c) => {
   return c.body(null, 204);
 });
 
-app.post('/marp/render', professorAuth, async (c) => {
+async function handleMarpRender(c: any) {
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
   const { titulo, markdown } = body as { titulo?: unknown; markdown?: unknown };
@@ -559,7 +561,10 @@ app.post('/marp/render', professorAuth, async (c) => {
   }
   const html = generateMarpNextStandaloneHtml(titulo, markdown);
   return c.json({ html });
-});
+}
+
+app.post('/marp/render', professorAuth, handleMarpRender);
+app.post('/api/marp/render', professorAuth, handleMarpRender);
 
 app.post('/atividades', professorAuth, createAtividade);
 app.put('/atividades/:id', professorAuth, updateAtividade);
