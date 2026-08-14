@@ -3,6 +3,11 @@ import { ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import { THEME_LABELS, NEXT_THEME, normalizeTheme, type ThemeKey } from '@/shared/marpTheme';
+// CSS canônico de tema (marpTheme.css). Injetado no <head> de forma NÃO-scoped
+// (onMounted) porque o preview renderiza o DOM do slide dinamicamente e <style scoped>
+// não alcança conteúdo injetado. Os seletores [data-theme=...] só ativam dentro do
+// wrapper do modal, que carrega o atributo data-theme.
+import marpThemeCss from '@/shared/marpTheme.css?inline';
 
 const props = defineProps<{
   show: boolean;
@@ -264,7 +269,10 @@ function renderSlides(source: string) {
   slideCountText.value = `${totalSlidesNum} slides`;
   charCountText.value = `${source.length} caracteres`;
 
-  const targetTheme = normalizeTheme(global.theme || currentTheme.value);
+  // O dropdown de tema sempre reescreve `theme:` no frontmatter (applyTheme → setFrontmatterTheme),
+  // então o caso sem theme no markdown é só markdown novo/importado → 'default' é o correto.
+  // Não usar fallback para currentTheme (evita estado stale).
+  const targetTheme = global.theme ? normalizeTheme(global.theme) : 'default';
 
   if (currentTheme.value !== targetTheme) {
     currentTheme.value = targetTheme;
@@ -570,6 +578,22 @@ function toggleTheme() {
   applyTheme(nextTheme, true);
 }
 
+// ─── Marp Theme CSS (canônico, não-scoped) ───
+// <style scoped> não alcança o DOM injetado do preview (renderSlides), então o CSS de tema
+// é injetado no <head> de forma não-scoped. Os seletores [data-theme=...] do marpTheme.css
+// só ativam dentro do wrapper do modal (que tem o atributo data-theme), então não vazam
+// visualmente para o restante do app. Idempotente: se o <style> já existir, só atualiza.
+function ensureMarpThemeCss() {
+  let style = document.getElementById('marp-theme-css') as HTMLStyleElement | null;
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'marp-theme-css';
+    style.setAttribute('data-marp-theme', '');
+    document.head.appendChild(style);
+  }
+  style.textContent = marpThemeCss;
+}
+
 // ─── Find & Replace Logic ────────────────────
 function openFindBar(showReplace = false) {
   showFindBar.value = true;
@@ -782,59 +806,11 @@ function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): stri
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"><${'/script'}>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><${'/script'}>
 <style>
+${marpThemeCss}
 :root {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --bg-app: #0f172a;
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --border: #334155;
-  --accent: #818cf8;
-  --accent-dim: rgba(129, 140, 248, 0.18);
-  --code-fg: #c7d2fe;
-  --slide-bg: #1e293b;
   --font-scale: 1;
   --anim-duration: 0.5s;
 }
-
-[data-theme="light"] {
-  --bg-app: #f8fafc;
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #475569;
-  --border: #cbd5e1;
-  --accent: #4338ca;
-  --accent-dim: rgba(67, 56, 202, 0.12);
-  --code-fg: #4338ca;
-  --slide-bg: #ffffff;
-}
-
-[data-theme="default"], [data-theme="high-contrast"] {
-  --c-bg:#ffffff; --c-text:#2b2b2b; --c-heading:#1a3a6e; --c-strong:#d62828; --c-border:#1a3a6e; --c-code-bg:#f0f0f0; --c-link:#1a3a6e;
-  --bg-app: #ffffff;
-  --text-primary: #2b2b2b;
-  --text-secondary: #2b2b2b;
-  --text-muted: #2b2b2b;
-  --border: #1a3a6e;
-  --accent: #1a3a6e;
-  --accent-dim: rgba(26, 58, 110, 0.12);
-  --code-fg: #2b2b2b;
-  --slide-bg: #ffffff;
-  font-family: 'Roboto', var(--font-sans), sans-serif;
-}
-[data-theme="default"], [data-theme="high-contrast"] html, [data-theme="default"], [data-theme="high-contrast"] body { font-family: 'Roboto', var(--font-sans), sans-serif; }
-[data-theme="default"], [data-theme="high-contrast"] .slide-content h1,
-[data-theme="default"], [data-theme="high-contrast"] .slide-content h2,
-[data-theme="default"], [data-theme="high-contrast"] .slide-content h3,
-[data-theme="default"], [data-theme="high-contrast"] .slide-content h4,
-[data-theme="default"], [data-theme="high-contrast"] .slide-content h5,
-[data-theme="default"], [data-theme="high-contrast"] .slide-content h6 { font-family: 'Roboto Slab', var(--font-sans), serif; }
-[data-theme="default"], [data-theme="high-contrast"] .slide-content h2 { border-bottom: 2px solid #1a3a6e; }
-[data-theme="default"], [data-theme="high-contrast"] .slide-content strong { color: #d62828; }
-[data-theme="default"], [data-theme="high-contrast"] .slide-content code { background: #f0f0f0; color: #2b2b2b; }
-[data-theme="default"], [data-theme="high-contrast"] .slide-content a { color: #1a3a6e; }
-[data-theme="default"], [data-theme="high-contrast"] .slide-content li::marker { color: #1a3a6e; }
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -893,9 +869,9 @@ html, body {
   align-items: center;
 }
 
-.slide-content h1 { font-size: calc(2.8em * var(--font-scale)); font-weight: 900; letter-spacing: -1px; line-height: 1.1; margin-bottom: 0.4em; color: var(--text-primary); }
-.slide-content h2 { font-size: calc(2.0em * var(--font-scale)); font-weight: 700; letter-spacing: -0.5px; margin-bottom: 0.4em; color: var(--text-primary); }
-.slide-content h3 { font-size: calc(1.4em * var(--font-scale)); font-weight: 600; margin-bottom: 0.4em; color: var(--text-primary); }
+.slide-content h1 { font-size: calc(2.8em * var(--font-scale)); font-weight: 900; letter-spacing: -1px; line-height: 1.1; margin-bottom: 0.4em; }
+.slide-content h2 { font-size: calc(2.0em * var(--font-scale)); font-weight: 700; letter-spacing: -0.5px; margin-bottom: 0.4em; }
+.slide-content h3 { font-size: calc(1.4em * var(--font-scale)); font-weight: 600; margin-bottom: 0.4em; }
 .slide-content p { font-size: calc(1.15em * var(--font-scale)); line-height: 1.7; margin-bottom: 0.6em; color: var(--text-secondary); }
 
 /* Table Styles for Standalone HTML */
@@ -913,51 +889,6 @@ html, body {
   border-radius: 0;
   margin: 0;
 }
-.slide-content th, .slide-content td {
-  padding: 12px 18px;
-  border: 1px solid var(--border);
-  text-align: left;
-  line-height: 1.5;
-}
-.slide-content th {
-  background: var(--accent-dim);
-  color: var(--text-primary);
-  font-weight: 700;
-}
-.slide-content tr:nth-child(even) {
-  background: rgba(255, 255, 255, 0.03);
-}
-[data-theme="light"] .slide-content tr:nth-child(even) {
-  background: rgba(0, 0, 0, 0.03);
-}
-[data-theme="default"], [data-theme="high-contrast"] .slide-content tr:nth-child(even) {
-  background: rgba(0, 0, 0, 0.03);
-}
-
-.slide-content code {
-  font-family: var(--font-mono);
-  font-size: 0.88em;
-  background: var(--accent-dim);
-  color: var(--code-fg);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-.slide-content pre {
-  background: #0d1117;
-  color: #e6edf3;
-  padding: 20px 24px;
-  border-radius: 8px;
-  overflow-x: auto;
-  font-size: 0.85em;
-  line-height: 1.65;
-  font-family: var(--font-mono);
-  margin: 1em 0;
-}
-.slide-content pre code {
-  background: none;
-  color: inherit;
-  padding: 0;
-}
 
 .slide-content ul, .slide-content ol {
   font-size: calc(1.1em * var(--font-scale));
@@ -966,28 +897,6 @@ html, body {
   margin-bottom: 0.8em;
   color: var(--text-secondary);
 }
-.slide-content li::marker { color: var(--accent); }
-.slide-content blockquote {
-  border-left: 4px solid var(--accent);
-  padding-left: 18px;
-  color: var(--text-muted);
-  font-style: italic;
-  margin: 1em 0;
-}
-.slide-content img { max-width: 100%; max-height: 75vh; object-fit: contain; height: auto; border-radius: 8px; }
-.slide-content a { color: var(--accent); text-decoration: none; }
-.slide-content a:hover { text-decoration: underline; }
-
-.slide-number {
-  position: absolute;
-  bottom: 20px;
-  right: 24px;
-  font-size: 12px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-weight: 600;
-}
-
 /* Animations */
 .slide .slide-content > * { opacity:1; transition: opacity .3s, transform .3s; }
 body.anim-mode .slide:not(.active) .slide-content > * { opacity:0; }
@@ -1046,15 +955,6 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   box-shadow: 0 10px 30px rgba(0,0,0,0.4);
   transition: opacity 0.3s ease;
 }
-[data-theme="light"] #controls-bar {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-}
-[data-theme="default"], [data-theme="high-contrast"] #controls-bar {
-  background: #ffffff;
-  border-color: #1a3a6e;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-}
 #controls-bar.idle { opacity: 0.15; }
 #controls-bar:hover, #controls-bar.idle:hover { opacity: 1; }
 
@@ -1088,15 +988,6 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   z-index: 1001;
 }
 
-@media print {
-  html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
-  #slides-container { display: block !important; height: auto !important; }
-  #controls-bar, #progress-bar { display: none !important; }
-  .slide { page-break-after: always !important; break-after: page !important; position: relative !important; opacity: 1 !important; width: 100vw !important; height: 100vh !important; }
-  body.anim-mode .slide .slide-content > * { opacity: 1 !important; animation: none !important; }
-  [data-theme="default"], [data-theme="high-contrast"] html, [data-theme="default"], [data-theme="high-contrast"] body { background: #fff !important; color: #2b2b2b !important; }
-  [data-theme="default"], [data-theme="high-contrast"] .slide { background: #fff !important; }
-}
 .mermaid-block {
   width: 100%;
   display: flex;
@@ -1398,8 +1289,42 @@ function exportHtml() {
 
 function exportPdf() {
   showExportMenu.value = false;
-  window.print();
+  // Gera o HTML standalone em memória e imprime via iframe oculto — NUNCA a página do app.
+  const htmlContent = generateMarpNextStandaloneHtml(titleInput.value || 'Aula Sem Título', markdownInput.value);
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+
+  const removeIframe = () => {
+    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    window.removeEventListener('afterprint', removeIframe);
+  };
+  window.addEventListener('afterprint', removeIframe);
+  setTimeout(removeIframe, 60000);
+
+  try {
+    const doc = iframe.contentDocument;
+    if (!doc || !iframe.contentWindow) { removeIframe(); return; }
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  } catch (e) {
+    removeIframe();
+    useToast().error('Não foi possível gerar o PDF.');
+  }
 }
+
+// Cores do export PPTX por tema — espelham os tokens de marpTheme.css (default/dark/light).
+// Decisão: fontFace permanece 'Arial' (universal em visualizadores de PPT; 'Roboto' cairia
+// em fallback silencioso e mudaria o layout em máquinas sem a fonte instalada).
+const THEME_PPT_COLORS: Record<ThemeKey, { bg: string; title: string; body: string; accent: string }> = {
+  default: { bg: '#FFFFFF', title: '#1a3a6e', body: '#2b2b2b', accent: '#d62828' },
+  dark: { bg: '#1E293B', title: '#F8FAFC', body: '#CBD5E1', accent: '#818CF8' },
+  light: { bg: '#FFFFFF', title: '#0F172A', body: '#334155', accent: '#4338CA' },
+};
 
 async function exportPptx() {
   showExportMenu.value = false;
@@ -1424,14 +1349,14 @@ async function exportPptx() {
 
   if (!previewPaneRef.value) return;
   const slideNodes = previewPaneRef.value.querySelectorAll('.slide');
-  const isDark = currentTheme.value === 'dark';
-  const titleColor = isDark ? 'F8FAFC' : '0F172A';
-  const bodyColor = isDark ? 'CBD5E1' : '475569';
+  const themeColors = THEME_PPT_COLORS[normalizeTheme(currentTheme.value)];
+  const titleColor = themeColors.title;
+  const bodyColor = themeColors.body;
 
   const slideBgColor = (sEl: Element) => {
     const style = sEl.getAttribute('style') || '';
     const m = style.match(/#[0-9a-fA-F]{3,8}/);
-    return m ? m[0].replace('#', '').slice(0, 6).toUpperCase() : (isDark ? '1E293B' : 'FFFFFF');
+    return m ? m[0].replace('#', '').slice(0, 6).toUpperCase() : themeColors.bg;
   };
 
   slideNodes.forEach((sEl) => {
@@ -1618,6 +1543,7 @@ function handleWindowClick() {
 }
 
 onMounted(() => {
+  ensureMarpThemeCss();
   setupAutoSave();
   window.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('mousemove', handleMouseMove);
@@ -1638,6 +1564,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cleanupAutoSave();
+  const themeStyle = document.getElementById('marp-theme-css');
+  if (themeStyle) themeStyle.remove();
   window.removeEventListener('keydown', handleGlobalKeydown);
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('click', handleWindowClick);
@@ -1831,49 +1759,6 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
-.marpnext-modal-root[data-theme="light"] {
-  --bg-app: #f4f4f5;
-  --bg-editor: #ffffff;
-  --bg-preview: #e4e4e7;
-  --bg-slide: #ffffff;
-  --border: #d4d4d8;
-  --text-primary: #18181b;
-  --text-secondary: #52525b;
-  --text-muted: #5c5c66;
-  --accent: #4f46e5;
-  --accent-dim: rgba(79,70,229,0.1);
-}
-
-.marpnext-modal-root[data-theme="default"], .marpnext-modal-root[data-theme="high-contrast"] {
-  --c-bg:#ffffff; --c-text:#2b2b2b; --c-heading:#1a3a6e; --c-strong:#d62828; --c-border:#1a3a6e; --c-code-bg:#f0f0f0; --c-link:#1a3a6e;
-  --bg-app: #ffffff;
-  --bg-editor: #ffffff;
-  --bg-preview: #ffffff;
-  --bg-slide: #ffffff;
-  --border: #1a3a6e;
-  --text-primary: #2b2b2b;
-  --text-secondary: #2b2b2b;
-  --text-muted: #2b2b2b;
-  --accent: #1a3a6e;
-  --accent-dim: rgba(26,58,110,0.12);
-}
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content h1),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h1),
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content h2),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h2),
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content h3),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h3),
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content h4),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h4),
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content h5),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h5),
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content h6),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h6) { font-family:'Roboto Slab', var(--font-sans), serif; color:#1a3a6e; }
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content h2),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content h2) { border-bottom:2px solid #1a3a6e; }
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content strong),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content strong) { color:#d62828; }
-
 #topbar {
   height: var(--topbar-h);
   display: flex; align-items: center; gap: 12px;
@@ -2036,10 +1921,10 @@ onBeforeUnmount(() => {
   background-color: rgba(129, 140, 248, 0.6); color: transparent !important; outline: 2px solid var(--accent);
 }
 
-/* SLIDES STYLING */
+/* SLIDES STYLING (card 960x540 = layout do preview; cores do slide vêm de marpTheme.css via --slide-bg) */
 :deep(.slide) {
   width: var(--slide-w); max-width:100%; min-height: var(--slide-h);
-  padding: 48px 56px; background: var(--bg-slide); border-radius: var(--radius);
+  padding: 48px 56px; background: var(--slide-bg); border-radius: var(--radius);
   scroll-snap-align: center; position:relative; overflow:visible;
   box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 0 1px var(--border); flex-shrink: 0;
 }
@@ -2049,30 +1934,15 @@ onBeforeUnmount(() => {
 :deep(.slide-content h1) { font-size: calc(2.8rem * var(--font-scale, 1)); font-weight:900; letter-spacing:-1px; line-height:1.1; }
 :deep(.slide-content h2) { font-size: calc(2rem * var(--font-scale, 1)); font-weight:700; letter-spacing:-0.5px; }
 :deep(.slide-content h3) { font-size: calc(1.4rem * var(--font-scale, 1)); font-weight:600; }
-:deep(.slide-content p)  { font-size: calc(1.15rem * var(--font-scale, 1)); line-height:1.75; color:var(--text-secondary); }
-:deep(.slide-content ul), :deep(.slide-content ol) { font-size: calc(1.1rem * var(--font-scale, 1)); line-height:1.8; padding-left:1.6rem; margin-bottom:0.8em; color:var(--text-secondary); list-style-position: outside; }
+:deep(.slide-content p)  { font-size: calc(1.15rem * var(--font-scale, 1)); line-height:1.75; color:var(--c-text); }
+:deep(.slide-content ul), :deep(.slide-content ol) { font-size: calc(1.1rem * var(--font-scale, 1)); line-height:1.8; padding-left:1.6rem; margin-bottom:0.8em; color:var(--c-text); list-style-position: outside; }
 :deep(.slide-content ul ul), :deep(.slide-content ul ol), :deep(.slide-content ol ul), :deep(.slide-content ol ol) { font-size:0.95em; line-height:1.6; margin-top:0.3em; margin-bottom:0.3em; padding-left:1.4rem; }
 :deep(.slide-content ul) { list-style-type: disc; }
 :deep(.slide-content ul ul) { list-style-type: circle; }
 :deep(.slide-content ul ul ul) { list-style-type: square; }
 :deep(.slide-content ol) { list-style-type: decimal; }
-:deep(.slide-content li::marker) { color:var(--accent); }
-:deep(.slide-content strong) { color:var(--text-primary); }
-:deep(.slide-content em) { color:var(--yellow); }
-.marpnext-modal-root[data-theme="light"] :deep(.slide-content em) { color:#b45309; }
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content em),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content em) { color:#d62828; }
-:deep(.slide-content blockquote) { border-left:3px solid var(--accent); padding-left:16px; color:var(--text-muted); font-style:italic; }
-:deep(.slide-content hr) { border:none; height:1px; background:var(--border); margin:1rem 0; }
-:deep(.slide-content img) { max-width:100%; border-radius:8px; }
 :deep(.table-wrap) { margin: 1.2em 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 :deep(.slide-content table) { width:100%; border-collapse:collapse; font-size: calc(0.95rem * var(--font-scale, 1)); margin:0; }
-:deep(.slide-content th), :deep(.slide-content td) { padding:10px 14px; border:1px solid var(--border); text-align:left; }
-:deep(.slide-content th) { background:var(--accent-dim); font-weight:600; }
-:deep(.slide-content tr:nth-child(even)) { background: rgba(255, 255, 255, 0.03); }
-.marpnext-modal-root[data-theme="light"] :deep(.slide-content tr:nth-child(even)) { background: rgba(0, 0, 0, 0.03); }
-.marpnext-modal-root[data-theme="default"] :deep(.slide-content tr:nth-child(even)),
-.marpnext-modal-root[data-theme="high-contrast"] :deep(.slide-content tr:nth-child(even)) { background: rgba(0, 0, 0, 0.03); }
 :deep(.slide.centered .slide-content) { align-items:center; text-align:center; }
 
 /* MERMAID STYLING */
@@ -2171,17 +2041,6 @@ onBeforeUnmount(() => {
   transition: opacity 0.3s ease, background 0.3s ease, border-color 0.3s ease;
 }
 
-.marpnext-modal-root[data-theme="light"] #controls-bar {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-}
-.marpnext-modal-root[data-theme="default"] #controls-bar,
-.marpnext-modal-root[data-theme="high-contrast"] #controls-bar {
-  background: #ffffff;
-  border-color: #1a3a6e;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-}
-
 #controls-bar.idle {
   opacity: 0.15;
 }
@@ -2207,13 +2066,5 @@ onBeforeUnmount(() => {
   background: var(--accent-dim);
   color: var(--accent);
   border-color: var(--accent);
-}
-
-@media print {
-  .marpnext-modal-root { position: static !important; background: #fff !important; }
-  #topbar, #editor-pane, #resizer, #progress-bar, #status-bar, #find-bar, #controls-bar { display: none !important; }
-  #preview-pane { display: block !important; position: static !important; width: 100% !important; height: auto !important; overflow: visible !important; padding: 0 !important; gap: 0 !important; background: #fff !important; }
-  .marpnext-modal-root.anim-mode :deep(.slide .slide-content > *) { opacity: 1 !important; animation: none !important; transition: none !important; }
-  :deep(.slide) { page-break-after: always !important; break-after: page !important; position: relative !important; opacity: 1 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; margin: 0 !important; box-shadow: none !important; border-radius: 0 !important; transform: none !important; }
 }
 </style>
