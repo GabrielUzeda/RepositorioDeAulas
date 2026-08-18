@@ -37,6 +37,7 @@ const exec = (command: string, value: string | null = null) => {
 
 // Função para sanitizar HTML prevenindo XSS via allowlist estrita de tags e atributos permitidos
 const ALLOWED_TAGS = new Set([
+  'HTML', 'HEAD', 'BODY',
   'P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'H2', 'H3', 'H4',
   'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'SPAN'
 ]);
