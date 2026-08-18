@@ -180,9 +180,13 @@ test.describe('Aluno — Atividades Avançadas & Modalidades Interativas', () =>
     await page.getByRole('button', { name: 'Confirmar' }).click();
     await expect(page.getByText('Acesso Restrito')).toBeHidden();
 
-    // Atividade desbloqueada
-    await expect(page.getByText('Perguntas da Atividade')).toBeVisible();
-    await expect(page.getByText('Qual o código secreto?')).toBeVisible();
+    // Atividade desbloqueada -> Passo 0: Identificação
+    await page.getByLabel('Seu Nome *').fill('Aluno Senha');
+    await page.getByLabel('Seu E-mail *').fill('aluno.senha@local');
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 1: Pergunta
+    await expect(page.getByText('Conteúdo Secreto')).toBeVisible();
   });
 
   test('interage com atividade tipo Minigame e envia/consulta Ranking', async ({ page, request }) => {

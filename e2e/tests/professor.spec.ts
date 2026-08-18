@@ -8,12 +8,6 @@ import {
   uniqueName
 } from '../helpers';
 
-async function acceptDialogs(page: Page) {
-  page.on('dialog', (d) => {
-    d.accept().catch(() => {});
-  });
-}
-
 test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
   let adminToken: string;
   let profEmail: string;
@@ -39,12 +33,7 @@ test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
     }
   });
 
-  function cursoCard(page: Page) {
-    return page.locator('h3', { hasText: cursoNome }).locator('xpath=ancestor::div[contains(@class,"rounded") or contains(@class,"card")][1]');
-  }
-
   test('fluxo completo: disciplina → aula (marp) → atividade pela UI', async ({ page }) => {
-    await acceptDialogs(page);
     await loginViaUI(page, profEmail, profPassword, /\/professor/);
 
     await expect(page.getByRole('heading', { name: 'Painel do Professor' })).toBeVisible();
@@ -60,21 +49,19 @@ test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
     await page.getByLabel('Nome da Disciplina *').fill(discNome);
     await page.getByRole('button', { name: 'Salvar Disciplina' }).click();
 
-    const discCard = page.locator('h3', { hasText: discNome }).locator('xpath=ancestor::div[contains(@class,"rounded") or contains(@class,"card")][1]');
-    await expect(discCard).toBeVisible();
+    await expect(page.locator('h3', { hasText: discNome })).toBeVisible();
 
     // ---------- Disciplina: UPDATE ----------
     const discEditada = `${discNome} Editada`;
-    await discCard.locator('button[title="Editar Disciplina"]').click();
+    await page.locator('h3', { hasText: discNome }).locator('xpath=ancestor::div[contains(@class,"rounded") or contains(@class,"card")][1]').locator('button[title="Editar Disciplina"]').click();
     await page.getByLabel('Nome da Disciplina *').fill(discEditada);
     await page.getByRole('button', { name: 'Salvar Disciplina' }).click();
 
-    const discCardEdit = page.locator('h3', { hasText: discEditada }).locator('xpath=ancestor::div[contains(@class,"rounded") or contains(@class,"card")][1]');
-    await expect(discCardEdit).toBeVisible();
+    await expect(page.locator('h3', { hasText: discEditada })).toBeVisible();
 
     // ---------- Entra na disciplina ----------
-    await discCardEdit.locator('button', { hasText: 'Gerenciar Aulas & Atividades' }).click();
-    await expect(page.getByText('Aulas (Marp Markdown)')).toBeVisible();
+    await page.locator('h3', { hasText: discEditada }).click();
+    await expect(page.getByRole('heading', { name: discEditada })).toBeVisible();
 
     // ---------- Aula: CREATE (Marp) ----------
     const aulaTitulo = uniqueName('AulaUI');
@@ -87,13 +74,15 @@ test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
 
     // ---------- Aula: UPDATE ----------
     const aulaEditada = `${aulaTitulo} Editada`;
-    await page.locator('p', { hasText: aulaTitulo }).locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]').locator('button[title="Editar Aula"]').click();
+    const aulaCard = page.locator('p', { hasText: aulaTitulo }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    await aulaCard.locator('button[title="Editar Aula"]').click();
     await page.getByPlaceholder('Título da Aula').fill(aulaEditada);
     await page.getByRole('button', { name: 'Salvar Aula' }).click();
     await expect(page.locator('p', { hasText: aulaEditada }).first()).toBeVisible();
 
     // ---------- Aula: DELETE ----------
-    await page.locator('p', { hasText: aulaEditada }).locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]').locator('button[title="Excluir Aula"]').click();
+    const aulaCardEdit = page.locator('p', { hasText: aulaEditada }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    await aulaCardEdit.locator('button[title="Excluir Aula"]').click();
     await page.getByRole('button', { name: 'Excluir' }).click();
     await expect(page.locator('p', { hasText: aulaEditada })).toHaveCount(0);
 
@@ -113,23 +102,73 @@ test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
 
     // ---------- Atividade: UPDATE ----------
     const atvEditada = `${atvTitulo} Editada`;
-    await page.locator('p', { hasText: atvTitulo }).locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]').locator('button[title="Editar Atividade"]').click();
+    const atvCard = page.locator('p', { hasText: atvTitulo }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    await atvCard.locator('button[title="Editar Atividade"]').click();
     await page.getByPlaceholder('Ex: Avaliação de Algoritmos').fill(atvEditada);
     await page.getByRole('button', { name: 'Salvar Atividade' }).click();
     await expect(page.locator('p', { hasText: atvEditada }).first()).toBeVisible();
 
     // ---------- Atividade: DELETE ----------
-    await page.locator('p', { hasText: atvEditada }).locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]').locator('button[title="Excluir Atividade"]').click();
+    const atvCardEdit = page.locator('p', { hasText: atvEditada }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    await atvCardEdit.locator('button[title="Excluir Atividade"]').click();
     await page.getByRole('button', { name: 'Excluir' }).click();
     await expect(page.locator('p', { hasText: atvEditada })).toHaveCount(0);
 
     // ---------- Volta para lista de disciplinas e exclui ----------
-    await page.getByRole('button', { name: /Voltar/i }).click();
+    await page.getByRole('button', { name: 'Voltar' }).click();
     await expect(page.getByRole('button', { name: 'Nova Disciplina' })).toBeVisible();
-    const discCardFinal = page.locator('h3', { hasText: discEditada }).locator('xpath=ancestor::div[contains(@class,"rounded") or contains(@class,"card")][1]');
-    await expect(discCardFinal).toBeVisible();
-    await discCardFinal.locator('button[title="Excluir Disciplina"]').click();
+    await page.locator('h3', { hasText: discEditada }).locator('xpath=ancestor::div[contains(@class,"rounded") or contains(@class,"card")][1]').locator('button[title="Excluir Disciplina"]').click();
     await page.getByRole('button', { name: 'Excluir' }).click();
-    await expect(discCardFinal).toHaveCount(0);
+    await expect(page.locator('h3', { hasText: discEditada })).toHaveCount(0);
+  });
+
+  test('reordenação de aulas e atividades via botões e modo de salvamento', async ({ page }) => {
+    await loginViaUI(page, profEmail, profPassword, /\/professor/);
+
+    // Entra no curso
+    await page.locator('h3', { hasText: cursoNome }).click();
+
+    // Cria disciplina de teste
+    const discNome = uniqueName('DiscReord');
+    await page.getByRole('button', { name: 'Nova Disciplina' }).click();
+    await page.getByLabel('Nome da Disciplina *').fill(discNome);
+    await page.getByRole('button', { name: 'Salvar Disciplina' }).click();
+
+    await page.locator('h3', { hasText: discNome }).click();
+
+    // Cria Aula 1 e Aula 2 (Aula 2 deve ficar no final por padrão)
+    await page.getByRole('button', { name: 'Nova Aula' }).click();
+    await page.getByPlaceholder('Título da Aula').fill('Aula Primeiro');
+    await page.getByPlaceholder('Digite seu código Marp Markdown aqui...').fill('# Slide 1');
+    await page.getByRole('button', { name: 'Salvar Aula' }).click();
+
+    await page.getByRole('button', { name: 'Nova Aula' }).click();
+    await page.getByPlaceholder('Título da Aula').fill('Aula Segundo');
+    await page.getByPlaceholder('Digite seu código Marp Markdown aqui...').fill('# Slide 1');
+    await page.getByRole('button', { name: 'Salvar Aula' }).click();
+
+    // Entra em modo de reordenação
+    const btnReordenar = page.locator('button', { hasText: 'Reordenar' }).first();
+    await expect(btnReordenar).toBeVisible();
+    await btnReordenar.click();
+
+    // O botão deve mudar para "Salvar Ordem"
+    const btnSalvarOrdem = page.locator('button', { hasText: 'Salvar Ordem' }).first();
+    await expect(btnSalvarOrdem).toBeVisible();
+
+    // Move a Aula Segundo para cima
+    const btnSubir = page.locator('button[title="Mover para cima"]').last();
+    await btnSubir.click();
+
+    // Salva a nova ordem
+    await btnSalvarOrdem.click();
+
+    // Aguarda retornar ao estado normal
+    await expect(page.locator('button', { hasText: 'Reordenar' }).first()).toBeVisible();
+
+    // Exclui a disciplina de teste
+    await page.getByRole('button', { name: 'Voltar' }).click();
+    await page.locator('h3', { hasText: discNome }).locator('xpath=ancestor::div[contains(@class,"rounded") or contains(@class,"card")][1]').locator('button[title="Excluir Disciplina"]').click();
+    await page.getByRole('button', { name: 'Excluir' }).click();
   });
 });

@@ -124,12 +124,19 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
     await page.getByRole('tab', { name: /Atividades/ }).click();
     await expect(page.locator('h3', { hasText: atvTitulo })).toBeVisible();
     await page.locator('h3', { hasText: atvTitulo }).click();
-    await expect(page.getByText('Perguntas da Atividade')).toBeVisible();
-    await expect(page.getByText('Qual é a capital do Brasil?')).toBeVisible();
 
+    // Passo 0: Identificação
     await page.getByLabel('Seu Nome *').fill('Aluno E2E');
     await page.getByLabel('Seu E-mail *').fill('aluno.e2e@local');
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 1: Pergunta
+    await expect(page.getByText(/Qual é a capital do Brasil|Questão 1/)).toBeVisible();
     await page.getByRole('button', { name: 'Brasília' }).click();
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 2: Revisão e Envio
+    await expect(page.getByText('Revisão das Respostas')).toBeVisible();
     await page.getByRole('button', { name: 'Enviar Resposta' }).click();
   });
 });

@@ -144,13 +144,22 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     // --- Aba Atividades: abre e responde ---
     await page.getByRole('tab', { name: /Atividades/ }).click();
     await page.locator('h3', { hasText: atvTitulo }).click();
-    await expect(page.getByText('Perguntas da Atividade')).toBeVisible();
+    
+    // Passo 0: Identificação
+    await expect(page.getByLabel('Seu Nome *')).toBeVisible();
     await page.getByLabel('Seu Nome *').fill(alunoNome);
     await page.getByLabel('Seu E-mail *').fill(alunoEmail);
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 1: Pergunta
     await page.getByRole('button', { name: 'Brasília' }).click();
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 2: Revisão e Envio
+    await expect(page.getByText('Revisão das Respostas')).toBeVisible();
     await page.getByRole('button', { name: 'Enviar Resposta' }).click();
-    await expect(page.getByText(/Resposta enviada/i)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/Correção do servidor/)).toContainText('1 / 1');
+    await expect(page.getByRole('heading', { name: 'Resposta Enviada com Sucesso!' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Correção do servidor/).first()).toContainText('1 / 1');
   });
 
   test('professor avalia o aluno com nota e feedback (respostas da atividade)', async ({ page }) => {
@@ -163,9 +172,7 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
 
     // Navega: curso → disciplina → detalhes
     await page.locator('h3', { hasText: cursoNome }).click();
-    const gerenciarBtn = page.getByRole('button', { name: 'Gerenciar Aulas & Atividades' });
-    await expect(gerenciarBtn).toBeVisible();
-    await gerenciarBtn.click();
+    await page.locator('h3', { hasText: materiaNome }).click();
     await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
 
     // Abre respostas da atividade
@@ -191,9 +198,7 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
 
     // Navega até os detalhes da disciplina
     await page.locator('h3', { hasText: cursoNome }).click();
-    const gerenciarBtn = page.getByRole('button', { name: 'Gerenciar Aulas & Atividades' });
-    await expect(gerenciarBtn).toBeVisible();
-    await gerenciarBtn.click();
+    await page.locator('h3', { hasText: materiaNome }).click();
     await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
 
     // Abre o relatório consolidado

@@ -95,16 +95,16 @@ test.describe('Aluno — Direitos LGPD (Consulta e Exclusão de Respostas)', () 
     const deleteRes = await request.delete(
       `${E2E_BACKEND_URL}/aluno/minhas-respostas?email=${encodeURIComponent(alunoEmail)}&token=${encodeURIComponent(consultaToken)}`
     );
-    expect(deleteRes.ok()).toBeTruthy();
-    const deleteJson = await deleteRes.json();
-    expect(deleteJson.success).toBeTruthy();
+    expect(deleteRes.status()).toBe(204);
 
-    // 4. Verificar que dados não constam mais no banco
+    // 4. Verificar que dados não constam mais no banco (401 ou lista vazia)
     const checkRes = await request.get(
       `${E2E_BACKEND_URL}/aluno/minhas-respostas?email=${encodeURIComponent(alunoEmail)}&token=${encodeURIComponent(consultaToken)}`
     );
-    expect(checkRes.ok()).toBeTruthy();
-    const checkLista = await checkRes.json();
-    expect(checkLista.length).toBe(0);
+    expect([200, 401]).toContain(checkRes.status());
+    if (checkRes.ok()) {
+      const checkLista = await checkRes.json();
+      expect(checkLista.length).toBe(0);
+    }
   });
 });

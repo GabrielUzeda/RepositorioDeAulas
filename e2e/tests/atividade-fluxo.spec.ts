@@ -51,12 +51,8 @@ test.describe('Professor — gravar, exportar e importar atividade (JSON)', () =
     await loginViaUI(page, profEmail, profPassword, /\/professor/);
     await expect(page.getByRole('heading', { name: 'Painel do Professor' })).toBeVisible();
     await page.locator('h3', { hasText: cursoNome }).click();
-    const discCard = page
-      .locator('h3', { hasText: materiaNome })
-      .locator('xpath=ancestor::div[contains(@class,"rounded") or contains(@class,"card")][1]');
-    await expect(discCard).toBeVisible();
-    await discCard.locator('button', { hasText: 'Gerenciar Aulas & Atividades' }).click();
-    await expect(page.getByText('Aulas (Marp Markdown)')).toBeVisible();
+    await page.locator('h3', { hasText: materiaNome }).click();
+    await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
 
     // --- NOVA ATIVIDADE (tipo objetivo: reforco) ---
     await page.getByRole('button', { name: 'Nova Atividade' }).click();
@@ -186,21 +182,32 @@ test.describe('Aluno — visualizar e corrigir atividade (resposta por questão)
 
   test('aluno vê questões, responde por questão e recebe correção 2/2', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Área do Aluno' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Selecione seu Curso' })).toBeVisible();
     await page.locator('h3', { hasText: cursoNome }).click();
     await expect(page.locator('h3', { hasText: materiaNome })).toBeVisible();
     await page.locator('h3', { hasText: materiaNome }).click();
-    await page.getByRole('button', { name: /Atividades/ }).click();
+    await page.getByRole('tab', { name: /Atividades/ }).click();
     await expect(page.locator('h3', { hasText: atvTitulo })).toBeVisible();
     await page.locator('h3', { hasText: atvTitulo }).click();
-    await expect(page.getByText('Perguntas da Atividade')).toBeVisible();
-    await expect(page.getByText('Qual é a capital do Brasil?')).toBeVisible();
 
+    // Passo 0: Identificação
     await page.getByLabel('Seu Nome *').fill('Aluno E2E');
     await page.getByLabel('Seu E-mail *').fill('aluno.e2e@local');
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 1: Pergunta 1
+    await expect(page.getByText('Q1')).toBeVisible();
     await page.getByRole('button', { name: /Brasília/ }).click();
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 2: Pergunta 2
+    await expect(page.getByText('Q2')).toBeVisible();
     await page.getByRole('button', { name: /^4/ }).click();
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 3: Revisão e Envio
+    await expect(page.getByText('Revisão das Respostas')).toBeVisible();
     await page.getByRole('button', { name: /Enviar Resposta/ }).click();
-    await expect(page.getByText(/Correção do servidor: 2 \/ 2 acertos/)).toBeVisible();
+    await expect(page.getByText(/Correção do servidor: 2 \/ 2 acertos/).first()).toBeVisible();
   });
 });
