@@ -104,6 +104,7 @@ app.onError((err, c) => {
 const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10, message: 'Muitas tentativas de login. Aguarde 1 minuto.' });
 const registerLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, message: 'Muitas tentativas de registro. Aguarde 10 minutos.' });
 const submissionLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 20, message: 'Muitas submissões de resposta. Aguarde 1 minuto.' });
+const draftLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10, message: 'Muitas requisições de rascunho. Aguarde 1 minuto.' });
 
 const dbq = (sql: string) => db.query<Record<string, any>, any[]>(sql);
 
@@ -800,6 +801,8 @@ app.get('/atividades/:id', async (c) => {
   }
 });
 
+
+
 interface CorrecaoResultado {
   acertos: number;
   total: number;
@@ -943,7 +946,14 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
   if (!body.aluno_nome || !body.aluno_email || !isValidEmail(body.aluno_email) || body.respostas === undefined) {
     return c.text('Informe nome, e-mail válido e respostas.', 400);
   }
-  const atv = dbq('SELECT id, json_data, allow_password, senha, disciplina_id FROM atividades WHERE id = ?').get(atividadeId) as any;
+  const atv = dbq(`
+    SELECT a.id, a.titulo, a.descricao, a.json_data, a.allow_password, a.senha, a.disciplina_id,
+           d.nome as disciplina_nome, c.nome as curso_nome
+    FROM atividades a
+    LEFT JOIN disciplinas d ON d.id = a.disciplina_id
+    LEFT JOIN cursos c ON c.id = d.curso_id
+    WHERE a.id = ?
+  `).get(atividadeId) as any;
   if (!atv) return c.text('Atividade não encontrada', 404);
 
   const errSenha = validarSenhasSubmissao(body, atv);
@@ -951,6 +961,7 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
 
   const email = String(body.aluno_email).trim();
   const nome = String(body.aluno_nome).trim();
+  const enviarEmail = Boolean(body.enviar_email);
   
   const respostasInput = body.respostas;
   const respostasStr = typeof respostasInput === 'string' ? respostasInput : JSON.stringify(respostasInput);
@@ -988,6 +999,62 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
 
     await logAudit(c, 'submeter_resposta', `atividade:${atividadeId}`, { email_hash: emailHash });
 
+    if (enviarEmail) {
+      try {
+        const escapeHtml = (str: string) => String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+
+        let perguntasRespostasHtml = '';
+        try {
+          const rawQuestions = typeof atv.json_data === 'string' ? JSON.parse(atv.json_data) : atv.json_data;
+          const questionsList = Array.isArray(rawQuestions) ? rawQuestions : (rawQuestions?.questions || rawQuestions?.perguntas || []);
+          const mapRespostas = typeof respostasInput === 'object' && respostasInput !== null ? respostasInput : {};
+
+          perguntasRespostasHtml = questionsList.map((q: any, idx: number) => {
+            const qId = q.id || idx;
+            const resp = mapRespostas[qId] ?? mapRespostas[String(qId)] ?? 'Não respondida';
+            const respText = typeof resp === 'object' ? JSON.stringify(resp) : String(resp);
+            const tituloQuestao = escapeHtml(q.title || q.titulo || q.statement || 'Pergunta');
+            return `<div style="margin-bottom: 12px; padding: 10px; background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <strong style="color: #1e293b;">Questão ${idx + 1}: ${tituloQuestao}</strong><br/>
+              <span style="color: #475569;">Sua resposta: </span><span style="color: #0284c7; font-weight: bold;">${escapeHtml(respText)}</span>
+            </div>`;
+          }).join('');
+        } catch (_e) {
+          perguntasRespostasHtml = `<p>Respostas submetidas: ${escapeHtml(respostasStr)}</p>`;
+        }
+
+        const html = `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <h2 style="color: #0284c7; margin-bottom: 4px;">Comprovante de Envio de Atividade</h2>
+            <p style="color: #64748b; font-size: 14px; margin-top: 0;">Guardado com segurança. Conforme a LGPD, este e-mail serve como seu comprovante individual.</p>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
+            <p><strong>Aluno:</strong> ${escapeHtml(nome)}</p>
+            <p><strong>Curso:</strong> ${escapeHtml(atv.curso_nome || 'N/A')}</p>
+            <p><strong>Disciplina:</strong> ${escapeHtml(atv.disciplina_nome || 'N/A')}</p>
+            <p><strong>Atividade:</strong> ${escapeHtml(atv.titulo || 'Atividade')}</p>
+            <p><strong>Data de Envio:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+            <h3 style="color: #1e293b; margin-top: 20px;">Resumo das suas respostas:</h3>
+            ${perguntasRespostasHtml}
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #94a3b8;">Este é um e-mail automático enviado pelo Repositório de Aulas. Nenhuma informação pessoal sensível permanece armazenada em texto puro no nosso banco de dados.</p>
+          </div>
+        `;
+
+        void sendMail({
+          to: email,
+          subject: `[Comprovante] Resposta enviada: ${atv.titulo || 'Atividade'}`,
+          html,
+        }).catch((err) => console.error('Erro ao enviar e-mail de comprovante ao aluno:', err));
+      } catch (errEmail) {
+        console.error('Erro ao preparar e-mail de comprovante:', errEmail);
+      }
+    }
+
     return c.json({
       id: r.id,
       atividade_id: r.atividade_id,
@@ -1011,6 +1078,113 @@ app.post('/atividades/:id/respostas', submissionLimiter, async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('ID inválido', 400);
   return handleSubmeterResposta(c, id);
+});
+
+// ---------- Endpoints de Rascunhos de Atividades (30 Dias) ----------
+
+function generateDraftCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  for (let i = 0; i < 6; i++) {
+    code += chars[bytes[i] % chars.length];
+  }
+  return code;
+}
+
+app.post('/atividades/:id/rascunhos', draftLimiter, async (c) => {
+  const atividadeId = parseId(c.req.param('id'));
+  if (atividadeId === null) return c.text('ID inválido', 400);
+
+  const body = await parseBody(c);
+  if (!body) return c.text('Dados inválidos', 400);
+
+  const atv = dbq('SELECT id FROM atividades WHERE id = ?').get(atividadeId);
+  if (!atv) return c.text('Atividade não encontrada', 404);
+
+  const nome = String(body.nome || body.aluno_nome || '').trim();
+  const email = String(body.email || body.aluno_email || '').trim();
+  const respostasInput = body.respostas || {};
+  const respostasStr = typeof respostasInput === 'string' ? respostasInput : JSON.stringify(respostasInput);
+
+  if (!email || !isValidEmail(email)) {
+    return c.json({ success: false, error: 'E-mail válido é obrigatório para salvar o rascunho.' }, 400);
+  }
+
+  const emailHash = await hashEmail(email);
+  const encNome = await encryptData(nome || 'Aluno Anônimo');
+  const encEmail = await encryptData(email);
+  const encRespostas = await encryptData(respostasStr);
+
+  const now = new Date();
+  const expiraDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const expiraEmIso = expiraDate.toISOString();
+
+  const existente = dbq('SELECT id, codigo_recuperacao FROM rascunhos_atividades WHERE atividade_id = ? AND aluno_email_hash = ?').get(atividadeId, emailHash) as any;
+
+  let codigo = '';
+  if (existente) {
+    codigo = existente.codigo_recuperacao;
+    dbq(`
+      UPDATE rascunhos_atividades 
+      SET aluno_nome = ?, aluno_email = ?, respostas_json = ?, expira_em = ?, atualizado_em = (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      WHERE id = ?
+    `).run(encNome, encEmail, encRespostas, expiraEmIso, existente.id);
+  } else {
+    codigo = generateDraftCode();
+    dbq(`
+      INSERT INTO rascunhos_atividades (codigo_recuperacao, atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas_json, expira_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(codigo, atividadeId, encNome, encEmail, emailHash, encRespostas, expiraEmIso);
+  }
+
+  return c.json({
+    success: true,
+    codigo,
+    codigo_recuperacao: codigo,
+    expira_em: expiraEmIso
+  });
+});
+
+app.get('/rascunhos/:codigo', draftLimiter, async (c) => {
+  const rawCodigo = c.req.param('codigo');
+  if (!rawCodigo || typeof rawCodigo !== 'string') return c.json({ success: false, error: 'Código inválido' }, 400);
+
+  const codigo = rawCodigo.trim().toUpperCase();
+
+  // Lazy cleanup de rascunhos expirados
+  const nowIso = new Date().toISOString();
+  dbq('DELETE FROM rascunhos_atividades WHERE expira_em < ?').run(nowIso);
+
+  const rascunho = dbq('SELECT * FROM rascunhos_atividades WHERE codigo_recuperacao = ?').get(codigo) as any;
+  if (!rascunho) {
+    return c.json({ success: false, error: 'Código de rascunho inválido ou expirado.' }, 404);
+  }
+
+  try {
+    const nome = await decryptData(rascunho.aluno_nome);
+    const email = await decryptData(rascunho.aluno_email);
+    const respostasRaw = await decryptData(rascunho.respostas_json);
+    let respostas = {};
+    try {
+      respostas = JSON.parse(respostasRaw);
+    } catch {
+      respostas = { "0": respostasRaw };
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        atividade_id: rascunho.atividade_id,
+        nome,
+        email,
+        respostas,
+        expira_em: rascunho.expira_em
+      }
+    });
+  } catch (err) {
+    return c.json({ success: false, error: 'Erro ao descriptografar rascunho' }, 500);
+  }
 });
 
 // Direitos do Titular (Art. 18 LGPD) - Consulta e exclusão de respostas próprias do aluno.

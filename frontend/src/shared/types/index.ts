@@ -100,6 +100,15 @@ export interface RespostaAluno {
   criado_em: string;
 }
 
+export interface RespostaPayload {
+  aluno_nome: string;
+  aluno_email: string;
+  respostas: RespostasAlunoMap;
+  enviar_email?: boolean;
+  senha_curso?: string;
+  senha_atividade?: string;
+}
+
 export interface AtividadeFeedbackItem {
   id: number;
   atividade_id: number;

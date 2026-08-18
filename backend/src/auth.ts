@@ -181,7 +181,7 @@ export function createRateLimiter(options: RateLimitOptions) {
   };
 
   return async (c: Context, next: Next) => {
-    if (process.env.NODE_ENV === 'test' || process.env.DATABASE_PATH?.includes('test')) {
+    if (process.env.NODE_ENV !== 'production' && process.env.DISABLE_RATE_LIMIT === 'true') {
       return next();
     }
     const ip = extractClientIp(c);

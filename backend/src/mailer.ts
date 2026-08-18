@@ -42,16 +42,21 @@ function getTransporter(): nodemailer.Transporter {
   const user = process.env.SMTP_USERNAME;
   const pass = process.env.SMTP_PASSWORD;
 
-  if (!host || !port || !user || !pass) {
+  if (!host || !port) {
     throw new Error('SMTP não configurado');
   }
 
-  transporterCache = nodemailer.createTransport({
+  const transportOptions: nodemailer.TransportOptions = {
     host,
     port,
     secure: port === 465,
-    auth: { user, pass },
-  });
+  } as any;
+
+  if (user && pass) {
+    (transportOptions as any).auth = { user, pass };
+  }
+
+  transporterCache = nodemailer.createTransport(transportOptions);
   return transporterCache;
 }
 
@@ -99,10 +104,7 @@ async function drain() {
 }
 
 async function processMail(req: MailRequest): Promise<void> {
-  const mailFrom = process.env.MAIL_FROM;
-  if (!mailFrom) {
-    throw new Error('SMTP não configurado');
-  }
+  const mailFrom = process.env.MAIL_FROM || process.env.SMTP_FROM || 'no-reply@escola.com';
 
   let html: string | undefined;
   let text: string | undefined;
