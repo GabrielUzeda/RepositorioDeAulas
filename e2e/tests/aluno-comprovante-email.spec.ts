@@ -124,4 +124,62 @@ test.describe('Aluno — Envio de Comprovante de Resposta por E-mail (Mailhog)',
     expect(body).toContain('Resposta Correta 1');
     expect(body).toContain('Comprovante de Envio de Atividade');
   });
+
+  test('envia e-mail com código de recuperação de rascunho via endpoint dedicado', async ({ request }) => {
+    const draftEmail = `aluno_draft_${Date.now()}@exemplo.com`;
+    // 1. Salva o rascunho
+    const draftRes = await request.post(`${E2E_BACKEND_URL}/atividades/${atividadeId}/rascunhos`, {
+      data: {
+        nome: alunoNome,
+        email: draftEmail,
+        respostas: { '0': 'Resposta em rascunho' }
+      }
+    });
+    expect(draftRes.ok()).toBeTruthy();
+    const draftData = await draftRes.json();
+    const codigo = draftData.codigo || draftData.codigo_recuperacao;
+    expect(codigo).toBeTruthy();
+
+    // 2. Dispara envio do código por e-mail pelo endpoint dedicado
+    const sendMailRes = await request.post(`${E2E_BACKEND_URL}/atividades/${atividadeId}/rascunhos/enviar-email`, {
+      data: {
+        email: draftEmail,
+        codigo
+      }
+    });
+    expect(sendMailRes.ok()).toBeTruthy();
+
+    // 3. Valida no Mailhog
+    const deadline = Date.now() + 30000;
+    let foundMsg: any = null;
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetch(`${mailhogBaseUrl()}/api/v2/messages`);
+        if (res.ok) {
+          const data = await res.json();
+          const items: any[] = data.items || [];
+          foundMsg = items.find((m) => {
+            const headers = m.Content?.Headers || {};
+            const subject = (headers.Subject || []).join(' ');
+            const to = (headers.To || []).join(' ');
+            return subject.includes('[Rascunho]') && to.toLowerCase().includes(draftEmail.toLowerCase());
+          });
+          if (foundMsg) break;
+        }
+      } catch {
+        // Mailhog retry
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    expect(foundMsg).toBeTruthy();
+    const headers = foundMsg.Content?.Headers || {};
+    const subject = (headers.Subject || []).join(' ');
+    expect(subject).toContain('[Rascunho]');
+    expect(subject).toContain(atvTitulo);
+
+    const body = decodeQuotedPrintable(foundMsg.Content?.Body || '');
+    expect(body).toContain(codigo);
+    expect(body).toContain('Código de Recuperação de Rascunho');
+  });
 });
