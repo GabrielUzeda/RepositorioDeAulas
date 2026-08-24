@@ -47,7 +47,7 @@ onMounted(async () => {
 
 async function handleSelectCurso(curso: Curso) {
   selectedCurso.value = curso;
-  if (curso.senha) {
+  if (curso.possui_senha) {
     const savedToken = await secureGet(`curso_access_${curso.id}`);
     if (savedToken !== 'granted') {
       pendingCurso.value = curso;
@@ -62,16 +62,7 @@ async function handleSelectCurso(curso: Curso) {
 async function handleSelectDisciplina(disciplina: Disciplina) {
   selectedDisciplina.value = disciplina;
 
-  if (selectedCurso.value?.senha) {
-    const savedToken = await secureGet(`curso_access_${selectedCurso.value.id}`);
-    if (savedToken !== 'granted') {
-      pendingCurso.value = selectedCurso.value;
-      showPasswordModal.value = true;
-      return;
-    }
-  }
-
-  let cursoPwd = cursoSenha.value || selectedCurso.value?.senha || '';
+  let cursoPwd = cursoSenha.value || '';
   if (!cursoPwd && selectedCurso.value?.id) {
     cursoPwd = (await secureGet(`curso_senha_${selectedCurso.value.id}`)) || '';
   }
@@ -103,11 +94,7 @@ async function handlePasswordSubmit(password: string) {
         const curso = pendingCurso.value;
         pendingCurso.value = null;
 
-        if (selectedDisciplina.value && (selectedDisciplina.value.curso_id === curso.id || selectedCurso.value?.id === curso.id)) {
-          await handleSelectDisciplina(selectedDisciplina.value);
-        } else {
-          await handleSelectCurso(curso);
-        }
+        await handleSelectCurso(curso);
       } else {
         error('Senha do curso incorreta!');
       }
@@ -132,7 +119,7 @@ async function handlePasswordSubmit(password: string) {
 async function handleOpenAula(aula: Aula) {
   let url = aula.caminho;
   if (selectedCurso.value?.id) {
-    let senha = selectedCurso.value.senha || (await secureGet(`curso_senha_${selectedCurso.value.id}`)) || undefined;
+    let senha = cursoSenha.value || (await secureGet(`curso_senha_${selectedCurso.value.id}`)) || undefined;
     if (senha) {
       const sep = url.includes('?') ? '&' : '?';
       url += `${sep}senha=${encodeURIComponent(senha)}`;

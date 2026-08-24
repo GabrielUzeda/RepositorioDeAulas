@@ -30,7 +30,7 @@ const metaInfo = computed(() => [
     :meta="metaInfo"
     :action-text="props.actionText"
     action-icon="arrow_forward"
-    :is-locked="!!props.curso.senha"
+    :is-locked="!!props.curso.possui_senha"
     @click="emit('select', props.curso)"
   >
     <template #header-actions>

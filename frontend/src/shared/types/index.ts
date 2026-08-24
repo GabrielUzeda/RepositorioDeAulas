@@ -13,6 +13,7 @@ export interface Curso {
   cor?: string;
   icone?: string;
   senha?: string;
+  possui_senha?: boolean;
   descricao?: string;
   criado_em?: string;
   atualizado_em?: string;
