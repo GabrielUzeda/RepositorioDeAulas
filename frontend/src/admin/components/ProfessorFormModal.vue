@@ -243,9 +243,9 @@ async function handleSubmit() {
             >
               <div class="flex items-center space-x-3 truncate">
                 <span class="w-3 h-3 rounded-full shrink-0" :style="{ backgroundColor: c.cor || 'var(--c-accent)' }"></span>
-                <span class="truncate">{{ c.nome }}</span>
+                <span :class="['truncate', selectedCursoIds.includes(c.id) ? 'text-white font-medium' : 'text-primary']">{{ c.nome }}</span>
               </div>
-              <span v-if="selectedCursoIds.includes(c.id)" class="material-icons text-accent text-base shrink-0 ml-2">check_circle</span>
+              <span v-if="selectedCursoIds.includes(c.id)" class="material-icons text-white text-base shrink-0 ml-2">check_circle</span>
               <span v-else class="material-icons text-secondary text-base shrink-0 ml-2">radio_button_unchecked</span>
             </button>
           </div>

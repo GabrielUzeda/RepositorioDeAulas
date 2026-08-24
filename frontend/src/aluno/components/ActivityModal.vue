@@ -112,12 +112,24 @@ async function handleRestoreDraft() {
   }
 }
 
+function isValidEmailFormat(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+const showDraftModal = ref(false);
+const savedDraftCode = ref('');
+const isCopyingCode = ref(false);
+const draftEmailInput = ref('');
+const isSendingDraftEmail = ref(false);
+const draftEmailStatus = ref('');
+
 async function handleSaveDraftToServer() {
   if (!props.atividade) return;
-  if (!alunoEmail.value) {
-    errorMessage.value = 'Preencha seu e-mail para salvar o rascunho no servidor.';
+  if (!alunoEmail.value || !isValidEmailFormat(alunoEmail.value)) {
+    errorMessage.value = 'Preencha um e-mail válido no primeiro passo para salvar o rascunho no servidor.';
     return;
   }
+  errorMessage.value = '';
   try {
     const res: any = await apiClient.post(`/atividades/${props.atividade.id}/rascunhos`, {
       nome: alunoNome.value,
@@ -126,12 +138,62 @@ async function handleSaveDraftToServer() {
     });
     const codigo = res.data?.codigo || res.data?.codigo_recuperacao || res.codigo || res.codigo_recuperacao;
     if (res.success && codigo) {
-      alert(`Rascunho salvo com sucesso!\n\nSeu código de recuperação é: ${codigo}\n\nGuarde este código! Ele é válido por 30 dias para você restaurar suas respostas.`);
+      savedDraftCode.value = codigo;
+      draftEmailInput.value = alunoEmail.value;
+      draftEmailStatus.value = '';
+      showDraftModal.value = true;
+      success('Rascunho salvo com sucesso!');
     } else {
       errorMessage.value = res.error || (res.data && res.data.error) || res.message || 'Erro ao salvar rascunho.';
     }
   } catch (err: any) {
     errorMessage.value = err.message || 'Erro ao salvar rascunho.';
+  }
+}
+
+async function copyDraftCode() {
+  if (!savedDraftCode.value) return;
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(savedDraftCode.value);
+    }
+    isCopyingCode.value = true;
+    success('Código copiado para a área de transferência!');
+    setTimeout(() => {
+      isCopyingCode.value = false;
+    }, 2500);
+  } catch {
+    isCopyingCode.value = true;
+    setTimeout(() => {
+      isCopyingCode.value = false;
+    }, 2500);
+  }
+}
+
+async function handleSendDraftEmail() {
+  if (!props.atividade || !savedDraftCode.value) return;
+  const email = draftEmailInput.value.trim();
+  if (!email || !isValidEmailFormat(email)) {
+    draftEmailStatus.value = 'Informe um e-mail válido para receber o código.';
+    return;
+  }
+  isSendingDraftEmail.value = true;
+  draftEmailStatus.value = '';
+  try {
+    const res: any = await apiClient.post(`/atividades/${props.atividade.id}/rascunhos/enviar-email`, {
+      email,
+      codigo: savedDraftCode.value
+    });
+    if (res.success) {
+      draftEmailStatus.value = 'Código enviado para seu e-mail com sucesso!';
+      success('Código enviado por e-mail!');
+    } else {
+      draftEmailStatus.value = res.error || res.message || 'Erro ao enviar e-mail.';
+    }
+  } catch (err: any) {
+    draftEmailStatus.value = err.message || 'Erro ao enviar e-mail.';
+  } finally {
+    isSendingDraftEmail.value = false;
   }
 }
 
@@ -143,6 +205,10 @@ function selectOption(key: string, optionText: string) {
 function nextStep() {
   if (currentStep.value === 0 && (!alunoNome.value || !alunoEmail.value)) {
     errorMessage.value = 'Preencha seu nome e e-mail.';
+    return;
+  }
+  if (currentStep.value === 0 && !isValidEmailFormat(alunoEmail.value)) {
+    errorMessage.value = 'Informe um formato de e-mail válido (ex: seu@email.com).';
     return;
   }
   errorMessage.value = '';
@@ -189,20 +255,20 @@ async function handleSubmit() {
       if (res.data?.total !== undefined) serverTotal.value = res.data.total;
       if (res.data?.pontuacao !== undefined) serverPontuacao.value = res.data.pontuacao;
       
-      let msg = 'Resposta enviada!';
-      if (serverAcertos.value !== null) {
+      let msg = 'Resposta enviada com sucesso!';
+      if (props.atividade?.tipo === 'prova' && serverAcertos.value !== null) {
         const total = serverTotal.value ?? questionsList.value.length;
         msg += ` Correção do servidor: ${serverAcertos.value} / ${total} acertos`;
-        if (serverPontuacao.value !== null) msg += ` (Pontuação: ${serverPontuacao.value}%)`;
+        if (serverPontuacao.value !== null) msg += ` (${serverPontuacao.value}%)`;
       }
       success(msg);
       emit('submit', { nome: alunoNome.value, email: alunoEmail.value, respostas: respostasMap.value });
-      setTimeout(() => emit('close'), serverAcertos.value !== null ? 6000 : 2000);
+      setTimeout(() => emit('close'), props.atividade?.tipo === 'prova' && serverAcertos.value !== null ? 4000 : 2500);
     } else {
-      errorMessage.value = res.error || 'Erro ao enviar.';
+      errorMessage.value = res.error || (res.data && res.data.error) || 'Erro ao enviar resposta. Verifique os dados e tente novamente.';
     }
   } catch (err: any) {
-    errorMessage.value = err.message || 'Erro ao enviar.';
+    errorMessage.value = err.message || 'Erro ao enviar resposta.';
   } finally {
     isSubmitting.value = false;
   }
@@ -306,13 +372,28 @@ async function handleSubmit() {
             <p v-else class="text-sm text-muted italic">Não respondida</p>
           </div>
         </div>
+
+        <div class="flex items-center gap-2 pt-2 bg-surface p-3 border border-line rounded-xl">
+          <input
+            id="enviarEmailCheckboxRev"
+            v-model="enviarEmail"
+            type="checkbox"
+            class="w-4 h-4 text-accent border-line rounded focus:ring-accent accent-accent cursor-pointer"
+          />
+          <label for="enviarEmailCheckboxRev" class="text-xs font-medium text-primary cursor-pointer select-none">
+            Desejo receber uma cópia de comprovante com minhas respostas por e-mail ({{ alunoEmail || 'e-mail informado' }})
+          </label>
+        </div>
       </div>
 
-      <div v-if="submitSuccess && serverAcertos !== null" class="p-4 bg-surface-alt border border-accent rounded-xl text-center space-y-2">
+      <div v-if="submitSuccess" class="p-4 bg-surface-alt border border-accent rounded-xl text-center space-y-2">
         <h3 class="text-lg font-bold text-primary">Resposta Enviada com Sucesso!</h3>
-        <p class="text-sm text-accent font-semibold">
+        <p v-if="props.atividade?.tipo === 'prova' && serverAcertos !== null" class="text-sm text-accent font-semibold">
           Correção do servidor: {{ serverAcertos }} / {{ serverTotal ?? questionsList.length }} acertos
           <span v-if="serverPontuacao !== null">({{ serverPontuacao }}%)</span>
+        </p>
+        <p v-else class="text-xs text-secondary">
+          Sua resposta foi registrada com sucesso.
         </p>
       </div>
 
@@ -327,5 +408,48 @@ async function handleSubmit() {
         </div>
       </div>
     </div>
+  </BaseModal>
+
+  <!-- Modal de Exibição do Código de Rascunho -->
+  <BaseModal
+    :model-value="showDraftModal"
+    title="Rascunho Salvo no Servidor"
+    max-width="max-w-md"
+    @close="showDraftModal = false"
+  >
+    <div class="space-y-4 text-center">
+      <div class="w-12 h-12 rounded-full bg-accent/10 text-accent flex items-center justify-center mx-auto">
+        <span class="material-icons text-2xl">save</span>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-primary">Código de Recuperação</h3>
+        <p class="text-xs text-secondary mt-1">Guarde este código! Ele é válido por 30 dias para você restaurar suas respostas em qualquer dispositivo.</p>
+      </div>
+
+      <div class="p-3.5 bg-surface-alt border border-line rounded-xl flex items-center justify-between gap-2">
+        <span class="font-mono text-base font-bold tracking-widest text-accent select-all">{{ savedDraftCode }}</span>
+        <BaseButton size="sm" variant="secondary" @click="copyDraftCode">
+          <span class="material-icons text-xs mr-1">{{ isCopyingCode ? 'check' : 'content_copy' }}</span>
+          {{ isCopyingCode ? 'Copiado!' : 'Copiar Código' }}
+        </BaseButton>
+      </div>
+
+      <div class="border-t border-line pt-3 text-left space-y-2">
+        <p class="text-xs font-medium text-primary">Enviar código para seu e-mail</p>
+        <div class="flex gap-2">
+          <BaseInput v-model="draftEmailInput" type="email" placeholder="seu@email.com" class="flex-1" />
+          <BaseButton variant="secondary" :loading="isSendingDraftEmail" @click="handleSendDraftEmail">Enviar</BaseButton>
+        </div>
+        <p v-if="draftEmailStatus" :class="['text-[11px]', draftEmailStatus.includes('sucesso') ? 'text-accent font-medium' : 'text-danger']">
+          {{ draftEmailStatus }}
+        </p>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="flex justify-end pt-2">
+        <BaseButton variant="primary" @click="showDraftModal = false">Concluir</BaseButton>
+      </div>
+    </template>
   </BaseModal>
 </template>

@@ -215,15 +215,20 @@ async function handleSubmit() {
             ]"
           >
             <div class="flex items-center space-x-3 truncate">
-              <div class="w-7 h-7 rounded-full bg-surface-alt text-secondary flex items-center justify-center text-xs font-bold shrink-0">
+              <div
+                :class="[
+                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
+                  selectedProfessorIds.includes(p.id) ? 'bg-white/20 text-white' : 'bg-surface-alt text-secondary'
+                ]"
+              >
                 {{ p.nome.charAt(0).toUpperCase() }}
               </div>
               <div class="truncate">
-                <p class="text-primary font-medium leading-tight truncate">{{ p.nome }}</p>
-                <p class="text-secondary text-[10px] truncate">{{ p.email }}</p>
+                <p :class="['font-medium leading-tight truncate', selectedProfessorIds.includes(p.id) ? 'text-white' : 'text-primary']">{{ p.nome }}</p>
+                <p :class="['text-[10px] truncate', selectedProfessorIds.includes(p.id) ? 'text-white/80' : 'text-secondary']">{{ p.email }}</p>
               </div>
             </div>
-            <span v-if="selectedProfessorIds.includes(p.id)" class="material-icons text-accent text-base shrink-0 ml-2">check_circle</span>
+            <span v-if="selectedProfessorIds.includes(p.id)" class="material-icons text-white text-base shrink-0 ml-2">check_circle</span>
             <span v-else class="material-icons text-secondary text-base shrink-0 ml-2">radio_button_unchecked</span>
           </button>
         </div>
