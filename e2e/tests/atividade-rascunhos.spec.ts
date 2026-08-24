@@ -97,7 +97,7 @@ test.describe('Aluno — Salvar e Restaurar Rascunho de Atividade por Código', 
     const rascunhoData = await rascunhoRes.json();
     const codigo = rascunhoData.codigo || rascunhoData.codigo_recuperacao;
     expect(codigo).toBeTruthy();
-    expect(codigo.length).toBe(6);
+    expect(codigo.length).toBe(12);
 
     // Recarrega página (simulando acesso posterior/outro dispositivo)
     await page.reload();

@@ -11,6 +11,10 @@ services:
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
       SMTP_FROM: "no-reply@escola.com"
+      # E2E: o limiter é validado pelo teste unitário dedicado; no compose de
+      # teste todos os containers falam direto com o bun-server (sem XFF) e
+      # colapsariam no mesmo bucket, barando os próprios testes (M12).
+      DISABLE_RATE_LIMIT: "true"
     volumes:
       - ./backend/:/app
       - backend_node_modules:/app/node_modules
