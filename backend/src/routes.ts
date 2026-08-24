@@ -988,7 +988,7 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
 
   const email = String(body.aluno_email).trim();
   const nome = String(body.aluno_nome).trim();
-  const enviarEmail = Boolean(body.enviar_email);
+  const enviarEmail = body.enviar_email === true || body.enviar_email === 'true' || body.enviar_email === 1;
   
   const respostasInput = body.respostas;
   const respostasStr = typeof respostasInput === 'string' ? respostasInput : JSON.stringify(respostasInput);
@@ -1028,13 +1028,6 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
 
     if (enviarEmail) {
       try {
-        const escapeHtml = (str: string) => String(str)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#039;');
-
         let perguntasRespostasHtml = '';
         try {
           const rawQuestions = typeof atv.json_data === 'string' ? JSON.parse(atv.json_data) : atv.json_data;
@@ -1042,10 +1035,10 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
           const mapRespostas = typeof respostasInput === 'object' && respostasInput !== null ? respostasInput : {};
 
           perguntasRespostasHtml = questionsList.map((q: any, idx: number) => {
-            const qId = q.id || idx;
-            const resp = mapRespostas[qId] ?? mapRespostas[String(qId)] ?? 'Não respondida';
+            const qId = q.id !== undefined ? String(q.id) : String(idx);
+            const resp = mapRespostas[qId] ?? mapRespostas[idx] ?? mapRespostas[`q_${idx}`] ?? mapRespostas[`q_${qId}`] ?? 'Não respondida';
             const respText = typeof resp === 'object' ? JSON.stringify(resp) : String(resp);
-            const tituloQuestao = escapeHtml(q.title || q.titulo || q.statement || 'Pergunta');
+            const tituloQuestao = escapeHtml(q.title || q.titulo || q.statement || q.content || `Questão ${idx + 1}`);
             return `<div style="margin-bottom: 12px; padding: 10px; background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
               <strong style="color: #1e293b;">Questão ${idx + 1}: ${tituloQuestao}</strong><br/>
               <span style="color: #475569;">Sua resposta: </span><span style="color: #0284c7; font-weight: bold;">${escapeHtml(respText)}</span>
@@ -1129,11 +1122,12 @@ app.post('/atividades/:id/rascunhos', draftLimiter, async (c) => {
   const body = await parseBody(c);
   if (!body) return c.text('Dados inválidos', 400);
 
-  const atv = dbq('SELECT id FROM atividades WHERE id = ?').get(atividadeId);
+  const atv = dbq('SELECT id, titulo FROM atividades WHERE id = ?').get(atividadeId) as any;
   if (!atv) return c.text('Atividade não encontrada', 404);
 
   const nome = String(body.nome || body.aluno_nome || '').trim();
   const email = String(body.email || body.aluno_email || '').trim();
+  const enviarEmail = body.enviar_email === true || body.enviar_email === 'true' || body.enviar_email === 1;
   const respostasInput = body.respostas || {};
   const respostasStr = typeof respostasInput === 'string' ? respostasInput : JSON.stringify(respostasInput);
 
@@ -1174,12 +1168,83 @@ app.post('/atividades/:id/rascunhos', draftLimiter, async (c) => {
     `).run(codigo, atividadeId, encNome, encEmail, emailHash, encRespostas, expiraEmIso);
   }
 
+  if (enviarEmail) {
+    try {
+      const atvTitulo = atv.titulo || 'Atividade';
+      const emailHtml = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #4f46e5; margin-bottom: 4px;">Código de Recuperação de Rascunho</h2>
+          <p style="color: #64748b; font-size: 14px; margin-top: 0;">Você salvou um rascunho para a atividade <strong>${escapeHtml(atvTitulo)}</strong>.</p>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
+          <p>Utilize o código abaixo para restaurar suas respostas em qualquer dispositivo dentro de 30 dias:</p>
+          <div style="text-align: center; margin: 24px 0;">
+            <span style="display: inline-block; font-size: 24px; font-weight: bold; font-family: monospace; letter-spacing: 4px; padding: 12px 24px; background: #e0e7ff; color: #3730a3; border-radius: 8px; border: 1px dashed #6366f1;">${escapeHtml(codigo)}</span>
+          </div>
+          <p style="font-size: 13px; color: #475569;"><strong>Como restaurar:</strong> Ao abrir a atividade novamente, informe este código no campo <em>Restaurar Rascunho</em> no primeiro passo da atividade.</p>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #94a3b8;">Este é um e-mail automático enviado pelo Repositório de Aulas.</p>
+        </div>
+      `;
+      void sendMail({
+        to: email,
+        subject: `[Rascunho] Código de Recuperação: ${atvTitulo}`,
+        html: emailHtml,
+      }).catch((err) => console.error('Erro ao enviar e-mail de código de rascunho:', err));
+    } catch (errEmail) {
+      console.error('Erro ao preparar e-mail de código de rascunho:', errEmail);
+    }
+  }
+
   return c.json({
     success: true,
     codigo,
     codigo_recuperacao: codigo,
     expira_em: expiraEmIso
   });
+});
+
+app.post('/atividades/:id/rascunhos/enviar-email', draftLimiter, async (c) => {
+  const atividadeId = parseId(c.req.param('id'));
+  if (atividadeId === null) return c.text('ID inválido', 400);
+
+  const body = await parseBody(c);
+  if (!body) return c.text('Dados inválidos', 400);
+
+  const email = String(body.email || '').trim();
+  const codigo = String(body.codigo || '').trim().toUpperCase();
+
+  if (!email || !isValidEmail(email)) {
+    return c.json({ success: false, error: 'Informe um e-mail válido.' }, 400);
+  }
+  if (!codigo) {
+    return c.json({ success: false, error: 'Código de recuperação é obrigatório.' }, 400);
+  }
+
+  const atv = dbq('SELECT id, titulo FROM atividades WHERE id = ?').get(atividadeId) as any;
+  const atvTitulo = atv?.titulo || 'Atividade';
+
+  const emailHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <h2 style="color: #4f46e5; margin-bottom: 4px;">Código de Recuperação de Rascunho</h2>
+      <p style="color: #64748b; font-size: 14px; margin-top: 0;">Você salvou um rascunho para a atividade <strong>${escapeHtml(atvTitulo)}</strong>.</p>
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
+      <p>Utilize o código abaixo para restaurar suas respostas em qualquer dispositivo dentro de 30 dias:</p>
+      <div style="text-align: center; margin: 24px 0;">
+        <span style="display: inline-block; font-size: 24px; font-weight: bold; font-family: monospace; letter-spacing: 4px; padding: 12px 24px; background: #e0e7ff; color: #3730a3; border-radius: 8px; border: 1px dashed #6366f1;">${escapeHtml(codigo)}</span>
+      </div>
+      <p style="font-size: 13px; color: #475569;"><strong>Como restaurar:</strong> Ao abrir a atividade novamente, informe este código no campo <em>Restaurar Rascunho</em> no primeiro passo da atividade.</p>
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+      <p style="font-size: 12px; color: #94a3b8;">Este é um e-mail automático enviado pelo Repositório de Aulas.</p>
+    </div>
+  `;
+
+  const mailResp = await sendMail({
+    to: email,
+    subject: `[Rascunho] Código de Recuperação: ${atvTitulo}`,
+    html: emailHtml,
+  });
+
+  return c.json(mailResp);
 });
 
 app.get('/rascunhos/:codigo', draftLimiter, async (c) => {
