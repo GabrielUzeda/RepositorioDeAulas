@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/shared/stores/auth';
 import { useCursoStore } from '@/shared/stores/curso';
@@ -9,6 +9,8 @@ import MarpEditorModal from '@/professor/components/MarpEditorModal.vue';
 import JsonActivityEditorModal from '@/professor/components/JsonActivityEditorModal.vue';
 import RespostasModal from '@/professor/components/RespostasModal.vue';
 import FeedbackConsolidadoModal from '@/professor/components/FeedbackConsolidadoModal.vue';
+import CursoCard from '@/aluno/components/CursoCard.vue';
+import DisciplinaCard from '@/aluno/components/DisciplinaCard.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseSkeleton from '@/shared/components/BaseSkeleton.vue';
@@ -127,7 +129,7 @@ async function handleSaveMarpAula(payload: { titulo: string; descricao: string; 
   isSavingAula.value = true;
 
   try {
-    const data = {
+    const data: any = {
       disciplina_id: selectedDisciplina.value.id,
       titulo: payload.titulo,
       descricao: payload.descricao,
@@ -135,8 +137,10 @@ async function handleSaveMarpAula(payload: { titulo: string; descricao: string; 
     };
 
     if (editingAula.value) {
-      await apiClient.put(`/aulas/${editingAula.value.id}`, data);
+      await apiClient.put(`/aulas/${editingAula.value.id}`, { ...editingAula.value, ...data });
     } else {
+      const maxOrdem = cursoStore.aulas.reduce((max, a) => Math.max(max, a.ordem ?? 0), -1);
+      data.ordem = maxOrdem + 1;
       await apiClient.post('/aulas', data);
     }
 
@@ -181,8 +185,10 @@ async function handleSaveActivity(payload: any) {
     };
 
     if (editingActivity.value) {
-      await apiClient.put(`/atividades/${editingActivity.value.id}`, data);
+      await apiClient.put(`/atividades/${editingActivity.value.id}`, { ...editingActivity.value, ...data });
     } else {
+      const maxOrdem = cursoStore.atividades.reduce((max, a) => Math.max(max, a.ordem ?? 0), -1);
+      data.ordem = maxOrdem + 1;
       await apiClient.post('/atividades', data);
     }
 
@@ -209,26 +215,127 @@ async function onConfirmDelAtiv() {
 
 function onCancelDelAtiv() {}
 
-async function moveAula(index: number, direction: 'up' | 'down') {
-  const list = cursoStore.aulas;
-  const target = direction === 'up' ? index - 1 : index + 1;
-  if (target < 0 || target >= list.length) return;
-  const a = list.splice(index, 1)[0];
-  list.splice(target, 0, a);
-  await apiClient.put(`/aulas/${a.id}`, { ordem: target });
-  const b = list[index];
-  if (b) await apiClient.put(`/aulas/${b.id}`, { ordem: index });
+// Modo de Reordenação e Drag & Drop
+const isReorderingAulas = ref(false);
+const isReorderingAtividades = ref(false);
+const isSavingOrders = ref(false);
+
+const localAulas = ref<Aula[]>([]);
+const localAtividades = ref<Atividade[]>([]);
+
+watch(() => cursoStore.aulas, (val) => {
+  localAulas.value = [...val];
+}, { immediate: true });
+
+watch(() => cursoStore.atividades, (val) => {
+  localAtividades.value = [...val];
+}, { immediate: true });
+
+function toggleReorderAulas() {
+  if (isReorderingAulas.value) {
+    saveAulasOrder();
+  } else {
+    isReorderingAulas.value = true;
+  }
 }
 
-async function moveAtividade(index: number, direction: 'up' | 'down') {
-  const list = cursoStore.atividades;
+async function saveAulasOrder() {
+  if (isSavingOrders.value) return;
+  isSavingOrders.value = true;
+  try {
+    for (let i = 0; i < localAulas.value.length; i++) {
+      const item = localAulas.value[i];
+      if (item.ordem !== i) {
+        await apiClient.put(`/aulas/${item.id}`, { ...item, ordem: i });
+      }
+    }
+    isReorderingAulas.value = false;
+    if (selectedDisciplina.value) {
+      await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+    }
+  } finally {
+    isSavingOrders.value = false;
+  }
+}
+
+function moveAula(index: number, direction: 'up' | 'down') {
   const target = direction === 'up' ? index - 1 : index + 1;
-  if (target < 0 || target >= list.length) return;
-  const a = list.splice(index, 1)[0];
-  list.splice(target, 0, a);
-  await apiClient.put(`/atividades/${a.id}`, { ordem: target });
-  const b = list[index];
-  if (b) await apiClient.put(`/atividades/${b.id}`, { ordem: index });
+  if (target < 0 || target >= localAulas.value.length) return;
+  const list = [...localAulas.value];
+  const item = list.splice(index, 1)[0];
+  list.splice(target, 0, item);
+  localAulas.value = list;
+}
+
+function toggleReorderAtividades() {
+  if (isReorderingAtividades.value) {
+    saveAtividadesOrder();
+  } else {
+    isReorderingAtividades.value = true;
+  }
+}
+
+async function saveAtividadesOrder() {
+  if (isSavingOrders.value) return;
+  isSavingOrders.value = true;
+  try {
+    for (let i = 0; i < localAtividades.value.length; i++) {
+      const item = localAtividades.value[i];
+      if (item.ordem !== i) {
+        await apiClient.put(`/atividades/${item.id}`, { ...item, ordem: i });
+      }
+    }
+    isReorderingAtividades.value = false;
+    if (selectedDisciplina.value) {
+      await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+    }
+  } finally {
+    isSavingOrders.value = false;
+  }
+}
+
+function moveAtividade(index: number, direction: 'up' | 'down') {
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (target < 0 || target >= localAtividades.value.length) return;
+  const list = [...localAtividades.value];
+  const item = list.splice(index, 1)[0];
+  list.splice(target, 0, item);
+  localAtividades.value = list;
+}
+
+// Drag and drop HTML5 Nativo
+let draggedType: 'aula' | 'atividade' | null = null;
+let draggedIndex: number | null = null;
+
+function onDragStart(type: 'aula' | 'atividade', index: number, e: DragEvent) {
+  draggedType = type;
+  draggedIndex = index;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+  }
+}
+
+function onDragOver(e: DragEvent) {
+  e.preventDefault();
+}
+
+function onDrop(type: 'aula' | 'atividade', targetIndex: number, e: DragEvent) {
+  e.preventDefault();
+  if (draggedType !== type || draggedIndex === null || draggedIndex === targetIndex) return;
+  
+  if (type === 'aula') {
+    const list = [...localAulas.value];
+    const item = list.splice(draggedIndex, 1)[0];
+    list.splice(targetIndex, 0, item);
+    localAulas.value = list;
+  } else {
+    const list = [...localAtividades.value];
+    const item = list.splice(draggedIndex, 1)[0];
+    list.splice(targetIndex, 0, item);
+    localAtividades.value = list;
+  }
+  draggedType = null;
+  draggedIndex = null;
 }
 
 function handleOpenRespostas(atividade: Atividade) {
@@ -293,28 +400,13 @@ function handleOpenRespostas(atividade: Atividade) {
           <EmptyState v-else-if="cursoStore.cursos.length === 0" message="Você não possui acesso a nenhum curso no momento." />
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div
+            <CursoCard
               v-for="curso in cursoStore.cursos"
               :key="curso.id"
-              @click="handleOpenCurso(curso)"
-              class="p-6 bg-surface-alt border border-line rounded-3xl hover:border-accent hover:bg-surface-alt transition cursor-pointer flex flex-col justify-between space-y-4 group"
-            >
-              <div class="flex items-start justify-between">
-                <div class="w-12 h-12 rounded-2xl bg-surface text-accent border border-line flex items-center justify-center">
-                  <span class="material-icons text-2xl">{{ curso.icone || 'school' }}</span>
-                </div>
-                <span class="material-icons text-secondary group-hover:text-primary transition">arrow_forward</span>
-              </div>
-
-              <div>
-                <h3 class="text-lg font-bold text-primary group-hover:text-accent transition">{{ curso.nome }}</h3>
-                <p class="text-secondary text-xs line-clamp-2 mt-1">{{ curso.descricao }}</p>
-              </div>
-
-              <div class="pt-4 border-t border-line flex items-center justify-between text-xs text-secondary">
-                <span>{{ curso.total_disciplinas ?? 0 }} disciplinas</span>
-              </div>
-            </div>
+              :curso="curso"
+              action-text="Ver disciplinas"
+              @select="handleOpenCurso(curso)"
+            />
           </div>
         </section>
 
@@ -362,34 +454,24 @@ function handleOpenRespostas(atividade: Atividade) {
           <EmptyState v-else-if="cursoStore.disciplinas.length === 0" message="Nenhuma disciplina cadastrada neste curso." />
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div
+            <DisciplinaCard
               v-for="disciplina in cursoStore.disciplinas"
               :key="disciplina.id"
-              class="p-6 bg-surface-alt border border-line rounded-3xl flex flex-col justify-between space-y-4 hover:border-secondary transition"
+              :disciplina="disciplina"
+              action-text="Gerenciar Aulas & Atividades"
+              @select="handleOpenDisciplinaDetails(disciplina)"
             >
-              <div class="flex items-start justify-between">
-                <div class="w-12 h-12 rounded-2xl bg-surface text-accent border border-line flex items-center justify-center">
-                  <span class="material-icons text-2xl">{{ disciplina.icone || 'school' }}</span>
-                </div>
-                <div class="flex items-center space-x-1">
-                  <button @click="handleOpenDisciplinaModal(disciplina)" title="Editar Disciplina" class="p-2 text-secondary hover:text-primary rounded-lg">
+              <template #header-actions>
+                <div class="flex items-center space-x-1" @click.stop>
+                  <button @click="handleOpenDisciplinaModal(disciplina)" title="Editar Disciplina" class="p-1.5 text-secondary hover:text-primary rounded-lg">
                     <span class="material-icons text-sm">edit</span>
                   </button>
-                  <button @click="handleDeleteDisciplina(disciplina.id)" title="Excluir Disciplina" class="p-2 text-secondary hover:text-danger rounded-lg">
+                  <button @click="handleDeleteDisciplina(disciplina.id)" title="Excluir Disciplina" class="p-1.5 text-secondary hover:text-danger rounded-lg">
                     <span class="material-icons text-sm">delete</span>
                   </button>
                 </div>
-              </div>
-
-              <div>
-                <h3 class="text-lg font-bold text-primary">{{ disciplina.nome }}</h3>
-                <p class="text-secondary text-xs line-clamp-2 mt-1">{{ disciplina.descricao }}</p>
-              </div>
-
-              <BaseButton variant="secondary" size="xs" block @click="handleOpenDisciplinaDetails(disciplina)">
-                Gerenciar Aulas & Atividades
-              </BaseButton>
-            </div>
+              </template>
+            </DisciplinaCard>
           </div>
         </section>
 
@@ -417,11 +499,29 @@ function handleOpenRespostas(atividade: Atividade) {
           <!-- Aulas -->
           <div class="space-y-4">
             <div class="flex items-center justify-between">
-              <h3 class="text-lg font-bold text-primary">Aulas (Marp Markdown)</h3>
-              <BaseButton variant="primary" size="sm" @click="handleOpenMarpModal()">
-                <span class="material-icons text-sm">add</span>
-                <span>Nova Aula</span>
-              </BaseButton>
+              <h3 class="text-lg font-bold text-primary flex items-center gap-2">
+                <span>Aulas (Marp Markdown)</span>
+                <span v-if="isReorderingAulas" class="text-xs font-normal text-accent bg-accent/10 px-2 py-0.5 rounded-full">
+                  Arraste ou use as setas para reordenar
+                </span>
+              </h3>
+              <div class="flex items-center space-x-2">
+                <BaseButton
+                  v-if="cursoStore.aulas.length > 1"
+                  :variant="isReorderingAulas ? 'primary' : 'secondary'"
+                  size="sm"
+                  :disabled="isSavingOrders"
+                  @click="toggleReorderAulas"
+                >
+                  <span class="material-icons text-sm">{{ isReorderingAulas ? 'save' : 'swap_vert' }}</span>
+                  <span>{{ isSavingOrders ? 'Salvando...' : (isReorderingAulas ? 'Salvar Ordem' : 'Reordenar') }}</span>
+                </BaseButton>
+
+                <BaseButton variant="primary" size="sm" @click="handleOpenMarpModal()">
+                  <span class="material-icons text-sm">add</span>
+                  <span>Nova Aula</span>
+                </BaseButton>
+              </div>
             </div>
 
             <div v-if="cursoStore.loadingContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true" aria-label="Carregando aulas">
@@ -436,32 +536,49 @@ function handleOpenRespostas(atividade: Atividade) {
               </div>
             </div>
 
-            <EmptyState v-else-if="cursoStore.aulas.length === 0" message="Nenhuma aula cadastrada nesta disciplina." />
+            <EmptyState v-else-if="localAulas.length === 0" message="Nenhuma aula cadastrada nesta disciplina." />
 
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div v-for="(aula, idx) in cursoStore.aulas" :key="aula.id" class="p-4 bg-surface-alt border border-line rounded-2xl flex items-center justify-between">
+              <div
+                v-for="(aula, idx) in localAulas"
+                :key="aula.id"
+                :draggable="isReorderingAulas"
+                @dragstart="onDragStart('aula', idx, $event)"
+                @dragover="onDragOver($event)"
+                @drop="onDrop('aula', idx, $event)"
+                class="p-4 bg-surface-alt border border-line rounded-2xl flex items-center justify-between transition-all duration-200"
+                :class="{
+                  'border-accent/60 cursor-grab active:cursor-grabbing hover:shadow-card': isReorderingAulas,
+                  'hover:border-secondary': !isReorderingAulas
+                }"
+              >
                 <div class="flex items-center space-x-3 truncate">
-                  <span class="material-icons text-accent text-lg shrink-0">slideshow</span>
+                  <span class="material-icons text-accent text-lg shrink-0">
+                    {{ isReorderingAulas ? 'drag_indicator' : 'slideshow' }}
+                  </span>
                   <div class="truncate">
                     <p class="text-primary text-xs font-bold truncate">{{ aula.titulo }}</p>
                     <p class="text-secondary text-[10px] truncate">{{ aula.descricao }}</p>
                   </div>
                 </div>
+
                 <div class="flex items-center space-x-1 shrink-0 ml-2">
-                  <div class="flex flex-col mr-1">
-                    <button @click="moveAula(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
-                      <span class="material-icons text-sm">keyboard_arrow_up</span>
+                  <div v-if="isReorderingAulas" class="flex items-center space-x-1 mr-1">
+                    <button @click="moveAula(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
+                      <span class="material-icons text-base">arrow_upward</span>
                     </button>
-                    <button @click="moveAula(idx, 'down')" :disabled="idx === cursoStore.aulas.length - 1" title="Mover para baixo" class="text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
-                      <span class="material-icons text-sm">keyboard_arrow_down</span>
+                    <button @click="moveAula(idx, 'down')" :disabled="idx === localAulas.length - 1" title="Mover para baixo" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
+                      <span class="material-icons text-base">arrow_downward</span>
                     </button>
                   </div>
-                  <button @click="handleOpenMarpModal(aula)" title="Editar Aula" class="p-1.5 text-secondary hover:text-primary">
-                    <span class="material-icons text-sm">edit</span>
-                  </button>
-                  <button @click="handleDeleteAula(aula.id)" title="Excluir Aula" class="p-1.5 text-secondary hover:text-danger">
-                    <span class="material-icons text-sm">delete</span>
-                  </button>
+                  <template v-else>
+                    <button @click="handleOpenMarpModal(aula)" title="Editar Aula" class="p-1.5 text-secondary hover:text-primary rounded-lg hover:bg-surface">
+                      <span class="material-icons text-sm">edit</span>
+                    </button>
+                    <button @click="handleDeleteAula(aula.id)" title="Excluir Aula" class="p-1.5 text-secondary hover:text-danger rounded-lg hover:bg-surface">
+                      <span class="material-icons text-sm">delete</span>
+                    </button>
+                  </template>
                 </div>
               </div>
             </div>
@@ -470,11 +587,29 @@ function handleOpenRespostas(atividade: Atividade) {
           <!-- Atividades -->
           <div class="space-y-4 pt-4 border-t border-line">
             <div class="flex items-center justify-between">
-              <h3 class="text-lg font-bold text-primary">Atividades & Avaliações</h3>
-              <BaseButton variant="primary" size="sm" @click="handleOpenActivityEditor()">
-                <span class="material-icons text-sm">add</span>
-                <span>Nova Atividade</span>
-              </BaseButton>
+              <h3 class="text-lg font-bold text-primary flex items-center gap-2">
+                <span>Atividades & Avaliações</span>
+                <span v-if="isReorderingAtividades" class="text-xs font-normal text-accent bg-accent/10 px-2 py-0.5 rounded-full">
+                  Arraste ou use as setas para reordenar
+                </span>
+              </h3>
+              <div class="flex items-center space-x-2">
+                <BaseButton
+                  v-if="cursoStore.atividades.length > 1"
+                  :variant="isReorderingAtividades ? 'primary' : 'secondary'"
+                  size="sm"
+                  :disabled="isSavingOrders"
+                  @click="toggleReorderAtividades"
+                >
+                  <span class="material-icons text-sm">{{ isReorderingAtividades ? 'save' : 'swap_vert' }}</span>
+                  <span>{{ isSavingOrders ? 'Salvando...' : (isReorderingAtividades ? 'Salvar Ordem' : 'Reordenar') }}</span>
+                </BaseButton>
+
+                <BaseButton variant="primary" size="sm" @click="handleOpenActivityEditor()">
+                  <span class="material-icons text-sm">add</span>
+                  <span>Nova Atividade</span>
+                </BaseButton>
+              </div>
             </div>
 
             <div v-if="cursoStore.loadingContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true" aria-label="Carregando atividades">
@@ -490,37 +625,53 @@ function handleOpenRespostas(atividade: Atividade) {
               </div>
             </div>
 
-            <EmptyState v-else-if="cursoStore.atividades.length === 0" message="Nenhuma atividade cadastrada nesta disciplina." />
+            <EmptyState v-else-if="localAtividades.length === 0" message="Nenhuma atividade cadastrada nesta disciplina." />
 
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div v-for="(atv, idx) in cursoStore.atividades" :key="atv.id" class="p-4 bg-surface-alt border border-line rounded-2xl flex flex-col justify-between space-y-3">
+              <div
+                v-for="(atv, idx) in localAtividades"
+                :key="atv.id"
+                :draggable="isReorderingAtividades"
+                @dragstart="onDragStart('atividade', idx, $event)"
+                @dragover="onDragOver($event)"
+                @drop="onDrop('atividade', idx, $event)"
+                class="p-4 bg-surface-alt border border-line rounded-2xl flex flex-col justify-between space-y-3 transition-all duration-200"
+                :class="{
+                  'border-accent/60 cursor-grab active:cursor-grabbing hover:shadow-card': isReorderingAtividades,
+                  'hover:border-secondary': !isReorderingAtividades
+                }"
+              >
                 <div class="flex items-start justify-between">
                   <div class="flex items-center space-x-3 truncate">
-                    <span class="material-icons text-accent text-lg shrink-0">assignment</span>
+                    <span class="material-icons text-accent text-lg shrink-0">
+                      {{ isReorderingAtividades ? 'drag_indicator' : 'assignment' }}
+                    </span>
                     <div class="truncate">
                       <p class="text-primary text-xs font-bold truncate">{{ atv.titulo }}</p>
                       <p class="text-secondary text-[10px] truncate">{{ atv.tipo || 'normal' }}</p>
                     </div>
                   </div>
                   <div class="flex items-center space-x-1 shrink-0 ml-2">
-                    <div class="flex flex-col mr-1">
-                      <button @click="moveAtividade(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
-                        <span class="material-icons text-sm">keyboard_arrow_up</span>
+                    <div v-if="isReorderingAtividades" class="flex items-center space-x-1 mr-1">
+                      <button @click="moveAtividade(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
+                        <span class="material-icons text-base">arrow_upward</span>
                       </button>
-                      <button @click="moveAtividade(idx, 'down')" :disabled="idx === cursoStore.atividades.length - 1" title="Mover para baixo" class="text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
-                        <span class="material-icons text-sm">keyboard_arrow_down</span>
+                      <button @click="moveAtividade(idx, 'down')" :disabled="idx === localAtividades.length - 1" title="Mover para baixo" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
+                        <span class="material-icons text-base">arrow_downward</span>
                       </button>
                     </div>
-                    <button @click="handleOpenActivityEditor(atv)" title="Editar Atividade" class="p-1.5 text-secondary hover:text-primary">
-                      <span class="material-icons text-sm">edit</span>
-                    </button>
-                    <button @click="handleDeleteActivity(atv.id)" title="Excluir Atividade" class="p-1.5 text-secondary hover:text-danger">
-                      <span class="material-icons text-sm">delete</span>
-                    </button>
+                    <template v-else>
+                      <button @click="handleOpenActivityEditor(atv)" title="Editar Atividade" class="p-1.5 text-secondary hover:text-primary rounded-lg hover:bg-surface">
+                        <span class="material-icons text-sm">edit</span>
+                      </button>
+                      <button @click="handleDeleteActivity(atv.id)" title="Excluir Atividade" class="p-1.5 text-secondary hover:text-danger rounded-lg hover:bg-surface">
+                        <span class="material-icons text-sm">delete</span>
+                      </button>
+                    </template>
                   </div>
                 </div>
 
-                <BaseButton variant="secondary" size="xs" block @click="handleOpenRespostas(atv)">
+                <BaseButton v-if="!isReorderingAtividades" variant="secondary" size="xs" block @click="handleOpenRespostas(atv)">
                   <span class="material-icons text-xs">analytics</span>
                   <span>Ver Respostas dos Alunos</span>
                 </BaseButton>

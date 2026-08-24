@@ -13,6 +13,7 @@ export interface Curso {
   cor?: string;
   icone?: string;
   senha?: string;
+  possui_senha?: boolean;
   descricao?: string;
   criado_em?: string;
   atualizado_em?: string;
@@ -98,6 +99,15 @@ export interface RespostaAluno {
   feedback?: string | null;
   enviado_em?: string | null;
   criado_em: string;
+}
+
+export interface RespostaPayload {
+  aluno_nome: string;
+  aluno_email: string;
+  respostas: RespostasAlunoMap;
+  enviar_email?: boolean;
+  senha_curso?: string;
+  senha_atividade?: string;
 }
 
 export interface AtividadeFeedbackItem {

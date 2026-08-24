@@ -71,13 +71,15 @@ const isMatIcon = computed(() => {
             <h3 class="text-sm font-semibold text-primary leading-snug line-clamp-2">
               {{ props.title }}
             </h3>
-            <BaseBadge
-              v-if="props.badgeText"
-              :variant="props.badgeVariant"
-              class="flex-shrink-0"
-            >
-              {{ props.badgeText }}
-            </BaseBadge>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <BaseBadge
+                v-if="props.badgeText"
+                :variant="props.badgeVariant"
+              >
+                {{ props.badgeText }}
+              </BaseBadge>
+              <slot name="header-actions" />
+            </div>
           </div>
         </div>
       </div>
@@ -96,7 +98,7 @@ const isMatIcon = computed(() => {
       </div>
 
       <!-- Rodapé CTA com transição greyed-out -> accent no hover -->
-      <div class="pt-3 border-t border-line flex items-center justify-between text-xs font-semibold text-muted group-hover:text-accent transition-colors duration-base">
+      <div v-if="props.actionText" class="pt-3 border-t border-line flex items-center justify-between text-xs font-semibold text-muted group-hover:text-accent transition-colors duration-base">
         <span>{{ props.isLocked ? 'Inserir senha' : props.actionText }}</span>
         <span class="material-icons text-[16px] group-hover:translate-x-0.5 transition-transform duration-base">
           {{ props.isLocked ? 'lock' : props.actionIcon }}

@@ -51,7 +51,7 @@ export default async function globalSetup() {
   }
   console.log('[e2e] Subindo stack isolado...');
   composeE2E('up', '-d', 'bun-server', 'vite');
-  await waitFor(`${E2E_BACKEND_URL}/db-test`);
+  await waitFor(`${E2E_BACKEND_URL}/health`);
   await waitFor(E2E_FRONTEND_URL);
   console.log('[e2e] Stack pronto.');
 }

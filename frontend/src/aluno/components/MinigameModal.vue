@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted, nextTick } from 'vue';
 import { MinigamePlayer } from './minigame-player';
-import type { Atividade } from '@/shared/types';
+import type { Atividade, Question } from '@/shared/types';
 import BaseButton from '@/shared/components/BaseButton.vue';
 
 const props = withDefaults(defineProps<{
   show: boolean;
   atividade: Atividade | null;
+  questions?: Question[];
   senhaCurso?: string;
   senhaAtividade?: string;
 }>(), {
+  questions: () => [],
   senhaCurso: '',
   senhaAtividade: '',
 });

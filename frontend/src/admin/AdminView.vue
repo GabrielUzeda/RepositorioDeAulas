@@ -5,6 +5,7 @@ import { useAuthStore } from '@/shared/stores/auth';
 import { apiClient } from '@/shared/api/client';
 import ProfessorFormModal from '@/admin/components/ProfessorFormModal.vue';
 import CursoFormModal from '@/admin/components/CursoFormModal.vue';
+import CursoCard from '@/aluno/components/CursoCard.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
@@ -395,52 +396,31 @@ function logout() {
         />
 
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div
+          <CursoCard
             v-for="curso in cursos"
             :key="curso.id"
-            class="bg-surface-alt rounded-md border border-line p-5 shadow-xs card-hover flex flex-col justify-between"
+            :curso="curso"
+            action-text=""
           >
-            <div>
-              <div class="flex justify-between items-start mb-3">
-                <div
-                  class="w-10 h-10 rounded-md flex items-center justify-center text-white shadow-xs"
-                  :class="curso.cor || 'bg-accent'"
+            <template #header-actions>
+              <div class="flex gap-1" @click.stop>
+                <button
+                  @click="openEditCurso(curso)"
+                  class="p-1.5 rounded text-muted hover:text-primary hover:bg-surface transition-colors"
+                  title="Editar curso"
                 >
-                  <span class="material-icons text-[20px]">{{ curso.icone || 'school' }}</span>
-                </div>
-                <div class="flex gap-1">
-                  <button
-                    @click="openEditCurso(curso)"
-                    class="p-1.5 rounded text-muted hover:text-primary hover:bg-surface transition-colors"
-                    title="Editar curso"
-                  >
-                    <span class="material-icons text-[16px]">edit</span>
-                  </button>
-                  <button
-                    @click="onDeleteCursoClick(curso)"
-                    class="p-1.5 rounded text-muted hover:text-danger hover:bg-surface transition-colors"
-                    title="Excluir curso"
-                  >
-                    <span class="material-icons text-[16px]">delete</span>
-                  </button>
-                </div>
+                  <span class="material-icons text-[16px]">edit</span>
+                </button>
+                <button
+                  @click="onDeleteCursoClick(curso)"
+                  class="p-1.5 rounded text-muted hover:text-danger hover:bg-surface transition-colors"
+                  title="Excluir curso"
+                >
+                  <span class="material-icons text-[16px]">delete</span>
+                </button>
               </div>
-
-              <h3 class="text-sm font-semibold text-primary line-clamp-1">{{ curso.nome }}</h3>
-              <p class="text-xs text-muted mt-1 line-clamp-2 leading-relaxed">{{ curso.descricao || 'Sem descrição.' }}</p>
-            </div>
-
-            <div class="flex items-center gap-3 pt-3 mt-3 border-t border-line text-xs text-muted">
-              <span class="flex items-center gap-1">
-                <span class="material-icons text-[14px]">menu_book</span>
-                {{ curso.total_disciplinas ?? 0 }} disciplinas
-              </span>
-              <span class="flex items-center gap-1">
-                <span class="material-icons text-[14px]">person</span>
-                {{ curso.total_professores ?? 0 }} professores
-              </span>
-            </div>
-          </div>
+            </template>
+          </CursoCard>
         </div>
       </div>
     </main>

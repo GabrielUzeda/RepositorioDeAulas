@@ -68,7 +68,22 @@ export async function verifyPassword(password: string, hash: string, salt: strin
 }
 
 function getJwtSecret(): string {
-  return process.env.JWT_SECRET || 'dev-secret-key-change-in-prod';
+  const secret = process.env.JWT_SECRET;
+  if (secret) return secret;
+  // [SEG] Fail-closed: em produção, sem JWT_SECRET não há como assinar/validar
+  // tokens de forma segura. Lançar impede a aceitação de tokens forjados com a
+  // chave pública padrão (bypass total de autenticação/autorização).
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET não definido em produção. Abortando operação de JWT.');
+  }
+  return 'dev-secret-key-change-in-prod';
+}
+
+// Validado na inicialização do servidor (index.ts) para falhar cedo em produção.
+export function assertRequiredSecrets(): void {
+  if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+    throw new Error('FATAL: JWT_SECRET ausente em ambiente de produção. Encerrando boot.');
+  }
 }
 
 export async function signJwt(payload: Record<string, any>): Promise<string> {
@@ -164,9 +179,17 @@ export function extractClientIp(c: Context): string {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
+    // Behind a trusted proxy the LAST hop is appended by the proxy (its view of
+    // the client). The backend is not directly internet-facing, so we trust that
+    // hop. (M12: do NOT trust the client-spoofable FIRST element.)
     const last = parts[parts.length - 1];
     if (last) return last;
   }
+  // Direct connection (no proxy / no XFF): use the real peer socket address so
+  // clients get distinct buckets instead of all collapsing to 127.0.0.1 (M12).
+  const sock = (c.req.raw as unknown as { socket?: { remoteAddress?: string } })?.socket;
+  const remote = sock?.remoteAddress;
+  if (remote) return remote;
   return '127.0.0.1';
 }
 
@@ -181,7 +204,7 @@ export function createRateLimiter(options: RateLimitOptions) {
   };
 
   return async (c: Context, next: Next) => {
-    if (process.env.NODE_ENV === 'test' || process.env.DATABASE_PATH?.includes('test')) {
+    if (process.env.NODE_ENV !== 'production' && process.env.DISABLE_RATE_LIMIT === 'true') {
       return next();
     }
     const ip = extractClientIp(c);

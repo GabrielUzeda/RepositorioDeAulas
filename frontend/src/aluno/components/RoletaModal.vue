@@ -12,8 +12,12 @@ const props = withDefaults(defineProps<{
   questions: Question[];
   title?: string;
   atividade?: Atividade | null;
+  senhaCurso?: string;
+  senhaAtividade?: string;
 }>(), {
   title: '',
+  senhaCurso: '',
+  senhaAtividade: '',
 });
 
 const emit = defineEmits<{

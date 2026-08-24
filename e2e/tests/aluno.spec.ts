@@ -92,23 +92,24 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
     await expect(page.getByRole('heading', { name: 'Selecione seu Curso' })).toBeVisible();
     await expect(page.locator('h3', { hasText: cursoNome })).toBeVisible();
 
-    // --- Seleciona curso ---
+    // --- Seleciona curso com senha → modal de senha ---
     await page.locator('h3', { hasText: cursoNome }).click();
-    await expect(page.locator('h3', { hasText: materiaNome })).toBeVisible();
-
-    // --- Seleciona disciplina de curso com senha → modal de senha ---
-    await page.locator('h3', { hasText: materiaNome }).click();
     await expect(page.getByText('Acesso Restrito')).toBeVisible();
 
     // --- Senha errada mostra alerta/erro e continua no modal ---
     await page.getByPlaceholder('Digite a senha').fill('senha-errada');
     await page.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(page.getByText('Senha do curso incorreta!')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('Acesso Restrito')).toBeVisible();
 
-    // --- Senha correta desbloqueia e entra no conteúdo da disciplina ---
+    // --- Senha correta desbloqueia e entra na lista de disciplinas ---
     await page.getByPlaceholder('Digite a senha').fill('curso123');
     await page.getByRole('button', { name: 'Confirmar' }).click();
     await expect(page.getByText('Acesso Restrito')).toBeHidden();
+    await expect(page.locator('h3', { hasText: materiaNome })).toBeVisible({ timeout: 15000 });
+
+    // --- Seleciona disciplina e entra no conteúdo ---
+    await page.locator('h3', { hasText: materiaNome }).click();
     await expect(page.locator('h3', { hasText: aulaTitulo })).toBeVisible({ timeout: 15000 });
 
     // --- Aba Aulas: card da aula aparece e abre em nova aba (slides Marp) ---
@@ -124,12 +125,20 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
     await page.getByRole('tab', { name: /Atividades/ }).click();
     await expect(page.locator('h3', { hasText: atvTitulo })).toBeVisible();
     await page.locator('h3', { hasText: atvTitulo }).click();
-    await expect(page.getByText('Perguntas da Atividade')).toBeVisible();
-    await expect(page.getByText('Qual é a capital do Brasil?')).toBeVisible();
 
+    // Passo 0: Identificação
     await page.getByLabel('Seu Nome *').fill('Aluno E2E');
     await page.getByLabel('Seu E-mail *').fill('aluno.e2e@local');
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 1: Pergunta
+    await expect(page.getByText(/Qual é a capital do Brasil|Questão 1/)).toBeVisible();
     await page.getByRole('button', { name: 'Brasília' }).click();
+    await page.getByRole('button', { name: 'Próximo' }).click();
+
+    // Passo 2: Revisão e Envio
+    await expect(page.getByText('Revisão das Respostas')).toBeVisible();
     await page.getByRole('button', { name: 'Enviar Resposta' }).click();
+    await expect(page.getByRole('heading', { name: 'Resposta Enviada com Sucesso!' })).toBeVisible({ timeout: 10000 });
   });
 });

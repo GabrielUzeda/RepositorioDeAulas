@@ -134,6 +134,20 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   user_agent TEXT,
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
+
+CREATE TABLE IF NOT EXISTS rascunhos_atividades (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo_recuperacao TEXT UNIQUE NOT NULL,
+  atividade_id INTEGER NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
+  aluno_nome TEXT NOT NULL,
+  aluno_email TEXT NOT NULL,
+  aluno_email_hash TEXT NOT NULL,
+  respostas_json TEXT NOT NULL,
+  expira_em TEXT NOT NULL,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rascunho_atv_email ON rascunhos_atividades(atividade_id, aluno_email_hash);
 `);
 
 // [2] Índices para alta performance
@@ -342,6 +356,20 @@ export function runDataRetentionPurge(): { respostas: number; ranking: number } 
           .run(cutoff);
         result.respostas += res.changes;
         if (res.changes < 500) break;
+      }
+
+      // [LGPD] Purgar rascunhos expirados e feedbacks individuais antigos do mesmo titular.
+      while (true) {
+        const resR = db
+          .query(`DELETE FROM rascunhos_atividades WHERE id IN (SELECT id FROM rascunhos_atividades WHERE expira_em < ? LIMIT 500)`)
+          .run(cutoff);
+        if (resR.changes < 500) break;
+      }
+      while (true) {
+        const resF = db
+          .query(`DELETE FROM disciplina_feedbacks WHERE id IN (SELECT id FROM disciplina_feedbacks WHERE aluno_email_hash IS NOT NULL AND atualizado_em < ? LIMIT 500)`)
+          .run(cutoff);
+        if (resF.changes < 500) break;
       }
     }
 

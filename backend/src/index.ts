@@ -2,6 +2,11 @@ import './env';
 import app from './routes';
 import { initMailer } from './mailer';
 import { runDataRetentionPurge } from './db';
+import { assertRequiredSecrets } from './auth';
+
+// [SEG] Fail-closed em produção: ausência de segredos críticos aborta o boot
+// antes de expor qualquer endpoint (evita JWT/criptografia com chaves padrão).
+assertRequiredSecrets();
 
 initMailer();
 

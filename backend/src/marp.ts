@@ -72,14 +72,16 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
 
   let slidesHtml = '';
   slides.forEach((slide, i) => {
-    const cls = 'slide' + (slide.directives.class ? ' ' + slide.directives.class : '');
+    const cls = 'slide' + (slide.directives.class ? ' ' + escapeHtml(slide.directives.class) : '');
     const animAttr = slide.directives.animation ? `data-animation="${escapeHtml(slide.directives.animation)}"` : '';
     const staggerAttr = slide.directives['animation-stagger'] ? `data-anim-stagger="true"` : '';
 
     const styleParts: string[] = [];
-    if (slide.directives.background) styleParts.push(`background:${slide.directives.background}`);
-    if (slide.directives['animation-duration']) styleParts.push(`--anim-duration:${slide.directives['animation-duration']}`);
-    if (slide.directives['animation-stagger']) styleParts.push(`--anim-stagger:${slide.directives['animation-stagger']}`);
+    // [SEG] Valores de diretivas interpolados em atributos/estilo devem ser escapados
+    // para evitar breakout de atributo (XSS armazenado em aulas servidas aos alunos).
+    if (slide.directives.background) styleParts.push(`background:${escapeHtml(slide.directives.background)}`);
+    if (slide.directives['animation-duration']) styleParts.push(`--anim-duration:${escapeHtml(slide.directives['animation-duration'])}`);
+    if (slide.directives['animation-stagger']) styleParts.push(`--anim-stagger:${escapeHtml(slide.directives['animation-stagger'])}`);
 
     const styleAttr = styleParts.length > 0 ? `style="${styleParts.join(';')}"` : '';
     const rawHtml = renderMarkdown(slide.content);
@@ -304,13 +306,14 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   <span id="counter" class="slide-counter">${slides.length > 0 ? '1/' + slides.length : '0/0'}</span>
   <div class="divider"></div>
   <button class="ctrl-btn" id="btn-theme" title="Alternar Tema (T)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
+  <div class="divider"></div>
+  <span id="clock-display" class="clock-display" title="Hora Atual">00:00:00</span>
+  <div class="divider"></div>
   <button class="ctrl-btn" id="btn-font-dec" title="Diminuir Fonte (-)">A-</button>
   <button class="ctrl-btn" id="btn-font-reset" title="Resetar Fonte">100%</button>
   <button class="ctrl-btn" id="btn-font-inc" title="Aumentar Fonte (+)">A+</button>
   <div class="divider"></div>
   <button class="ctrl-btn" id="btn-fs" title="Tela Cheia (F)">⛶ Fullscreen</button>
-  <div class="divider"></div>
-  <span id="clock-display" class="clock-display" title="Hora Atual">00:00:00</span>
 </div>
 
 <script>
@@ -549,15 +552,15 @@ export function processMarpContent(
 
   try {
     writeFileSync(mdPath, mdContent);
-  } catch (e: any) {
-    return { error: `Failed to write MD file: ${e.message}` };
+  } catch {
+    return { error: 'Falha ao salvar o arquivo da aula no servidor.' };
   }
 
   try {
     const standaloneHtml = generateMarpNextStandaloneHtml(titulo, mdContent);
     writeFileSync(htmlPath, standaloneHtml);
-  } catch (e: any) {
-    return { error: `Failed to generate MarpNext HTML: ${e.message}` };
+  } catch {
+    return { error: 'Falha ao gerar o HTML da aula.' };
   }
 
   if (!existsSync(htmlPath)) {

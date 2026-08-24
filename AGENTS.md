@@ -121,6 +121,8 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 | `BaseTabs.vue` | Tabs de AlunoView (aulas/atividades). | ⚠️ criado, não usado (AlunoView fora do escopo de migração) |
 | `BaseSelect.vue` | `<select>` em formulários. | ✅ em uso (2 arquivos) |
 | `BaseTextarea.vue` | `<textarea>` em 7 arquivos. | ✅ em uso (6 arquivos) |
+| `BaseContentCard.vue` | Card padronizado de conteúdo com header, ícone, badges, meta e slots de ações. | ✅ em uso (CursoCard, DisciplinaCard, AdminView, ProfessorView) |
+| `RichTextEditor.vue` | Editor WYSIWYG com sanitização anti-XSS e suporte a formatação/código. | ✅ em uso (ActivityModal) |
 
 **Regras:** para criar novo componente, siga a convenção PascalCase em `src/shared/components/`; use apenas classes literais de tokens (nunca classes dinâmicas); aproveite `BaseButton`/`BaseInput`/`BaseCard` em vez de botões/inputs novos; migrar o trio base para as views é trabalho pendente (não feito ainda).
 
@@ -129,10 +131,11 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 ## 4. Modelo de dados principal (SQLite — `db.ts`)
 
 - `usuarios` (admin/professor), `cursos` (com coluna `senha`), `curso_professores`
-- `disciplinas` (curso_id, slug, nome, cor, icone, descricao, **`senha`**)
+- `disciplinas` (curso_id, slug, nome, cor, icone, descricao)
 - `aulas` (disciplina_id, titulo, **caminho** → `materias/{slug}/aulas/{slug}.html`, descricao, ordem, conteudo_md)
 - `atividades` (disciplina_id, external_id, titulo, descricao, caminho, icone, `json_data`, tipo, senha, allow_password, ordem)
 - `respostas_alunos` (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas [criptografadas], acertos, total, pontuacao, **nota REAL, feedback TEXT, enviado_em**, consulta_token, criado_em)
+- `rascunhos_atividades` (codigo_recuperacao, atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas_json [criptografadas], expira_em [30 dias], criado_em, atualizado_em)
 - `disciplina_feedbacks` (disciplina_id, aluno_email_hash [NULL=turma], feedback_geral, enviado_em, criado_em, atualizado_em, UNIQUE(disciplina_id, aluno_email_hash))
 
 **Convenção:** resposta individual tem `aluno_email_hash` preenchido; feedback de turma é o registro com hash NULL.
@@ -159,30 +162,77 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 
 ---
 
-## 7. Fluxos de negócio (importantes)
+## 7. Fluxos de negócio e Jornada End-to-End
 
-- **Professor**: login → `Seus Cursos` → clica curso → lista de disciplinas → **`Gerenciar Aulas & Atividades`** abre os detalhes (note: o h3 do card de disciplina NÃO é clicável — só o botão) → seções Aulas (MarpEditor) e Atividades (JsonActivityEditor) → para avaliar: `Ver Respostas dos Alunos` → `Avaliar / Ver` → nota+feedback → `Salvar Avaliação` → gerar relatório: botão **`Gerar Feedback da Disciplina`** (FeedbackConsolidadoModal).
-- **Aluno (anônimo)**: `/` → `Área do Aluno` → seleciona curso → disciplina → corpo de conteúdo com tabs `Aulas (N)` / `Atividades (N)` → aula abre em **popup (window.open)** apontando para `materias/...` (servido pelo vite proxy / backend com CSP) → atividade abre em modal e submete resposta.
-- **Controle de acesso**:
-  - **Curso com senha** → aluno precisa verificar `POST /cursos/:id/verificar-senha` antes de ver conteúdo. É a senha do **CURSO** que importa para aulas/atividades (`readCursoSenha`).
-  - Atividade com `allow_password` → senha própria, verificada ao abrir a atividade.
-  - **Senha é exclusiva do curso:** `disciplinas` não possui mais coluna `senha` (foi removida). O acesso anônimo a aulas/atividades é controlado **apenas** por `cursos.senha`. O formulário `DisciplinaFormModal.vue` não tem campo de senha — não há risco de "disciplina com senha mas curso sem senha".
+O repositório opera em 4 grandes papéis/fluxos encadeados, do gerenciamento administrativo até a entrega pedagógica:
+
+### 7.1 Jornada End-to-End do Sistema
+
+```
+[1. Administrador] ──► Criar Professores & Cursos ──► Vincular Professores aos Cursos
+                                                                  │
+                                                                  ▼
+[2. Professor]     ──► Criar Disciplinas ──► Criar Aulas (Marp) & Atividades (Tipos) ──► Reordenar
+                                                                  │
+                                                                  ▼
+[3. Aluno]         ──► Autenticar Curso (Senha) ──► Visualizar Aulas ──► Responder Atividade (Opt-in Email)
+                                                                  │
+                                                                  ▼
+[4. Avaliação]     ──► Professor atribui Nota/Feedback ──► Gera Relatório Consolidado da Turma (Disparo Email)
+```
+
+1. **Administrador (`/admin`)**:
+   - Autentica-se com credenciais master (`PROFESSOR_EMAIL` / `PROFESSOR_PASSWORD`).
+   - **Gestão de Professores**: Realiza CRUD de novos docentes (`POST/PUT/DELETE /professores`).
+   - **Gestão de Cursos**: Cria os cursos (`POST/PUT/DELETE /cursos`), define senha de acesso anônimo do curso e vincula os professores responsáveis pela gestão pedagógica via `curso_professores`.
+
+2. **Professor (`/professor`)**:
+   - Autentica-se e acessa seus cursos vinculados em `Painel do Professor`.
+   - **Disciplinas**: Seleciona o curso e faz CRUD das disciplinas/matérias.
+   - **Aulas & Marp**: Abre a disciplina e cria/edita aulas usando o **Marp Markdown Editor** (com suporte a slides, KaTeX, Mermaid e preview em tempo real).
+   - **Atividades & Reordenação**: Cria/edita atividades interativas e utiliza os botões ou recurso **Drag & Drop** (`Reordenar`) para definir a sequência pedagógica de aulas e atividades.
+   - **Avaliação**: Acessa `Ver Respostas dos Alunos` em cada atividade, atribui notas numéricas e feedbacks individuais.
+   - **Relatórios**: Clica em `Gerar Feedback da Disciplina` para redigir a devolutiva geral da turma, ajustar os comentários individuais e disparar notificações por e-mail via `POST /disciplinas/:id/enviar-emails-feedback`.
+
+3. **Aluno (Área Pública - `/`)**:
+   - Navega anonimamente pelos cursos disponíveis.
+   - Se o curso possuir senha (`cursos.senha`), o modal `Acesso Restrito` solicita a verificação antes de liberar disciplinas.
+   - **Aulas**: Abre os slides renderizados pelo backend/Marp em popup seguro (window.open).
+   - **Atividades**: Responde a atividade (passo-a-passo por pergunta ou minigame/roleta), salva rascunho local ou no servidor (código de 30 dias), opcionalmente marca a checkbox para **receber comprovante com suas respostas por e-mail** (conforme LGPD) e submete a resposta.
+
+### 7.2 Modalidades e Tipos de Atividades Disponíveis
+
+O sistema suporta 4 tipos principais de atividades interativas (armazenadas na coluna `tipo` e estruturadas em `json_data`):
+
+| Tipo | Chave `tipo` | Características e Comportamento |
+|---|---|---|
+| **Normal / Prova** | `normal` / `prova` | Avaliação formal com perguntas objetivas ou discursivas. Exibe pontuação e porcentagem de acertos ao final se houver gabarito. |
+| **Reforço** | `reforco` | Focado na aprendizagem contínua. Apresenta feedback pedagógico imediato após cada pergunta sem caráter eliminatório. |
+| **Minigame** | `minigame` | Formato gamificado interativo. Registra pontuação e tempo de conclusão, alimentando a tabela `ranking` (expurgo automático em 30 dias). |
+| **Roleta** | `roleta` | Atividade dinâmica de sorteio de perguntas. Utilizada em dinâmica de grupo ou revisão presencial/híbrida em sala de aula. |
+
+> **Controle de Acesso por Atividade**: Atividades individuais podem opcionalmente ter `allow_password: 1` e uma senha própria (`atividades.senha`), exigindo uma confirmação secundária do aluno ao abrir a atividade.
 
 ---
 
 ## 8. Testes E2E (Playwright via Docker — caminho oficial)
 
 ### Escopo
-Há 6 specs em `e2e/tests/`. Status verificados:
+Há 11 specs em `e2e/tests/`. Status verificados (todos 100% passando):
 
 | Spec | Status | Cobre |
 |---|---|---|
 | `admin.spec.ts` | ✅ atual | Login admin, CRUD professor/curso via UI |
 | `auth.spec.ts` | ✅ atual | Credenciais inválidas, redirects p/ `/login?redirect=` |
-| `professor.spec.ts` | ⚠️ **STALE** | Selectors de UI antiga (`Meus Cursos`, `Gerenciar Materias`, `Nova Materia`, `Salvar Materia`, `Aulas Cadastradas`, `Criar Aula (Marp)`, etc.) inexistentes na UI atual. Precisa reescrita. |
-| `aluno.spec.ts` | ⚠️ **parcial** | Setup por API; a parte do modal `Acesso Restrito` pós-disciplina não casa com a UI atual (senha é do curso, não da disciplina). Cobre navegação, popup da aula (só URL), envio de resposta. |
-| `aluno-atividades-avancadas.spec.ts` | ⚠️ **parcial** | Reforço/roleta/minigame/senha de atividade — mesmo problema de senha de curso. |
-| `fluxo-completo.spec.ts` | ✅ **novo** | Jornada completa (ver abaixo). |
+| `professor.spec.ts` | ✅ **atualizado** | CRUD de disciplinas, aulas (Marp), atividades e reordenação via UI |
+| `aluno.spec.ts` | ✅ atual | Acesso anônimo, modal de senha de curso, visualização de aulas em popup e envio de respostas |
+| `aluno-atividades-avancadas.spec.ts` | ✅ atual | Fluxos de minigames/roleta/reforço e senhas de atividade |
+| `aluno-comprovante-email.spec.ts` | ✅ **novo** | Submissão de resposta com opt-in de e-mail e validação de entrega do comprovante via Mailhog |
+| `aluno-lgpd.spec.ts` | ✅ atual | Direito de consulta e exclusão de dados do aluno conforme LGPD |
+| `atividade-fluxo.spec.ts` | ✅ atual | Importação e exportação de JSON de atividades |
+| `atividade-rascunhos.spec.ts` | ✅ atual | Salvamento e restauração de rascunhos de atividades (30 dias) |
+| `email-feedback.spec.ts` | ✅ atual | Entrega real de e-mails de feedback pedagógico via Mailhog |
+| `fluxo-completo.spec.ts` | ✅ atual | Jornada completa de ponta a ponta (Professor → Aluno → Avaliação → Feedback) |
 
 ### Como executar
 ```bash

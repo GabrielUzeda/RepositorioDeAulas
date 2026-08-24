@@ -104,6 +104,7 @@ app.onError((err, c) => {
 const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10, message: 'Muitas tentativas de login. Aguarde 1 minuto.' });
 const registerLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, message: 'Muitas tentativas de registro. Aguarde 10 minutos.' });
 const submissionLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 20, message: 'Muitas submissões de resposta. Aguarde 1 minuto.' });
+const draftLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10, message: 'Muitas requisições de rascunho. Aguarde 1 minuto.' });
 
 const dbq = (sql: string) => db.query<Record<string, any>, any[]>(sql);
 
@@ -153,6 +154,17 @@ function normalizeJsonData(value: any): string | null {
   if (value == null) return null;
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+}
+
+// [SEG] Escapa valor para inserção segura em contexto HTML (e-mails, atributos).
+// Previne HTML injection / stored XSS a partir de dados de alunos/professores.
+function escapeHtml(value: any): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // [2.6] Leitura única e coesa da "senha" de acesso do aluno ao curso.
@@ -267,20 +279,27 @@ async function createCurso(c: any) {
 async function updateCurso(c: any) {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
+  const existing = dbq('SELECT * FROM cursos WHERE id = ?').get(id) as any;
+  if (!existing) return c.text('Curso not found', 404);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-  const slug = sanitizeSlug(body.slug ?? body.nome ?? '');
+  const slug = sanitizeSlug(body.slug ?? body.nome ?? existing.slug);
   if (!slug) return c.text('Informe um nome válido para o curso.', 400);
+
+  let novaSenha = existing.senha;
+  if (body.senha !== undefined) {
+    novaSenha = body.senha === '' || body.senha === null ? null : String(body.senha);
+  }
+
   const r = db
     .query(
       `UPDATE cursos
-       SET slug = ?, nome = ?, cor = ?, icone = ?, senha = COALESCE(?, senha), descricao = ?,
+       SET slug = ?, nome = ?, cor = ?, icone = ?, senha = ?, descricao = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
        WHERE id = ?
        RETURNING *`
     )
-    .get(slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null, id);
-  if (!r) return c.text('Curso not found', 404);
+    .get(slug, body.nome ?? existing.nome, body.cor ?? existing.cor, body.icone ?? existing.icone, novaSenha, body.descricao ?? existing.descricao, id);
   return c.json(r, 200);
 }
 
@@ -610,6 +629,7 @@ app.get('/cursos', async (c) => {
   }
   const rows = dbq(
     `SELECT c.id, c.slug, c.nome, c.cor, c.icone, c.descricao,
+       CASE WHEN c.senha IS NOT NULL AND c.senha <> '' THEN 1 ELSE 0 END AS possui_senha,
        (SELECT COUNT(*) FROM disciplinas d WHERE d.curso_id = c.id) AS total_disciplinas,
        (SELECT COUNT(*) FROM curso_professores cp WHERE cp.curso_id = c.id) AS total_professores
      FROM cursos c ORDER BY c.nome`
@@ -620,7 +640,7 @@ app.get('/cursos', async (c) => {
 app.get('/cursos/:id', (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const r = dbq('SELECT id, slug, nome, cor, icone, descricao, senha FROM cursos WHERE id = ?').get(id);
+  const r = dbq('SELECT id, slug, nome, cor, icone, descricao, CASE WHEN senha IS NOT NULL AND senha <> \'\' THEN 1 ELSE 0 END AS possui_senha FROM cursos WHERE id = ?').get(id);
   if (!r) return c.text('Curso not found', 404);
   return c.json(r);
 });
@@ -791,14 +811,24 @@ app.get('/atividades/:id', async (c) => {
   const atvSenha = atv.senha ?? '';
   const isProtected = !!atv.allow_password;
 
-  if (inputSenha === atvSenha && isProtected) {
-    return c.json(stripGabarito(atv));
-  } else if (inputSenha === cursoSenha) {
-    return c.json(stripGabarito(atv));
-  } else {
-    return c.text('Senha incorreta', 401);
+  if (isProtected) {
+    if (atvSenha && inputSenha === atvSenha) {
+      return c.json(stripGabarito(atv));
+    }
+    return c.text('Senha da atividade incorreta', 401);
   }
+
+  if (cursoSenha) {
+    if (inputSenha === cursoSenha) {
+      return c.json(stripGabarito(atv));
+    }
+    return c.text('Senha do curso incorreta', 401);
+  }
+
+  return c.json(stripGabarito(atv));
 });
+
+
 
 interface CorrecaoResultado {
   acertos: number;
@@ -943,7 +973,14 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
   if (!body.aluno_nome || !body.aluno_email || !isValidEmail(body.aluno_email) || body.respostas === undefined) {
     return c.text('Informe nome, e-mail válido e respostas.', 400);
   }
-  const atv = dbq('SELECT id, json_data, allow_password, senha, disciplina_id FROM atividades WHERE id = ?').get(atividadeId) as any;
+  const atv = dbq(`
+    SELECT a.id, a.titulo, a.descricao, a.json_data, a.allow_password, a.senha, a.disciplina_id,
+           d.nome as disciplina_nome, c.nome as curso_nome
+    FROM atividades a
+    LEFT JOIN disciplinas d ON d.id = a.disciplina_id
+    LEFT JOIN cursos c ON c.id = d.curso_id
+    WHERE a.id = ?
+  `).get(atividadeId) as any;
   if (!atv) return c.text('Atividade não encontrada', 404);
 
   const errSenha = validarSenhasSubmissao(body, atv);
@@ -951,6 +988,7 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
 
   const email = String(body.aluno_email).trim();
   const nome = String(body.aluno_nome).trim();
+  const enviarEmail = body.enviar_email === true || body.enviar_email === 'true' || body.enviar_email === 1;
   
   const respostasInput = body.respostas;
   const respostasStr = typeof respostasInput === 'string' ? respostasInput : JSON.stringify(respostasInput);
@@ -988,6 +1026,55 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
 
     await logAudit(c, 'submeter_resposta', `atividade:${atividadeId}`, { email_hash: emailHash });
 
+    if (enviarEmail) {
+      try {
+        let perguntasRespostasHtml = '';
+        try {
+          const rawQuestions = typeof atv.json_data === 'string' ? JSON.parse(atv.json_data) : atv.json_data;
+          const questionsList = Array.isArray(rawQuestions) ? rawQuestions : (rawQuestions?.questions || rawQuestions?.perguntas || []);
+          const mapRespostas = typeof respostasInput === 'object' && respostasInput !== null ? respostasInput : {};
+
+          perguntasRespostasHtml = questionsList.map((q: any, idx: number) => {
+            const qId = q.id !== undefined ? String(q.id) : String(idx);
+            const resp = mapRespostas[qId] ?? mapRespostas[idx] ?? mapRespostas[`q_${idx}`] ?? mapRespostas[`q_${qId}`] ?? 'Não respondida';
+            const respText = typeof resp === 'object' ? JSON.stringify(resp) : String(resp);
+            const tituloQuestao = escapeHtml(q.title || q.titulo || q.statement || q.content || `Questão ${idx + 1}`);
+            return `<div style="margin-bottom: 12px; padding: 10px; background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <strong style="color: #1e293b;">Questão ${idx + 1}: ${tituloQuestao}</strong><br/>
+              <span style="color: #475569;">Sua resposta: </span><span style="color: #0284c7; font-weight: bold;">${escapeHtml(respText)}</span>
+            </div>`;
+          }).join('');
+        } catch (_e) {
+          perguntasRespostasHtml = `<p>Respostas submetidas: ${escapeHtml(respostasStr)}</p>`;
+        }
+
+        const html = `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <h2 style="color: #0284c7; margin-bottom: 4px;">Comprovante de Envio de Atividade</h2>
+            <p style="color: #64748b; font-size: 14px; margin-top: 0;">Guardado com segurança. Conforme a LGPD, este e-mail serve como seu comprovante individual.</p>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
+            <p><strong>Aluno:</strong> ${escapeHtml(nome)}</p>
+            <p><strong>Curso:</strong> ${escapeHtml(atv.curso_nome || 'N/A')}</p>
+            <p><strong>Disciplina:</strong> ${escapeHtml(atv.disciplina_nome || 'N/A')}</p>
+            <p><strong>Atividade:</strong> ${escapeHtml(atv.titulo || 'Atividade')}</p>
+            <p><strong>Data de Envio:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+            <h3 style="color: #1e293b; margin-top: 20px;">Resumo das suas respostas:</h3>
+            ${perguntasRespostasHtml}
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #94a3b8;">Este é um e-mail automático enviado pelo Repositório de Aulas. Nenhuma informação pessoal sensível permanece armazenada em texto puro no nosso banco de dados.</p>
+          </div>
+        `;
+
+        void sendMail({
+          to: email,
+          subject: `[Comprovante] Resposta enviada: ${atv.titulo || 'Atividade'}`,
+          html,
+        }).catch((err) => console.error('Erro ao enviar e-mail de comprovante ao aluno:', err));
+      } catch (errEmail) {
+        console.error('Erro ao preparar e-mail de comprovante:', errEmail);
+      }
+    }
+
     return c.json({
       id: r.id,
       atividade_id: r.atividade_id,
@@ -1011,6 +1098,194 @@ app.post('/atividades/:id/respostas', submissionLimiter, async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('ID inválido', 400);
   return handleSubmeterResposta(c, id);
+});
+
+// ---------- Endpoints de Rascunhos de Atividades (30 Dias) ----------
+
+// [SEG] Código de recuperação de rascunho com alta entropia (~60 bits) para
+// dificultar força bruta/enumeração de PII de alunos.
+function generateDraftCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const len = 12;
+  let code = '';
+  const bytes = crypto.getRandomValues(new Uint8Array(len));
+  for (let i = 0; i < len; i++) {
+    code += chars[bytes[i] % chars.length];
+  }
+  return code;
+}
+
+app.post('/atividades/:id/rascunhos', draftLimiter, async (c) => {
+  const atividadeId = parseId(c.req.param('id'));
+  if (atividadeId === null) return c.text('ID inválido', 400);
+
+  const body = await parseBody(c);
+  if (!body) return c.text('Dados inválidos', 400);
+
+  const atv = dbq('SELECT id, titulo FROM atividades WHERE id = ?').get(atividadeId) as any;
+  if (!atv) return c.text('Atividade não encontrada', 404);
+
+  const nome = String(body.nome || body.aluno_nome || '').trim();
+  const email = String(body.email || body.aluno_email || '').trim();
+  const enviarEmail = body.enviar_email === true || body.enviar_email === 'true' || body.enviar_email === 1;
+  const respostasInput = body.respostas || {};
+  const respostasStr = typeof respostasInput === 'string' ? respostasInput : JSON.stringify(respostasInput);
+
+  if (!email || !isValidEmail(email)) {
+    return c.json({ success: false, error: 'E-mail válido é obrigatório para salvar o rascunho.' }, 400);
+  }
+
+  const emailHash = await hashEmail(email);
+  const encNome = await encryptData(nome || 'Aluno Anônimo');
+  const encEmail = await encryptData(email);
+  const encRespostas = await encryptData(respostasStr);
+
+  const now = new Date();
+  const expiraDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const expiraEmIso = expiraDate.toISOString();
+
+  const existente = dbq('SELECT id, codigo_recuperacao FROM rascunhos_atividades WHERE atividade_id = ? AND aluno_email_hash = ?').get(atividadeId, emailHash) as any;
+
+  let codigo = '';
+  if (existente) {
+    codigo = existente.codigo_recuperacao;
+    dbq(`
+      UPDATE rascunhos_atividades 
+      SET aluno_nome = ?, aluno_email = ?, respostas_json = ?, expira_em = ?, atualizado_em = (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      WHERE id = ?
+    `).run(encNome, encEmail, encRespostas, expiraEmIso, existente.id);
+  } else {
+    let tentativas = 0;
+    do {
+      codigo = generateDraftCode();
+      tentativas++;
+      const duplicado = dbq('SELECT 1 AS ok FROM rascunhos_atividades WHERE codigo_recuperacao = ?').get(codigo);
+      if (!duplicado) break;
+    } while (tentativas < 5);
+    dbq(`
+      INSERT INTO rascunhos_atividades (codigo_recuperacao, atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas_json, expira_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(codigo, atividadeId, encNome, encEmail, emailHash, encRespostas, expiraEmIso);
+  }
+
+  if (enviarEmail) {
+    try {
+      const atvTitulo = atv.titulo || 'Atividade';
+      const emailHtml = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #4f46e5; margin-bottom: 4px;">Código de Recuperação de Rascunho</h2>
+          <p style="color: #64748b; font-size: 14px; margin-top: 0;">Você salvou um rascunho para a atividade <strong>${escapeHtml(atvTitulo)}</strong>.</p>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
+          <p>Utilize o código abaixo para restaurar suas respostas em qualquer dispositivo dentro de 30 dias:</p>
+          <div style="text-align: center; margin: 24px 0;">
+            <span style="display: inline-block; font-size: 24px; font-weight: bold; font-family: monospace; letter-spacing: 4px; padding: 12px 24px; background: #e0e7ff; color: #3730a3; border-radius: 8px; border: 1px dashed #6366f1;">${escapeHtml(codigo)}</span>
+          </div>
+          <p style="font-size: 13px; color: #475569;"><strong>Como restaurar:</strong> Ao abrir a atividade novamente, informe este código no campo <em>Restaurar Rascunho</em> no primeiro passo da atividade.</p>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #94a3b8;">Este é um e-mail automático enviado pelo Repositório de Aulas.</p>
+        </div>
+      `;
+      void sendMail({
+        to: email,
+        subject: `[Rascunho] Código de Recuperação: ${atvTitulo}`,
+        html: emailHtml,
+      }).catch((err) => console.error('Erro ao enviar e-mail de código de rascunho:', err));
+    } catch (errEmail) {
+      console.error('Erro ao preparar e-mail de código de rascunho:', errEmail);
+    }
+  }
+
+  return c.json({
+    success: true,
+    codigo,
+    codigo_recuperacao: codigo,
+    expira_em: expiraEmIso
+  });
+});
+
+app.post('/atividades/:id/rascunhos/enviar-email', draftLimiter, async (c) => {
+  const atividadeId = parseId(c.req.param('id'));
+  if (atividadeId === null) return c.text('ID inválido', 400);
+
+  const body = await parseBody(c);
+  if (!body) return c.text('Dados inválidos', 400);
+
+  const email = String(body.email || '').trim();
+  const codigo = String(body.codigo || '').trim().toUpperCase();
+
+  if (!email || !isValidEmail(email)) {
+    return c.json({ success: false, error: 'Informe um e-mail válido.' }, 400);
+  }
+  if (!codigo) {
+    return c.json({ success: false, error: 'Código de recuperação é obrigatório.' }, 400);
+  }
+
+  const atv = dbq('SELECT id, titulo FROM atividades WHERE id = ?').get(atividadeId) as any;
+  const atvTitulo = atv?.titulo || 'Atividade';
+
+  const emailHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <h2 style="color: #4f46e5; margin-bottom: 4px;">Código de Recuperação de Rascunho</h2>
+      <p style="color: #64748b; font-size: 14px; margin-top: 0;">Você salvou um rascunho para a atividade <strong>${escapeHtml(atvTitulo)}</strong>.</p>
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
+      <p>Utilize o código abaixo para restaurar suas respostas em qualquer dispositivo dentro de 30 dias:</p>
+      <div style="text-align: center; margin: 24px 0;">
+        <span style="display: inline-block; font-size: 24px; font-weight: bold; font-family: monospace; letter-spacing: 4px; padding: 12px 24px; background: #e0e7ff; color: #3730a3; border-radius: 8px; border: 1px dashed #6366f1;">${escapeHtml(codigo)}</span>
+      </div>
+      <p style="font-size: 13px; color: #475569;"><strong>Como restaurar:</strong> Ao abrir a atividade novamente, informe este código no campo <em>Restaurar Rascunho</em> no primeiro passo da atividade.</p>
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+      <p style="font-size: 12px; color: #94a3b8;">Este é um e-mail automático enviado pelo Repositório de Aulas.</p>
+    </div>
+  `;
+
+  const mailResp = await sendMail({
+    to: email,
+    subject: `[Rascunho] Código de Recuperação: ${atvTitulo}`,
+    html: emailHtml,
+  });
+
+  return c.json(mailResp);
+});
+
+app.get('/rascunhos/:codigo', draftLimiter, async (c) => {
+  const rawCodigo = c.req.param('codigo');
+  if (!rawCodigo || typeof rawCodigo !== 'string') return c.json({ success: false, error: 'Código inválido' }, 400);
+
+  const codigo = rawCodigo.trim().toUpperCase();
+
+  // Lazy cleanup de rascunhos expirados
+  const nowIso = new Date().toISOString();
+  dbq('DELETE FROM rascunhos_atividades WHERE expira_em < ?').run(nowIso);
+
+  const rascunho = dbq('SELECT * FROM rascunhos_atividades WHERE codigo_recuperacao = ?').get(codigo) as any;
+  if (!rascunho) {
+    return c.json({ success: false, error: 'Código de rascunho inválido ou expirado.' }, 404);
+  }
+
+  try {
+    const nome = await decryptData(rascunho.aluno_nome);
+    const email = await decryptData(rascunho.aluno_email);
+    const respostasRaw = await decryptData(rascunho.respostas_json);
+    let respostas = {};
+    try {
+      respostas = JSON.parse(respostasRaw);
+    } catch {
+      respostas = { "0": respostasRaw };
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        atividade_id: rascunho.atividade_id,
+        nome,
+        email,
+        respostas,
+        expira_em: rascunho.expira_em
+      }
+    });
+  } catch (err) {
+    return c.json({ success: false, error: 'Erro ao descriptografar rascunho' }, 500);
+  }
 });
 
 // Direitos do Titular (Art. 18 LGPD) - Consulta e exclusão de respostas próprias do aluno.
@@ -1072,7 +1347,13 @@ app.delete('/aluno/minhas-respostas', submissionLimiter, async (c) => {
   ).get(emailHash, tokenHash);
   if (!tokenCheck) return c.text('Token inválido para este e-mail.', 401);
 
-  dbq('DELETE FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?').run(emailHash, tokenHash);
+  db.transaction(() => {
+    dbq('DELETE FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?').run(emailHash, tokenHash);
+    // [LGPD] Direito à eliminação (Art. 16): cascata para rascunhos e feedbacks
+    // individuais do mesmo titular (mesmo e-mail/hash), que também contêm PII.
+    dbq('DELETE FROM rascunhos_atividades WHERE aluno_email_hash = ?').run(emailHash);
+    dbq('DELETE FROM disciplina_feedbacks WHERE aluno_email_hash = ?').run(emailHash);
+  })();
 
   await logAudit(c, 'excluir_respostas_aluno', 'respostas_alunos', { email_hash: emailHash });
 
@@ -1115,9 +1396,15 @@ app.delete('/respostas/:id', professorAuth, async (c) => {
   return c.body(null, 204);
 });
 
-app.post('/send-mail', async (c) => {
+// [SEG] Endpoint de envio de e-mail restrito a admins. Não aceita HTML/texto cru
+// do cliente (apenas templates pré-definidos + variáveis) para evitar open relay
+// de phishing através do SMTP da escola.
+app.post('/send-mail', adminAuth, async (c) => {
   const body = await parseBody(c);
-  if (!body) return c.json({ success: false, message: 'Erro ao enfileirar email' }, 200);
+  if (!body) return c.json({ success: false, message: 'Erro ao enfileirar email' }, 400);
+  if (body.html || body.text) {
+    return c.json({ success: false, message: 'Envio de HTML/texto cru não permitido. Use template + variables.' }, 400);
+  }
   const req: MailRequest = {
     to: body.to ?? '',
     subject: body.subject ?? '',
@@ -1128,7 +1415,11 @@ app.post('/send-mail', async (c) => {
   return c.json(resp, 200);
 });
 
-app.get('/db-test', (c) => {
+app.get('/health', (c) => {
+  return c.json({ status: 'ok' }, 200);
+});
+
+app.get('/db-test', adminAuth, (c) => {
   try {
     dbq('SELECT 1').get();
     return c.json({ success: true, message: 'Conexão com SQLite OK!' });
@@ -1490,29 +1781,29 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
 
     const atividadesHtml = item.respostas.map(r => `
       <div style="margin-bottom: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #f8fafc;">
-        <strong style="color: #1e293b; font-size: 14px;">${r.atividade_titulo}</strong>
-        ${r.nota !== null && r.nota !== undefined ? `<span style="float: right; font-weight: bold; color: #4f46e5;">Nota: ${r.nota}/100</span>` : ''}
-        ${r.feedback ? `<p style="margin: 6px 0 0 0; color: #475569; font-size: 13px;"><em>Feedback: ${r.feedback}</em></p>` : '<p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 12px;">Sem comentários específicos.</p>'}
+        <strong style="color: #1e293b; font-size: 14px;">${escapeHtml(r.atividade_titulo)}</strong>
+        ${r.nota !== null && r.nota !== undefined ? `<span style="float: right; font-weight: bold; color: #4f46e5;">Nota: ${escapeHtml(r.nota)}/100</span>` : ''}
+        ${r.feedback ? `<p style="margin: 6px 0 0 0; color: #475569; font-size: 13px;"><em>Feedback: ${escapeHtml(r.feedback)}</em></p>` : '<p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 12px;">Sem comentários específicos.</p>'}
       </div>
     `).join('');
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #334155;">
-        <h2 style="color: #4f46e5; border-b: 2px solid #e0e7ff; padding-bottom: 8px;">Relatório de Feedback - ${disciplina.nome}</h2>
-        <p>Olá, <strong>${item.aluno_nome}</strong>!</p>
-        <p>Segue abaixo o seu relatório consolidado de atividades e avaliações da disciplina <strong>${disciplina.nome}</strong>:</p>
+        <h2 style="color: #4f46e5; border-b: 2px solid #e0e7ff; padding-bottom: 8px;">Relatório de Feedback - ${escapeHtml(disciplina.nome)}</h2>
+        <p>Olá, <strong>${escapeHtml(item.aluno_nome)}</strong>!</p>
+        <p>Segue abaixo o seu relatório consolidado de atividades e avaliações da disciplina <strong>${escapeHtml(disciplina.nome)}</strong>:</p>
 
         ${feedbackTurma ? `
           <div style="margin-bottom: 16px; padding: 14px; background: #e0e7ff; border-left: 4px solid #4f46e5; border-radius: 4px;">
             <strong style="color: #3730a3;">📢 Recado Geral para a Turma:</strong>
-            <p style="margin: 6px 0 0 0; color: #312e81; font-size: 13px;">${feedbackTurma}</p>
+            <p style="margin: 6px 0 0 0; color: #312e81; font-size: 13px;">${escapeHtml(feedbackTurma)}</p>
           </div>
         ` : ''}
 
         ${feedbackAluno ? `
           <div style="margin-bottom: 16px; padding: 14px; background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px;">
             <strong style="color: #166534;">📝 Feedback do Professor para Você:</strong>
-            <p style="margin: 6px 0 0 0; color: #14532d; font-size: 13px;">${feedbackAluno}</p>
+            <p style="margin: 6px 0 0 0; color: #14532d; font-size: 13px;">${escapeHtml(feedbackAluno)}</p>
           </div>
         ` : ''}
 
@@ -1592,47 +1883,24 @@ app.use('*', async (c, next) => {
   await next();
   if (c.res.status === 404 && existsSync(frontendStaticDir)) {
     const reqPath = c.req.path;
-    const filePath = path.join(frontendStaticDir, reqPath.startsWith('/') ? reqPath.slice(1) : reqPath);
-    const fileResp = serveFileWithCsp(filePath);
+    const base = path.resolve(frontendStaticDir);
+    // [SEG] Resolve o caminho e impede traversal de diretório (ex.: /../../etc/passwd).
+    const target = path.resolve(base, reqPath.replace(/^\/+/, ''));
+    if (target !== base && !target.startsWith(base + path.sep)) {
+      return; // tentativa de path traversal: mantém 404
+    }
+    const fileResp = serveFileWithCsp(target);
     if (fileResp) {
       c.res = fileResp;
       return;
     }
-    const indexPath = path.join(frontendStaticDir, 'index.html');
+    const indexPath = path.join(base, 'index.html');
     const indexResp = serveFileWithCsp(indexPath, 'text/html; charset=utf-8');
     if (indexResp) {
       c.res = indexResp;
       return;
     }
   }
-});
-
-app.post('/ranking', async (c) => {
-  const body = await parseBody(c);
-  if (!body || !body.atividade_id || !body.nome_jogador || body.pontuacao == null) {
-    return c.json({ success: false, error: 'Dados inválidos' }, 400);
-  }
-  const atividadeId = parseId(body.atividade_id);
-  if (atividadeId === null) return c.json({ success: false, error: 'ID de atividade inválido' }, 400);
-
-  const atv = dbq('SELECT * FROM atividades WHERE id = ?').get(atividadeId) as any;
-  if (!atv) return c.json({ success: false, error: 'Atividade não encontrada' }, 404);
-
-  const errSenha = validarSenhasSubmissao(body, atv);
-  if (errSenha) return c.json({ success: false, erro: errSenha }, 403);
-
-  const nomeJogador = String(body.nome_jogador).trim().slice(0, 30);
-  const pontuacao = Number(body.pontuacao);
-
-  dbq('INSERT INTO ranking (atividade_id, nome_jogador, pontuacao) VALUES (?, ?, ?)').run(atividadeId, nomeJogador, pontuacao);
-  return c.json({ success: true, message: 'Pontuação salva no ranking!' });
-});
-
-app.get('/ranking/:atividade_id', (c) => {
-  const atividadeId = parseId(c.req.param('atividade_id'));
-  if (atividadeId === null) return c.json([], 400);
-  const rows = dbq('SELECT id, atividade_id, nome_jogador, pontuacao, data_envio FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(atividadeId);
-  return c.json(rows);
 });
 
 export default app;

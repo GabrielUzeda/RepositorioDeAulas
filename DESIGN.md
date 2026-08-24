@@ -131,6 +131,8 @@ Configurada em `theme.extend.fontSize`. Fonte base: **Inter** (via Google Fonts 
 | `BaseTextarea.vue` | `v-model` · `label` · `hint` · `error` · `rows` · `required` | ✅ em uso | Campos longos |
 | `BaseSelect.vue` | `v-model` · `label` · `options` · `hint` · `error` · `placeholder` · `required` | ✅ em uso | Seleções |
 | `BaseCard.vue` | `title` · `padded` · `shadow` · `hoverable` + slots `header/footer` | ✅ disponível | Containers |
+| `BaseContentCard.vue` | `title` · `description` · `icon` · `color` · `badgeText` · `meta` · `actionText` + slots | ✅ em uso | Cards padronizados |
+| `RichTextEditor.vue` | `modelValue` · `label` · `placeholder` · `error` · `minHeight` | ✅ em uso | Editor rico anti-XSS |
 | `BaseModal.vue` | `v-model` · `title` · `maxWidth` · `noPadding` + slots `header/footer` | ✅ em uso | Diálogos |
 | `BaseBadge.vue` | `variant: accent\|success\|danger\|warning\|secondary\|neutral` · `dot` | ✅ em uso | Status, categorias |
 | `BaseSpinner.vue` | `size: sm\|md\|lg` · `label` + `role="status"` | ✅ em uso | Loading states |
