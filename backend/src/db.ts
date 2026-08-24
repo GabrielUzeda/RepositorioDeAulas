@@ -357,6 +357,20 @@ export function runDataRetentionPurge(): { respostas: number; ranking: number } 
         result.respostas += res.changes;
         if (res.changes < 500) break;
       }
+
+      // [LGPD] Purgar rascunhos expirados e feedbacks individuais antigos do mesmo titular.
+      while (true) {
+        const resR = db
+          .query(`DELETE FROM rascunhos_atividades WHERE id IN (SELECT id FROM rascunhos_atividades WHERE expira_em < ? LIMIT 500)`)
+          .run(cutoff);
+        if (resR.changes < 500) break;
+      }
+      while (true) {
+        const resF = db
+          .query(`DELETE FROM disciplina_feedbacks WHERE id IN (SELECT id FROM disciplina_feedbacks WHERE aluno_email_hash IS NOT NULL AND atualizado_em < ? LIMIT 500)`)
+          .run(cutoff);
+        if (resF.changes < 500) break;
+      }
     }
 
     result.ranking = purgeOldRanking(30);

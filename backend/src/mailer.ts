@@ -103,6 +103,15 @@ async function drain() {
   }
 }
 
+function escapeHtml(value: any): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 async function processMail(req: MailRequest): Promise<void> {
   const mailFrom = process.env.MAIL_FROM || process.env.SMTP_FROM || 'no-reply@escola.com';
 
@@ -131,13 +140,14 @@ async function processMail(req: MailRequest): Promise<void> {
     }
     let body = await file.text();
 
+    const isHtml = templateName.endsWith('.html');
     if (req.variables) {
       for (const [k, v] of Object.entries(req.variables)) {
-        body = body.replaceAll(`{{${k}}}`, () => v);
+        body = body.replaceAll(`{{${k}}}`, () => (isHtml ? escapeHtml(v) : String(v ?? '')));
       }
     }
 
-    if (templateName.endsWith('.html')) {
+    if (isHtml) {
       html = body;
     } else {
       text = body;

@@ -72,14 +72,16 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
 
   let slidesHtml = '';
   slides.forEach((slide, i) => {
-    const cls = 'slide' + (slide.directives.class ? ' ' + slide.directives.class : '');
+    const cls = 'slide' + (slide.directives.class ? ' ' + escapeHtml(slide.directives.class) : '');
     const animAttr = slide.directives.animation ? `data-animation="${escapeHtml(slide.directives.animation)}"` : '';
     const staggerAttr = slide.directives['animation-stagger'] ? `data-anim-stagger="true"` : '';
 
     const styleParts: string[] = [];
-    if (slide.directives.background) styleParts.push(`background:${slide.directives.background}`);
-    if (slide.directives['animation-duration']) styleParts.push(`--anim-duration:${slide.directives['animation-duration']}`);
-    if (slide.directives['animation-stagger']) styleParts.push(`--anim-stagger:${slide.directives['animation-stagger']}`);
+    // [SEG] Valores de diretivas interpolados em atributos/estilo devem ser escapados
+    // para evitar breakout de atributo (XSS armazenado em aulas servidas aos alunos).
+    if (slide.directives.background) styleParts.push(`background:${escapeHtml(slide.directives.background)}`);
+    if (slide.directives['animation-duration']) styleParts.push(`--anim-duration:${escapeHtml(slide.directives['animation-duration'])}`);
+    if (slide.directives['animation-stagger']) styleParts.push(`--anim-stagger:${escapeHtml(slide.directives['animation-stagger'])}`);
 
     const styleAttr = styleParts.length > 0 ? `style="${styleParts.join(';')}"` : '';
     const rawHtml = renderMarkdown(slide.content);
@@ -549,15 +551,15 @@ export function processMarpContent(
 
   try {
     writeFileSync(mdPath, mdContent);
-  } catch (e: any) {
-    return { error: `Failed to write MD file: ${e.message}` };
+  } catch {
+    return { error: 'Falha ao salvar o arquivo da aula no servidor.' };
   }
 
   try {
     const standaloneHtml = generateMarpNextStandaloneHtml(titulo, mdContent);
     writeFileSync(htmlPath, standaloneHtml);
-  } catch (e: any) {
-    return { error: `Failed to generate MarpNext HTML: ${e.message}` };
+  } catch {
+    return { error: 'Falha ao gerar o HTML da aula.' };
   }
 
   if (!existsSync(htmlPath)) {

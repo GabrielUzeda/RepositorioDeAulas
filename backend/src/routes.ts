@@ -156,6 +156,17 @@ function normalizeJsonData(value: any): string | null {
   return String(value);
 }
 
+// [SEG] Escapa valor para inserção segura em contexto HTML (e-mails, atributos).
+// Previne HTML injection / stored XSS a partir de dados de alunos/professores.
+function escapeHtml(value: any): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // [2.6] Leitura única e coesa da "senha" de acesso do aluno ao curso.
 function readCursoSenha(c: any): string | null {
   const header = c.req.header('x-curso-senha')?.trim() || c.req.header('x-materia-senha')?.trim();
@@ -268,20 +279,27 @@ async function createCurso(c: any) {
 async function updateCurso(c: any) {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
+  const existing = dbq('SELECT * FROM cursos WHERE id = ?').get(id) as any;
+  if (!existing) return c.text('Curso not found', 404);
   const body = await parseBody(c);
   if (!body) return c.text('', 400);
-  const slug = sanitizeSlug(body.slug ?? body.nome ?? '');
+  const slug = sanitizeSlug(body.slug ?? body.nome ?? existing.slug);
   if (!slug) return c.text('Informe um nome válido para o curso.', 400);
+
+  let novaSenha = existing.senha;
+  if (body.senha !== undefined) {
+    novaSenha = body.senha === '' || body.senha === null ? null : String(body.senha);
+  }
+
   const r = db
     .query(
       `UPDATE cursos
-       SET slug = ?, nome = ?, cor = ?, icone = ?, senha = COALESCE(?, senha), descricao = ?,
+       SET slug = ?, nome = ?, cor = ?, icone = ?, senha = ?, descricao = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
        WHERE id = ?
        RETURNING *`
     )
-    .get(slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null, id);
-  if (!r) return c.text('Curso not found', 404);
+    .get(slug, body.nome ?? existing.nome, body.cor ?? existing.cor, body.icone ?? existing.icone, novaSenha, body.descricao ?? existing.descricao, id);
   return c.json(r, 200);
 }
 
@@ -611,6 +629,7 @@ app.get('/cursos', async (c) => {
   }
   const rows = dbq(
     `SELECT c.id, c.slug, c.nome, c.cor, c.icone, c.descricao,
+       CASE WHEN c.senha IS NOT NULL AND c.senha <> '' THEN 1 ELSE 0 END AS possui_senha,
        (SELECT COUNT(*) FROM disciplinas d WHERE d.curso_id = c.id) AS total_disciplinas,
        (SELECT COUNT(*) FROM curso_professores cp WHERE cp.curso_id = c.id) AS total_professores
      FROM cursos c ORDER BY c.nome`
@@ -621,7 +640,7 @@ app.get('/cursos', async (c) => {
 app.get('/cursos/:id', (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const r = dbq('SELECT id, slug, nome, cor, icone, descricao, senha FROM cursos WHERE id = ?').get(id);
+  const r = dbq('SELECT id, slug, nome, cor, icone, descricao, CASE WHEN senha IS NOT NULL AND senha <> \'\' THEN 1 ELSE 0 END AS possui_senha FROM cursos WHERE id = ?').get(id);
   if (!r) return c.text('Curso not found', 404);
   return c.json(r);
 });
@@ -792,13 +811,21 @@ app.get('/atividades/:id', async (c) => {
   const atvSenha = atv.senha ?? '';
   const isProtected = !!atv.allow_password;
 
-  if (inputSenha === atvSenha && isProtected) {
-    return c.json(stripGabarito(atv));
-  } else if (inputSenha === cursoSenha) {
-    return c.json(stripGabarito(atv));
-  } else {
-    return c.text('Senha incorreta', 401);
+  if (isProtected) {
+    if (atvSenha && inputSenha === atvSenha) {
+      return c.json(stripGabarito(atv));
+    }
+    return c.text('Senha da atividade incorreta', 401);
   }
+
+  if (cursoSenha) {
+    if (inputSenha === cursoSenha) {
+      return c.json(stripGabarito(atv));
+    }
+    return c.text('Senha do curso incorreta', 401);
+  }
+
+  return c.json(stripGabarito(atv));
 });
 
 
@@ -1082,11 +1109,14 @@ app.post('/atividades/:id/respostas', submissionLimiter, async (c) => {
 
 // ---------- Endpoints de Rascunhos de Atividades (30 Dias) ----------
 
+// [SEG] Código de recuperação de rascunho com alta entropia (~60 bits) para
+// dificultar força bruta/enumeração de PII de alunos.
 function generateDraftCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const len = 12;
   let code = '';
-  const bytes = crypto.getRandomValues(new Uint8Array(6));
-  for (let i = 0; i < 6; i++) {
+  const bytes = crypto.getRandomValues(new Uint8Array(len));
+  for (let i = 0; i < len; i++) {
     code += chars[bytes[i] % chars.length];
   }
   return code;
@@ -1131,7 +1161,13 @@ app.post('/atividades/:id/rascunhos', draftLimiter, async (c) => {
       WHERE id = ?
     `).run(encNome, encEmail, encRespostas, expiraEmIso, existente.id);
   } else {
-    codigo = generateDraftCode();
+    let tentativas = 0;
+    do {
+      codigo = generateDraftCode();
+      tentativas++;
+      const duplicado = dbq('SELECT 1 AS ok FROM rascunhos_atividades WHERE codigo_recuperacao = ?').get(codigo);
+      if (!duplicado) break;
+    } while (tentativas < 5);
     dbq(`
       INSERT INTO rascunhos_atividades (codigo_recuperacao, atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas_json, expira_em)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -1246,7 +1282,13 @@ app.delete('/aluno/minhas-respostas', submissionLimiter, async (c) => {
   ).get(emailHash, tokenHash);
   if (!tokenCheck) return c.text('Token inválido para este e-mail.', 401);
 
-  dbq('DELETE FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?').run(emailHash, tokenHash);
+  db.transaction(() => {
+    dbq('DELETE FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?').run(emailHash, tokenHash);
+    // [LGPD] Direito à eliminação (Art. 16): cascata para rascunhos e feedbacks
+    // individuais do mesmo titular (mesmo e-mail/hash), que também contêm PII.
+    dbq('DELETE FROM rascunhos_atividades WHERE aluno_email_hash = ?').run(emailHash);
+    dbq('DELETE FROM disciplina_feedbacks WHERE aluno_email_hash = ?').run(emailHash);
+  })();
 
   await logAudit(c, 'excluir_respostas_aluno', 'respostas_alunos', { email_hash: emailHash });
 
@@ -1289,9 +1331,15 @@ app.delete('/respostas/:id', professorAuth, async (c) => {
   return c.body(null, 204);
 });
 
-app.post('/send-mail', async (c) => {
+// [SEG] Endpoint de envio de e-mail restrito a admins. Não aceita HTML/texto cru
+// do cliente (apenas templates pré-definidos + variáveis) para evitar open relay
+// de phishing através do SMTP da escola.
+app.post('/send-mail', adminAuth, async (c) => {
   const body = await parseBody(c);
-  if (!body) return c.json({ success: false, message: 'Erro ao enfileirar email' }, 200);
+  if (!body) return c.json({ success: false, message: 'Erro ao enfileirar email' }, 400);
+  if (body.html || body.text) {
+    return c.json({ success: false, message: 'Envio de HTML/texto cru não permitido. Use template + variables.' }, 400);
+  }
   const req: MailRequest = {
     to: body.to ?? '',
     subject: body.subject ?? '',
@@ -1302,7 +1350,11 @@ app.post('/send-mail', async (c) => {
   return c.json(resp, 200);
 });
 
-app.get('/db-test', (c) => {
+app.get('/health', (c) => {
+  return c.json({ status: 'ok' }, 200);
+});
+
+app.get('/db-test', adminAuth, (c) => {
   try {
     dbq('SELECT 1').get();
     return c.json({ success: true, message: 'Conexão com SQLite OK!' });
@@ -1664,29 +1716,29 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
 
     const atividadesHtml = item.respostas.map(r => `
       <div style="margin-bottom: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #f8fafc;">
-        <strong style="color: #1e293b; font-size: 14px;">${r.atividade_titulo}</strong>
-        ${r.nota !== null && r.nota !== undefined ? `<span style="float: right; font-weight: bold; color: #4f46e5;">Nota: ${r.nota}/100</span>` : ''}
-        ${r.feedback ? `<p style="margin: 6px 0 0 0; color: #475569; font-size: 13px;"><em>Feedback: ${r.feedback}</em></p>` : '<p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 12px;">Sem comentários específicos.</p>'}
+        <strong style="color: #1e293b; font-size: 14px;">${escapeHtml(r.atividade_titulo)}</strong>
+        ${r.nota !== null && r.nota !== undefined ? `<span style="float: right; font-weight: bold; color: #4f46e5;">Nota: ${escapeHtml(r.nota)}/100</span>` : ''}
+        ${r.feedback ? `<p style="margin: 6px 0 0 0; color: #475569; font-size: 13px;"><em>Feedback: ${escapeHtml(r.feedback)}</em></p>` : '<p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 12px;">Sem comentários específicos.</p>'}
       </div>
     `).join('');
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #334155;">
-        <h2 style="color: #4f46e5; border-b: 2px solid #e0e7ff; padding-bottom: 8px;">Relatório de Feedback - ${disciplina.nome}</h2>
-        <p>Olá, <strong>${item.aluno_nome}</strong>!</p>
-        <p>Segue abaixo o seu relatório consolidado de atividades e avaliações da disciplina <strong>${disciplina.nome}</strong>:</p>
+        <h2 style="color: #4f46e5; border-b: 2px solid #e0e7ff; padding-bottom: 8px;">Relatório de Feedback - ${escapeHtml(disciplina.nome)}</h2>
+        <p>Olá, <strong>${escapeHtml(item.aluno_nome)}</strong>!</p>
+        <p>Segue abaixo o seu relatório consolidado de atividades e avaliações da disciplina <strong>${escapeHtml(disciplina.nome)}</strong>:</p>
 
         ${feedbackTurma ? `
           <div style="margin-bottom: 16px; padding: 14px; background: #e0e7ff; border-left: 4px solid #4f46e5; border-radius: 4px;">
             <strong style="color: #3730a3;">📢 Recado Geral para a Turma:</strong>
-            <p style="margin: 6px 0 0 0; color: #312e81; font-size: 13px;">${feedbackTurma}</p>
+            <p style="margin: 6px 0 0 0; color: #312e81; font-size: 13px;">${escapeHtml(feedbackTurma)}</p>
           </div>
         ` : ''}
 
         ${feedbackAluno ? `
           <div style="margin-bottom: 16px; padding: 14px; background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px;">
             <strong style="color: #166534;">📝 Feedback do Professor para Você:</strong>
-            <p style="margin: 6px 0 0 0; color: #14532d; font-size: 13px;">${feedbackAluno}</p>
+            <p style="margin: 6px 0 0 0; color: #14532d; font-size: 13px;">${escapeHtml(feedbackAluno)}</p>
           </div>
         ` : ''}
 
@@ -1766,47 +1818,24 @@ app.use('*', async (c, next) => {
   await next();
   if (c.res.status === 404 && existsSync(frontendStaticDir)) {
     const reqPath = c.req.path;
-    const filePath = path.join(frontendStaticDir, reqPath.startsWith('/') ? reqPath.slice(1) : reqPath);
-    const fileResp = serveFileWithCsp(filePath);
+    const base = path.resolve(frontendStaticDir);
+    // [SEG] Resolve o caminho e impede traversal de diretório (ex.: /../../etc/passwd).
+    const target = path.resolve(base, reqPath.replace(/^\/+/, ''));
+    if (target !== base && !target.startsWith(base + path.sep)) {
+      return; // tentativa de path traversal: mantém 404
+    }
+    const fileResp = serveFileWithCsp(target);
     if (fileResp) {
       c.res = fileResp;
       return;
     }
-    const indexPath = path.join(frontendStaticDir, 'index.html');
+    const indexPath = path.join(base, 'index.html');
     const indexResp = serveFileWithCsp(indexPath, 'text/html; charset=utf-8');
     if (indexResp) {
       c.res = indexResp;
       return;
     }
   }
-});
-
-app.post('/ranking', async (c) => {
-  const body = await parseBody(c);
-  if (!body || !body.atividade_id || !body.nome_jogador || body.pontuacao == null) {
-    return c.json({ success: false, error: 'Dados inválidos' }, 400);
-  }
-  const atividadeId = parseId(body.atividade_id);
-  if (atividadeId === null) return c.json({ success: false, error: 'ID de atividade inválido' }, 400);
-
-  const atv = dbq('SELECT * FROM atividades WHERE id = ?').get(atividadeId) as any;
-  if (!atv) return c.json({ success: false, error: 'Atividade não encontrada' }, 404);
-
-  const errSenha = validarSenhasSubmissao(body, atv);
-  if (errSenha) return c.json({ success: false, erro: errSenha }, 403);
-
-  const nomeJogador = String(body.nome_jogador).trim().slice(0, 30);
-  const pontuacao = Number(body.pontuacao);
-
-  dbq('INSERT INTO ranking (atividade_id, nome_jogador, pontuacao) VALUES (?, ?, ?)').run(atividadeId, nomeJogador, pontuacao);
-  return c.json({ success: true, message: 'Pontuação salva no ranking!' });
-});
-
-app.get('/ranking/:atividade_id', (c) => {
-  const atividadeId = parseId(c.req.param('atividade_id'));
-  if (atividadeId === null) return c.json([], 400);
-  const rows = dbq('SELECT id, atividade_id, nome_jogador, pontuacao, data_envio FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(atividadeId);
-  return c.json(rows);
 });
 
 export default app;
