@@ -1679,12 +1679,12 @@ onBeforeUnmount(() => {
         {{ THEME_LABELS[currentTheme] }}
       </button>
       <div class="divider"></div>
-      <span id="clock-display" class="clock-display" title="Hora Atual">{{ clockText }}</span>
-      <div class="divider"></div>
       <button class="ctrl-btn" id="btn-zoom" @click="() => toggleZoom()" title="Lupa / Zoom (Z)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
         <span>Zoom {{ currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x') }}</span>
       </button>
+      <div class="divider"></div>
+      <span id="clock-display" class="clock-display" title="Hora Atual">{{ clockText }}</span>
       <div class="divider"></div>
       <button class="ctrl-btn" id="btn-font-dec" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
       <button class="ctrl-btn" id="btn-font-reset" @click="resetFont" title="Resetar Fonte">100%</button>
