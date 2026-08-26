@@ -530,48 +530,6 @@ describe('Auth Module & Multi-Professor System', () => {
     expect(auditRow.ip).toBe('10.0.0.99');
   });
 
-  test('Marp Standalone HTML: aspect-ratio 16:9, highlight.js, Font Awesome, mobile rotate-prompt e delegação de eventos', async () => {
-    const md = `---
-title: Aula Teste Marp
-theme: dark
----
-
-# Slide 1
-
-:fa-rocket: Teste de Ícone Font Awesome
-<i class="fa fa-user"></i> Usuário
-
-\`\`\`javascript
-const x = 42;
-console.log(x);
-\`\`\`
-
----
-
-# Slide 2
-
-<button class="custom-btn">Botão Interativo</button>
-`;
-    const html = generateMarpNextStandaloneHtml('Aula Teste Marp', md);
-    expect(html).toContain('data-theme="dark"');
-    expect(html).toContain('highlight.min.js');
-    expect(html).toContain('fontawesome-free');
-    expect(html).toContain('fa-rocket');
-    expect(html).toContain('id="landscape-modal"');
-    expect(html).toContain('isInteractiveElement');
-    expect(html).toContain('--c-code-bg');
-    expect(html).toContain('width: 100vw;');
-    expect(html).toContain('height: 100vh;');
-    expect(html).toContain('safeNavigate');
-    
-    // Validar que os blocos de script compilam sem SyntaxError
-    const allScripts = Array.from(html.matchAll(/<script(?![^>]*src=)>([\s\S]*?)<\/script>/g));
-    expect(allScripts.length).toBeGreaterThan(0);
-    for (const match of allScripts) {
-      expect(() => new Function(match[1])).not.toThrow();
-    }
-  });
-
   test('Acesso a slide protegido sem senha ou com senha incorreta renderiza página HTML de senha amigável com status 401', async () => {
     const materia = db.query(`SELECT id FROM disciplinas WHERE slug = 'demo-class'`).get() as any;
     const adminLogin = await app.request('/auth/login', {

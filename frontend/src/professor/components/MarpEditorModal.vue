@@ -73,13 +73,12 @@ let findMatches: Array<{ start: number; end: number }> = [];
 let currentMatchIndex = -1;
 let isResizing = false;
 
-const clockText = ref('00:00:00');
+const clockText = ref('00:00');
 function updateClock() {
   const now = new Date();
   const h = String(now.getHours()).padStart(2, '0');
   const m = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
-  clockText.value = `${h}:${m}:${s}`;
+  clockText.value = `${h}:${m}`;
 }
 let clockTimer: any = null;
 
@@ -112,7 +111,40 @@ async function toggleFullscreen() {
   } catch (e) {}
 }
 
-function handleMouseMove() {
+let lastTouchTime = 0;
+let lastMouseX = window.innerWidth / 2;
+let lastMouseY = window.innerHeight / 2;
+let isMousePanning = false;
+
+function toggleControlsBar() {
+  if (idleTimer) clearTimeout(idleTimer);
+  if (isIdle.value) {
+    isIdle.value = false;
+    idleTimer = setTimeout(() => {
+      isIdle.value = true;
+    }, 2500);
+  } else {
+    isIdle.value = true;
+  }
+}
+
+function handleMouseMove(e: MouseEvent) {
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+
+  if (isMousePanning && currentZoom.value > 1.05) {
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
+    panX += dx;
+    panY += dy;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    applySlideZoom();
+    return;
+  }
+
+  if (Date.now() - lastTouchTime < 1000) return;
+  if (e.movementX === 0 && e.movementY === 0) return;
   isIdle.value = false;
   if (idleTimer) clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
@@ -145,6 +177,89 @@ function isInteractiveElement(target: HTMLElement | null): boolean {
   return false;
 }
 
+let currentZoom = ref(1.0);
+let panX = 0;
+let panY = 0;
+let initialPinchDistance = 0;
+let initialZoom = 1.0;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let lastTapTime = 0;
+const showZoomPillActive = ref(false);
+let zoomPillTimer: any = null;
+
+function triggerZoomPill() {
+  showZoomPillActive.value = true;
+  if (zoomPillTimer) clearTimeout(zoomPillTimer);
+  zoomPillTimer = setTimeout(() => {
+    showZoomPillActive.value = false;
+  }, 1200);
+}
+
+function applySlideZoom() {
+  const activeSlide = previewPaneRef.value?.querySelector('.slide.active') as HTMLElement | null;
+  if (!activeSlide) return;
+  if (currentZoom.value <= 1.01) {
+    currentZoom.value = 1.0;
+    panX = 0;
+    panY = 0;
+    activeSlide.style.transform = '';
+    activeSlide.style.transformOrigin = 'center center';
+    if (previewPaneRef.value) previewPaneRef.value.style.cursor = '';
+  } else {
+    activeSlide.style.transformOrigin = 'center center';
+    activeSlide.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${currentZoom.value})`;
+    if (previewPaneRef.value) previewPaneRef.value.style.cursor = isMousePanning ? 'grabbing' : 'grab';
+  }
+  triggerZoomPill();
+}
+
+function resetZoom() {
+  currentZoom.value = 1.0;
+  panX = 0;
+  panY = 0;
+  initialPinchDistance = 0;
+  isPanning = false;
+  isMousePanning = false;
+  if (previewPaneRef.value) {
+    previewPaneRef.value.style.cursor = '';
+    previewPaneRef.value.querySelectorAll('.slide').forEach((s) => {
+      (s as HTMLElement).style.transform = '';
+      (s as HTMLElement).style.transformOrigin = 'center center';
+    });
+  }
+}
+
+function toggleZoom(focalX?: number, focalY?: number) {
+  if (focalX === undefined && focalY === undefined) {
+    focalX = lastMouseX;
+    focalY = lastMouseY;
+  }
+
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const fx = (focalX !== undefined && !isNaN(focalX)) ? focalX : cx;
+  const fy = (focalY !== undefined && !isNaN(focalY)) ? focalY : cy;
+
+  let nextZoom = 1.0;
+  if (currentZoom.value < 1.9) {
+    nextZoom = 2.0;
+  } else if (currentZoom.value < 2.9) {
+    nextZoom = 3.0;
+  } else if (currentZoom.value < 3.9) {
+    nextZoom = 4.0;
+  } else {
+    resetZoom();
+    return;
+  }
+
+  panX = (cx - fx) * (nextZoom - 1);
+  panY = (cy - fy) * (nextZoom - 1);
+  currentZoom.value = nextZoom;
+  applySlideZoom();
+}
+
 let isPointerActive = false;
 let startX = 0;
 let startY = 0;
@@ -160,18 +275,106 @@ function safeNavigate(delta: number) {
 }
 
 function handleTouchStart(e: TouchEvent) {
+  lastTouchTime = Date.now();
   if (!isPresentMode.value) return;
   const target = e.target as HTMLElement;
   if (isInteractiveElement(target)) return;
-  if (!e.touches || !e.touches[0]) return;
-  isPointerActive = true;
-  startX = e.touches[0].clientX;
-  startY = e.touches[0].clientY;
-  startTime = Date.now();
+  if (!e.touches) return;
+
+  // Gesto de Pinça com 2 dedos
+  if (e.touches.length === 2) {
+    isPointerActive = false;
+    isPanning = false;
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    originX = Math.round((midX / window.innerWidth) * 100);
+    originY = Math.round((midY / window.innerHeight) * 100);
+    initialPinchDistance = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    initialZoom = currentZoom.value;
+    return;
+  }
+
+  if (e.touches.length === 1) {
+    isPointerActive = true;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+    if (currentZoom.value > 1.05) {
+      isPanning = true;
+      panStartX = e.touches[0].clientX;
+      panStartY = e.touches[0].clientY;
+    }
+  }
+}
+
+function handleTouchMove(e: TouchEvent) {
+  lastTouchTime = Date.now();
+  if (!isPresentMode.value) return;
+  const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  if (!e.touches) return;
+
+  // Pinch-to-zoom com 2 dedos
+  if (e.touches.length === 2 && initialPinchDistance > 0) {
+    if (e.cancelable) e.preventDefault();
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const currentDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    const factor = currentDist / Math.max(initialPinchDistance, 1);
+    const oldZoom = currentZoom.value;
+    const newZoom = Math.min(Math.max(initialZoom * factor, 1.0), 4.0);
+    if (newZoom <= 1.01) {
+      resetZoom();
+      return;
+    }
+    const scaleRatio = newZoom / oldZoom;
+    panX = (midX - cx) - (midX - cx - panX) * scaleRatio;
+    panY = (midY - cy) - (midY - cy - panY) * scaleRatio;
+    currentZoom.value = newZoom;
+    applySlideZoom();
+    return;
+  }
+
+  // Pan quando zoom ativo
+  if (e.touches.length === 1 && currentZoom.value > 1.05 && isPanning) {
+    if (e.cancelable) e.preventDefault();
+    const dx = e.touches[0].clientX - panStartX;
+    const dy = e.touches[0].clientY - panStartY;
+    panX += dx;
+    panY += dy;
+    panStartX = e.touches[0].clientX;
+    panStartY = e.touches[0].clientY;
+    applySlideZoom();
+  }
 }
 
 function handleTouchEnd(e: TouchEvent) {
-  if (!isPresentMode.value || !isPointerActive) return;
+  lastTouchTime = Date.now();
+  if (!isPresentMode.value) return;
+  if (e.touches && e.touches.length > 0) {
+    if (e.touches.length === 1) {
+      panStartX = e.touches[0].clientX;
+      panStartY = e.touches[0].clientY;
+    }
+    return;
+  }
+
+  initialPinchDistance = 0;
+  isPanning = false;
+
+  if (currentZoom.value > 1.05) {
+    return;
+  }
+
+  if (!isPointerActive) return;
   isPointerActive = false;
   const touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
   if (!touch) return;
@@ -191,19 +394,31 @@ function handleTouchEnd(e: TouchEvent) {
     return;
   }
 
-  // Clique simples em áreas livres
+  // Toque simples em áreas livres
   if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && dt < 500) {
+    const now = Date.now();
+    // Duplo toque para alternar zoom na posição focal
+    if (now - lastTapTime < 320) {
+      toggleZoom(endX, endY);
+      lastTapTime = 0;
+      return;
+    }
+    lastTapTime = now;
+
     const vw = window.innerWidth;
     if (startX < vw * 0.25) {
       safeNavigate(-1);
     } else if (startX > vw * 0.75) {
       safeNavigate(1);
+    } else {
+      toggleControlsBar();
     }
   }
 }
 
 function handlePointerCancel() {
   isPointerActive = false;
+  isPanning = false;
 }
 
 // Default Markdown Template
@@ -539,9 +754,10 @@ async function renderAllMermaid() {
   });
 }
 
-function activateSlide(index: number) {
-  if (totalSlides.value === 0) return;
-  currentSlideNum = Math.max(0, Math.min(index, totalSlides.value - 1));
+function activateSlide(idx: number) {
+  if (totalSlidesNum === 0) return;
+  resetZoom();
+  currentSlideNum = Math.max(0, Math.min(idx, totalSlidesNum - 1));
   currentSlide.value = currentSlideNum;
   if (!previewPaneRef.value) return;
 
@@ -1212,12 +1428,56 @@ function handleGlobalKeydown(e: KeyboardEvent) {
     } else if (e.key === 'End') {
       e.preventDefault();
       activateSlide(totalSlidesNum - 1);
+    } else if (e.key === 'z' || e.key === 'Z') {
+      e.preventDefault();
+      toggleZoom();
     }
   }
 }
 
-function handleWindowClick() {
-  showExportMenu.value = false;
+function handleMouseDown(e: MouseEvent) {
+  if (!isPresentMode.value) return;
+  const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  if (currentZoom.value > 1.05) {
+    isMousePanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+  }
+}
+
+function handleMouseUp() {
+  isMousePanning = false;
+}
+
+function handleDblClick(e: MouseEvent) {
+  if (!isPresentMode.value) return;
+  const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  toggleZoom(e.clientX, e.clientY);
+}
+
+function handleWheel(e: WheelEvent) {
+  if (!isPresentMode.value) return;
+  if (e.ctrlKey) {
+    if (e.cancelable) e.preventDefault();
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const fx = e.clientX;
+    const fy = e.clientY;
+    const delta = -e.deltaY * 0.01;
+    const oldZoom = currentZoom.value;
+    const newZoom = Math.min(Math.max(currentZoom.value + delta, 1.0), 4.0);
+    if (newZoom <= 1.01) {
+      resetZoom();
+      return;
+    }
+    const factor = newZoom / oldZoom;
+    panX = (fx - cx) - (fx - cx - panX) * factor;
+    panY = (fy - cy) - (fy - cy - panY) * factor;
+    currentZoom.value = newZoom;
+    applySlideZoom();
+  }
 }
 
 onMounted(() => {
@@ -1227,7 +1487,12 @@ onMounted(() => {
   clockTimer = setInterval(updateClock, 1000);
   window.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('mousemove', handleMouseMove);
+  window.addEventListener('mousedown', handleMouseDown);
+  window.addEventListener('mouseup', handleMouseUp);
+  window.addEventListener('dblclick', handleDblClick);
+  window.addEventListener('wheel', handleWheel, { passive: false });
   window.addEventListener('touchstart', handleTouchStart, { passive: true });
+  window.addEventListener('touchmove', handleTouchMove, { passive: false });
   window.addEventListener('touchend', handleTouchEnd, { passive: true });
   window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
   window.addEventListener('dragstart', handlePointerCancel, { passive: true });
@@ -1252,8 +1517,13 @@ onBeforeUnmount(() => {
   if (themeStyle) themeStyle.remove();
   window.removeEventListener('keydown', handleGlobalKeydown);
   window.removeEventListener('mousemove', handleMouseMove);
+  window.removeEventListener('mousedown', handleMouseDown);
+  window.removeEventListener('mouseup', handleMouseUp);
+  window.removeEventListener('dblclick', handleDblClick);
+  window.removeEventListener('wheel', handleWheel);
   window.removeEventListener('click', handleWindowClick);
   window.removeEventListener('touchstart', handleTouchStart);
+  window.removeEventListener('touchmove', handleTouchMove);
   window.removeEventListener('touchend', handleTouchEnd);
   window.removeEventListener('touchcancel', handlePointerCancel);
   window.removeEventListener('dragstart', handlePointerCancel);
@@ -1389,6 +1659,10 @@ onBeforeUnmount(() => {
       <div id="preview-pane" ref="previewPaneRef" :data-theme="currentTheme" @click="handlePreviewClick" @scroll="handlePreviewScroll"></div>
     </div>
 
+    <div v-if="isPresentMode" id="zoom-indicator-pill" class="zoom-indicator-pill" :class="{ show: showZoomPillActive }">
+      Zoom {{ currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x') }}
+    </div>
+
     <div id="progress-bar" ref="progressBarRef"></div>
     <div id="status-bar" ref="statusBarRef"></div>
 
@@ -1403,6 +1677,11 @@ onBeforeUnmount(() => {
         <svg v-else-if="currentTheme === 'dark'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         {{ THEME_LABELS[currentTheme] }}
+      </button>
+      <div class="divider"></div>
+      <button class="ctrl-btn" id="btn-zoom" @click="() => toggleZoom()" title="Lupa / Zoom (Z)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        <span>Zoom {{ currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x') }}</span>
       </button>
       <div class="divider"></div>
       <span id="clock-display" class="clock-display" title="Hora Atual">{{ clockText }}</span>
