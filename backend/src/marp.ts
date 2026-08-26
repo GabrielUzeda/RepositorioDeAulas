@@ -148,33 +148,32 @@ html, body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  max-width: none;
-  max-height: none;
+  box-sizing: border-box;
   background: var(--slide-bg);
   border: none;
   border-radius: 0;
-  padding: 60px 80px;
-  box-shadow: none;
+  padding: 32px 48px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
   opacity: 0;
   pointer-events: none;
   transform: scale(1);
   transition: opacity 0.4s ease;
   font-size: calc(16px * var(--font-scale, 1));
-  overflow: visible;
+  overflow: hidden;
 }
 
 @media (max-width: 768px) {
   .slide {
-    padding: 18px 22px;
+    padding: 8px 12px !important;
   }
 }
 
 @media (max-width: 480px) {
   .slide {
-    padding: 14px 16px;
+    padding: 4px 6px !important;
   }
 }
 
@@ -185,24 +184,30 @@ html, body {
   z-index: 10;
 }
 
-.slide.centered {
+.slide.centered,
+.slide.centered .slide-content {
   text-align: center;
-  align-items: center;
 }
 
 .slide-content {
   width: 100%;
-  max-height: calc(100vh - 40px);
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: auto 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
-  padding-right: 4px;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  padding-right: 2px;
 }
 
 .slide-content::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 
 .slide-content::-webkit-scrollbar-track {
@@ -210,12 +215,12 @@ html, body {
 }
 
 .slide-content::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.3);
   border-radius: 4px;
 }
 
 .slide-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.6);
+  background: rgba(148, 163, 184, 0.55);
 }
 
 .slide-content h1 { font-size: calc(2.8em * var(--font-scale)); font-weight: 900; letter-spacing: -1px; line-height: 1.1; margin-bottom: 0.4em; }
@@ -603,10 +608,25 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// Controls auto-hide when idle
+// Controls auto-hide & toggle
 let idleTimer;
+let lastTouchTime = 0;
 const controls = document.getElementById('controls-bar');
-document.addEventListener('mousemove', () => {
+
+function toggleControlsBar() {
+  clearTimeout(idleTimer);
+  const isCurrentlyIdle = controls.classList.contains('idle');
+  if (isCurrentlyIdle) {
+    controls.classList.remove('idle');
+    idleTimer = setTimeout(() => controls.classList.add('idle'), 2500);
+  } else {
+    controls.classList.add('idle');
+  }
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (Date.now() - lastTouchTime < 1000) return;
+  if (e.movementX === 0 && e.movementY === 0) return;
   controls.classList.remove('idle');
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => controls.classList.add('idle'), 2500);
@@ -791,7 +811,7 @@ function handlePointerEnd(e) {
     } else if (startX > vw * 0.75) {
       safeNavigate(1);  // Clique na lateral direita -> próximo slide
     } else {
-      controls.classList.toggle('idle'); // Clique ao centro -> oculta/exibe barra de controles
+      toggleControlsBar(); // Clique ao centro -> oculta/exibe barra de controles
     }
   }
 }
@@ -802,6 +822,7 @@ function handlePointerCancel() {
 }
 
 function handleTouchStart(e) {
+  lastTouchTime = Date.now();
   if (isInteractiveElement(e.target)) return;
   if (!e.touches) return;
 
@@ -835,6 +856,7 @@ function handleTouchStart(e) {
 }
 
 function handleTouchMove(e) {
+  lastTouchTime = Date.now();
   if (isInteractiveElement(e.target)) return;
   if (!e.touches) return;
 
@@ -869,6 +891,7 @@ function handleTouchMove(e) {
 }
 
 function handleTouchEnd(e) {
+  lastTouchTime = Date.now();
   if (e.touches && e.touches.length > 0) {
     if (e.touches.length === 1) {
       panStartX = e.touches[0].clientX;
@@ -922,7 +945,7 @@ function handleTouchEnd(e) {
     } else if (startX > vw * 0.75) {
       safeNavigate(1);
     } else {
-      controls.classList.toggle('idle'); // Clique/toque ao centro -> oculta/exibe controles
+      toggleControlsBar(); // Clique/toque ao centro -> oculta/exibe controles
     }
   }
 }

@@ -111,7 +111,23 @@ async function toggleFullscreen() {
   } catch (e) {}
 }
 
-function handleMouseMove() {
+let lastTouchTime = 0;
+
+function toggleControlsBar() {
+  if (idleTimer) clearTimeout(idleTimer);
+  if (isIdle.value) {
+    isIdle.value = false;
+    idleTimer = setTimeout(() => {
+      isIdle.value = true;
+    }, 2500);
+  } else {
+    isIdle.value = true;
+  }
+}
+
+function handleMouseMove(e: MouseEvent) {
+  if (Date.now() - lastTouchTime < 1000) return;
+  if (e.movementX === 0 && e.movementY === 0) return;
   isIdle.value = false;
   if (idleTimer) clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
@@ -239,6 +255,7 @@ function safeNavigate(delta: number) {
 }
 
 function handleTouchStart(e: TouchEvent) {
+  lastTouchTime = Date.now();
   if (!isPresentMode.value) return;
   const target = e.target as HTMLElement;
   if (isInteractiveElement(target)) return;
@@ -274,6 +291,7 @@ function handleTouchStart(e: TouchEvent) {
 }
 
 function handleTouchMove(e: TouchEvent) {
+  lastTouchTime = Date.now();
   if (!isPresentMode.value) return;
   const target = e.target as HTMLElement;
   if (isInteractiveElement(target)) return;
@@ -310,6 +328,7 @@ function handleTouchMove(e: TouchEvent) {
 }
 
 function handleTouchEnd(e: TouchEvent) {
+  lastTouchTime = Date.now();
   if (!isPresentMode.value) return;
   if (e.touches && e.touches.length > 0) {
     if (e.touches.length === 1) {
@@ -363,7 +382,7 @@ function handleTouchEnd(e: TouchEvent) {
     } else if (startX > vw * 0.75) {
       safeNavigate(1);
     } else {
-      isIdle.value = !isIdle.value;
+      toggleControlsBar();
     }
   }
 }
