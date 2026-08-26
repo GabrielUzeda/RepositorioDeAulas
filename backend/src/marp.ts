@@ -674,14 +674,14 @@ function renderAllKaTeX() {
     textNodes.forEach(textNode => {
       const text = textNode.nodeValue;
       if (!text) return;
-      if (/$$[sS]+?$$|$[^$\n]+?$/.test(text)) {
+      if (/\\$\\$[\\s\\S]+?\\$\\$|\\$[^\\$\\n]+?\\$/.test(text)) {
         const span = document.createElement('span');
         span.innerHTML = text
-          .replace(/$$([sS]+?)$$/g, (_, math) => {
+          .replace(/\\$\\$([\\s\\S]+?)\\$\\$/g, (_, math) => {
             try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
             catch (e) { return '$$' + math + '$$'; }
           })
-          .replace(/(^|[^\\])$([^$\n]+?)$/g, (_, prefix, math) => {
+          .replace(/(^|[^\\\\])\\$([^\\$\\n]+?)\\$/g, (_, prefix, math) => {
             try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
             catch (e) { return prefix + '$' + math + '$'; }
           });

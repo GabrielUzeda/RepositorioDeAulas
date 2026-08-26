@@ -563,5 +563,12 @@ console.log(x);
     expect(html).toContain('width: 100vw;');
     expect(html).toContain('height: 100vh;');
     expect(html).toContain('safeNavigate');
+    
+    // Validar que os blocos de script compilam sem SyntaxError
+    const allScripts = Array.from(html.matchAll(/<script(?![^>]*src=)>([\s\S]*?)<\/script>/g));
+    expect(allScripts.length).toBeGreaterThan(0);
+    for (const match of allScripts) {
+      expect(() => new Function(match[1])).not.toThrow();
+    }
   });
 });
