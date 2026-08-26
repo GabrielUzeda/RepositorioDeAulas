@@ -557,7 +557,7 @@ console.log(x);
     expect(html).toContain('highlight.min.js');
     expect(html).toContain('fontawesome-free');
     expect(html).toContain('fa-rocket');
-    expect(html).toContain('id="rotate-prompt"');
+    expect(html).toContain('id="landscape-modal"');
     expect(html).toContain('isInteractiveElement');
     expect(html).toContain('--c-code-bg');
     expect(html).toContain('width: 100vw;');
@@ -569,6 +569,62 @@ console.log(x);
     expect(allScripts.length).toBeGreaterThan(0);
     for (const match of allScripts) {
       expect(() => new Function(match[1])).not.toThrow();
+    }
+  });
+
+  test('Acesso a slide protegido sem senha ou com senha incorreta renderiza página HTML de senha amigável com status 401', async () => {
+    const materia = db.query(`SELECT id FROM disciplinas WHERE slug = 'demo-class'`).get() as any;
+    const adminLogin = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '10.0.0.9' },
+      body: JSON.stringify({ email: 'admin@escola.com', password: ADMIN_SEED_PASSWORD }),
+    });
+    const { token } = await adminLogin.json();
+
+    const createRes = await app.request('/aulas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        materia_id: materia.id,
+        titulo: `Senha Prompt Teste ${Date.now()}`,
+        markdown: '# Slide Protegido\nConteudo da aula',
+      }),
+    });
+    expect(createRes.status).toBe(201);
+    const aula = await createRes.json();
+
+    // 1. Acesso anônimo sem senha -> 401 com página HTML e input de senha
+    const noSenhaRes = await app.request(`/${aula.caminho}`, {
+      method: 'GET',
+    });
+    expect(noSenhaRes.status).toBe(401);
+    const noSenhaHtml = await noSenhaRes.text();
+    expect(noSenhaHtml).toContain('Acesso Restrito');
+    expect(noSenhaHtml).toContain('name="senha"');
+    expect(noSenhaHtml).not.toContain('Senha incorreta');
+
+    // 2. Acesso anônimo com senha incorreta -> 401 com mensagem de erro
+    const wrongSenhaRes = await app.request(`/${aula.caminho}?senha=senha_errada_123`, {
+      method: 'GET',
+    });
+    expect(wrongSenhaRes.status).toBe(401);
+    const wrongSenhaHtml = await wrongSenhaRes.text();
+    expect(wrongSenhaHtml).toContain('Acesso Restrito');
+    expect(wrongSenhaHtml).toContain('Senha incorreta');
+
+    // 3. Acesso com senha correta -> 200 com conteúdo do slide
+    const correctSenhaRes = await app.request(`/${aula.caminho}?senha=asdf1234`, {
+      method: 'GET',
+    });
+    expect(correctSenhaRes.status).toBe(200);
+    const correctHtml = await correctSenhaRes.text();
+    expect(correctHtml).toContain('Slide Protegido');
+
+    // Limpeza
+    const htmlAbs = path.join(resolveFrontendDir(), aula.caminho);
+    const mdAbs = htmlAbs.replace(/\.html$/, '.md');
+    for (const f of [htmlAbs, mdAbs]) {
+      if (existsSync(f)) unlinkSync(f);
     }
   });
 });

@@ -67,6 +67,8 @@ async function fetchCursos() {
   }
 }
 
+import { executeWithFeedback } from '@/shared/api/requestHelper';
+
 function openCreateProfessor() {
   editingProfessor.value = null;
   showProfessorModal.value = true;
@@ -79,27 +81,36 @@ function openEditProfessor(prof: Professor) {
 
 async function handleSaveProfessor(payload: { nome: string; email: string; password: string; role: string; curso_ids: number[] }) {
   let profId = editingProfessor.value?.id;
-  if (editingProfessor.value) {
-    const res = await apiClient.put(`/professores/${editingProfessor.value.id}`, payload);
-    if (!res.success) {
-      error.value = res.error || 'Falha ao atualizar professor.';
-      return;
+  const isEditing = Boolean(editingProfessor.value);
+
+  const res = await executeWithFeedback(async () => {
+    if (isEditing && editingProfessor.value) {
+      return apiClient.put(`/professores/${editingProfessor.value.id}`, payload);
+    } else {
+      const createRes = await apiClient.post<Professor>('/professores', payload);
+      if (createRes.success && createRes.data) {
+        profId = createRes.data.id;
+      }
+      return createRes;
     }
-  } else {
-    const res = await apiClient.post<Professor>('/professores', payload);
-    if (!res.success || !res.data) {
-      error.value = res.error || 'Falha ao criar professor.';
-      return;
-    }
-    profId = res.data.id;
-  }
+  }, {
+    successMessage: isEditing ? 'Professor atualizado com sucesso!' : 'Professor criado com sucesso!',
+    errorMessage: isEditing ? 'Falha ao atualizar professor.' : 'Falha ao criar professor.'
+  });
+
+  if (!res.success) return;
+
   if (profId && payload.role !== 'admin' && Array.isArray(payload.curso_ids)) {
-    const resCursos = await apiClient.put(`/professores/${profId}/cursos`, { curso_ids: payload.curso_ids });
-    if (!resCursos.success) {
-      error.value = resCursos.error || 'Falha ao vincular cursos ao professor.';
-      return;
-    }
+    const resCursos = await executeWithFeedback(
+      () => apiClient.put(`/professores/${profId}/cursos`, { curso_ids: payload.curso_ids }),
+      {
+        showSuccessToast: false,
+        errorMessage: 'Falha ao vincular cursos ao professor.'
+      }
+    );
+    if (!resCursos.success) return;
   }
+
   showProfessorModal.value = false;
   await fetchProfessores();
 }
@@ -115,12 +126,16 @@ function onDeleteProfessorClick(prof: Professor) {
 async function onConfirmProf() {
   const prof = deleteTargetProf.value;
   if (!prof) return;
-  const res = await apiClient.delete(`/professores/${prof.id}`);
-  if (!res.success) {
-    error.value = res.error || 'Falha ao excluir professor.';
-    return;
+  const res = await executeWithFeedback(
+    () => apiClient.delete(`/professores/${prof.id}`),
+    {
+      successMessage: 'Professor excluído com sucesso!',
+      errorMessage: 'Falha ao excluir professor.'
+    }
+  );
+  if (res.success) {
+    await fetchProfessores();
   }
-  await fetchProfessores();
 }
 
 function onCancelProf() {}
@@ -137,28 +152,36 @@ function openEditCurso(curso: Curso) {
 
 async function handleSaveCurso(payload: { nome: string; descricao: string; cor: string; icone: string; professor_ids: number[] }) {
   let cursoId = editingCurso.value?.id;
-  if (editingCurso.value) {
-    const res = await apiClient.put(`/cursos/${editingCurso.value.id}`, payload);
-    if (!res.success) {
-      error.value = res.error || 'Falha ao atualizar curso.';
-      return;
+  const isEditing = Boolean(editingCurso.value);
+
+  const res = await executeWithFeedback(async () => {
+    if (isEditing && editingCurso.value) {
+      return apiClient.put(`/cursos/${editingCurso.value.id}`, payload);
+    } else {
+      const createRes = await apiClient.post<Curso>('/cursos', payload);
+      if (createRes.success && createRes.data) {
+        cursoId = createRes.data.id;
+      }
+      return createRes;
     }
-  } else {
-    const res = await apiClient.post<Curso>('/cursos', payload);
-    if (!res.success || !res.data) {
-      error.value = res.error || 'Falha ao criar curso.';
-      return;
-    }
-    cursoId = res.data.id;
-  }
+  }, {
+    successMessage: isEditing ? 'Curso atualizado com sucesso!' : 'Curso criado com sucesso!',
+    errorMessage: isEditing ? 'Falha ao atualizar curso.' : 'Falha ao criar curso.'
+  });
+
+  if (!res.success) return;
 
   if (cursoId && Array.isArray(payload.professor_ids)) {
-    const resProfs = await apiClient.put(`/cursos/${cursoId}/professores`, { professor_ids: payload.professor_ids });
-    if (!resProfs.success) {
-      error.value = resProfs.error || 'Falha ao vincular professores ao curso.';
-      return;
-    }
+    const resProfs = await executeWithFeedback(
+      () => apiClient.put(`/cursos/${cursoId}/professores`, { professor_ids: payload.professor_ids }),
+      {
+        showSuccessToast: false,
+        errorMessage: 'Falha ao vincular professores ao curso.'
+      }
+    );
+    if (!resProfs.success) return;
   }
+
   showCursoModal.value = false;
   await fetchCursos();
 }
@@ -174,12 +197,16 @@ function onDeleteCursoClick(curso: Curso) {
 async function onConfirmCurso() {
   const curso = deleteTargetCurso.value;
   if (!curso) return;
-  const res = await apiClient.delete(`/cursos/${curso.id}`);
-  if (!res.success) {
-    error.value = res.error || 'Falha ao excluir curso.';
-    return;
+  const res = await executeWithFeedback(
+    () => apiClient.delete(`/cursos/${curso.id}`),
+    {
+      successMessage: 'Curso excluído com sucesso!',
+      errorMessage: 'Falha ao excluir curso.'
+    }
+  );
+  if (res.success) {
+    await fetchCursos();
   }
-  await fetchCursos();
 }
 
 function onCancelCurso() {}

@@ -43,7 +43,7 @@ async function logAudit(c: any, acao: string, recurso: string, detalhes?: object
       sanitizedDetalhes
     );
   } catch (e) {
-    console.error('❌ Falha ao gravar log de auditoria:', e);
+    console.error('[audit] Falha ao gravar log de auditoria:', e);
   }
 }
 
@@ -1795,14 +1795,14 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
 
         ${feedbackTurma ? `
           <div style="margin-bottom: 16px; padding: 14px; background: #e0e7ff; border-left: 4px solid #4f46e5; border-radius: 4px;">
-            <strong style="color: #3730a3;">📢 Recado Geral para a Turma:</strong>
+            <strong style="color: #3730a3;">Recado Geral para a Turma:</strong>
             <p style="margin: 6px 0 0 0; color: #312e81; font-size: 13px;">${escapeHtml(feedbackTurma)}</p>
           </div>
         ` : ''}
 
         ${feedbackAluno ? `
           <div style="margin-bottom: 16px; padding: 14px; background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px;">
-            <strong style="color: #166534;">📝 Feedback do Professor para Você:</strong>
+            <strong style="color: #166534;">Feedback do Professor para Você:</strong>
             <p style="margin: 6px 0 0 0; color: #14532d; font-size: 13px;">${escapeHtml(feedbackAluno)}</p>
           </div>
         ` : ''}
@@ -1837,6 +1837,192 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
   return c.json({ success: true, message: `${totalEnviados} e-mails de feedback enviados com sucesso`, enviados: totalEnviados });
 });
 
+function renderSlidePasswordPromptHtml(hasError: boolean): string {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acesso Restrito - Repositório de Aulas</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <style>
+    :root {
+      --bg-canvas: #0f172a;
+      --bg-card: #1e293b;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent: #1d4ed8;
+      --accent-hover: #1e40af;
+      --border: #334155;
+      --danger-bg: rgba(220, 38, 38, 0.15);
+      --danger-border: #dc2626;
+      --danger-text: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      max-width: 400px;
+      width: 100%;
+      padding: 32px 24px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .icon-wrapper {
+      width: 60px;
+      height: 60px;
+      background: rgba(29, 78, 216, 0.15);
+      color: #38bdf8;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .icon-wrapper .material-icons {
+      font-size: 32px;
+      color: #38bdf8;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+    p {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+    .error-box {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      color: var(--danger-text);
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-align: left;
+    }
+    .error-box .material-icons {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      color: var(--text-secondary);
+    }
+    input[type="password"] {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input[type="password"]:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    }
+    button {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    button:hover {
+      background: var(--accent-hover);
+    }
+    button:active {
+      transform: scale(0.98);
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 20px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .back-link:hover {
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-wrapper">
+      <span class="material-icons">lock</span>
+    </div>
+    <h1>Acesso Restrito</h1>
+    <p>Esta aula pertence a um curso protegido por senha. Digite a senha para acessar o material.</p>
+
+    ${hasError ? `
+      <div class="error-box">
+        <span class="material-icons">error_outline</span>
+        <span>Senha incorreta. Por favor, tente novamente.</span>
+      </div>
+    ` : ''}
+
+    <form method="GET" action="">
+      <div class="form-group">
+        <label for="senha-input">Senha do Curso</label>
+        <input type="password" id="senha-input" name="senha" placeholder="Digite a senha do curso" required autofocus>
+      </div>
+      <button type="submit">
+        <span class="material-icons" style="font-size:18px;">key</span>
+        <span>Acessar Aula</span>
+      </button>
+    </form>
+
+    <a href="/" class="back-link">
+      <span class="material-icons" style="font-size:16px;">arrow_back</span>
+      <span>Voltar para o Início</span>
+    </a>
+  </div>
+</body>
+</html>`;
+}
+
 // Conteúdo estático gerado pelo marp (aulas). Exposto em `/disciplinas/*` (API renomeada)
 // e também em `/materias/*` (compat: caminhos `/materias/...` gravados no banco por marp.ts
 // e usados pelo frontend). Ambos servem os arquivos do diretório `materias/` do frontend.
@@ -1863,7 +2049,14 @@ async function serveStaticDisciplinaContent(c: any) {
       const curso = dbq('SELECT senha FROM cursos WHERE id = ?').get(disciplina.curso_id) as { senha: string | null } | undefined;
       if (curso?.senha) {
         const senha = readCursoSenha(c);
-        if (!senha || senha !== curso.senha) return c.text('Unauthorized', 401);
+        if (!senha || senha !== curso.senha) {
+          const isHtmlRequest = safe.endsWith('.html') || (c.req.header('accept') && c.req.header('accept').includes('text/html'));
+          if (isHtmlRequest) {
+            const hasSentInvalidPassword = Boolean(senha && senha !== curso.senha);
+            return c.html(renderSlidePasswordPromptHtml(hasSentInvalidPassword), 401);
+          }
+          return c.text('Unauthorized', 401);
+        }
       }
     }
   }

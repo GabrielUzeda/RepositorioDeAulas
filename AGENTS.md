@@ -145,6 +145,7 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 ## 5. Convenções de código
 
 - **Sem comentários** no código (salvo quando o usuário pedir).
+- **Proibição estrita de Emojis:** É PROIBIDO o uso de emojis unicode em qualquer parte do projeto (código-fonte, templates Vue/HTML, componentes, mensagens de feedback/toast, modais, logs e documentação). Utilize SEMPRE **Material Icons** (`<span class="material-icons">nome_do_icone</span>`) ou **Font Awesome** (`<i class="fa ..."></i>` / atalhos `:fa-...:`).
 - **Tailwind JIT** só gera classes **literais** — paletas de cores são escritas por extenso (ex.: `bg-indigo-600`); nunca monte strings de classe dinamicamente.
 - **Reuse de UI:** prefira os componentes de `src/shared/components/` (ver seção 3) a repetir Tailwind literal. Antes de escrever um botão/input/card/modal/spinner/empty novo, verifique se o componente base já existe ou se o padrão merece ser extraído para lá.
 - Nomes de arquivos: PascalCase para componentes (`.vue`), camelCase para stores/utilities.

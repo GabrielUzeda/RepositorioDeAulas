@@ -310,12 +310,20 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
 </head>
 <body class="anim-mode">
 
-<div id="rotate-prompt">
-  <div class="prompt-content">
-    <span class="prompt-icon">🔄</span>
-    <span>Para melhor visualização, gire o dispositivo para o modo paisagem (landscape).</span>
+<div id="landscape-modal">
+  <div class="landscape-modal-card">
+    <div class="landscape-icon-wrapper">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+        <path d="M12 18h.01"/>
+      </svg>
+    </div>
+    <h3>Modo Paisagem Recomendado</h3>
+    <p>Para uma melhor experiência de visualização dos slides, por favor gire seu dispositivo para a posição horizontal (paisagem).</p>
+    <button id="btn-confirm-landscape" type="button" class="landscape-btn-confirm">
+      Entendido, Continuar
+    </button>
   </div>
-  <button class="prompt-close" id="btn-dismiss-rotate" title="Dispensar">✕</button>
 </div>
 
 <div id="progress-bar"></div>
@@ -336,7 +344,10 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   <button class="ctrl-btn" id="btn-font-reset" title="Resetar Fonte">100%</button>
   <button class="ctrl-btn" id="btn-font-inc" title="Aumentar Fonte (+)">A+</button>
   <div class="divider"></div>
-  <button class="ctrl-btn" id="btn-fs" title="Tela Cheia (F)">⛶ Fullscreen</button>
+  <button class="ctrl-btn" id="btn-fs" title="Tela Cheia (F)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    Fullscreen
+  </button>
 </div>
 
 <script>
@@ -465,7 +476,7 @@ async function renderAllMermaid() {
           svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach(node => node.style.overflow = 'visible');
         }
       }).catch(err => {
-        wrapper.innerHTML = '<div style="color:#ef4444;font-size:12px;">⚠ Mermaid: ' + err.message + '</div>';
+        wrapper.innerHTML = '<div style="color:#ef4444;font-size:12px;">[Erro] Mermaid: ' + err.message + '</div>';
       });
     });
   });
@@ -524,7 +535,7 @@ document.addEventListener('keydown', e => {
      target.tagName === 'TEXTAREA' ||
      target.tagName === 'SELECT' ||
      target.isContentEditable ||
-     (typeof target.closest === 'function' && target.closest('[contenteditable="true"], input, textarea, select, #rotate-prompt')))
+     (typeof target.closest === 'function' && target.closest('[contenteditable="true"], input, textarea, select, #landscape-modal')))
   ) {
     return;
   }
@@ -567,7 +578,7 @@ function isInteractiveElement(target) {
     '[role="slider"], [role="textbox"], [role="switch"], [data-interactive], .interactive, ' +
     '[draggable="true"], [draggable], [onclick], [onmousedown], [onmouseup], [ontouchstart], [ontouchend], ' +
     'canvas, audio, video, iframe, embed, object, svg, pre, code, kbd, samp, ' +
-    '#controls-bar, #controls-bar *, #rotate-prompt, #rotate-prompt *'
+    '#controls-bar, #controls-bar *, #landscape-modal, #landscape-modal *'
   );
   if (interactive) return true;
 
@@ -706,12 +717,15 @@ if (window.PointerEvent) {
 }
 window.addEventListener('dragstart', handlePointerCancel, { passive: true });
 
-const btnDismissRotate = document.getElementById('btn-dismiss-rotate');
-if (btnDismissRotate) {
-  btnDismissRotate.addEventListener('click', (e) => {
+const btnConfirmLandscape = document.getElementById('btn-confirm-landscape');
+if (btnConfirmLandscape) {
+  btnConfirmLandscape.addEventListener('click', (e) => {
     e.stopPropagation();
-    const prompt = document.getElementById('rotate-prompt');
-    if (prompt) prompt.style.display = 'none';
+    const modal = document.getElementById('landscape-modal');
+    if (modal) {
+      modal.classList.add('dismissed');
+      modal.style.display = 'none';
+    }
   });
 }
 
