@@ -137,22 +137,21 @@ html, body {
   width: 100vw;
   height: 100vh;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
 }
 
 .slide {
   position: absolute;
-  width: min(100vw, calc(100vh * 16 / 9));
-  height: min(100vh, calc(100vw * 9 / 16));
-  max-width: 100vw;
-  max-height: 100vh;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
   background: var(--slide-bg);
   border: none;
   border-radius: 0;
-  padding: 40px 60px;
+  padding: 60px 80px;
   box-shadow: none;
   display: flex;
   flex-direction: column;
@@ -160,17 +159,14 @@ html, body {
   opacity: 0;
   pointer-events: none;
   transform: scale(1);
-  transition: opacity 0.3s ease;
+  transition: opacity 0.4s ease;
   font-size: calc(16px * var(--font-scale, 1));
   overflow: visible;
-  margin: auto;
 }
 
 @media (max-width: 768px) {
   .slide {
-    padding: 20px 24px;
-    width: 100vw;
-    height: 100vh;
+    padding: 24px 28px;
   }
 }
 
