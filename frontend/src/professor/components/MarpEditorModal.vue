@@ -123,9 +123,26 @@ function handleMouseMove() {
 // Delegação de eventos no modo apresentar
 function isInteractiveElement(target: HTMLElement | null): boolean {
   if (!target || target === document.body || target === document.documentElement) return false;
-  return !!target.closest(
-    '#controls-bar, #rotate-prompt, button, a, input, textarea, select, details, summary, label, [contenteditable="true"], [tabindex], [role="button"], [role="link"], [data-interactive], .interactive, canvas, audio, video, iframe, pre, code'
+  const interactive = target.closest(
+    'button, a, input, textarea, select, option, details, summary, label, form, ' +
+    '[contenteditable="true"], [tabindex], [role="button"], [role="link"], [role="checkbox"], ' +
+    '[role="slider"], [role="textbox"], [role="switch"], [data-interactive], .interactive, ' +
+    '[draggable="true"], [draggable], [onclick], [onmousedown], [onmouseup], [ontouchstart], [ontouchend], ' +
+    'canvas, audio, video, iframe, embed, object, svg, pre, code, kbd, samp, ' +
+    '#controls-bar, #controls-bar *, #rotate-prompt, #rotate-prompt *'
   );
+  if (interactive) return true;
+
+  try {
+    const style = window.getComputedStyle(target);
+    if (style.cursor === 'pointer' || style.cursor === 'grab' || style.cursor === 'grabbing' || style.cursor === 'text') {
+      if (!target.classList.contains('slide') && !target.classList.contains('slide-content') && target.id !== 'slides-container' && target.id !== 'preview-pane') {
+        return true;
+      }
+    }
+  } catch (e) {}
+
+  return false;
 }
 
 let isPointerActive = false;
@@ -183,6 +200,10 @@ function handlePointerEnd(e: PointerEvent | TouchEvent) {
       safeNavigate(1);  // Clique na lateral direita -> próximo slide
     }
   }
+}
+
+function handlePointerCancel() {
+  isPointerActive = false;
 }
 
 // Default Markdown Template
@@ -403,6 +424,8 @@ function renderSlides(source: string) {
     `;
     renderKaTeX(el);
     container.appendChild(el);
+    executeSlideScripts(el);
+    renderAllCodeHighlight(el);
   });
 
   activateSlide(Math.min(currentSlideNum, totalSlidesNum - 1));
@@ -414,24 +437,55 @@ function renderKaTeX(container: HTMLElement) {
   if (!w.katex) return;
 
   const contentDiv = container.querySelector('.slide-content');
-  if (!contentDiv) return;
+  if (!contentDiv || !contentDiv.innerHTML.includes('$')) return;
 
-  // Processa blocos $$...$$ primeiro
-  contentDiv.innerHTML = contentDiv.innerHTML.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
-    try {
-      return w.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false });
-    } catch (e) {
-      return `$$${math}$$`;
+  const walker = document.createTreeWalker(contentDiv, NodeFilter.SHOW_TEXT, null, false);
+  const textNodes: Text[] = [];
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    if (node.nodeValue && node.nodeValue.includes('$')) {
+      if (node.parentElement && node.parentElement.closest('pre, code, script, style')) continue;
+      textNodes.push(node as Text);
+    }
+  }
+  textNodes.forEach(textNode => {
+    const text = textNode.nodeValue;
+    if (!text) return;
+    if (/\$\$[\s\S]+?\$\$|\$[^$\n]+?\$/.test(text)) {
+      const span = document.createElement('span');
+      span.innerHTML = text
+        .replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+          try { return w.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
+          catch (e) { return '$$' + math + '$$'; }
+        })
+        .replace(/(^|[^\\])\$([^$\n]+?)\$/g, (_, prefix, math) => {
+          try { return prefix + w.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
+          catch (e) { return prefix + '$' + math + '$'; }
+        });
+      textNode.parentNode?.replaceChild(span, textNode);
     }
   });
+}
 
-  // Processa inline $...$
-  contentDiv.innerHTML = contentDiv.innerHTML.replace(/(^|[^\\])\$([^$\n]+?)\$/g, (_, prefix, math) => {
+function executeSlideScripts(container: HTMLElement) {
+  container.querySelectorAll('script').forEach(oldScript => {
+    const newScript = document.createElement('script');
+    Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+    newScript.textContent = oldScript.textContent;
     try {
-      return prefix + w.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false });
+      oldScript.parentNode?.replaceChild(newScript, oldScript);
     } catch (e) {
-      return `${prefix}$${math}$`;
+      console.warn('Erro ao executar script do slide:', e);
     }
+  });
+}
+
+function renderAllCodeHighlight(container: HTMLElement) {
+  const w = window as any;
+  if (!w.hljs) return;
+  container.querySelectorAll('.slide-content pre code').forEach((block: any) => {
+    if (block.closest('.mermaid-block') || block.classList.contains('mermaid')) return;
+    w.hljs.highlightElement(block);
   });
 }
 
@@ -605,6 +659,9 @@ function highlightCurrentMatch(focusTarget = false) {
 
 function handlePreviewClick(e: MouseEvent) {
   const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  if (isPresentMode.value) return;
+
   const slideEl = target.closest('.slide') as HTMLElement | null;
   if (!slideEl || !editorRef.value) return;
   const index = parseInt(slideEl.dataset.slide || '0', 10);
@@ -1168,10 +1225,13 @@ onMounted(() => {
   if (window.PointerEvent) {
     window.addEventListener('pointerdown', handlePointerStart, { passive: true });
     window.addEventListener('pointerup', handlePointerEnd, { passive: true });
+    window.addEventListener('pointercancel', handlePointerCancel, { passive: true });
   } else {
     window.addEventListener('touchstart', handlePointerStart, { passive: true });
     window.addEventListener('touchend', handlePointerEnd, { passive: true });
+    window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
   }
+  window.addEventListener('dragstart', handlePointerCancel, { passive: true });
   const w = window as any;
   w.marpNext = {
     render: renderSlides,
@@ -1197,10 +1257,13 @@ onBeforeUnmount(() => {
   if (window.PointerEvent) {
     window.removeEventListener('pointerdown', handlePointerStart);
     window.removeEventListener('pointerup', handlePointerEnd);
+    window.removeEventListener('pointercancel', handlePointerCancel);
   } else {
     window.removeEventListener('touchstart', handlePointerStart);
     window.removeEventListener('touchend', handlePointerEnd);
+    window.removeEventListener('touchcancel', handlePointerCancel);
   }
+  window.removeEventListener('dragstart', handlePointerCancel);
   if (idleTimer) clearTimeout(idleTimer);
   const w = window as any;
   if (w.marpNext) delete w.marpNext;

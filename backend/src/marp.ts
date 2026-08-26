@@ -547,9 +547,26 @@ document.addEventListener('mousemove', () => {
 // Robust Event Delegation & Gestures
 function isInteractiveElement(target) {
   if (!target || target === document.body || target === document.documentElement) return false;
-  return !!target.closest(
-    '#controls-bar, #rotate-prompt, button, a, input, textarea, select, details, summary, label, [contenteditable="true"], [tabindex], [role="button"], [role="link"], [data-interactive], .interactive, canvas, audio, video, iframe, pre, code'
+  const interactive = target.closest(
+    'button, a, input, textarea, select, option, details, summary, label, form, ' +
+    '[contenteditable="true"], [tabindex], [role="button"], [role="link"], [role="checkbox"], ' +
+    '[role="slider"], [role="textbox"], [role="switch"], [data-interactive], .interactive, ' +
+    '[draggable="true"], [draggable], [onclick], [onmousedown], [onmouseup], [ontouchstart], [ontouchend], ' +
+    'canvas, audio, video, iframe, embed, object, svg, pre, code, kbd, samp, ' +
+    '#controls-bar, #controls-bar *, #rotate-prompt, #rotate-prompt *'
   );
+  if (interactive) return true;
+
+  try {
+    const style = window.getComputedStyle(target);
+    if (style.cursor === 'pointer' || style.cursor === 'grab' || style.cursor === 'grabbing' || style.cursor === 'text') {
+      if (!target.classList.contains('slide') && !target.classList.contains('slide-content') && target.id !== 'slides-container') {
+        return true;
+      }
+    }
+  } catch (e) {}
+
+  return false;
 }
 
 let isPointerActive = false;
@@ -609,13 +626,20 @@ function handlePointerEnd(e) {
   }
 }
 
+function handlePointerCancel() {
+  isPointerActive = false;
+}
+
 if (window.PointerEvent) {
   slidesContainer.addEventListener('pointerdown', handlePointerStart, { passive: true });
   slidesContainer.addEventListener('pointerup', handlePointerEnd, { passive: true });
+  slidesContainer.addEventListener('pointercancel', handlePointerCancel, { passive: true });
 } else {
   slidesContainer.addEventListener('touchstart', handlePointerStart, { passive: true });
   slidesContainer.addEventListener('touchend', handlePointerEnd, { passive: true });
+  slidesContainer.addEventListener('touchcancel', handlePointerCancel, { passive: true });
 }
+window.addEventListener('dragstart', handlePointerCancel, { passive: true });
 
 const btnDismissRotate = document.getElementById('btn-dismiss-rotate');
 if (btnDismissRotate) {
@@ -637,13 +661,32 @@ try {
 function renderAllKaTeX() {
   if (!window.katex) return;
   document.querySelectorAll('.slide-content').forEach(container => {
-    container.innerHTML = container.innerHTML.replace(/\\$\\$([\\s\\S]+?)\\$\\$/g, (_, math) => {
-      try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
-      catch (e) { return '$$' + math + '$$'; }
-    });
-    container.innerHTML = container.innerHTML.replace(/(^|[^\\\\])\\$([^\\$\\n]+?)\\$/g, (_, prefix, math) => {
-      try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
-      catch (e) { return prefix + '$' + math + '$'; }
+    if (!container.innerHTML.includes('$')) return;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.nodeValue && node.nodeValue.includes('$')) {
+        if (node.parentElement && node.parentElement.closest('pre, code, script, style')) continue;
+        textNodes.push(node);
+      }
+    }
+    textNodes.forEach(textNode => {
+      const text = textNode.nodeValue;
+      if (!text) return;
+      if (/$$[sS]+?$$|$[^$\n]+?$/.test(text)) {
+        const span = document.createElement('span');
+        span.innerHTML = text
+          .replace(/$$([sS]+?)$$/g, (_, math) => {
+            try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
+            catch (e) { return '$$' + math + '$$'; }
+          })
+          .replace(/(^|[^\\])$([^$\n]+?)$/g, (_, prefix, math) => {
+            try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
+            catch (e) { return prefix + '$' + math + '$'; }
+          });
+        textNode.parentNode && textNode.parentNode.replaceChild(span, textNode);
+      }
     });
   });
 }
