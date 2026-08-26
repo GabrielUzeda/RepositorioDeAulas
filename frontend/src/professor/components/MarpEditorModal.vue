@@ -147,12 +147,24 @@ function isInteractiveElement(target: HTMLElement | null): boolean {
 let currentZoom = ref(1.0);
 let panX = 0;
 let panY = 0;
+let originX = 50;
+let originY = 50;
 let initialPinchDistance = 0;
 let initialZoom = 1.0;
 let isPanning = false;
 let panStartX = 0;
 let panStartY = 0;
 let lastTapTime = 0;
+const showZoomPillActive = ref(false);
+let zoomPillTimer: any = null;
+
+function triggerZoomPill() {
+  showZoomPillActive.value = true;
+  if (zoomPillTimer) clearTimeout(zoomPillTimer);
+  zoomPillTimer = setTimeout(() => {
+    showZoomPillActive.value = false;
+  }, 1200);
+}
 
 function applySlideZoom() {
   const activeSlide = previewPaneRef.value?.querySelector('.slide.active') as HTMLElement | null;
@@ -161,36 +173,55 @@ function applySlideZoom() {
     currentZoom.value = 1.0;
     panX = 0;
     panY = 0;
+    originX = 50;
+    originY = 50;
     activeSlide.style.transform = '';
     activeSlide.style.transformOrigin = 'center center';
   } else {
-    activeSlide.style.transformOrigin = 'center center';
+    activeSlide.style.transformOrigin = `${originX}% ${originY}%`;
     activeSlide.style.transform = `scale(${currentZoom.value}) translate(${panX / currentZoom.value}px, ${panY / currentZoom.value}px)`;
   }
+  triggerZoomPill();
 }
 
 function resetZoom() {
   currentZoom.value = 1.0;
   panX = 0;
   panY = 0;
+  originX = 50;
+  originY = 50;
   initialPinchDistance = 0;
   isPanning = false;
   if (previewPaneRef.value) {
     previewPaneRef.value.querySelectorAll('.slide').forEach((s) => {
       (s as HTMLElement).style.transform = '';
+      (s as HTMLElement).style.transformOrigin = 'center center';
     });
   }
 }
 
-function toggleZoom() {
-  if (currentZoom.value > 1.05) {
-    resetZoom();
+function toggleZoom(focalX?: number, focalY?: number) {
+  if (focalX !== undefined && focalY !== undefined) {
+    originX = Math.round((focalX / window.innerWidth) * 100);
+    originY = Math.round((focalY / window.innerHeight) * 100);
   } else {
-    currentZoom.value = 1.8;
-    panX = 0;
-    panY = 0;
-    applySlideZoom();
+    originX = 50;
+    originY = 50;
   }
+
+  if (currentZoom.value < 1.9) {
+    currentZoom.value = 2.0;
+  } else if (currentZoom.value < 2.9) {
+    currentZoom.value = 3.0;
+  } else if (currentZoom.value < 3.9) {
+    currentZoom.value = 4.0;
+  } else {
+    resetZoom();
+    return;
+  }
+  panX = 0;
+  panY = 0;
+  applySlideZoom();
 }
 
 let isPointerActive = false;
@@ -217,6 +248,10 @@ function handleTouchStart(e: TouchEvent) {
   if (e.touches.length === 2) {
     isPointerActive = false;
     isPanning = false;
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    originX = Math.round((midX / window.innerWidth) * 100);
+    originY = Math.round((midY / window.innerHeight) * 100);
     initialPinchDistance = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
@@ -247,12 +282,16 @@ function handleTouchMove(e: TouchEvent) {
   // Pinch-to-zoom com 2 dedos
   if (e.touches.length === 2 && initialPinchDistance > 0) {
     if (e.cancelable) e.preventDefault();
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    originX = Math.round((midX / window.innerWidth) * 100);
+    originY = Math.round((midY / window.innerHeight) * 100);
     const currentDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
     );
     const factor = currentDist / Math.max(initialPinchDistance, 1);
-    currentZoom.value = Math.min(Math.max(initialZoom * factor, 1.0), 3.0);
+    currentZoom.value = Math.min(Math.max(initialZoom * factor, 1.0), 4.0);
     applySlideZoom();
     return;
   }
@@ -310,8 +349,9 @@ function handleTouchEnd(e: TouchEvent) {
   // Toque simples em áreas livres
   if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && dt < 500) {
     const now = Date.now();
+    // Duplo toque para alternar zoom na posição focal
     if (now - lastTapTime < 320) {
-      toggleZoom();
+      toggleZoom(endX, endY);
       lastTapTime = 0;
       return;
     }
@@ -1522,6 +1562,10 @@ onBeforeUnmount(() => {
       <div id="preview-pane" ref="previewPaneRef" :data-theme="currentTheme" @click="handlePreviewClick" @scroll="handlePreviewScroll"></div>
     </div>
 
+    <div v-if="isPresentMode" id="zoom-indicator-pill" class="zoom-indicator-pill" :class="{ show: showZoomPillActive }">
+      Zoom {{ currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x') }}
+    </div>
+
     <div id="progress-bar" ref="progressBarRef"></div>
     <div id="status-bar" ref="statusBarRef"></div>
 
@@ -1540,14 +1584,14 @@ onBeforeUnmount(() => {
       <div class="divider"></div>
       <span id="clock-display" class="clock-display" title="Hora Atual">{{ clockText }}</span>
       <div class="divider"></div>
+      <button class="ctrl-btn" id="btn-zoom" @click="() => toggleZoom()" title="Lupa / Zoom (Z)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        <span>Zoom {{ currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x') }}</span>
+      </button>
+      <div class="divider"></div>
       <button class="ctrl-btn" id="btn-font-dec" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
       <button class="ctrl-btn" id="btn-font-reset" @click="resetFont" title="Resetar Fonte">100%</button>
       <button class="ctrl-btn" id="btn-font-inc" @click="adjustFont(1.1)" title="Aumentar Fonte (+)">A+</button>
-      <div class="divider"></div>
-      <button class="ctrl-btn" id="btn-zoom" @click="toggleZoom" title="Lupa / Zoom (Z)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-        Zoom
-      </button>
       <div class="divider"></div>
       <button class="ctrl-btn" id="btn-fs" @click="toggleFullscreen" title="Tela Cheia (F)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
