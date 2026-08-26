@@ -39,7 +39,7 @@ animation: fade-up
     expect(html).toContain('safeNavigate');
     expect(html).toContain('id="btn-zoom"');
     expect(html).toContain('applySlideZoom');
-    expect(html).toContain('overflow-y: auto;');
+    expect(html).toContain('translate3d');
     expect(html).toContain('00:00');
     expect(html).toContain('id="zoom-indicator-pill"');
     expect(html).toContain('Zoom 1x');

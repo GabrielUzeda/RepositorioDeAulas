@@ -180,8 +180,6 @@ function isInteractiveElement(target: HTMLElement | null): boolean {
 let currentZoom = ref(1.0);
 let panX = 0;
 let panY = 0;
-let originX = 50;
-let originY = 50;
 let initialPinchDistance = 0;
 let initialZoom = 1.0;
 let isPanning = false;
@@ -206,14 +204,12 @@ function applySlideZoom() {
     currentZoom.value = 1.0;
     panX = 0;
     panY = 0;
-    originX = 50;
-    originY = 50;
     activeSlide.style.transform = '';
     activeSlide.style.transformOrigin = 'center center';
     if (previewPaneRef.value) previewPaneRef.value.style.cursor = '';
   } else {
-    activeSlide.style.transformOrigin = `${originX}% ${originY}%`;
-    activeSlide.style.transform = `scale(${currentZoom.value}) translate(${panX / currentZoom.value}px, ${panY / currentZoom.value}px)`;
+    activeSlide.style.transformOrigin = 'center center';
+    activeSlide.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${currentZoom.value})`;
     if (previewPaneRef.value) previewPaneRef.value.style.cursor = isMousePanning ? 'grabbing' : 'grab';
   }
   triggerZoomPill();
@@ -223,8 +219,6 @@ function resetZoom() {
   currentZoom.value = 1.0;
   panX = 0;
   panY = 0;
-  originX = 50;
-  originY = 50;
   initialPinchDistance = 0;
   isPanning = false;
   isMousePanning = false;
@@ -243,26 +237,26 @@ function toggleZoom(focalX?: number, focalY?: number) {
     focalY = lastMouseY;
   }
 
-  if (focalX !== undefined && focalY !== undefined) {
-    originX = Math.min(Math.max(Math.round((focalX / window.innerWidth) * 100), 0), 100);
-    originY = Math.min(Math.max(Math.round((focalY / window.innerHeight) * 100), 0), 100);
-  } else {
-    originX = 50;
-    originY = 50;
-  }
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const fx = (focalX !== undefined && !isNaN(focalX)) ? focalX : cx;
+  const fy = (focalY !== undefined && !isNaN(focalY)) ? focalY : cy;
 
+  let nextZoom = 1.0;
   if (currentZoom.value < 1.9) {
-    currentZoom.value = 2.0;
+    nextZoom = 2.0;
   } else if (currentZoom.value < 2.9) {
-    currentZoom.value = 3.0;
+    nextZoom = 3.0;
   } else if (currentZoom.value < 3.9) {
-    currentZoom.value = 4.0;
+    nextZoom = 4.0;
   } else {
     resetZoom();
     return;
   }
-  panX = 0;
-  panY = 0;
+
+  panX = (cx - fx) * (nextZoom - 1);
+  panY = (cy - fy) * (nextZoom - 1);
+  currentZoom.value = nextZoom;
   applySlideZoom();
 }
 
@@ -328,14 +322,23 @@ function handleTouchMove(e: TouchEvent) {
     if (e.cancelable) e.preventDefault();
     const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
     const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    originX = Math.round((midX / window.innerWidth) * 100);
-    originY = Math.round((midY / window.innerHeight) * 100);
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
     const currentDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
     );
     const factor = currentDist / Math.max(initialPinchDistance, 1);
-    currentZoom.value = Math.min(Math.max(initialZoom * factor, 1.0), 4.0);
+    const oldZoom = currentZoom.value;
+    const newZoom = Math.min(Math.max(initialZoom * factor, 1.0), 4.0);
+    if (newZoom <= 1.01) {
+      resetZoom();
+      return;
+    }
+    const scaleRatio = newZoom / oldZoom;
+    panX = (midX - cx) - (midX - cx - panX) * scaleRatio;
+    panY = (midY - cy) - (midY - cy - panY) * scaleRatio;
+    currentZoom.value = newZoom;
     applySlideZoom();
     return;
   }
@@ -1458,10 +1461,21 @@ function handleWheel(e: WheelEvent) {
   if (!isPresentMode.value) return;
   if (e.ctrlKey) {
     if (e.cancelable) e.preventDefault();
-    originX = Math.min(Math.max(Math.round((e.clientX / window.innerWidth) * 100), 0), 100);
-    originY = Math.min(Math.max(Math.round((e.clientY / window.innerHeight) * 100), 0), 100);
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const fx = e.clientX;
+    const fy = e.clientY;
     const delta = -e.deltaY * 0.01;
-    currentZoom.value = Math.min(Math.max(currentZoom.value + delta, 1.0), 4.0);
+    const oldZoom = currentZoom.value;
+    const newZoom = Math.min(Math.max(currentZoom.value + delta, 1.0), 4.0);
+    if (newZoom <= 1.01) {
+      resetZoom();
+      return;
+    }
+    const factor = newZoom / oldZoom;
+    panX = (fx - cx) - (fx - cx - panX) * factor;
+    panY = (fy - cy) - (fy - cy - panY) * factor;
+    currentZoom.value = newZoom;
     applySlideZoom();
   }
 }

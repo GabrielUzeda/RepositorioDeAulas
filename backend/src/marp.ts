@@ -162,7 +162,6 @@ html, body {
   transform: scale(1);
   transition: opacity 0.4s ease;
   font-size: calc(16px * var(--font-scale, 1));
-  overflow: hidden;
 }
 
 @media (max-width: 768px) {
@@ -192,33 +191,6 @@ html, body {
 .slide-content {
   width: 100%;
   max-width: 100%;
-  max-height: 100%;
-  margin: auto 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
-  padding-right: 2px;
-}
-
-.slide-content::-webkit-scrollbar {
-  width: 4px;
-}
-
-.slide-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.slide-content::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
-  border-radius: 4px;
-}
-
-.slide-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.55);
 }
 
 .slide-content h1 { font-size: calc(2.8em * var(--font-scale)); font-weight: 900; letter-spacing: -1px; line-height: 1.1; margin-bottom: 0.4em; }
@@ -688,14 +660,12 @@ function applySlideZoom() {
     currentZoom = 1.0;
     panX = 0;
     panY = 0;
-    originX = 50;
-    originY = 50;
     activeSlide.style.transform = '';
     activeSlide.style.transformOrigin = 'center center';
     if (slidesContainer) slidesContainer.style.cursor = '';
   } else {
-    activeSlide.style.transformOrigin = \`\${originX}% \${originY}%\`;
-    activeSlide.style.transform = \`scale(\${currentZoom}) translate(\${panX / currentZoom}px, \${panY / currentZoom}px)\`;
+    activeSlide.style.transformOrigin = 'center center';
+    activeSlide.style.transform = \`translate3d(\${panX}px, \${panY}px, 0) scale(\${currentZoom})\`;
     if (slidesContainer) slidesContainer.style.cursor = isMousePanning ? 'grabbing' : 'grab';
   }
   updateZoomUI();
@@ -705,8 +675,6 @@ function resetZoom() {
   currentZoom = 1.0;
   panX = 0;
   panY = 0;
-  originX = 50;
-  originY = 50;
   initialPinchDistance = 0;
   isPanning = false;
   isMousePanning = false;
@@ -725,26 +693,26 @@ function toggleZoom(focalX, focalY) {
     focalY = lastMouseY;
   }
 
-  if (focalX !== undefined && focalY !== undefined) {
-    originX = Math.min(Math.max(Math.round((focalX / window.innerWidth) * 100), 0), 100);
-    originY = Math.min(Math.max(Math.round((focalY / window.innerHeight) * 100), 0), 100);
-  } else {
-    originX = 50;
-    originY = 50;
-  }
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const fx = (focalX !== undefined && !isNaN(focalX)) ? focalX : cx;
+  const fy = (focalY !== undefined && !isNaN(focalY)) ? focalY : cy;
 
+  let nextZoom = 1.0;
   if (currentZoom < 1.9) {
-    currentZoom = 2.0;
+    nextZoom = 2.0;
   } else if (currentZoom < 2.9) {
-    currentZoom = 3.0;
+    nextZoom = 3.0;
   } else if (currentZoom < 3.9) {
-    currentZoom = 4.0;
+    nextZoom = 4.0;
   } else {
     resetZoom();
     return;
   }
-  panX = 0;
-  panY = 0;
+
+  panX = (cx - fx) * (nextZoom - 1);
+  panY = (cy - fy) * (nextZoom - 1);
+  currentZoom = nextZoom;
   applySlideZoom();
 }
 
@@ -900,14 +868,23 @@ function handleTouchMove(e) {
     if (e.cancelable) e.preventDefault();
     const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
     const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    originX = Math.round((midX / window.innerWidth) * 100);
-    originY = Math.round((midY / window.innerHeight) * 100);
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
     const currentDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
     );
     const factor = currentDist / Math.max(initialPinchDistance, 1);
-    currentZoom = Math.min(Math.max(initialZoom * factor, 1.0), 4.0);
+    const oldZoom = currentZoom;
+    const newZoom = Math.min(Math.max(initialZoom * factor, 1.0), 4.0);
+    if (newZoom <= 1.01) {
+      resetZoom();
+      return;
+    }
+    const scaleRatio = newZoom / oldZoom;
+    panX = (midX - cx) - (midX - cx - panX) * scaleRatio;
+    panY = (midY - cy) - (midY - cy - panY) * scaleRatio;
+    currentZoom = newZoom;
     applySlideZoom();
     return;
   }
@@ -999,10 +976,21 @@ slidesContainer.addEventListener('dblclick', (e) => {
 window.addEventListener('wheel', (e) => {
   if (e.ctrlKey) {
     if (e.cancelable) e.preventDefault();
-    originX = Math.min(Math.max(Math.round((e.clientX / window.innerWidth) * 100), 0), 100);
-    originY = Math.min(Math.max(Math.round((e.clientY / window.innerHeight) * 100), 0), 100);
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const fx = e.clientX;
+    const fy = e.clientY;
     const delta = -e.deltaY * 0.01;
-    currentZoom = Math.min(Math.max(currentZoom + delta, 1.0), 4.0);
+    const oldZoom = currentZoom;
+    const newZoom = Math.min(Math.max(currentZoom + delta, 1.0), 4.0);
+    if (newZoom <= 1.01) {
+      resetZoom();
+      return;
+    }
+    const factor = newZoom / oldZoom;
+    panX = (fx - cx) - (fx - cx - panX) * factor;
+    panY = (fy - cy) - (fy - cy - panY) * factor;
+    currentZoom = newZoom;
     applySlideZoom();
   }
 }, { passive: false });
