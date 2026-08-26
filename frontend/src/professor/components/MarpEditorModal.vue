@@ -1175,7 +1175,13 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   }
 
   const target = e.target as HTMLElement | null;
-  const isInputTarget = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('#find-bar'));
+  const isInputTarget = target && (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    (target as any).isContentEditable ||
+    !!target.closest?.('#find-bar, [contenteditable="true"], input, textarea, select')
+  );
 
   if ((e.key === 'f' || e.key === 'F') && !isCtrlOrCmd) {
     if (!isInputTarget) {
@@ -1193,7 +1199,7 @@ function handleGlobalKeydown(e: KeyboardEvent) {
     }
   }
 
-  if (isPresentMode.value || !isInputTarget) {
+  if (!isInputTarget) {
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ' || e.key === 'PageDown') {
       e.preventDefault();
       nextSlide();

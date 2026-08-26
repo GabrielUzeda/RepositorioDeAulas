@@ -515,6 +515,18 @@ document.getElementById('btn-fs').addEventListener('click', async () => {
 
 // Keyboard Hotkeys
 document.addEventListener('keydown', e => {
+  const target = e.target;
+  if (
+    target &&
+    (target.tagName === 'INPUT' ||
+     target.tagName === 'TEXTAREA' ||
+     target.tagName === 'SELECT' ||
+     target.isContentEditable ||
+     (typeof target.closest === 'function' && target.closest('[contenteditable="true"], input, textarea, select, #rotate-prompt')))
+  ) {
+    return;
+  }
+
   switch (e.key) {
     case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
       e.preventDefault(); activateSlide(currentSlide + 1); break;
