@@ -3,6 +3,7 @@ import app from './routes';
 import { initMailer } from './mailer';
 import { runDataRetentionPurge } from './db';
 import { assertRequiredSecrets } from './auth';
+import { regenerateAllAulasHtml } from './marp';
 
 // [SEG] Fail-closed em produção: ausência de segredos críticos aborta o boot
 // antes de expor qualquer endpoint (evita JWT/criptografia com chaves padrão).
@@ -14,6 +15,10 @@ initMailer();
 // diariamente. `.unref()` evita que o timer impeça o encerramento do processo.
 runDataRetentionPurge();
 setInterval(runDataRetentionPurge, 24 * 60 * 60 * 1000).unref();
+
+// Sincroniza e regenera o HTML standalone de todas as aulas cadastradas no boot
+const totalRegeneradas = regenerateAllAulasHtml();
+console.log(`[marp] ${totalRegeneradas} aulas sincronizadas no boot`);
 
 console.log(`[server] Servidor Bun rodando em ${process.env.HOST || '0.0.0.0'}:${Number(process.env.PORT) || 8080}`);
 console.log('[mail] Endpoint: POST /send-mail');
