@@ -73,6 +73,16 @@ let findMatches: Array<{ start: number; end: number }> = [];
 let currentMatchIndex = -1;
 let isResizing = false;
 
+const clockText = ref('00:00:00');
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  clockText.value = `${h}:${m}:${s}`;
+}
+let clockTimer: any = null;
+
 function adjustFont(factor: number) {
   fontScale.value *= factor;
   fontScale.value = Math.max(0.6, Math.min(2.5, fontScale.value));
@@ -84,12 +94,22 @@ function resetFont() {
   document.documentElement.style.setProperty('--font-scale', '1.0');
 }
 
-function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen?.();
-  } else {
-    document.exitFullscreen?.();
-  }
+async function toggleFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen?.();
+      const screenAny = screen as any;
+      if (screenAny.orientation && typeof screenAny.orientation.lock === 'function') {
+        screenAny.orientation.lock('landscape').catch(() => {});
+      }
+    } else {
+      await document.exitFullscreen?.();
+      const screenAny = screen as any;
+      if (screenAny.orientation && typeof screenAny.orientation.unlock === 'function') {
+        screenAny.orientation.unlock();
+      }
+    }
+  } catch (e) {}
 }
 
 function handleMouseMove() {
@@ -98,6 +118,71 @@ function handleMouseMove() {
   idleTimer = setTimeout(() => {
     isIdle.value = true;
   }, 2500);
+}
+
+// Delegação de eventos no modo apresentar
+function isInteractiveElement(target: HTMLElement | null): boolean {
+  if (!target || target === document.body || target === document.documentElement) return false;
+  return !!target.closest(
+    '#controls-bar, #rotate-prompt, button, a, input, textarea, select, details, summary, label, [contenteditable="true"], [tabindex], [role="button"], [role="link"], [data-interactive], .interactive, canvas, audio, video, iframe, pre, code'
+  );
+}
+
+let isPointerActive = false;
+let startX = 0;
+let startY = 0;
+let startTime = 0;
+let lastNavTime = 0;
+const NAV_COOLDOWN_MS = 200;
+
+function safeNavigate(delta: number) {
+  const now = Date.now();
+  if (now - lastNavTime < NAV_COOLDOWN_MS) return;
+  lastNavTime = now;
+  activateSlide(currentSlide.value + delta);
+}
+
+function handlePointerStart(e: PointerEvent | TouchEvent) {
+  if (!isPresentMode.value) return;
+  const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  isPointerActive = true;
+  startX = (e as PointerEvent).clientX !== undefined ? (e as PointerEvent).clientX : ((e as TouchEvent).touches?.[0]?.clientX || 0);
+  startY = (e as PointerEvent).clientY !== undefined ? (e as PointerEvent).clientY : ((e as TouchEvent).touches?.[0]?.clientY || 0);
+  startTime = Date.now();
+}
+
+function handlePointerEnd(e: PointerEvent | TouchEvent) {
+  if (!isPresentMode.value || !isPointerActive) return;
+  isPointerActive = false;
+  const endX = (e as PointerEvent).clientX !== undefined ? (e as PointerEvent).clientX : ((e as TouchEvent).changedTouches?.[0]?.clientX || startX);
+  const endY = (e as PointerEvent).clientY !== undefined ? (e as PointerEvent).clientY : ((e as TouchEvent).changedTouches?.[0]?.clientY || startY);
+  const diffX = endX - startX;
+  const diffY = endY - startY;
+  const dt = Date.now() - startTime;
+
+  // Gesto de Arrastar/Swipe Horizontal (>40px horizontal e dominante sobre o vertical)
+  if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY) * 1.2 && dt < 800) {
+    if (diffX < 0) {
+      safeNavigate(1);  // Swipe para a esquerda -> próximo slide
+    } else {
+      safeNavigate(-1); // Swipe para a direita -> slide anterior
+    }
+    return;
+  }
+
+  // Clique simples em áreas livres (movimento < 10px e sem seleção de texto)
+  if (Math.abs(diffX) < 10 && Math.abs(diffY) < 10 && dt < 400) {
+    const sel = window.getSelection ? window.getSelection()?.toString() : '';
+    if (sel && sel.length > 0) return;
+
+    const vw = window.innerWidth;
+    if (startX < vw * 0.25) {
+      safeNavigate(-1); // Clique na lateral esquerda -> slide anterior
+    } else if (startX > vw * 0.75) {
+      safeNavigate(1);  // Clique na lateral direita -> próximo slide
+    }
+  }
 }
 
 // Default Markdown Template
@@ -1075,9 +1160,18 @@ function handleWindowClick() {
 onMounted(() => {
   ensureMarpThemeCss();
   setupAutoSave();
+  updateClock();
+  clockTimer = setInterval(updateClock, 1000);
   window.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('mousemove', handleMouseMove);
   window.addEventListener('click', handleWindowClick);
+  if (window.PointerEvent) {
+    window.addEventListener('pointerdown', handlePointerStart, { passive: true });
+    window.addEventListener('pointerup', handlePointerEnd, { passive: true });
+  } else {
+    window.addEventListener('touchstart', handlePointerStart, { passive: true });
+    window.addEventListener('touchend', handlePointerEnd, { passive: true });
+  }
   const w = window as any;
   w.marpNext = {
     render: renderSlides,
@@ -1094,11 +1188,19 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cleanupAutoSave();
+  if (clockTimer) clearInterval(clockTimer);
   const themeStyle = document.getElementById('marp-theme-css');
   if (themeStyle) themeStyle.remove();
   window.removeEventListener('keydown', handleGlobalKeydown);
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('click', handleWindowClick);
+  if (window.PointerEvent) {
+    window.removeEventListener('pointerdown', handlePointerStart);
+    window.removeEventListener('pointerup', handlePointerEnd);
+  } else {
+    window.removeEventListener('touchstart', handlePointerStart);
+    window.removeEventListener('touchend', handlePointerEnd);
+  }
   if (idleTimer) clearTimeout(idleTimer);
   const w = window as any;
   if (w.marpNext) delete w.marpNext;
@@ -1107,7 +1209,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="props.show" class="marpnext-modal-root fixed inset-0 bg-canvas flex flex-col z-50 overflow-hidden" :class="{ 'present-mode': isPresentMode, 'anim-mode': isAnimMode }">
+  <div v-if="props.show" class="marpnext-modal-root fixed inset-0 bg-canvas flex flex-col z-50 overflow-hidden" :class="{ 'present-mode': isPresentMode, 'anim-mode': isAnimMode }" :data-theme="currentTheme">
     <!-- TOPBAR -->
     <div id="topbar">
       <div class="logo">marp-next <span>/ editor</span></div>
@@ -1233,23 +1335,26 @@ onBeforeUnmount(() => {
     <div id="progress-bar" ref="progressBarRef"></div>
     <div id="status-bar" ref="statusBarRef"></div>
 
-    <!-- FLOATING PRESENTATION CONTROLS (Igual a apresentacao-marp-next.html) -->
+    <!-- FLOATING PRESENTATION CONTROLS (Idêntico a backend/src/marp.ts) -->
     <div v-if="isPresentMode" id="controls-bar" :class="{ idle: isIdle }">
-      <button class="ctrl-btn" @click="prevSlide" title="Anterior (← / ↑)">◀</button>
-      <button class="ctrl-btn" @click="nextSlide" title="Próximo (→ / ↓ / Espaço)">▶</button>
-      <span id="counter" class="slide-counter">{{ currentSlide + 1 }}/{{ totalSlides }}</span>
+      <button class="ctrl-btn" id="btn-prev" @click="prevSlide" title="Anterior (← / ↑)">◀</button>
+      <button class="ctrl-btn" id="btn-next" @click="nextSlide" title="Próximo (→ / ↓ / Espaço)">▶</button>
+      <span id="counter" class="slide-counter">{{ totalSlides > 0 ? (currentSlide + 1) + '/' + totalSlides : '0/0' }}</span>
       <div class="divider"></div>
-      <button class="ctrl-btn" @click="toggleTheme" title="Alternar Tema (T)">
+      <button class="ctrl-btn" id="btn-theme" @click="toggleTheme" title="Alternar Tema (T)">
         <svg v-if="currentTheme === 'default'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         <svg v-else-if="currentTheme === 'dark'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         {{ THEME_LABELS[currentTheme] }}
       </button>
-      <button class="ctrl-btn" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
-      <button class="ctrl-btn" @click="resetFont" title="Resetar Fonte">100%</button>
-      <button class="ctrl-btn" @click="adjustFont(1.1)" title="Aumentar Fonte (+)">A+</button>
       <div class="divider"></div>
-      <button class="ctrl-btn" @click="toggleFullscreen" title="Tela Cheia (F)">⛶ Fullscreen</button>
+      <span id="clock-display" class="clock-display" title="Hora Atual">{{ clockText }}</span>
+      <div class="divider"></div>
+      <button class="ctrl-btn" id="btn-font-dec" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
+      <button class="ctrl-btn" id="btn-font-reset" @click="resetFont" title="Resetar Fonte">100%</button>
+      <button class="ctrl-btn" id="btn-font-inc" @click="adjustFont(1.1)" title="Aumentar Fonte (+)">A+</button>
+      <div class="divider"></div>
+      <button class="ctrl-btn" id="btn-fs" @click="toggleFullscreen" title="Tela Cheia (F)">⛶ Fullscreen</button>
     </div>
   </div>
 </template>
@@ -1516,10 +1621,44 @@ onBeforeUnmount(() => {
 
 /* PRESENT MODE */
 .present-mode #topbar, .present-mode #editor-pane, .present-mode #resizer { display:none !important; }
-.present-mode #preview-pane { padding:0 !important; gap:0 !important; background:var(--bg-app); width:100vw; height:100vh; overflow:hidden; }
+.present-mode #preview-pane {
+  position: relative !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  background: var(--bg-app);
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  user-select: none;
+}
 .present-mode :deep(.slide) {
-  width:100vw!important; height:100vh!important; min-height:100vh!important;
-  max-width:none!important; max-height:none!important; border-radius:0!important;
-  box-shadow:none!important; border:none!important; padding:60px 80px!important; margin:0!important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 60px 80px !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(1) !important;
+  transition: opacity 0.4s ease !important;
+}
+.present-mode :deep(.slide.active) {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: scale(1) !important;
+}
+
+@media (max-width: 768px) {
+  .present-mode :deep(.slide) {
+    padding: 24px 28px !important;
+  }
 }
 </style>
