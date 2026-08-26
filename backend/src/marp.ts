@@ -156,7 +156,7 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: flex-start;
+  justify-content: center;
   opacity: 0;
   pointer-events: none;
   transform: scale(1);
@@ -193,8 +193,6 @@ html, body {
   width: 100%;
   max-width: 100%;
   max-height: 100%;
-  min-height: 0;
-  flex: 1 1 auto;
   margin: auto 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -611,6 +609,9 @@ document.addEventListener('keydown', e => {
 // Controls auto-hide & toggle
 let idleTimer;
 let lastTouchTime = 0;
+let lastMouseX = window.innerWidth / 2;
+let lastMouseY = window.innerHeight / 2;
+let isMousePanning = false;
 const controls = document.getElementById('controls-bar');
 
 function toggleControlsBar() {
@@ -625,6 +626,20 @@ function toggleControlsBar() {
 }
 
 document.addEventListener('mousemove', (e) => {
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+
+  if (isMousePanning && currentZoom > 1.05) {
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
+    panX += dx;
+    panY += dy;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    applySlideZoom();
+    return;
+  }
+
   if (Date.now() - lastTouchTime < 1000) return;
   if (e.movementX === 0 && e.movementY === 0) return;
   controls.classList.remove('idle');
@@ -677,9 +692,11 @@ function applySlideZoom() {
     originY = 50;
     activeSlide.style.transform = '';
     activeSlide.style.transformOrigin = 'center center';
+    if (slidesContainer) slidesContainer.style.cursor = '';
   } else {
     activeSlide.style.transformOrigin = \`\${originX}% \${originY}%\`;
     activeSlide.style.transform = \`scale(\${currentZoom}) translate(\${panX / currentZoom}px, \${panY / currentZoom}px)\`;
+    if (slidesContainer) slidesContainer.style.cursor = isMousePanning ? 'grabbing' : 'grab';
   }
   updateZoomUI();
 }
@@ -692,18 +709,25 @@ function resetZoom() {
   originY = 50;
   initialPinchDistance = 0;
   isPanning = false;
+  isMousePanning = false;
   document.querySelectorAll('.slide').forEach(s => {
     s.style.transform = '';
     s.style.transformOrigin = 'center center';
   });
+  if (slidesContainer) slidesContainer.style.cursor = '';
   const zoomText = document.getElementById('zoom-text');
   if (zoomText) zoomText.textContent = 'Zoom 1x';
 }
 
 function toggleZoom(focalX, focalY) {
+  if (focalX === undefined && focalY === undefined) {
+    focalX = lastMouseX;
+    focalY = lastMouseY;
+  }
+
   if (focalX !== undefined && focalY !== undefined) {
-    originX = Math.round((focalX / window.innerWidth) * 100);
-    originY = Math.round((focalY / window.innerHeight) * 100);
+    originX = Math.min(Math.max(Math.round((focalX / window.innerWidth) * 100), 0), 100);
+    originY = Math.min(Math.max(Math.round((focalY / window.innerHeight) * 100), 0), 100);
   } else {
     originX = 50;
     originY = 50;
@@ -779,9 +803,15 @@ function handlePointerStart(e) {
   startX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
   startY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
   startTime = Date.now();
+  if (currentZoom > 1.05) {
+    isMousePanning = true;
+    panStartX = startX;
+    panStartY = startY;
+  }
 }
 
 function handlePointerEnd(e) {
+  isMousePanning = false;
   if (!isPointerActive) return;
   isPointerActive = false;
   const endX = e.clientX !== undefined ? e.clientX : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : startX);
@@ -790,8 +820,12 @@ function handlePointerEnd(e) {
   const diffY = endY - startY;
   const dt = Date.now() - startTime;
 
+  if (currentZoom > 1.05) {
+    return;
+  }
+
   // Gesto de Arrastar/Swipe Horizontal (>30px horizontal, movimento dominante horizontal e tempo < 1200ms)
-  if (currentZoom <= 1.05 && Math.abs(diffX) > 30 && Math.abs(diffX) > Math.abs(diffY) * 1.1 && dt < 1200) {
+  if (Math.abs(diffX) > 30 && Math.abs(diffX) > Math.abs(diffY) * 1.1 && dt < 1200) {
     if (diffX < 0) {
       safeNavigate(1);  // Swipe para a esquerda -> próximo slide
     } else {
@@ -819,6 +853,7 @@ function handlePointerEnd(e) {
 function handlePointerCancel() {
   isPointerActive = false;
   isPanning = false;
+  isMousePanning = false;
 }
 
 function handleTouchStart(e) {
@@ -955,6 +990,22 @@ slidesContainer.addEventListener('touchstart', handleTouchStart, { passive: true
 slidesContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
 window.addEventListener('touchend', handleTouchEnd, { passive: true });
 window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
+
+slidesContainer.addEventListener('dblclick', (e) => {
+  if (isInteractiveElement(e.target)) return;
+  toggleZoom(e.clientX, e.clientY);
+});
+
+window.addEventListener('wheel', (e) => {
+  if (e.ctrlKey) {
+    if (e.cancelable) e.preventDefault();
+    originX = Math.min(Math.max(Math.round((e.clientX / window.innerWidth) * 100), 0), 100);
+    originY = Math.min(Math.max(Math.round((e.clientY / window.innerHeight) * 100), 0), 100);
+    const delta = -e.deltaY * 0.01;
+    currentZoom = Math.min(Math.max(currentZoom + delta, 1.0), 4.0);
+    applySlideZoom();
+  }
+}, { passive: false });
 
 if (window.PointerEvent) {
   slidesContainer.addEventListener('pointerdown', e => {

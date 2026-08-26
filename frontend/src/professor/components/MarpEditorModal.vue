@@ -112,6 +112,9 @@ async function toggleFullscreen() {
 }
 
 let lastTouchTime = 0;
+let lastMouseX = window.innerWidth / 2;
+let lastMouseY = window.innerHeight / 2;
+let isMousePanning = false;
 
 function toggleControlsBar() {
   if (idleTimer) clearTimeout(idleTimer);
@@ -126,6 +129,20 @@ function toggleControlsBar() {
 }
 
 function handleMouseMove(e: MouseEvent) {
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+
+  if (isMousePanning && currentZoom.value > 1.05) {
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
+    panX += dx;
+    panY += dy;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    applySlideZoom();
+    return;
+  }
+
   if (Date.now() - lastTouchTime < 1000) return;
   if (e.movementX === 0 && e.movementY === 0) return;
   isIdle.value = false;
@@ -193,9 +210,11 @@ function applySlideZoom() {
     originY = 50;
     activeSlide.style.transform = '';
     activeSlide.style.transformOrigin = 'center center';
+    if (previewPaneRef.value) previewPaneRef.value.style.cursor = '';
   } else {
     activeSlide.style.transformOrigin = `${originX}% ${originY}%`;
     activeSlide.style.transform = `scale(${currentZoom.value}) translate(${panX / currentZoom.value}px, ${panY / currentZoom.value}px)`;
+    if (previewPaneRef.value) previewPaneRef.value.style.cursor = isMousePanning ? 'grabbing' : 'grab';
   }
   triggerZoomPill();
 }
@@ -208,7 +227,9 @@ function resetZoom() {
   originY = 50;
   initialPinchDistance = 0;
   isPanning = false;
+  isMousePanning = false;
   if (previewPaneRef.value) {
+    previewPaneRef.value.style.cursor = '';
     previewPaneRef.value.querySelectorAll('.slide').forEach((s) => {
       (s as HTMLElement).style.transform = '';
       (s as HTMLElement).style.transformOrigin = 'center center';
@@ -217,9 +238,14 @@ function resetZoom() {
 }
 
 function toggleZoom(focalX?: number, focalY?: number) {
+  if (focalX === undefined && focalY === undefined) {
+    focalX = lastMouseX;
+    focalY = lastMouseY;
+  }
+
   if (focalX !== undefined && focalY !== undefined) {
-    originX = Math.round((focalX / window.innerWidth) * 100);
-    originY = Math.round((focalY / window.innerHeight) * 100);
+    originX = Math.min(Math.max(Math.round((focalX / window.innerWidth) * 100), 0), 100);
+    originY = Math.min(Math.max(Math.round((focalY / window.innerHeight) * 100), 0), 100);
   } else {
     originX = 50;
     originY = 50;
@@ -1406,8 +1432,38 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
-function handleWindowClick() {
-  showExportMenu.value = false;
+function handleMouseDown(e: MouseEvent) {
+  if (!isPresentMode.value) return;
+  const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  if (currentZoom.value > 1.05) {
+    isMousePanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+  }
+}
+
+function handleMouseUp() {
+  isMousePanning = false;
+}
+
+function handleDblClick(e: MouseEvent) {
+  if (!isPresentMode.value) return;
+  const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  toggleZoom(e.clientX, e.clientY);
+}
+
+function handleWheel(e: WheelEvent) {
+  if (!isPresentMode.value) return;
+  if (e.ctrlKey) {
+    if (e.cancelable) e.preventDefault();
+    originX = Math.min(Math.max(Math.round((e.clientX / window.innerWidth) * 100), 0), 100);
+    originY = Math.min(Math.max(Math.round((e.clientY / window.innerHeight) * 100), 0), 100);
+    const delta = -e.deltaY * 0.01;
+    currentZoom.value = Math.min(Math.max(currentZoom.value + delta, 1.0), 4.0);
+    applySlideZoom();
+  }
 }
 
 onMounted(() => {
@@ -1417,6 +1473,10 @@ onMounted(() => {
   clockTimer = setInterval(updateClock, 1000);
   window.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('mousemove', handleMouseMove);
+  window.addEventListener('mousedown', handleMouseDown);
+  window.addEventListener('mouseup', handleMouseUp);
+  window.addEventListener('dblclick', handleDblClick);
+  window.addEventListener('wheel', handleWheel, { passive: false });
   window.addEventListener('touchstart', handleTouchStart, { passive: true });
   window.addEventListener('touchmove', handleTouchMove, { passive: false });
   window.addEventListener('touchend', handleTouchEnd, { passive: true });
@@ -1443,6 +1503,10 @@ onBeforeUnmount(() => {
   if (themeStyle) themeStyle.remove();
   window.removeEventListener('keydown', handleGlobalKeydown);
   window.removeEventListener('mousemove', handleMouseMove);
+  window.removeEventListener('mousedown', handleMouseDown);
+  window.removeEventListener('mouseup', handleMouseUp);
+  window.removeEventListener('dblclick', handleDblClick);
+  window.removeEventListener('wheel', handleWheel);
   window.removeEventListener('click', handleWindowClick);
   window.removeEventListener('touchstart', handleTouchStart);
   window.removeEventListener('touchmove', handleTouchMove);
