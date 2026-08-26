@@ -61,8 +61,15 @@ import MarkdownIt from 'markdown-it';
 const mdParser = new MarkdownIt({ html: true, linkify: true, typographer: true });
 
 function renderMarkdown(mdText: string): string {
-  const html = mdParser.render(mdText);
-  return html.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml) => `<div class="table-wrap">${tableHtml}</div>`);
+  let html = mdParser.render(mdText);
+  html = html.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml) => `<div class="table-wrap">${tableHtml}</div>`);
+  // Suporte a atalhos de ícones Font Awesome :fa-name:, :fas-name:, :fab-name:, :far-name:
+  html = html.replace(/:fa([srb]?)-([a-z0-9-]+):/gi, (_m, type, name) => {
+    const prefix = type.toLowerCase() === 'b' ? 'fa-brands' : type.toLowerCase() === 'r' ? 'fa-regular' : 'fa-solid';
+    return `<i class="fa ${prefix} fa-${name}"></i>`;
+  });
+  html = html.replace(/:fa-([a-z0-9-]+):/gi, '<i class="fa fa-solid fa-$1"></i>');
+  return html;
 }
 
 export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): string {
@@ -102,9 +109,11 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&family=JetBrains Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
 <style>
 ${MARP_THEME_CSS}
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -122,15 +131,15 @@ html, body {
   font-family: var(--font-sans);
   overflow: hidden;
   user-select: none;
+  touch-action: pan-y;
 }
 
 #slides-container {
   width: 100vw;
   height: 100vh;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
+  touch-action: pan-y;
 }
 
 .slide {
@@ -153,8 +162,14 @@ html, body {
   pointer-events: none;
   transform: scale(1);
   transition: opacity 0.4s ease;
-  font-size: calc(16px * var(--font-scale));
+  font-size: calc(16px * var(--font-scale, 1));
   overflow: visible;
+}
+
+@media (max-width: 768px) {
+  .slide {
+    padding: 24px 28px;
+  }
 }
 
 .slide.active {
@@ -295,6 +310,14 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
 </head>
 <body class="anim-mode">
 
+<div id="rotate-prompt">
+  <div class="prompt-content">
+    <span class="prompt-icon">🔄</span>
+    <span>Para melhor visualização, gire o dispositivo para o modo paisagem (landscape).</span>
+  </div>
+  <button class="prompt-close" id="btn-dismiss-rotate" title="Dispensar">✕</button>
+</div>
+
 <div id="progress-bar"></div>
 <div id="slides-container">
   ${slidesHtml}
@@ -383,6 +406,14 @@ function updateThemeUI(themeName) {
   btn.innerHTML = (icons[theme] || sunSvg) + ' ' + (themeLabels[theme] || theme);
 }
 
+function renderAllCodeHighlight() {
+  if (!window.hljs) return;
+  document.querySelectorAll('.slide-content pre code').forEach(block => {
+    if (block.closest('.mermaid-block') || block.classList.contains('mermaid')) return;
+    window.hljs.highlightElement(block);
+  });
+}
+
 function activateSlide(idx) {
   if (totalSlides === 0) return;
   currentSlide = Math.max(0, Math.min(idx, totalSlides - 1));
@@ -452,6 +483,7 @@ function toggleTheme() {
   updateThemeUI(next);
   initMermaid(next);
   renderAllMermaid();
+  renderAllCodeHighlight();
 }
 
 document.getElementById('btn-font-inc').addEventListener('click', () => adjustFont(1.1));
@@ -467,13 +499,36 @@ function applyFontScale() {
   document.documentElement.style.setProperty('--font-scale', fontScale);
 }
 
-document.getElementById('btn-fs').addEventListener('click', () => {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-  else document.exitFullscreen();
+document.getElementById('btn-fs').addEventListener('click', async () => {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    } else {
+      await document.exitFullscreen();
+      if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+        screen.orientation.unlock();
+      }
+    }
+  } catch (_err) {}
 });
 
 // Keyboard Hotkeys
 document.addEventListener('keydown', e => {
+  const target = e.target;
+  if (
+    target &&
+    (target.tagName === 'INPUT' ||
+     target.tagName === 'TEXTAREA' ||
+     target.tagName === 'SELECT' ||
+     target.isContentEditable ||
+     (typeof target.closest === 'function' && target.closest('[contenteditable="true"], input, textarea, select, #rotate-prompt')))
+  ) {
+    return;
+  }
+
   switch (e.key) {
     case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
       e.preventDefault(); activateSlide(currentSlide + 1); break;
@@ -503,6 +558,163 @@ document.addEventListener('mousemove', () => {
   idleTimer = setTimeout(() => controls.classList.add('idle'), 2500);
 });
 
+// Robust Event Delegation & Gestures
+function isInteractiveElement(target) {
+  if (!target || target === document.body || target === document.documentElement) return false;
+  const interactive = target.closest(
+    'button, a, input, textarea, select, option, details, summary, label, form, ' +
+    '[contenteditable="true"], [tabindex], [role="button"], [role="link"], [role="checkbox"], ' +
+    '[role="slider"], [role="textbox"], [role="switch"], [data-interactive], .interactive, ' +
+    '[draggable="true"], [draggable], [onclick], [onmousedown], [onmouseup], [ontouchstart], [ontouchend], ' +
+    'canvas, audio, video, iframe, embed, object, svg, pre, code, kbd, samp, ' +
+    '#controls-bar, #controls-bar *, #rotate-prompt, #rotate-prompt *'
+  );
+  if (interactive) return true;
+
+  try {
+    const style = window.getComputedStyle(target);
+    if (style.cursor === 'pointer' || style.cursor === 'grab' || style.cursor === 'grabbing' || style.cursor === 'text') {
+      if (!target.classList.contains('slide') && !target.classList.contains('slide-content') && target.id !== 'slides-container') {
+        return true;
+      }
+    }
+  } catch (e) {}
+
+  return false;
+}
+
+let isPointerActive = false;
+let startX = 0;
+let startY = 0;
+let startTime = 0;
+let lastNavTime = 0;
+const NAV_COOLDOWN_MS = 200;
+
+function safeNavigate(delta) {
+  const now = Date.now();
+  if (now - lastNavTime < NAV_COOLDOWN_MS) return;
+  lastNavTime = now;
+  activateSlide(currentSlide + delta);
+}
+
+const slidesContainer = document.getElementById('slides-container') || document.body;
+
+function handlePointerStart(e) {
+  if (isInteractiveElement(e.target)) return;
+  isPointerActive = true;
+  startX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+  startY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+  startTime = Date.now();
+}
+
+function handlePointerEnd(e) {
+  if (!isPointerActive) return;
+  isPointerActive = false;
+  const endX = e.clientX !== undefined ? e.clientX : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : startX);
+  const endY = e.clientY !== undefined ? e.clientY : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientY : startY);
+  const diffX = endX - startX;
+  const diffY = endY - startY;
+  const dt = Date.now() - startTime;
+
+  // Gesto de Arrastar/Swipe Horizontal (>30px horizontal, movimento dominante horizontal e tempo < 1200ms)
+  if (Math.abs(diffX) > 30 && Math.abs(diffX) > Math.abs(diffY) * 1.1 && dt < 1200) {
+    if (diffX < 0) {
+      safeNavigate(1);  // Swipe para a esquerda -> próximo slide
+    } else {
+      safeNavigate(-1); // Swipe para a direita -> slide anterior
+    }
+    return;
+  }
+
+  // Clique simples em áreas livres (movimento < 12px, tempo < 500ms e sem seleção de texto)
+  if (Math.abs(diffX) < 12 && Math.abs(diffY) < 12 && dt < 500) {
+    const sel = window.getSelection ? window.getSelection().toString() : '';
+    if (sel && sel.length > 0) return;
+
+    const vw = window.innerWidth;
+    if (startX < vw * 0.25) {
+      safeNavigate(-1); // Clique na lateral esquerda -> slide anterior
+    } else if (startX > vw * 0.75) {
+      safeNavigate(1);  // Clique na lateral direita -> próximo slide
+    }
+  }
+}
+
+function handlePointerCancel() {
+  isPointerActive = false;
+}
+
+function handleTouchStart(e) {
+  if (isInteractiveElement(e.target)) return;
+  if (!e.touches || !e.touches[0]) return;
+  isPointerActive = true;
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+  startTime = Date.now();
+}
+
+function handleTouchEnd(e) {
+  if (!isPointerActive) return;
+  isPointerActive = false;
+  const touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+  if (!touch) return;
+  const endX = touch.clientX;
+  const endY = touch.clientY;
+  const diffX = endX - startX;
+  const diffY = endY - startY;
+  const dt = Date.now() - startTime;
+
+  // Gesto de Arrastar/Swipe Horizontal (>30px horizontal e tempo < 1200ms)
+  if (Math.abs(diffX) > 30 && Math.abs(diffX) > Math.abs(diffY) * 0.9 && dt < 1200) {
+    if (diffX < 0) {
+      safeNavigate(1);  // Swipe para a esquerda -> próximo slide
+    } else {
+      safeNavigate(-1); // Swipe para a direita -> slide anterior
+    }
+    return;
+  }
+
+  // Clique simples em áreas livres
+  if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && dt < 500) {
+    const vw = window.innerWidth;
+    if (startX < vw * 0.25) {
+      safeNavigate(-1);
+    } else if (startX > vw * 0.75) {
+      safeNavigate(1);
+    }
+  }
+}
+
+// Suporte simultâneo a Touch e Pointer
+slidesContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+window.addEventListener('touchend', handleTouchEnd, { passive: true });
+window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
+
+if (window.PointerEvent) {
+  slidesContainer.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return; // Evita duplicidade com TouchEvent
+    handlePointerStart(e);
+  }, { passive: true });
+  window.addEventListener('pointerup', e => {
+    if (e.pointerType === 'touch') return;
+    handlePointerEnd(e);
+  }, { passive: true });
+  window.addEventListener('pointercancel', handlePointerCancel, { passive: true });
+} else {
+  slidesContainer.addEventListener('mousedown', handlePointerStart, { passive: true });
+  window.addEventListener('mouseup', handlePointerEnd, { passive: true });
+}
+window.addEventListener('dragstart', handlePointerCancel, { passive: true });
+
+const btnDismissRotate = document.getElementById('btn-dismiss-rotate');
+if (btnDismissRotate) {
+  btnDismissRotate.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const prompt = document.getElementById('rotate-prompt');
+    if (prompt) prompt.style.display = 'none';
+  });
+}
+
 try {
   const _url = new URL(window.location.href);
   if (_url.searchParams.has('senha')) {
@@ -514,19 +726,39 @@ try {
 function renderAllKaTeX() {
   if (!window.katex) return;
   document.querySelectorAll('.slide-content').forEach(container => {
-    container.innerHTML = container.innerHTML.replace(/\\$\\$([\\s\\S]+?)\\$\\$/g, (_, math) => {
-      try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
-      catch (e) { return '$$' + math + '$$'; }
-    });
-    container.innerHTML = container.innerHTML.replace(/(^|[^\\\\])\\$([^\\$\\n]+?)\\$/g, (_, prefix, math) => {
-      try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
-      catch (e) { return prefix + '$' + math + '$'; }
+    if (!container.innerHTML.includes('$')) return;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.nodeValue && node.nodeValue.includes('$')) {
+        if (node.parentElement && node.parentElement.closest('pre, code, script, style')) continue;
+        textNodes.push(node);
+      }
+    }
+    textNodes.forEach(textNode => {
+      const text = textNode.nodeValue;
+      if (!text) return;
+      if (/\\$\\$[\\s\\S]+?\\$\\$|\\$[^\\$\\n]+?\\$/.test(text)) {
+        const span = document.createElement('span');
+        span.innerHTML = text
+          .replace(/\\$\\$([\\s\\S]+?)\\$\\$/g, (_, math) => {
+            try { return window.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
+            catch (e) { return '$$' + math + '$$'; }
+          })
+          .replace(/(^|[^\\\\])\\$([^\\$\\n]+?)\\$/g, (_, prefix, math) => {
+            try { return prefix + window.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
+            catch (e) { return prefix + '$' + math + '$'; }
+          });
+        textNode.parentNode && textNode.parentNode.replaceChild(span, textNode);
+      }
     });
   });
 }
 
 activateSlide(0);
 renderAllKaTeX();
+renderAllCodeHighlight();
 updateThemeUI('${initialTheme}');
 initMermaid('${initialTheme}');
 renderAllMermaid();

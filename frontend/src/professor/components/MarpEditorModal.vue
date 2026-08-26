@@ -73,6 +73,16 @@ let findMatches: Array<{ start: number; end: number }> = [];
 let currentMatchIndex = -1;
 let isResizing = false;
 
+const clockText = ref('00:00:00');
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  clockText.value = `${h}:${m}:${s}`;
+}
+let clockTimer: any = null;
+
 function adjustFont(factor: number) {
   fontScale.value *= factor;
   fontScale.value = Math.max(0.6, Math.min(2.5, fontScale.value));
@@ -84,12 +94,22 @@ function resetFont() {
   document.documentElement.style.setProperty('--font-scale', '1.0');
 }
 
-function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen?.();
-  } else {
-    document.exitFullscreen?.();
-  }
+async function toggleFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen?.();
+      const screenAny = screen as any;
+      if (screenAny.orientation && typeof screenAny.orientation.lock === 'function') {
+        screenAny.orientation.lock('landscape').catch(() => {});
+      }
+    } else {
+      await document.exitFullscreen?.();
+      const screenAny = screen as any;
+      if (screenAny.orientation && typeof screenAny.orientation.unlock === 'function') {
+        screenAny.orientation.unlock();
+      }
+    }
+  } catch (e) {}
 }
 
 function handleMouseMove() {
@@ -98,6 +118,92 @@ function handleMouseMove() {
   idleTimer = setTimeout(() => {
     isIdle.value = true;
   }, 2500);
+}
+
+// Delegação de eventos no modo apresentar
+function isInteractiveElement(target: HTMLElement | null): boolean {
+  if (!target || target === document.body || target === document.documentElement) return false;
+  const interactive = target.closest(
+    'button, a, input, textarea, select, option, details, summary, label, form, ' +
+    '[contenteditable="true"], [tabindex], [role="button"], [role="link"], [role="checkbox"], ' +
+    '[role="slider"], [role="textbox"], [role="switch"], [data-interactive], .interactive, ' +
+    '[draggable="true"], [draggable], [onclick], [onmousedown], [onmouseup], [ontouchstart], [ontouchend], ' +
+    'canvas, audio, video, iframe, embed, object, svg, pre, code, kbd, samp, ' +
+    '#controls-bar, #controls-bar *, #rotate-prompt, #rotate-prompt *'
+  );
+  if (interactive) return true;
+
+  try {
+    const style = window.getComputedStyle(target);
+    if (style.cursor === 'pointer' || style.cursor === 'grab' || style.cursor === 'grabbing' || style.cursor === 'text') {
+      if (!target.classList.contains('slide') && !target.classList.contains('slide-content') && target.id !== 'slides-container' && target.id !== 'preview-pane') {
+        return true;
+      }
+    }
+  } catch (e) {}
+
+  return false;
+}
+
+let isPointerActive = false;
+let startX = 0;
+let startY = 0;
+let startTime = 0;
+let lastNavTime = 0;
+const NAV_COOLDOWN_MS = 200;
+
+function safeNavigate(delta: number) {
+  const now = Date.now();
+  if (now - lastNavTime < NAV_COOLDOWN_MS) return;
+  lastNavTime = now;
+  activateSlide(currentSlide.value + delta);
+}
+
+function handleTouchStart(e: TouchEvent) {
+  if (!isPresentMode.value) return;
+  const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  if (!e.touches || !e.touches[0]) return;
+  isPointerActive = true;
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+  startTime = Date.now();
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  if (!isPresentMode.value || !isPointerActive) return;
+  isPointerActive = false;
+  const touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+  if (!touch) return;
+  const endX = touch.clientX;
+  const endY = touch.clientY;
+  const diffX = endX - startX;
+  const diffY = endY - startY;
+  const dt = Date.now() - startTime;
+
+  // Gesto de Arrastar/Swipe Horizontal (>30px horizontal e tempo < 1200ms)
+  if (Math.abs(diffX) > 30 && Math.abs(diffX) > Math.abs(diffY) * 0.9 && dt < 1200) {
+    if (diffX < 0) {
+      safeNavigate(1);  // Swipe para a esquerda -> próximo slide
+    } else {
+      safeNavigate(-1); // Swipe para a direita -> slide anterior
+    }
+    return;
+  }
+
+  // Clique simples em áreas livres
+  if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && dt < 500) {
+    const vw = window.innerWidth;
+    if (startX < vw * 0.25) {
+      safeNavigate(-1);
+    } else if (startX > vw * 0.75) {
+      safeNavigate(1);
+    }
+  }
+}
+
+function handlePointerCancel() {
+  isPointerActive = false;
 }
 
 // Default Markdown Template
@@ -306,12 +412,20 @@ function renderSlides(source: string) {
 
     let html = md ? md.render(slide.content) : `<p>${escapeHtml(slide.content)}</p>`;
     html = html.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml: string) => `<div class="table-wrap">${tableHtml}</div>`);
+    // Suporte a atalhos de ícones Font Awesome :fa-name:, :fas-name:, :fab-name:, :far-name:
+    html = html.replace(/:fa([srb]?)-([a-z0-9-]+):/gi, (_m, type, name) => {
+      const prefix = type.toLowerCase() === 'b' ? 'fa-brands' : type.toLowerCase() === 'r' ? 'fa-regular' : 'fa-solid';
+      return `<i class="fa ${prefix} fa-${name}"></i>`;
+    });
+    html = html.replace(/:fa-([a-z0-9-]+):/gi, '<i class="fa fa-solid fa-$1"></i>');
     el.innerHTML = `
       <span class="slide-number">${i + 1}/${totalSlidesNum}</span>
       <div class="slide-content">${html}</div>
     `;
     renderKaTeX(el);
     container.appendChild(el);
+    executeSlideScripts(el);
+    renderAllCodeHighlight(el);
   });
 
   activateSlide(Math.min(currentSlideNum, totalSlidesNum - 1));
@@ -323,24 +437,55 @@ function renderKaTeX(container: HTMLElement) {
   if (!w.katex) return;
 
   const contentDiv = container.querySelector('.slide-content');
-  if (!contentDiv) return;
+  if (!contentDiv || !contentDiv.innerHTML.includes('$')) return;
 
-  // Processa blocos $$...$$ primeiro
-  contentDiv.innerHTML = contentDiv.innerHTML.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
-    try {
-      return w.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false });
-    } catch (e) {
-      return `$$${math}$$`;
+  const walker = document.createTreeWalker(contentDiv, NodeFilter.SHOW_TEXT, null, false);
+  const textNodes: Text[] = [];
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    if (node.nodeValue && node.nodeValue.includes('$')) {
+      if (node.parentElement && node.parentElement.closest('pre, code, script, style')) continue;
+      textNodes.push(node as Text);
+    }
+  }
+  textNodes.forEach(textNode => {
+    const text = textNode.nodeValue;
+    if (!text) return;
+    if (/\$\$[\s\S]+?\$\$|\$[^$\n]+?\$/.test(text)) {
+      const span = document.createElement('span');
+      span.innerHTML = text
+        .replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+          try { return w.katex.renderToString(math.trim(), { displayMode: true, throwOnError: false }); }
+          catch (e) { return '$$' + math + '$$'; }
+        })
+        .replace(/(^|[^\\])\$([^$\n]+?)\$/g, (_, prefix, math) => {
+          try { return prefix + w.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false }); }
+          catch (e) { return prefix + '$' + math + '$'; }
+        });
+      textNode.parentNode?.replaceChild(span, textNode);
     }
   });
+}
 
-  // Processa inline $...$
-  contentDiv.innerHTML = contentDiv.innerHTML.replace(/(^|[^\\])\$([^$\n]+?)\$/g, (_, prefix, math) => {
+function executeSlideScripts(container: HTMLElement) {
+  container.querySelectorAll('script').forEach(oldScript => {
+    const newScript = document.createElement('script');
+    Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+    newScript.textContent = oldScript.textContent;
     try {
-      return prefix + w.katex.renderToString(math.trim(), { displayMode: false, throwOnError: false });
+      oldScript.parentNode?.replaceChild(newScript, oldScript);
     } catch (e) {
-      return `${prefix}$${math}$`;
+      console.warn('Erro ao executar script do slide:', e);
     }
+  });
+}
+
+function renderAllCodeHighlight(container: HTMLElement) {
+  const w = window as any;
+  if (!w.hljs) return;
+  container.querySelectorAll('.slide-content pre code').forEach((block: any) => {
+    if (block.closest('.mermaid-block') || block.classList.contains('mermaid')) return;
+    w.hljs.highlightElement(block);
   });
 }
 
@@ -514,6 +659,9 @@ function highlightCurrentMatch(focusTarget = false) {
 
 function handlePreviewClick(e: MouseEvent) {
   const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  if (isPresentMode.value) return;
+
   const slideEl = target.closest('.slide') as HTMLElement | null;
   if (!slideEl || !editorRef.value) return;
   const index = parseInt(slideEl.dataset.slide || '0', 10);
@@ -1027,7 +1175,13 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   }
 
   const target = e.target as HTMLElement | null;
-  const isInputTarget = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('#find-bar'));
+  const isInputTarget = target && (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    (target as any).isContentEditable ||
+    !!target.closest?.('#find-bar, [contenteditable="true"], input, textarea, select')
+  );
 
   if ((e.key === 'f' || e.key === 'F') && !isCtrlOrCmd) {
     if (!isInputTarget) {
@@ -1045,7 +1199,7 @@ function handleGlobalKeydown(e: KeyboardEvent) {
     }
   }
 
-  if (isPresentMode.value || !isInputTarget) {
+  if (!isInputTarget) {
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ' || e.key === 'PageDown') {
       e.preventDefault();
       nextSlide();
@@ -1069,9 +1223,14 @@ function handleWindowClick() {
 onMounted(() => {
   ensureMarpThemeCss();
   setupAutoSave();
+  updateClock();
+  clockTimer = setInterval(updateClock, 1000);
   window.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('mousemove', handleMouseMove);
-  window.addEventListener('click', handleWindowClick);
+  window.addEventListener('touchstart', handleTouchStart, { passive: true });
+  window.addEventListener('touchend', handleTouchEnd, { passive: true });
+  window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
+  window.addEventListener('dragstart', handlePointerCancel, { passive: true });
   const w = window as any;
   w.marpNext = {
     render: renderSlides,
@@ -1088,11 +1247,16 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cleanupAutoSave();
+  if (clockTimer) clearInterval(clockTimer);
   const themeStyle = document.getElementById('marp-theme-css');
   if (themeStyle) themeStyle.remove();
   window.removeEventListener('keydown', handleGlobalKeydown);
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('click', handleWindowClick);
+  window.removeEventListener('touchstart', handleTouchStart);
+  window.removeEventListener('touchend', handleTouchEnd);
+  window.removeEventListener('touchcancel', handlePointerCancel);
+  window.removeEventListener('dragstart', handlePointerCancel);
   if (idleTimer) clearTimeout(idleTimer);
   const w = window as any;
   if (w.marpNext) delete w.marpNext;
@@ -1101,7 +1265,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="props.show" class="marpnext-modal-root fixed inset-0 bg-canvas flex flex-col z-50 overflow-hidden" :class="{ 'present-mode': isPresentMode, 'anim-mode': isAnimMode }">
+  <div v-if="props.show" class="marpnext-modal-root fixed inset-0 bg-canvas flex flex-col z-50 overflow-hidden" :class="{ 'present-mode': isPresentMode, 'anim-mode': isAnimMode }" :data-theme="currentTheme">
     <!-- TOPBAR -->
     <div id="topbar">
       <div class="logo">marp-next <span>/ editor</span></div>
@@ -1227,23 +1391,26 @@ onBeforeUnmount(() => {
     <div id="progress-bar" ref="progressBarRef"></div>
     <div id="status-bar" ref="statusBarRef"></div>
 
-    <!-- FLOATING PRESENTATION CONTROLS (Igual a apresentacao-marp-next.html) -->
+    <!-- FLOATING PRESENTATION CONTROLS (Idêntico a backend/src/marp.ts) -->
     <div v-if="isPresentMode" id="controls-bar" :class="{ idle: isIdle }">
-      <button class="ctrl-btn" @click="prevSlide" title="Anterior (← / ↑)">◀</button>
-      <button class="ctrl-btn" @click="nextSlide" title="Próximo (→ / ↓ / Espaço)">▶</button>
-      <span id="counter" class="slide-counter">{{ currentSlide + 1 }}/{{ totalSlides }}</span>
+      <button class="ctrl-btn" id="btn-prev" @click="prevSlide" title="Anterior (← / ↑)">◀</button>
+      <button class="ctrl-btn" id="btn-next" @click="nextSlide" title="Próximo (→ / ↓ / Espaço)">▶</button>
+      <span id="counter" class="slide-counter">{{ totalSlides > 0 ? (currentSlide + 1) + '/' + totalSlides : '0/0' }}</span>
       <div class="divider"></div>
-      <button class="ctrl-btn" @click="toggleTheme" title="Alternar Tema (T)">
+      <button class="ctrl-btn" id="btn-theme" @click="toggleTheme" title="Alternar Tema (T)">
         <svg v-if="currentTheme === 'default'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         <svg v-else-if="currentTheme === 'dark'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         {{ THEME_LABELS[currentTheme] }}
       </button>
-      <button class="ctrl-btn" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
-      <button class="ctrl-btn" @click="resetFont" title="Resetar Fonte">100%</button>
-      <button class="ctrl-btn" @click="adjustFont(1.1)" title="Aumentar Fonte (+)">A+</button>
       <div class="divider"></div>
-      <button class="ctrl-btn" @click="toggleFullscreen" title="Tela Cheia (F)">⛶ Fullscreen</button>
+      <span id="clock-display" class="clock-display" title="Hora Atual">{{ clockText }}</span>
+      <div class="divider"></div>
+      <button class="ctrl-btn" id="btn-font-dec" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
+      <button class="ctrl-btn" id="btn-font-reset" @click="resetFont" title="Resetar Fonte">100%</button>
+      <button class="ctrl-btn" id="btn-font-inc" @click="adjustFont(1.1)" title="Aumentar Fonte (+)">A+</button>
+      <div class="divider"></div>
+      <button class="ctrl-btn" id="btn-fs" @click="toggleFullscreen" title="Tela Cheia (F)">⛶ Fullscreen</button>
     </div>
   </div>
 </template>
@@ -1510,10 +1677,44 @@ onBeforeUnmount(() => {
 
 /* PRESENT MODE */
 .present-mode #topbar, .present-mode #editor-pane, .present-mode #resizer { display:none !important; }
-.present-mode #preview-pane { padding:0 !important; gap:0 !important; background:var(--bg-app); width:100vw; height:100vh; overflow:hidden; }
+.present-mode #preview-pane {
+  position: relative !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  background: var(--bg-app);
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  user-select: none;
+}
 .present-mode :deep(.slide) {
-  width:100vw!important; height:100vh!important; min-height:100vh!important;
-  max-width:none!important; max-height:none!important; border-radius:0!important;
-  box-shadow:none!important; border:none!important; padding:60px 80px!important; margin:0!important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 60px 80px !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(1) !important;
+  transition: opacity 0.4s ease !important;
+}
+.present-mode :deep(.slide.active) {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: scale(1) !important;
+}
+
+@media (max-width: 768px) {
+  .present-mode :deep(.slide) {
+    padding: 24px 28px !important;
+  }
 }
 </style>
