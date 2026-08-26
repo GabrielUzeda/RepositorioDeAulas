@@ -182,7 +182,7 @@ function handleNextQuestion() {
           <div class="w-16 h-16 bg-success-light text-success-text rounded-full flex items-center justify-center mx-auto shadow-sm">
             <span class="material-icons text-3xl">emoji_events</span>
           </div>
-          <h3 class="text-2xl font-extrabold text-primary">🎉 Parabéns! Roleta Concluída!</h3>
+          <h3 class="text-2xl font-extrabold text-primary">Parabéns! Roleta Concluída!</h3>
           <p class="text-secondary text-sm leading-relaxed">
             Você respondeu a todas as perguntas sorteadas nesta atividade.
           </p>
@@ -273,7 +273,7 @@ function handleNextQuestion() {
               class="p-3.5 bg-success-light border-l-4 border-success text-success-text rounded-r-xl text-xs font-semibold flex items-center gap-2.5"
             >
               <span class="material-icons text-lg">check_circle</span>
-              <span>Resposta Correta! 🎉 {{ selectedOption.feedback || '' }}</span>
+              <span>Resposta Correta! {{ selectedOption.feedback || '' }}</span>
             </div>
 
             <div

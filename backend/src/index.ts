@@ -15,11 +15,11 @@ initMailer();
 runDataRetentionPurge();
 setInterval(runDataRetentionPurge, 24 * 60 * 60 * 1000).unref();
 
-console.log(`🚀 Servidor Bun rodando em ${process.env.HOST || '0.0.0.0'}:${Number(process.env.PORT) || 8080}`);
-console.log('📧 Endpoint: POST /send-mail');
-console.log('📁 Templates disponíveis em: /app/src/templates/');
-console.log('🗄️  SQLite disponível via DB_PATH');
-console.log(`🌐 CORS restrito por CORS_ORIGIN (fallback: http://localhost) — ${process.env.CORS_ORIGIN ? 'configurado' : 'não definido (dev)'}`);
+console.log(`[server] Servidor Bun rodando em ${process.env.HOST || '0.0.0.0'}:${Number(process.env.PORT) || 8080}`);
+console.log('[mail] Endpoint: POST /send-mail');
+console.log('[mail] Templates disponíveis em: /app/src/templates/');
+console.log('[db] SQLite disponível via DB_PATH');
+console.log(`[cors] CORS restrito por CORS_ORIGIN (fallback: http://localhost) — ${process.env.CORS_ORIGIN ? 'configurado' : 'não definido (dev)'}`);
 
 export default {
   port: Number(process.env.PORT) || 8080,

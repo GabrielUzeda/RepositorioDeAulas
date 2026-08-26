@@ -74,7 +74,7 @@ function selectOption(optIndex: number) {
     answeredCorrectly.value = newSet;
 
     if (newSet.size === props.questions.length) {
-      success('Parabéns! Você acertou todas as questões de reforço! 🎉');
+      success('Parabéns! Você acertou todas as questões de reforço!');
     }
   }
 }
@@ -155,7 +155,7 @@ function prevQuestion() {
       <div v-if="isCompleted" class="p-4 bg-success-light border border-success/30 text-success-text rounded-xl text-sm font-bold flex items-center gap-3 animate-fade-in">
         <span class="material-icons text-2xl">emoji_events</span>
         <div>
-          <h4 class="text-base font-extrabold">🎉 Parabéns!</h4>
+          <h4 class="text-base font-extrabold">Parabéns!</h4>
           <p class="text-xs font-normal opacity-90">Você acertou todas as questões da atividade de reforço!</p>
         </div>
       </div>
@@ -210,7 +210,7 @@ function prevQuestion() {
             class="p-4 bg-success-light border-l-4 border-success text-success-text rounded-r-xl text-sm font-semibold flex items-center gap-3 animate-fade-in"
           >
             <span class="material-icons text-xl">check_circle</span>
-            <span>Resposta Correta! 🎉</span>
+            <span>Resposta Correta!</span>
           </div>
 
           <!-- Incorrect Feedback with Explanation -->
