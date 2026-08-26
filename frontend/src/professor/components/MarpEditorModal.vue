@@ -73,13 +73,12 @@ let findMatches: Array<{ start: number; end: number }> = [];
 let currentMatchIndex = -1;
 let isResizing = false;
 
-const clockText = ref('00:00:00');
+const clockText = ref('00:00');
 function updateClock() {
   const now = new Date();
   const h = String(now.getHours()).padStart(2, '0');
   const m = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
-  clockText.value = `${h}:${m}:${s}`;
+  clockText.value = `${h}:${m}`;
 }
 let clockTimer: any = null;
 
@@ -145,6 +144,55 @@ function isInteractiveElement(target: HTMLElement | null): boolean {
   return false;
 }
 
+let currentZoom = ref(1.0);
+let panX = 0;
+let panY = 0;
+let initialPinchDistance = 0;
+let initialZoom = 1.0;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let lastTapTime = 0;
+
+function applySlideZoom() {
+  const activeSlide = previewPaneRef.value?.querySelector('.slide.active') as HTMLElement | null;
+  if (!activeSlide) return;
+  if (currentZoom.value <= 1.01) {
+    currentZoom.value = 1.0;
+    panX = 0;
+    panY = 0;
+    activeSlide.style.transform = '';
+    activeSlide.style.transformOrigin = 'center center';
+  } else {
+    activeSlide.style.transformOrigin = 'center center';
+    activeSlide.style.transform = `scale(${currentZoom.value}) translate(${panX / currentZoom.value}px, ${panY / currentZoom.value}px)`;
+  }
+}
+
+function resetZoom() {
+  currentZoom.value = 1.0;
+  panX = 0;
+  panY = 0;
+  initialPinchDistance = 0;
+  isPanning = false;
+  if (previewPaneRef.value) {
+    previewPaneRef.value.querySelectorAll('.slide').forEach((s) => {
+      (s as HTMLElement).style.transform = '';
+    });
+  }
+}
+
+function toggleZoom() {
+  if (currentZoom.value > 1.05) {
+    resetZoom();
+  } else {
+    currentZoom.value = 1.8;
+    panX = 0;
+    panY = 0;
+    applySlideZoom();
+  }
+}
+
 let isPointerActive = false;
 let startX = 0;
 let startY = 0;
@@ -163,15 +211,83 @@ function handleTouchStart(e: TouchEvent) {
   if (!isPresentMode.value) return;
   const target = e.target as HTMLElement;
   if (isInteractiveElement(target)) return;
-  if (!e.touches || !e.touches[0]) return;
-  isPointerActive = true;
-  startX = e.touches[0].clientX;
-  startY = e.touches[0].clientY;
-  startTime = Date.now();
+  if (!e.touches) return;
+
+  // Gesto de Pinça com 2 dedos
+  if (e.touches.length === 2) {
+    isPointerActive = false;
+    isPanning = false;
+    initialPinchDistance = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    initialZoom = currentZoom.value;
+    return;
+  }
+
+  if (e.touches.length === 1) {
+    isPointerActive = true;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+    if (currentZoom.value > 1.05) {
+      isPanning = true;
+      panStartX = e.touches[0].clientX;
+      panStartY = e.touches[0].clientY;
+    }
+  }
+}
+
+function handleTouchMove(e: TouchEvent) {
+  if (!isPresentMode.value) return;
+  const target = e.target as HTMLElement;
+  if (isInteractiveElement(target)) return;
+  if (!e.touches) return;
+
+  // Pinch-to-zoom com 2 dedos
+  if (e.touches.length === 2 && initialPinchDistance > 0) {
+    if (e.cancelable) e.preventDefault();
+    const currentDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    const factor = currentDist / Math.max(initialPinchDistance, 1);
+    currentZoom.value = Math.min(Math.max(initialZoom * factor, 1.0), 3.0);
+    applySlideZoom();
+    return;
+  }
+
+  // Pan quando zoom ativo
+  if (e.touches.length === 1 && currentZoom.value > 1.05 && isPanning) {
+    if (e.cancelable) e.preventDefault();
+    const dx = e.touches[0].clientX - panStartX;
+    const dy = e.touches[0].clientY - panStartY;
+    panX += dx;
+    panY += dy;
+    panStartX = e.touches[0].clientX;
+    panStartY = e.touches[0].clientY;
+    applySlideZoom();
+  }
 }
 
 function handleTouchEnd(e: TouchEvent) {
-  if (!isPresentMode.value || !isPointerActive) return;
+  if (!isPresentMode.value) return;
+  if (e.touches && e.touches.length > 0) {
+    if (e.touches.length === 1) {
+      panStartX = e.touches[0].clientX;
+      panStartY = e.touches[0].clientY;
+    }
+    return;
+  }
+
+  initialPinchDistance = 0;
+  isPanning = false;
+
+  if (currentZoom.value > 1.05) {
+    return;
+  }
+
+  if (!isPointerActive) return;
   isPointerActive = false;
   const touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
   if (!touch) return;
@@ -191,19 +307,30 @@ function handleTouchEnd(e: TouchEvent) {
     return;
   }
 
-  // Clique simples em áreas livres
+  // Toque simples em áreas livres
   if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && dt < 500) {
+    const now = Date.now();
+    if (now - lastTapTime < 320) {
+      toggleZoom();
+      lastTapTime = 0;
+      return;
+    }
+    lastTapTime = now;
+
     const vw = window.innerWidth;
     if (startX < vw * 0.25) {
       safeNavigate(-1);
     } else if (startX > vw * 0.75) {
       safeNavigate(1);
+    } else {
+      isIdle.value = !isIdle.value;
     }
   }
 }
 
 function handlePointerCancel() {
   isPointerActive = false;
+  isPanning = false;
 }
 
 // Default Markdown Template
@@ -539,9 +666,10 @@ async function renderAllMermaid() {
   });
 }
 
-function activateSlide(index: number) {
-  if (totalSlides.value === 0) return;
-  currentSlideNum = Math.max(0, Math.min(index, totalSlides.value - 1));
+function activateSlide(idx: number) {
+  if (totalSlidesNum === 0) return;
+  resetZoom();
+  currentSlideNum = Math.max(0, Math.min(idx, totalSlidesNum - 1));
   currentSlide.value = currentSlideNum;
   if (!previewPaneRef.value) return;
 
@@ -1212,6 +1340,9 @@ function handleGlobalKeydown(e: KeyboardEvent) {
     } else if (e.key === 'End') {
       e.preventDefault();
       activateSlide(totalSlidesNum - 1);
+    } else if (e.key === 'z' || e.key === 'Z') {
+      e.preventDefault();
+      toggleZoom();
     }
   }
 }
@@ -1228,6 +1359,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('mousemove', handleMouseMove);
   window.addEventListener('touchstart', handleTouchStart, { passive: true });
+  window.addEventListener('touchmove', handleTouchMove, { passive: false });
   window.addEventListener('touchend', handleTouchEnd, { passive: true });
   window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
   window.addEventListener('dragstart', handlePointerCancel, { passive: true });
@@ -1254,6 +1386,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('click', handleWindowClick);
   window.removeEventListener('touchstart', handleTouchStart);
+  window.removeEventListener('touchmove', handleTouchMove);
   window.removeEventListener('touchend', handleTouchEnd);
   window.removeEventListener('touchcancel', handlePointerCancel);
   window.removeEventListener('dragstart', handlePointerCancel);
@@ -1410,6 +1543,11 @@ onBeforeUnmount(() => {
       <button class="ctrl-btn" id="btn-font-dec" @click="adjustFont(0.9)" title="Diminuir Fonte (-)">A-</button>
       <button class="ctrl-btn" id="btn-font-reset" @click="resetFont" title="Resetar Fonte">100%</button>
       <button class="ctrl-btn" id="btn-font-inc" @click="adjustFont(1.1)" title="Aumentar Fonte (+)">A+</button>
+      <div class="divider"></div>
+      <button class="ctrl-btn" id="btn-zoom" @click="toggleZoom" title="Lupa / Zoom (Z)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        Zoom
+      </button>
       <div class="divider"></div>
       <button class="ctrl-btn" id="btn-fs" @click="toggleFullscreen" title="Tela Cheia (F)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>

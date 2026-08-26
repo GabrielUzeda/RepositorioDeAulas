@@ -563,6 +563,10 @@ console.log(x);
     expect(html).toContain('width: 100vw;');
     expect(html).toContain('height: 100vh;');
     expect(html).toContain('safeNavigate');
+    expect(html).toContain('id="btn-zoom"');
+    expect(html).toContain('applySlideZoom');
+    expect(html).toContain('overflow-y: auto;');
+    expect(html).toContain('00:00');
     
     // Validar que os blocos de script compilam sem SyntaxError
     const allScripts = Array.from(html.matchAll(/<script(?![^>]*src=)>([\s\S]*?)<\/script>/g));
