@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { unlinkSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword, verifyPassword, signJwt, verifyJwt } from './auth';
-import { resolveFrontendDir } from './marp';
+import { resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
 import { db, runDataRetentionPurge, purgeOldRanking } from './db';
 import app from './routes';
 
@@ -528,5 +528,34 @@ describe('Auth Module & Multi-Professor System', () => {
     expect(auditRow).toBeDefined();
     expect(auditRow.recurso).toBe(`atividade:${atvId}`);
     expect(auditRow.ip).toBe('10.0.0.99');
+  });
+
+  test('Marp Standalone HTML: aspect-ratio 16:9, highlight.js, mobile rotate-prompt e delegação de eventos', async () => {
+    const md = `---
+title: Aula Teste Marp
+theme: dark
+---
+
+# Slide 1
+
+\`\`\`javascript
+const x = 42;
+console.log(x);
+\`\`\`
+
+---
+
+# Slide 2
+
+<button class="custom-btn">Botão Interativo</button>
+`;
+    const html = generateMarpNextStandaloneHtml('Aula Teste Marp', md);
+    expect(html).toContain('data-theme="dark"');
+    expect(html).toContain('highlight.min.js');
+    expect(html).toContain('id="rotate-prompt"');
+    expect(html).toContain('isInteractiveElement');
+    expect(html).toContain('--c-code-bg');
+    expect(html).toContain('calc(100vh * 16 / 9)');
+    expect(html).toContain('safeNavigate');
   });
 });

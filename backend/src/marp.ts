@@ -105,6 +105,7 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
 <style>
 ${MARP_THEME_CSS}
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -131,20 +132,19 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .slide {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  max-width: none;
-  max-height: none;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  max-width: 100vw;
+  max-height: 100vh;
   background: var(--slide-bg);
   border: none;
   border-radius: 0;
-  padding: 60px 80px;
+  padding: 40px 60px;
   box-shadow: none;
   display: flex;
   flex-direction: column;
@@ -152,9 +152,18 @@ html, body {
   opacity: 0;
   pointer-events: none;
   transform: scale(1);
-  transition: opacity 0.4s ease;
-  font-size: calc(16px * var(--font-scale));
+  transition: opacity 0.3s ease;
+  font-size: calc(16px * var(--font-scale, 1));
   overflow: visible;
+  margin: auto;
+}
+
+@media (max-width: 768px) {
+  .slide {
+    padding: 20px 24px;
+    width: 100vw;
+    height: 100vh;
+  }
 }
 
 .slide.active {
@@ -295,6 +304,14 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
 </head>
 <body class="anim-mode">
 
+<div id="rotate-prompt">
+  <div class="prompt-content">
+    <span class="prompt-icon">🔄</span>
+    <span>Para melhor visualização, gire o dispositivo para o modo paisagem (landscape).</span>
+  </div>
+  <button class="prompt-close" id="btn-dismiss-rotate" title="Dispensar">✕</button>
+</div>
+
 <div id="progress-bar"></div>
 <div id="slides-container">
   ${slidesHtml}
@@ -383,6 +400,14 @@ function updateThemeUI(themeName) {
   btn.innerHTML = (icons[theme] || sunSvg) + ' ' + (themeLabels[theme] || theme);
 }
 
+function renderAllCodeHighlight() {
+  if (!window.hljs) return;
+  document.querySelectorAll('.slide-content pre code').forEach(block => {
+    if (block.closest('.mermaid-block') || block.classList.contains('mermaid')) return;
+    window.hljs.highlightElement(block);
+  });
+}
+
 function activateSlide(idx) {
   if (totalSlides === 0) return;
   currentSlide = Math.max(0, Math.min(idx, totalSlides - 1));
@@ -452,6 +477,7 @@ function toggleTheme() {
   updateThemeUI(next);
   initMermaid(next);
   renderAllMermaid();
+  renderAllCodeHighlight();
 }
 
 document.getElementById('btn-font-inc').addEventListener('click', () => adjustFont(1.1));
@@ -467,9 +493,20 @@ function applyFontScale() {
   document.documentElement.style.setProperty('--font-scale', fontScale);
 }
 
-document.getElementById('btn-fs').addEventListener('click', () => {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-  else document.exitFullscreen();
+document.getElementById('btn-fs').addEventListener('click', async () => {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    } else {
+      await document.exitFullscreen();
+      if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+        screen.orientation.unlock();
+      }
+    }
+  } catch (_err) {}
 });
 
 // Keyboard Hotkeys
@@ -503,6 +540,88 @@ document.addEventListener('mousemove', () => {
   idleTimer = setTimeout(() => controls.classList.add('idle'), 2500);
 });
 
+// Robust Event Delegation & Gestures
+function isInteractiveElement(target) {
+  if (!target || target === document.body || target === document.documentElement) return false;
+  return !!target.closest(
+    '#controls-bar, #rotate-prompt, button, a, input, textarea, select, details, summary, label, [contenteditable="true"], [tabindex], [role="button"], [role="link"], [data-interactive], .interactive, canvas, audio, video, iframe, pre, code'
+  );
+}
+
+let isPointerActive = false;
+let startX = 0;
+let startY = 0;
+let startTime = 0;
+let lastNavTime = 0;
+const NAV_COOLDOWN_MS = 200;
+
+function safeNavigate(delta) {
+  const now = Date.now();
+  if (now - lastNavTime < NAV_COOLDOWN_MS) return;
+  lastNavTime = now;
+  activateSlide(currentSlide + delta);
+}
+
+const slidesContainer = document.getElementById('slides-container') || document.body;
+
+function handlePointerStart(e) {
+  if (isInteractiveElement(e.target)) return;
+  isPointerActive = true;
+  startX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+  startY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+  startTime = Date.now();
+}
+
+function handlePointerEnd(e) {
+  if (!isPointerActive) return;
+  isPointerActive = false;
+  const endX = e.clientX !== undefined ? e.clientX : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : startX);
+  const endY = e.clientY !== undefined ? e.clientY : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientY : startY);
+  const diffX = endX - startX;
+  const diffY = endY - startY;
+  const dt = Date.now() - startTime;
+
+  // Gesto de Arrastar/Swipe Horizontal (>40px horizontal e dominante sobre o vertical)
+  if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY) * 1.2 && dt < 800) {
+    if (diffX < 0) {
+      safeNavigate(1);  // Swipe para a esquerda -> próximo slide
+    } else {
+      safeNavigate(-1); // Swipe para a direita -> slide anterior
+    }
+    return;
+  }
+
+  // Clique simples em áreas livres (movimento < 10px e sem seleção de texto)
+  if (Math.abs(diffX) < 10 && Math.abs(diffY) < 10 && dt < 400) {
+    const sel = window.getSelection ? window.getSelection().toString() : '';
+    if (sel && sel.length > 0) return;
+
+    const vw = window.innerWidth;
+    if (startX < vw * 0.25) {
+      safeNavigate(-1); // Clique na lateral esquerda -> slide anterior
+    } else if (startX > vw * 0.75) {
+      safeNavigate(1);  // Clique na lateral direita -> próximo slide
+    }
+  }
+}
+
+if (window.PointerEvent) {
+  slidesContainer.addEventListener('pointerdown', handlePointerStart, { passive: true });
+  slidesContainer.addEventListener('pointerup', handlePointerEnd, { passive: true });
+} else {
+  slidesContainer.addEventListener('touchstart', handlePointerStart, { passive: true });
+  slidesContainer.addEventListener('touchend', handlePointerEnd, { passive: true });
+}
+
+const btnDismissRotate = document.getElementById('btn-dismiss-rotate');
+if (btnDismissRotate) {
+  btnDismissRotate.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const prompt = document.getElementById('rotate-prompt');
+    if (prompt) prompt.style.display = 'none';
+  });
+}
+
 try {
   const _url = new URL(window.location.href);
   if (_url.searchParams.has('senha')) {
@@ -527,6 +646,7 @@ function renderAllKaTeX() {
 
 activateSlide(0);
 renderAllKaTeX();
+renderAllCodeHighlight();
 updateThemeUI('${initialTheme}');
 initMermaid('${initialTheme}');
 renderAllMermaid();
