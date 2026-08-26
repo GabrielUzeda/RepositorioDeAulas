@@ -36,21 +36,23 @@ export async function executeWithFeedback<T>(
       }
       return res;
     } else {
-      const errorDetail = res.error || errorMessage;
+      const isServer500 = res.status && res.status >= 500;
+      const errorDetail = isServer500 ? 'Erro interno no servidor. Tente novamente mais tarde.' : (res.error || errorMessage);
       if (showErrorToast) {
         toast.error(errorDetail);
       }
       return res;
     }
   } catch (err: any) {
-    const fallbackMsg = err?.message || errorMessage;
+    const isServer500 = err?.response?.status && err.response.status >= 500;
+    const fallbackMsg = isServer500 ? 'Erro interno no servidor. Tente novamente mais tarde.' : (err?.message || errorMessage);
     if (showErrorToast) {
       toast.error(fallbackMsg);
     }
     return {
       success: false,
       error: fallbackMsg,
-      status: 0,
+      status: err?.response?.status || 0,
     };
   } finally {
     if (loadingRef) {

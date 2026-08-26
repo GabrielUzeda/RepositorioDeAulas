@@ -612,6 +612,15 @@ console.log(x);
     expect(wrongSenhaHtml).toContain('Acesso Restrito');
     expect(wrongSenhaHtml).toContain('Senha incorreta');
 
+    // 2.1 Teste de proteção contra XSS via query param senha
+    const xssSenhaRes = await app.request(`/${aula.caminho}?senha=%3Cscript%3Ealert(1)%3C%2Fscript%3E`, {
+      method: 'GET',
+    });
+    expect(xssSenhaRes.status).toBe(401);
+    const xssHtml = await xssSenhaRes.text();
+    expect(xssHtml).toContain('Acesso Restrito');
+    expect(xssHtml).not.toContain('<script>alert(1)</script>');
+
     // 3. Acesso com senha correta -> 200 com conteúdo do slide
     const correctSenhaRes = await app.request(`/${aula.caminho}?senha=asdf1234`, {
       method: 'GET',
