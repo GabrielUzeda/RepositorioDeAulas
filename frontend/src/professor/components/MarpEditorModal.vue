@@ -129,7 +129,7 @@ function isInteractiveElement(target: HTMLElement | null): boolean {
     '[role="slider"], [role="textbox"], [role="switch"], [data-interactive], .interactive, ' +
     '[draggable="true"], [draggable], [onclick], [onmousedown], [onmouseup], [ontouchstart], [ontouchend], ' +
     'canvas, audio, video, iframe, embed, object, svg, pre, code, kbd, samp, ' +
-    '#controls-bar, #controls-bar *, #rotate-prompt, #rotate-prompt *'
+    '#controls-bar, #controls-bar *, #landscape-modal, #landscape-modal *'
   );
   if (interactive) return true;
 
@@ -220,7 +220,7 @@ animation-duration: 0.8s
 class: centered
 -->
 
-# Marp Next ⚡
+# Marp Next
 
 Apresentações em Markdown com animações nativas
 
@@ -281,7 +281,7 @@ class: centered
 background: linear-gradient(135deg, #667eea, #764ba2)
 -->
 
-# Pronto para começar? 🚀
+# Pronto para começar?
 
 Edite este Markdown à esquerda
 `;
@@ -533,7 +533,7 @@ async function renderAllMermaid() {
           svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach((node: Element) => (node as HTMLElement).style.overflow = 'visible');
         }
       }).catch((err: any) => {
-        wrapper.innerHTML = '<div style="color:#ef4444;font-size:12px;">⚠ Mermaid: ' + err.message + '</div>';
+        wrapper.innerHTML = '<div style="color:#ef4444;font-size:12px;">[Erro] Mermaid: ' + err.message + '</div>';
       });
     });
   });
@@ -1286,8 +1286,8 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="sep"></div>
-      <BaseButton :variant="isPresentMode ? 'primary' : 'secondary'" size="sm" @click="togglePresentMode" title="Apresentar (F)">▶ Apresentar</BaseButton>
-      <BaseButton :variant="isAnimMode ? 'primary' : 'secondary'" size="sm" @click="isAnimMode = !isAnimMode" title="Toggle animações">✦ Animação</BaseButton>
+      <BaseButton :variant="isPresentMode ? 'primary' : 'secondary'" size="sm" @click="togglePresentMode" title="Apresentar (F)">Apresentar</BaseButton>
+      <BaseButton :variant="isAnimMode ? 'primary' : 'secondary'" size="sm" @click="isAnimMode = !isAnimMode" title="Toggle animações">Animação</BaseButton>
       <select
         v-model="currentTheme"
         @change="applyTheme(currentTheme, true)"
@@ -1301,11 +1301,11 @@ onBeforeUnmount(() => {
 
       <!-- Dropdown de Exportar -->
       <div class="export-dropdown relative">
-        <BaseButton variant="secondary" size="sm" @click.stop="showExportMenu = !showExportMenu" title="Exportar Apresentação">📥 Exportar ▾</BaseButton>
+        <BaseButton variant="secondary" size="sm" @click.stop="showExportMenu = !showExportMenu" title="Exportar Apresentação">Exportar</BaseButton>
         <div v-if="showExportMenu" class="export-menu">
-          <button class="export-item" @click="exportHtml(); showExportMenu = false">🌐 HTML Autossuficiente (.html)</button>
-          <button class="export-item" @click="exportPdf(); showExportMenu = false">📄 Documento PDF (.pdf)</button>
-          <button class="export-item" @click="exportPptx(); showExportMenu = false">📊 Apresentação PowerPoint (.pptx)</button>
+          <button class="export-item" @click="exportHtml(); showExportMenu = false">HTML Autossuficiente (.html)</button>
+          <button class="export-item" @click="exportPdf(); showExportMenu = false">Documento PDF (.pdf)</button>
+          <button class="export-item" @click="exportPptx(); showExportMenu = false">Apresentação PowerPoint (.pptx)</button>
         </div>
       </div>
 
@@ -1348,8 +1348,9 @@ onBeforeUnmount(() => {
             <div class="find-actions">
               <button class="find-btn" @click="findPrev" title="Anterior (Shift+Enter)">↑</button>
               <button class="find-btn" @click="findNext" title="Próximo (Enter)">↓</button>
-              <button class="find-btn" @click="showReplaceRow = !showReplaceRow" title="Alternar substituir (Ctrl+H)">⇄</button>
-              <button class="find-btn" @click="closeFindBar" title="Fechar (Esc)">✕</button>
+              <button class="find-btn" @click="closeFindBar" title="Fechar (Esc)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
           </div>
           <div class="replace-row" v-if="showReplaceRow">
@@ -1410,7 +1411,10 @@ onBeforeUnmount(() => {
       <button class="ctrl-btn" id="btn-font-reset" @click="resetFont" title="Resetar Fonte">100%</button>
       <button class="ctrl-btn" id="btn-font-inc" @click="adjustFont(1.1)" title="Aumentar Fonte (+)">A+</button>
       <div class="divider"></div>
-      <button class="ctrl-btn" id="btn-fs" @click="toggleFullscreen" title="Tela Cheia (F)">⛶ Fullscreen</button>
+      <button class="ctrl-btn" id="btn-fs" @click="toggleFullscreen" title="Tela Cheia (F)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        Fullscreen
+      </button>
     </div>
   </div>
 </template>

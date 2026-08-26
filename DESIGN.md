@@ -175,6 +175,7 @@ Configurada em `theme.extend.fontSize`. Fonte base: **Inter** (via Google Fonts 
 ### ❌ Nunca faça
 
 - **Nunca** usar cor Tailwind literal (`bg-purple-100`, `text-pink-600`). Use os tokens `--c-*`.
+- **Nunca** usar emojis unicode na interface, mensagens de feedback, toasts ou código. Use sempre **Material Icons** (`<span class="material-icons">`) ou **Font Awesome** (`<i class="fa...">`).
 - **Nunca** montar classes dinamicamente via concatenação de strings.
 - **Nunca** usar `window.confirm()` — use `ConfirmDialog.vue`.
 - **Nunca** usar fundo sólido preto/escuro no backdrop de modais — use `bg-primary/30 backdrop-blur-sm`.

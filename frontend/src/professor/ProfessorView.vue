@@ -61,6 +61,8 @@ async function showDisciplinas() {
   activeView.value = 'disciplinas';
 }
 
+import { executeWithFeedback } from '@/shared/api/requestHelper';
+
 function handleOpenDisciplinaModal(disciplina?: Disciplina) {
   editingDisciplina.value = disciplina || null;
   showDisciplinaModal.value = true;
@@ -70,18 +72,23 @@ const isSavingDisciplina = ref(false);
 
 async function handleSaveDisciplina(data: Partial<Disciplina>) {
   if (!selectedCurso.value || isSavingDisciplina.value) return;
-  isSavingDisciplina.value = true;
-  try {
-    const payload = { ...data, curso_id: selectedCurso.value.id };
-    if (editingDisciplina.value) {
-      await apiClient.put(`/disciplinas/${editingDisciplina.value.id}`, payload);
-    } else {
-      await apiClient.post('/disciplinas', payload);
+  const isEditing = Boolean(editingDisciplina.value);
+  const payload = { ...data, curso_id: selectedCurso.value.id };
+
+  const res = await executeWithFeedback(
+    () => isEditing && editingDisciplina.value
+      ? apiClient.put(`/disciplinas/${editingDisciplina.value.id}`, payload)
+      : apiClient.post('/disciplinas', payload),
+    {
+      loadingRef: isSavingDisciplina,
+      successMessage: isEditing ? 'Disciplina atualizada com sucesso!' : 'Disciplina criada com sucesso!',
+      errorMessage: isEditing ? 'Falha ao atualizar disciplina.' : 'Falha ao criar disciplina.'
     }
+  );
+
+  if (res.success) {
     showDisciplinaModal.value = false;
     await showDisciplinas();
-  } finally {
-    isSavingDisciplina.value = false;
   }
 }
 
@@ -95,8 +102,16 @@ function handleDeleteDisciplina(disciplinaId: number) {
 
 async function onConfirmDelDisc() {
   if (delDiscId.value == null) return;
-  await apiClient.delete(`/disciplinas/${delDiscId.value}`);
-  await showDisciplinas();
+  const res = await executeWithFeedback(
+    () => apiClient.delete(`/disciplinas/${delDiscId.value}`),
+    {
+      successMessage: 'Disciplina excluída com sucesso!',
+      errorMessage: 'Falha ao excluir disciplina.'
+    }
+  );
+  if (res.success) {
+    await showDisciplinas();
+  }
 }
 
 function onCancelDelDisc() {}
@@ -126,28 +141,34 @@ const isSavingAula = ref(false);
 
 async function handleSaveMarpAula(payload: { titulo: string; descricao: string; markdown: string }) {
   if (!selectedDisciplina.value || isSavingAula.value) return;
-  isSavingAula.value = true;
+  const isEditing = Boolean(editingAula.value);
+  const data: any = {
+    disciplina_id: selectedDisciplina.value.id,
+    titulo: payload.titulo,
+    descricao: payload.descricao,
+    markdown: payload.markdown
+  };
 
-  try {
-    const data: any = {
-      disciplina_id: selectedDisciplina.value.id,
-      titulo: payload.titulo,
-      descricao: payload.descricao,
-      markdown: payload.markdown
-    };
-
-    if (editingAula.value) {
-      await apiClient.put(`/aulas/${editingAula.value.id}`, { ...editingAula.value, ...data });
-    } else {
-      const maxOrdem = cursoStore.aulas.reduce((max, a) => Math.max(max, a.ordem ?? 0), -1);
-      data.ordem = maxOrdem + 1;
-      await apiClient.post('/aulas', data);
+  const res = await executeWithFeedback(
+    () => {
+      if (isEditing && editingAula.value) {
+        return apiClient.put(`/aulas/${editingAula.value.id}`, { ...editingAula.value, ...data });
+      } else {
+        const maxOrdem = cursoStore.aulas.reduce((max, a) => Math.max(max, a.ordem ?? 0), -1);
+        data.ordem = maxOrdem + 1;
+        return apiClient.post('/aulas', data);
+      }
+    },
+    {
+      loadingRef: isSavingAula,
+      successMessage: isEditing ? 'Aula atualizada com sucesso!' : 'Aula criada com sucesso!',
+      errorMessage: isEditing ? 'Falha ao salvar aula.' : 'Falha ao criar aula.'
     }
+  );
 
+  if (res.success) {
     showMarpModal.value = false;
     await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
-  } finally {
-    isSavingAula.value = false;
   }
 }
 
@@ -161,8 +182,16 @@ function handleDeleteAula(aulaId: number) {
 
 async function onConfirmDelAula() {
   if (delAulaId.value == null) return;
-  await apiClient.delete(`/aulas/${delAulaId.value}`);
-  if (selectedDisciplina.value) await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+  const res = await executeWithFeedback(
+    () => apiClient.delete(`/aulas/${delAulaId.value}`),
+    {
+      successMessage: 'Aula excluída com sucesso!',
+      errorMessage: 'Falha ao excluir aula.'
+    }
+  );
+  if (res.success && selectedDisciplina.value) {
+    await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+  }
 }
 
 function onCancelDelAula() {}
@@ -176,26 +205,32 @@ const isSavingActivity = ref(false);
 
 async function handleSaveActivity(payload: any) {
   if (!selectedDisciplina.value || isSavingActivity.value) return;
-  isSavingActivity.value = true;
+  const isEditing = Boolean(editingActivity.value);
+  const data = {
+    ...payload,
+    disciplina_id: selectedDisciplina.value.id
+  };
 
-  try {
-    const data = {
-      ...payload,
-      disciplina_id: selectedDisciplina.value.id
-    };
-
-    if (editingActivity.value) {
-      await apiClient.put(`/atividades/${editingActivity.value.id}`, { ...editingActivity.value, ...data });
-    } else {
-      const maxOrdem = cursoStore.atividades.reduce((max, a) => Math.max(max, a.ordem ?? 0), -1);
-      data.ordem = maxOrdem + 1;
-      await apiClient.post('/atividades', data);
+  const res = await executeWithFeedback(
+    () => {
+      if (isEditing && editingActivity.value) {
+        return apiClient.put(`/atividades/${editingActivity.value.id}`, { ...editingActivity.value, ...data });
+      } else {
+        const maxOrdem = cursoStore.atividades.reduce((max, a) => Math.max(max, a.ordem ?? 0), -1);
+        data.ordem = maxOrdem + 1;
+        return apiClient.post('/atividades', data);
+      }
+    },
+    {
+      loadingRef: isSavingActivity,
+      successMessage: isEditing ? 'Atividade atualizada com sucesso!' : 'Atividade criada com sucesso!',
+      errorMessage: isEditing ? 'Falha ao salvar atividade.' : 'Falha ao criar atividade.'
     }
+  );
 
+  if (res.success) {
     showActivityEditorModal.value = false;
     await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
-  } finally {
-    isSavingActivity.value = false;
   }
 }
 
@@ -209,8 +244,16 @@ function handleDeleteActivity(atividadeId: number) {
 
 async function onConfirmDelAtiv() {
   if (delAtivId.value == null) return;
-  await apiClient.delete(`/atividades/${delAtivId.value}`);
-  if (selectedDisciplina.value) await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+  const res = await executeWithFeedback(
+    () => apiClient.delete(`/atividades/${delAtivId.value}`),
+    {
+      successMessage: 'Atividade excluída com sucesso!',
+      errorMessage: 'Falha ao excluir atividade.'
+    }
+  );
+  if (res.success && selectedDisciplina.value) {
+    await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+  }
 }
 
 function onCancelDelAtiv() {}
@@ -241,20 +284,27 @@ function toggleReorderAulas() {
 
 async function saveAulasOrder() {
   if (isSavingOrders.value) return;
-  isSavingOrders.value = true;
-  try {
-    for (let i = 0; i < localAulas.value.length; i++) {
-      const item = localAulas.value[i];
-      if (item.ordem !== i) {
-        await apiClient.put(`/aulas/${item.id}`, { ...item, ordem: i });
+
+  const res = await executeWithFeedback(
+    async () => {
+      for (let i = 0; i < localAulas.value.length; i++) {
+        const item = localAulas.value[i];
+        if (item.ordem !== i) {
+          await apiClient.put(`/aulas/${item.id}`, { ...item, ordem: i });
+        }
       }
+      return { success: true, status: 200 };
+    },
+    {
+      loadingRef: isSavingOrders,
+      successMessage: 'Ordem das aulas atualizada com sucesso!',
+      errorMessage: 'Falha ao salvar a nova ordem das aulas.'
     }
-    isReorderingAulas.value = false;
-    if (selectedDisciplina.value) {
-      await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
-    }
-  } finally {
-    isSavingOrders.value = false;
+  );
+
+  isReorderingAulas.value = false;
+  if (res.success && selectedDisciplina.value) {
+    await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
   }
 }
 
@@ -277,20 +327,27 @@ function toggleReorderAtividades() {
 
 async function saveAtividadesOrder() {
   if (isSavingOrders.value) return;
-  isSavingOrders.value = true;
-  try {
-    for (let i = 0; i < localAtividades.value.length; i++) {
-      const item = localAtividades.value[i];
-      if (item.ordem !== i) {
-        await apiClient.put(`/atividades/${item.id}`, { ...item, ordem: i });
+
+  const res = await executeWithFeedback(
+    async () => {
+      for (let i = 0; i < localAtividades.value.length; i++) {
+        const item = localAtividades.value[i];
+        if (item.ordem !== i) {
+          await apiClient.put(`/atividades/${item.id}`, { ...item, ordem: i });
+        }
       }
+      return { success: true, status: 200 };
+    },
+    {
+      loadingRef: isSavingOrders,
+      successMessage: 'Ordem das atividades atualizada com sucesso!',
+      errorMessage: 'Falha ao salvar a nova ordem das atividades.'
     }
-    isReorderingAtividades.value = false;
-    if (selectedDisciplina.value) {
-      await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
-    }
-  } finally {
-    isSavingOrders.value = false;
+  );
+
+  isReorderingAtividades.value = false;
+  if (res.success && selectedDisciplina.value) {
+    await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
   }
 }
 

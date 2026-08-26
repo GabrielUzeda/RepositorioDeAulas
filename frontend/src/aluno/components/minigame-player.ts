@@ -680,10 +680,10 @@ export class MinigamePlayer {
                 list.textContent = '';
                 data.forEach((r, i) => {
                     let colorClass = 'text-gray-300';
-                    let icon = `${i + 1}.`;
-                    if (i === 0) { colorClass = 'text-yellow-400 font-bold'; icon = '👑'; }
-                    else if (i === 1) { colorClass = 'text-gray-300 font-bold'; icon = '🥈'; }
-                    else if (i === 2) { colorClass = 'text-accent font-bold'; icon = '🥉'; }
+                    let icon = `${i + 1}º`;
+                    if (i === 0) { colorClass = 'text-yellow-400 font-bold'; icon = '1º'; }
+                    else if (i === 1) { colorClass = 'text-gray-300 font-bold'; icon = '2º'; }
+                    else if (i === 2) { colorClass = 'text-accent font-bold'; icon = '3º'; }
 
                     const row = document.createElement('div');
                     row.className = `flex justify-between items-center border-b border-[#222] py-3 px-2 hover:bg-[#111] transition-colors ${colorClass}`;
