@@ -614,8 +614,8 @@ function handlePointerEnd(e) {
   const diffY = endY - startY;
   const dt = Date.now() - startTime;
 
-  // Gesto de Arrastar/Swipe Horizontal (>40px horizontal e dominante sobre o vertical)
-  if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY) * 1.2 && dt < 800) {
+  // Gesto de Arrastar/Swipe Horizontal (>30px horizontal, movimento dominante horizontal e tempo < 1200ms)
+  if (Math.abs(diffX) > 30 && Math.abs(diffX) > Math.abs(diffY) * 1.1 && dt < 1200) {
     if (diffX < 0) {
       safeNavigate(1);  // Swipe para a esquerda -> próximo slide
     } else {
@@ -624,8 +624,8 @@ function handlePointerEnd(e) {
     return;
   }
 
-  // Clique simples em áreas livres (movimento < 10px e sem seleção de texto)
-  if (Math.abs(diffX) < 10 && Math.abs(diffY) < 10 && dt < 400) {
+  // Clique simples em áreas livres (movimento < 12px, tempo < 500ms e sem seleção de texto)
+  if (Math.abs(diffX) < 12 && Math.abs(diffY) < 12 && dt < 500) {
     const sel = window.getSelection ? window.getSelection().toString() : '';
     if (sel && sel.length > 0) return;
 
@@ -644,12 +644,12 @@ function handlePointerCancel() {
 
 if (window.PointerEvent) {
   slidesContainer.addEventListener('pointerdown', handlePointerStart, { passive: true });
-  slidesContainer.addEventListener('pointerup', handlePointerEnd, { passive: true });
-  slidesContainer.addEventListener('pointercancel', handlePointerCancel, { passive: true });
+  window.addEventListener('pointerup', handlePointerEnd, { passive: true });
+  window.addEventListener('pointercancel', handlePointerCancel, { passive: true });
 } else {
   slidesContainer.addEventListener('touchstart', handlePointerStart, { passive: true });
-  slidesContainer.addEventListener('touchend', handlePointerEnd, { passive: true });
-  slidesContainer.addEventListener('touchcancel', handlePointerCancel, { passive: true });
+  window.addEventListener('touchend', handlePointerEnd, { passive: true });
+  window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
 }
 window.addEventListener('dragstart', handlePointerCancel, { passive: true });
 
