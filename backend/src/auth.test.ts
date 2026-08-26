@@ -530,13 +530,16 @@ describe('Auth Module & Multi-Professor System', () => {
     expect(auditRow.ip).toBe('10.0.0.99');
   });
 
-  test('Marp Standalone HTML: aspect-ratio 16:9, highlight.js, mobile rotate-prompt e delegação de eventos', async () => {
+  test('Marp Standalone HTML: aspect-ratio 16:9, highlight.js, Font Awesome, mobile rotate-prompt e delegação de eventos', async () => {
     const md = `---
 title: Aula Teste Marp
 theme: dark
 ---
 
 # Slide 1
+
+:fa-rocket: Teste de Ícone Font Awesome
+<i class="fa fa-user"></i> Usuário
 
 \`\`\`javascript
 const x = 42;
@@ -552,6 +555,8 @@ console.log(x);
     const html = generateMarpNextStandaloneHtml('Aula Teste Marp', md);
     expect(html).toContain('data-theme="dark"');
     expect(html).toContain('highlight.min.js');
+    expect(html).toContain('fontawesome-free');
+    expect(html).toContain('fa-rocket');
     expect(html).toContain('id="rotate-prompt"');
     expect(html).toContain('isInteractiveElement');
     expect(html).toContain('--c-code-bg');

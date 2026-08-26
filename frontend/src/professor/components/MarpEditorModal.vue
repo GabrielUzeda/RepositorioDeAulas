@@ -306,6 +306,12 @@ function renderSlides(source: string) {
 
     let html = md ? md.render(slide.content) : `<p>${escapeHtml(slide.content)}</p>`;
     html = html.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml: string) => `<div class="table-wrap">${tableHtml}</div>`);
+    // Suporte a atalhos de ícones Font Awesome :fa-name:, :fas-name:, :fab-name:, :far-name:
+    html = html.replace(/:fa([srb]?)-([a-z0-9-]+):/gi, (_m, type, name) => {
+      const prefix = type.toLowerCase() === 'b' ? 'fa-brands' : type.toLowerCase() === 'r' ? 'fa-regular' : 'fa-solid';
+      return `<i class="fa ${prefix} fa-${name}"></i>`;
+    });
+    html = html.replace(/:fa-([a-z0-9-]+):/gi, '<i class="fa fa-solid fa-$1"></i>');
     el.innerHTML = `
       <span class="slide-number">${i + 1}/${totalSlidesNum}</span>
       <div class="slide-content">${html}</div>

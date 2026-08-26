@@ -61,8 +61,15 @@ import MarkdownIt from 'markdown-it';
 const mdParser = new MarkdownIt({ html: true, linkify: true, typographer: true });
 
 function renderMarkdown(mdText: string): string {
-  const html = mdParser.render(mdText);
-  return html.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml) => `<div class="table-wrap">${tableHtml}</div>`);
+  let html = mdParser.render(mdText);
+  html = html.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml) => `<div class="table-wrap">${tableHtml}</div>`);
+  // Suporte a atalhos de ícones Font Awesome :fa-name:, :fas-name:, :fab-name:, :far-name:
+  html = html.replace(/:fa([srb]?)-([a-z0-9-]+):/gi, (_m, type, name) => {
+    const prefix = type.toLowerCase() === 'b' ? 'fa-brands' : type.toLowerCase() === 'r' ? 'fa-regular' : 'fa-solid';
+    return `<i class="fa ${prefix} fa-${name}"></i>`;
+  });
+  html = html.replace(/:fa-([a-z0-9-]+):/gi, '<i class="fa fa-solid fa-$1"></i>');
+  return html;
 }
 
 export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string): string {
@@ -102,6 +109,7 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&family=JetBrains Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>

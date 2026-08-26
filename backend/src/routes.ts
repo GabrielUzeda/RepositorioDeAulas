@@ -51,8 +51,8 @@ async function logAudit(c: any, acao: string, recurso: string, detalhes?: object
 const CSP_HTML = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://esm.sh https://cdn.jsdelivr.net",
-  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://cdnjs.cloudflare.com",
+  "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
   "img-src 'self' data: blob: https:",
   "connect-src 'self' https://esm.sh https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com",
   "frame-ancestors 'self'",
