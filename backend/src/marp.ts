@@ -131,6 +131,7 @@ html, body {
   font-family: var(--font-sans);
   overflow: hidden;
   user-select: none;
+  touch-action: pan-y;
 }
 
 #slides-container {
@@ -138,6 +139,7 @@ html, body {
   height: 100vh;
   position: relative;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .slide {
@@ -642,14 +644,65 @@ function handlePointerCancel() {
   isPointerActive = false;
 }
 
+function handleTouchStart(e) {
+  if (isInteractiveElement(e.target)) return;
+  if (!e.touches || !e.touches[0]) return;
+  isPointerActive = true;
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+  startTime = Date.now();
+}
+
+function handleTouchEnd(e) {
+  if (!isPointerActive) return;
+  isPointerActive = false;
+  const touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+  if (!touch) return;
+  const endX = touch.clientX;
+  const endY = touch.clientY;
+  const diffX = endX - startX;
+  const diffY = endY - startY;
+  const dt = Date.now() - startTime;
+
+  // Gesto de Arrastar/Swipe Horizontal (>30px horizontal e tempo < 1200ms)
+  if (Math.abs(diffX) > 30 && Math.abs(diffX) > Math.abs(diffY) * 0.9 && dt < 1200) {
+    if (diffX < 0) {
+      safeNavigate(1);  // Swipe para a esquerda -> próximo slide
+    } else {
+      safeNavigate(-1); // Swipe para a direita -> slide anterior
+    }
+    return;
+  }
+
+  // Clique simples em áreas livres
+  if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && dt < 500) {
+    const vw = window.innerWidth;
+    if (startX < vw * 0.25) {
+      safeNavigate(-1);
+    } else if (startX > vw * 0.75) {
+      safeNavigate(1);
+    }
+  }
+}
+
+// Suporte simultâneo a Touch e Pointer
+slidesContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+window.addEventListener('touchend', handleTouchEnd, { passive: true });
+window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
+
 if (window.PointerEvent) {
-  slidesContainer.addEventListener('pointerdown', handlePointerStart, { passive: true });
-  window.addEventListener('pointerup', handlePointerEnd, { passive: true });
+  slidesContainer.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return; // Evita duplicidade com TouchEvent
+    handlePointerStart(e);
+  }, { passive: true });
+  window.addEventListener('pointerup', e => {
+    if (e.pointerType === 'touch') return;
+    handlePointerEnd(e);
+  }, { passive: true });
   window.addEventListener('pointercancel', handlePointerCancel, { passive: true });
 } else {
-  slidesContainer.addEventListener('touchstart', handlePointerStart, { passive: true });
-  window.addEventListener('touchend', handlePointerEnd, { passive: true });
-  window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
+  slidesContainer.addEventListener('mousedown', handlePointerStart, { passive: true });
+  window.addEventListener('mouseup', handlePointerEnd, { passive: true });
 }
 window.addEventListener('dragstart', handlePointerCancel, { passive: true });
 

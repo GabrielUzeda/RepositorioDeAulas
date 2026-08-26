@@ -159,27 +159,30 @@ function safeNavigate(delta: number) {
   activateSlide(currentSlide.value + delta);
 }
 
-function handlePointerStart(e: PointerEvent | TouchEvent) {
+function handleTouchStart(e: TouchEvent) {
   if (!isPresentMode.value) return;
   const target = e.target as HTMLElement;
   if (isInteractiveElement(target)) return;
+  if (!e.touches || !e.touches[0]) return;
   isPointerActive = true;
-  startX = (e as PointerEvent).clientX !== undefined ? (e as PointerEvent).clientX : ((e as TouchEvent).touches?.[0]?.clientX || 0);
-  startY = (e as PointerEvent).clientY !== undefined ? (e as PointerEvent).clientY : ((e as TouchEvent).touches?.[0]?.clientY || 0);
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
   startTime = Date.now();
 }
 
-function handlePointerEnd(e: PointerEvent | TouchEvent) {
+function handleTouchEnd(e: TouchEvent) {
   if (!isPresentMode.value || !isPointerActive) return;
   isPointerActive = false;
-  const endX = (e as PointerEvent).clientX !== undefined ? (e as PointerEvent).clientX : ((e as TouchEvent).changedTouches?.[0]?.clientX || startX);
-  const endY = (e as PointerEvent).clientY !== undefined ? (e as PointerEvent).clientY : ((e as TouchEvent).changedTouches?.[0]?.clientY || startY);
+  const touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+  if (!touch) return;
+  const endX = touch.clientX;
+  const endY = touch.clientY;
   const diffX = endX - startX;
   const diffY = endY - startY;
   const dt = Date.now() - startTime;
 
-  // Gesto de Arrastar/Swipe Horizontal (>30px horizontal, movimento dominante horizontal e tempo < 1200ms)
-  if (Math.abs(diffX) > 30 && Math.abs(diffX) > Math.abs(diffY) * 1.1 && dt < 1200) {
+  // Gesto de Arrastar/Swipe Horizontal (>30px horizontal e tempo < 1200ms)
+  if (Math.abs(diffX) > 30 && Math.abs(diffX) > Math.abs(diffY) * 0.9 && dt < 1200) {
     if (diffX < 0) {
       safeNavigate(1);  // Swipe para a esquerda -> próximo slide
     } else {
@@ -188,16 +191,13 @@ function handlePointerEnd(e: PointerEvent | TouchEvent) {
     return;
   }
 
-  // Clique simples em áreas livres (movimento < 12px, tempo < 500ms e sem seleção de texto)
-  if (Math.abs(diffX) < 12 && Math.abs(diffY) < 12 && dt < 500) {
-    const sel = window.getSelection ? window.getSelection()?.toString() : '';
-    if (sel && sel.length > 0) return;
-
+  // Clique simples em áreas livres
+  if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && dt < 500) {
     const vw = window.innerWidth;
     if (startX < vw * 0.25) {
-      safeNavigate(-1); // Clique na lateral esquerda -> slide anterior
+      safeNavigate(-1);
     } else if (startX > vw * 0.75) {
-      safeNavigate(1);  // Clique na lateral direita -> próximo slide
+      safeNavigate(1);
     }
   }
 }
@@ -1227,16 +1227,9 @@ onMounted(() => {
   clockTimer = setInterval(updateClock, 1000);
   window.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('mousemove', handleMouseMove);
-  window.addEventListener('click', handleWindowClick);
-  if (window.PointerEvent) {
-    window.addEventListener('pointerdown', handlePointerStart, { passive: true });
-    window.addEventListener('pointerup', handlePointerEnd, { passive: true });
-    window.addEventListener('pointercancel', handlePointerCancel, { passive: true });
-  } else {
-    window.addEventListener('touchstart', handlePointerStart, { passive: true });
-    window.addEventListener('touchend', handlePointerEnd, { passive: true });
-    window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
-  }
+  window.addEventListener('touchstart', handleTouchStart, { passive: true });
+  window.addEventListener('touchend', handleTouchEnd, { passive: true });
+  window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
   window.addEventListener('dragstart', handlePointerCancel, { passive: true });
   const w = window as any;
   w.marpNext = {
@@ -1260,15 +1253,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalKeydown);
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('click', handleWindowClick);
-  if (window.PointerEvent) {
-    window.removeEventListener('pointerdown', handlePointerStart);
-    window.removeEventListener('pointerup', handlePointerEnd);
-    window.removeEventListener('pointercancel', handlePointerCancel);
-  } else {
-    window.removeEventListener('touchstart', handlePointerStart);
-    window.removeEventListener('touchend', handlePointerEnd);
-    window.removeEventListener('touchcancel', handlePointerCancel);
-  }
+  window.removeEventListener('touchstart', handleTouchStart);
+  window.removeEventListener('touchend', handleTouchEnd);
+  window.removeEventListener('touchcancel', handlePointerCancel);
   window.removeEventListener('dragstart', handlePointerCancel);
   if (idleTimer) clearTimeout(idleTimer);
   const w = window as any;
