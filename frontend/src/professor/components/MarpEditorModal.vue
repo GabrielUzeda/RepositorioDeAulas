@@ -285,10 +285,6 @@ function handleTouchStart(e: TouchEvent) {
   if (e.touches.length === 2) {
     isPointerActive = false;
     isPanning = false;
-    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    originX = Math.round((midX / window.innerWidth) * 100);
-    originY = Math.round((midY / window.innerHeight) * 100);
     initialPinchDistance = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
@@ -628,7 +624,7 @@ function renderSlides(source: string) {
     let html = md ? md.render(slide.content) : `<p>${escapeHtml(slide.content)}</p>`;
     html = html.replace(/<table>[\s\S]*?<\/table>/g, (tableHtml: string) => `<div class="table-wrap">${tableHtml}</div>`);
     // Suporte a atalhos de ícones Font Awesome :fa-name:, :fas-name:, :fab-name:, :far-name:
-    html = html.replace(/:fa([srb]?)-([a-z0-9-]+):/gi, (_m, type, name) => {
+    html = html.replace(/:fa([srb]?)-([a-z0-9-]+):/gi, (_m: string, type: string, name: string) => {
       const prefix = type.toLowerCase() === 'b' ? 'fa-brands' : type.toLowerCase() === 'r' ? 'fa-regular' : 'fa-solid';
       return `<i class="fa ${prefix} fa-${name}"></i>`;
     });
@@ -654,7 +650,7 @@ function renderKaTeX(container: HTMLElement) {
   const contentDiv = container.querySelector('.slide-content');
   if (!contentDiv || !contentDiv.innerHTML.includes('$')) return;
 
-  const walker = document.createTreeWalker(contentDiv, NodeFilter.SHOW_TEXT, null, false);
+  const walker = document.createTreeWalker(contentDiv, NodeFilter.SHOW_TEXT);
   const textNodes: Text[] = [];
   let node: Node | null;
   while ((node = walker.nextNode())) {
@@ -1480,6 +1476,10 @@ function handleWheel(e: WheelEvent) {
   }
 }
 
+function handleWindowClick() {
+  showExportMenu.value = false;
+}
+
 onMounted(() => {
   ensureMarpThemeCss();
   setupAutoSave();
@@ -1487,6 +1487,7 @@ onMounted(() => {
   clockTimer = setInterval(updateClock, 1000);
   window.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('mousemove', handleMouseMove);
+  window.addEventListener('click', handleWindowClick);
   window.addEventListener('mousedown', handleMouseDown);
   window.addEventListener('mouseup', handleMouseUp);
   window.addEventListener('dblclick', handleDblClick);
