@@ -154,8 +154,11 @@ function handleNextQuestion() {
     <div class="py-2 space-y-6 relative">
       <!-- Main Wheel Area -->
       <div class="flex flex-col items-center justify-center space-y-5">
-        <div v-if="!isCompleted" class="text-center space-y-1">
+        <div v-if="!isCompleted" class="text-center space-y-2 max-w-xl">
           <h3 class="text-xl font-bold text-primary">Sua Vez de Jogar</h3>
+          <p v-if="props.atividade?.descricao" class="text-primary text-xs font-medium leading-relaxed whitespace-pre-line bg-surface-alt p-2.5 rounded-lg border border-line">
+            {{ props.atividade.descricao }}
+          </p>
           <p class="text-secondary text-sm">Clique no botão para sortear uma pergunta no painel.</p>
         </div>
 

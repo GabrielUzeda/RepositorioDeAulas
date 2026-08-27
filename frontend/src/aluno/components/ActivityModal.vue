@@ -39,9 +39,9 @@ const totalSteps = computed(() => questionsList.value.length + 2); // 0 (ID), 1.
 const progress = computed(() => ((currentStep.value) / (totalSteps.value - 1)) * 100);
 
 watch(
-  () => props.show,
-  (val) => {
-    if (val && props.atividade) {
+  () => [props.show, props.atividade],
+  ([showVal, atvVal]) => {
+    if (showVal && atvVal) {
       currentStep.value = 0;
       submitSuccess.value = false;
       errorMessage.value = '';
@@ -51,7 +51,7 @@ watch(
       Promise.all([
         secureGet('alunoNome'),
         secureGet('alunoEmail'),
-        secureGet(`draft_${props.atividade.id}`),
+        secureGet(`draft_${props.atividade?.id}`),
       ]).then(([nome, email, draft]) => {
         alunoNome.value = nome || '';
         alunoEmail.value = email || '';
@@ -64,12 +64,31 @@ watch(
         }
       });
 
-      if (props.atividade.json_data) {
+      if (props.atividade?.json_data) {
         try {
           const parsed = typeof props.atividade.json_data === 'string'
             ? JSON.parse(props.atividade.json_data)
             : props.atividade.json_data;
-          questionsList.value = parsed.questions || [];
+          const rawQuestions = Array.isArray(parsed?.questions)
+            ? parsed.questions
+            : Array.isArray(parsed?.perguntas)
+              ? parsed.perguntas
+              : Array.isArray(parsed)
+                ? parsed
+                : [];
+          questionsList.value = rawQuestions.map((q: any, idx: number) => {
+            if (typeof q === 'string') {
+              return { title: '', content: q };
+            }
+            const title = (q.title || q.titulo || '').trim();
+            const content = (q.content || q.enunciado || q.pergunta || q.texto || q.descricao || '').trim();
+            return {
+              ...q,
+              title: title || (content ? '' : `Questão ${idx + 1}`),
+              content: content,
+              options: q.options || q.alternativas || []
+            };
+          });
         } catch {
           questionsList.value = [];
         }
@@ -77,7 +96,8 @@ watch(
         questionsList.value = [];
       }
     }
-  }
+  },
+  { immediate: true }
 );
 
 function getQuestionKey(q: Question, idx: number): string {
@@ -298,6 +318,15 @@ async function handleSubmit() {
 
     <div v-if="props.atividade" class="space-y-6">
       <div v-if="currentStep === 0" class="space-y-4">
+        <!-- Descrição da Atividade -->
+        <div v-if="props.atividade.descricao" class="p-4 bg-surface-alt border border-line rounded-xl space-y-1.5">
+          <div class="flex items-center gap-2 text-primary font-medium text-xs">
+            <span class="material-icons text-accent text-base">description</span>
+            <span>Instruções da Atividade</span>
+          </div>
+          <p class="text-xs text-secondary whitespace-pre-line leading-relaxed">{{ props.atividade.descricao }}</p>
+        </div>
+
         <!-- Painel LGPD e Re-envio -->
         <div class="p-4 bg-surface-alt border border-line rounded-xl space-y-3">
           <div class="flex items-start gap-2 text-secondary">
@@ -333,7 +362,15 @@ async function handleSubmit() {
       <div v-else-if="currentStep <= questionsList.length" class="space-y-4">
         <template v-for="(q, idx) in questionsList" :key="idx">
           <div v-if="currentStep === idx + 1" class="space-y-4">
-            <h3 class="font-bold text-primary">{{ idx + 1 }}. {{ q.title || q.content }}</h3>
+            <div class="space-y-1.5">
+              <h3 class="font-bold text-base text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</h3>
+              <p v-if="q.content && q.content !== q.title" class="text-sm text-secondary whitespace-pre-line leading-relaxed bg-surface-alt/50 p-3 rounded-lg border border-line">
+                {{ q.content }}
+              </p>
+              <p v-else-if="q.content && !q.title" class="text-sm text-secondary whitespace-pre-line leading-relaxed">
+                {{ q.content }}
+              </p>
+            </div>
             
             <div v-if="q.options && q.options.length > 0" class="grid gap-2">
               <button
@@ -361,7 +398,12 @@ async function handleSubmit() {
         <div class="bg-surface-alt p-4 rounded-xl space-y-4 max-h-[60vh] overflow-y-auto">
           <div v-for="(q, idx) in questionsList" :key="idx" class="border-b border-line pb-3">
             <div class="flex justify-between items-start mb-1">
-              <p class="text-sm font-semibold text-primary">{{ idx + 1 }}. {{ q.title || q.content }}</p>
+              <div class="space-y-0.5">
+                <p class="text-sm font-semibold text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</p>
+                <p v-if="q.content" class="text-xs text-secondary whitespace-pre-line">
+                  {{ q.content }}
+                </p>
+              </div>
               <BaseButton size="sm" variant="ghost" @click="currentStep = idx + 1">Editar</BaseButton>
             </div>
             <div
