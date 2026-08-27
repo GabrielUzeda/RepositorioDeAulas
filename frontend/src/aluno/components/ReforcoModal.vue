@@ -128,6 +128,9 @@ function prevQuestion() {
 
       <div class="space-y-2 max-w-lg">
         <h3 class="text-xl font-bold text-primary">Aprendizado Livre e Sem Avaliação</h3>
+        <p v-if="props.atividade?.descricao" class="text-primary text-sm font-medium leading-relaxed whitespace-pre-line bg-surface-alt p-3 rounded-lg border border-line">
+          {{ props.atividade.descricao }}
+        </p>
         <p class="text-secondary text-sm leading-relaxed">
           Responda todas as questões sem medo de errar! O objetivo desta atividade é fixar os conceitos com feedback imediato a cada escolha.
         </p>
