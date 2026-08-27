@@ -39,9 +39,9 @@ const totalSteps = computed(() => questionsList.value.length + 2); // 0 (ID), 1.
 const progress = computed(() => ((currentStep.value) / (totalSteps.value - 1)) * 100);
 
 watch(
-  () => props.show,
-  (val) => {
-    if (val && props.atividade) {
+  () => [props.show, props.atividade],
+  ([showVal, atvVal]) => {
+    if (showVal && atvVal) {
       currentStep.value = 0;
       submitSuccess.value = false;
       errorMessage.value = '';
@@ -51,7 +51,7 @@ watch(
       Promise.all([
         secureGet('alunoNome'),
         secureGet('alunoEmail'),
-        secureGet(`draft_${props.atividade.id}`),
+        secureGet(`draft_${props.atividade?.id}`),
       ]).then(([nome, email, draft]) => {
         alunoNome.value = nome || '';
         alunoEmail.value = email || '';
@@ -64,7 +64,7 @@ watch(
         }
       });
 
-      if (props.atividade.json_data) {
+      if (props.atividade?.json_data) {
         try {
           const parsed = typeof props.atividade.json_data === 'string'
             ? JSON.parse(props.atividade.json_data)
@@ -96,7 +96,8 @@ watch(
         questionsList.value = [];
       }
     }
-  }
+  },
+  { immediate: true }
 );
 
 function getQuestionKey(q: Question, idx: number): string {
