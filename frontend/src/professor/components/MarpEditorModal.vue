@@ -798,7 +798,7 @@ function getSlideStartCharIndex(source: string, slideIndex: number) {
   return offset;
 }
 
-function scrollToCharIndex(textarea: HTMLTextAreaElement, charIndex: number, focusTarget = true) {
+function scrollToCharIndex(textarea: HTMLTextAreaElement, charIndex: number, focusTarget = true, alignToTop = false) {
   if (charIndex < 0) charIndex = 0;
   if (charIndex > textarea.value.length) charIndex = textarea.value.length;
 
@@ -813,7 +813,9 @@ function scrollToCharIndex(textarea: HTMLTextAreaElement, charIndex: number, foc
       const activeMark = editorHighlightsRef.value.querySelector('mark.find-match.active') as HTMLElement | null;
       if (activeMark) {
         const markTop = activeMark.offsetTop;
-        const targetScrollTop = Math.max(0, markTop - (textarea.clientHeight / 2) + (activeMark.offsetHeight / 2));
+        const targetScrollTop = alignToTop
+          ? Math.max(0, markTop - 20)
+          : Math.max(0, markTop - (textarea.clientHeight / 2) + (activeMark.offsetHeight / 2));
         textarea.scrollTop = targetScrollTop;
       } else {
         const textBefore = textarea.value.substring(0, charIndex);
@@ -822,7 +824,10 @@ function scrollToCharIndex(textarea: HTMLTextAreaElement, charIndex: number, foc
         const fontSize = parseFloat(style.fontSize) || 13;
         const lineHeight = parseFloat(style.lineHeight) || (fontSize * 1.7);
         const paddingTop = parseFloat(style.paddingTop) || 20;
-        textarea.scrollTop = Math.max(0, (linesBefore * lineHeight) + paddingTop - (textarea.clientHeight / 2));
+        const targetScrollTop = alignToTop
+          ? Math.max(0, (linesBefore * lineHeight) + paddingTop - 20)
+          : Math.max(0, (linesBefore * lineHeight) + paddingTop - (textarea.clientHeight / 2));
+        textarea.scrollTop = targetScrollTop;
       }
     }
     syncBackdropScroll();
@@ -881,7 +886,7 @@ function handlePreviewClick(e: MouseEvent) {
 
   activateSlide(index);
   const charIdx = getSlideStartCharIndex(markdownInput.value, index);
-  scrollToCharIndex(editorRef.value, charIdx);
+  scrollToCharIndex(editorRef.value, charIdx, true, true);
 }
 
 function handlePreviewScroll() {
@@ -1661,7 +1666,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="isPresentMode" id="zoom-indicator-pill" class="zoom-indicator-pill" :class="{ show: showZoomPillActive }">
-      Zoom {{ currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x') }}
+      {{ currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x') }}
     </div>
 
     <div id="progress-bar" ref="progressBarRef"></div>
@@ -1682,7 +1687,7 @@ onBeforeUnmount(() => {
       <div class="divider"></div>
       <button class="ctrl-btn" id="btn-zoom" @click="() => toggleZoom()" title="Lupa / Zoom (Z)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-        <span>Zoom {{ currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x') }}</span>
+        <span>{{ currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x') }}</span>
       </button>
       <div class="divider"></div>
       <span id="clock-display" class="clock-display" title="Hora Atual">{{ clockText }}</span>

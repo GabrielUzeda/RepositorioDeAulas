@@ -188,11 +188,11 @@ function formatDate(isoStr: string) {
 <template>
   <BaseModal
     :model-value="props.show && !!props.atividade"
-    max-width="max-w-4xl"
+    max-width="max-w-5xl"
     @close="emit('close')"
   >
     <template #header>
-      <div class="flex justify-between items-start border-b pb-4">
+      <div class="flex justify-between items-start border-b border-line pb-4 w-full">
         <div>
           <BaseBadge variant="accent">Respostas dos Alunos</BaseBadge>
           <h2 class="text-2xl font-bold text-primary mt-2">{{ props.atividade?.titulo }}</h2>
@@ -202,43 +202,51 @@ function formatDate(isoStr: string) {
     </template>
 
     <!-- Main Content Area -->
-    <div class="space-y-4">
-      <div v-if="isLoading" class="text-center py-12 text-secondary">
+    <div class="space-y-6">
+      <div v-if="isLoading" class="text-center py-12 text-secondary flex flex-col items-center">
         <BaseSpinner />
         <p class="mt-2 text-sm">Carregando respostas dos alunos...</p>
       </div>
 
-      <div v-else-if="errorMessage" class="p-6 bg-surface border border-danger text-white rounded-2xl text-center space-y-2">
-        <span class="material-icons text-3xl text-danger">error_outline</span>
+      <div v-else-if="errorMessage" class="p-6 bg-surface-alt border border-danger text-danger rounded-xl text-center space-y-2">
+        <span class="material-icons text-3xl">error_outline</span>
         <p class="text-sm font-semibold">{{ errorMessage }}</p>
       </div>
 
       <EmptyState v-else-if="respostas.length === 0" icon="inbox" message="Nenhuma resposta registrada para esta atividade até o momento." />
 
-      <div v-else class="space-y-4">
+      <div v-else class="space-y-6">
         <!-- Submission Details & Evaluation Section if selected -->
-        <div v-if="selectedResposta" class="p-6 bg-surface border border-line rounded-2xl space-y-5">
-          <div class="flex justify-between items-center border-b border-line pb-3">
-            <div>
-              <h4 class="font-bold text-primary text-lg">{{ selectedResposta.aluno_nome }}</h4>
-              <p class="text-secondary text-xs">{{ selectedResposta.aluno_email }} • {{ formatDate(selectedResposta.criado_em) }}</p>
+        <div v-if="selectedResposta" class="p-6 bg-surface-alt border border-accent/40 rounded-xl space-y-6 shadow-md transition-all">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-accent/20 text-accent font-bold flex items-center justify-center text-sm">
+                {{ selectedResposta.aluno_nome.charAt(0).toUpperCase() }}
+              </div>
+              <div>
+                <h4 class="font-bold text-primary text-base leading-tight">{{ selectedResposta.aluno_nome }}</h4>
+                <p class="text-secondary text-xs mt-0.5">{{ selectedResposta.aluno_email }} • Enviado em {{ formatDate(selectedResposta.criado_em) }}</p>
+              </div>
             </div>
             <BaseButton variant="secondary" size="sm" @click="selectedResposta = null">
-              Fechar Detalhes
+              <span class="material-icons text-sm">close</span>
+              <span>Fechar Detalhes</span>
             </BaseButton>
           </div>
 
           <!-- Formulário de Avaliação (Nota e Feedback) -->
-          <div class="p-4 bg-surface-alt rounded-xl border border-line shadow-sm space-y-3">
+          <div class="p-5 bg-surface rounded-xl border border-line shadow-xs space-y-4">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-primary uppercase tracking-wider flex items-center space-x-1">
+              <span class="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
                 <span class="material-icons text-sm text-accent">grade</span>
-                <span>Avaliação do Professor (Interno)</span>
+                <span>Avaliação do Professor</span>
               </span>
-
+              <span v-if="selectedResposta.nota !== null" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-accent/15 text-accent">
+                Nota atual: {{ selectedResposta.nota }}/100
+              </span>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div class="sm:col-span-1">
                 <BaseInput
                   v-model="editingNotaStr"
@@ -250,13 +258,14 @@ function formatDate(isoStr: string) {
               <div class="sm:col-span-3">
                 <BaseTextarea
                   v-model="editingFeedback"
-                  label="Comentário / Feedback:"
+                  :rows="2"
+                  label="Comentário Pedagógico / Feedback:"
                   placeholder="Escreva um comentário pedagógico para este aluno..."
                 />
               </div>
             </div>
 
-            <div class="flex justify-end">
+            <div class="flex justify-end pt-1">
               <BaseButton
                 variant="primary"
                 size="sm"
@@ -270,25 +279,30 @@ function formatDate(isoStr: string) {
           </div>
           
           <!-- Respostas do Aluno por Pergunta -->
-          <div class="space-y-3">
-            <label class="block text-xs font-bold text-accent uppercase tracking-wider">Respostas do Aluno:</label>
+          <div class="space-y-4">
+            <h5 class="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+              <span class="material-icons text-sm text-accent">forum</span>
+              <span>Respostas Submetidas:</span>
+            </h5>
             
-            <div v-for="(item, idx) in parseRespostas(selectedResposta.respostas)" :key="idx" class="p-4 bg-surface-alt rounded-xl border border-line shadow-sm space-y-1.5">
-              <div class="flex items-center space-x-2 text-xs font-bold text-primary">
-                <span class="px-2 py-0.5 bg-accent text-secondary rounded-md">Q{{ idx + 1 }}</span>
-                <span>{{ item.label }}</span>
-              </div>
-              <div class="p-3 bg-surface rounded-lg text-sm text-primary font-mono whitespace-pre-wrap border border-line">
-                {{ item.value || '(Sem resposta)' }}
+            <div class="space-y-3">
+              <div v-for="(item, idx) in parseRespostas(selectedResposta.respostas)" :key="idx" class="p-4 bg-surface rounded-xl border border-line space-y-2">
+                <div class="flex items-center gap-2 text-xs font-bold text-primary">
+                  <span class="px-2 py-0.5 bg-accent/15 text-accent rounded-md">Q{{ idx + 1 }}</span>
+                  <span class="leading-snug">{{ item.label }}</span>
+                </div>
+                <div class="p-3 bg-surface-alt rounded-lg text-sm text-primary font-mono whitespace-pre-wrap border border-line leading-relaxed">
+                  {{ item.value || '(Sem resposta)' }}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Submissions Table -->
-        <div class="overflow-x-auto border border-line rounded-2xl">
+        <div class="overflow-x-auto border border-line rounded-xl shadow-xs">
           <table class="w-full text-left text-sm text-secondary">
-            <thead class="bg-surface text-secondary text-xs uppercase font-semibold">
+            <thead class="bg-surface text-secondary text-xs uppercase font-semibold border-b border-line">
               <tr>
                 <th class="py-3 px-4">Aluno</th>
                 <th class="py-3 px-4">E-mail</th>
@@ -298,14 +312,14 @@ function formatDate(isoStr: string) {
               </tr>
             </thead>
             <tbody class="divide-y divide-line">
-              <tr v-for="resp in respostas" :key="resp.id" class="hover:bg-surface transition">
+              <tr v-for="resp in respostas" :key="resp.id" class="hover:bg-surface-alt/70 transition-colors">
                 <td class="py-3 px-4 font-bold text-primary">{{ resp.aluno_nome }}</td>
                 <td class="py-3 px-4 text-secondary">{{ resp.aluno_email }}</td>
                 <td class="py-3 px-4 text-secondary text-xs">{{ formatDate(resp.criado_em) }}</td>
                 <td class="py-3 px-4 text-center">
                   <span
                     v-if="resp.nota !== null && resp.nota !== undefined"
-                    class="px-2.5 py-1 bg-accent text-white font-bold rounded-lg text-xs"
+                    class="px-2.5 py-1 bg-accent/20 text-accent font-bold rounded-lg text-xs"
                   >
                     {{ resp.nota }}/100
                   </span>

@@ -208,16 +208,21 @@ function handleImportJson(e: Event) {
 </script>
 
 <template>
-  <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-4xl">
+  <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-5xl">
     <template #header>
-      <div class="flex items-center justify-between gap-4 w-full border-b border-line pb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full border-b border-line pb-4">
         <div class="flex items-center space-x-3">
-          <span class="material-icons text-accent">quiz</span>
-          <h2 class="text-xl font-bold text-primary">{{ props.atividade ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
+          <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs">
+            <span class="material-icons text-[20px]">quiz</span>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-primary">{{ props.atividade ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
+            <p class="text-xs text-secondary">Configure os dados gerais e adicione perguntas objetivas ou discursivas.</p>
+          </div>
         </div>
 
-        <div class="flex items-center space-x-3">
-          <label class="cursor-pointer px-3 py-1.5 bg-surface-alt hover:bg-surface text-secondary rounded-lg text-xs font-semibold flex items-center space-x-1">
+        <div class="flex items-center flex-wrap gap-2">
+          <label class="cursor-pointer px-3 py-1.5 bg-surface-alt hover:bg-surface border border-line text-secondary rounded-md text-xs font-semibold flex items-center space-x-1 transition-colors">
             <span class="material-icons text-sm">upload_file</span>
             <span>Importar JSON</span>
             <input type="file" accept=".json" @change="handleImportJson" class="hidden" />
@@ -236,8 +241,8 @@ function handleImportJson(e: Event) {
 
     <div class="space-y-6">
       <!-- Basic Info Box -->
-      <div class="bg-surface p-6 rounded-2xl border border-line space-y-4 shadow-lg">
-        <h3 class="text-lg font-bold text-primary border-b border-line pb-2">Informações Básicas</h3>
+      <div class="bg-surface-alt p-6 rounded-xl border border-line space-y-4 shadow-sm">
+        <h3 class="text-base font-bold text-primary border-b border-line pb-2">Informações Básicas</h3>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <BaseInput
@@ -257,13 +262,13 @@ function handleImportJson(e: Event) {
           <div class="md:col-span-2">
             <BaseTextarea
               v-model="descricao"
-              :rows="2"
-              label="Descrição"
-              placeholder="Breve resumo da atividade..."
+              :rows="3"
+              label="Descrição / Orientações"
+              placeholder="Breve resumo ou instruções da atividade para os alunos..."
             />
           </div>
 
-          <div class="md:col-span-2 flex items-center space-x-3 pt-2">
+          <div class="md:col-span-2 flex items-center space-x-3 pt-1">
             <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
             <label for="allowPassword" class="text-sm font-medium text-secondary cursor-pointer">Exigir senha individual de acesso para os alunos</label>
           </div>
@@ -282,7 +287,10 @@ function handleImportJson(e: Event) {
       <!-- Questions Section -->
       <div class="space-y-4">
         <div class="flex justify-between items-center">
-          <h3 class="text-xl font-bold text-primary">Perguntas ({{ questions.length }})</h3>
+          <div>
+            <h3 class="text-lg font-bold text-primary">Perguntas ({{ questions.length }})</h3>
+            <p class="text-xs text-secondary">Defina o enunciado e as opções de cada questão.</p>
+          </div>
           <BaseButton variant="primary" size="sm" @click="addQuestion">
             <span class="material-icons text-sm">add</span>
             <span>Adicionar Pergunta</span>
@@ -291,63 +299,91 @@ function handleImportJson(e: Event) {
 
         <EmptyState v-if="questions.length === 0" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
 
-        <div v-if="!usesOptions" class="p-3 bg-surface border border-line rounded-xl text-secondary text-xs">
-          <span class="material-icons text-sm align-middle mr-1 text-accent">edit_note</span>
-          <span>Atividade do tipo <strong class="text-secondary">{{ tipo }}</strong>: as perguntas são <strong class="text-secondary">discursivas</strong> (resposta em texto). Não são exibidas alternativas.</span>
+        <div v-if="!usesOptions" class="p-3 bg-surface-alt border border-line rounded-lg text-secondary text-xs flex items-center gap-2">
+          <span class="material-icons text-base text-accent">edit_note</span>
+          <span>Atividade do tipo <strong class="text-primary">{{ tipo }}</strong>: as perguntas são <strong class="text-primary">discursivas</strong> (resposta livre em texto).</span>
         </div>
 
         <div
           v-for="(q, qIndex) in questions"
           :key="qIndex"
-          class="bg-surface p-6 rounded-2xl border border-line space-y-4 shadow-md"
+          class="bg-surface-alt p-6 rounded-xl border border-line space-y-4 shadow-sm"
         >
-          <div class="flex justify-between items-center border-b border-line pb-3">
-            <input v-model="q.title" placeholder="Título/Tema da Questão" class="bg-surface px-3 py-1.5 rounded-lg border border-line font-bold text-accent text-sm outline-none focus:ring-2 focus:ring-accent w-64" />
-            <div class="flex items-center space-x-1">
-              <BaseButton variant="ghost" size="sm" :disabled="qIndex === 0" @click="moveQuestion(qIndex, 'up')">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-3">
+            <div class="flex items-center gap-2 flex-1">
+              <span class="w-6 h-6 rounded-full bg-accent/15 text-accent text-xs font-bold flex items-center justify-center shrink-0">
+                {{ qIndex + 1 }}
+              </span>
+              <input
+                v-model="q.title"
+                placeholder="Título/Tema da Questão (Ex: Questão 1)"
+                class="bg-surface px-3 py-1.5 rounded-md border border-line font-semibold text-primary text-sm outline-none focus:ring-2 focus:ring-accent flex-1 max-w-md"
+              />
+            </div>
+
+            <div class="flex items-center space-x-1 self-end sm:self-auto">
+              <BaseButton variant="ghost" size="sm" :disabled="qIndex === 0" title="Mover para cima" @click="moveQuestion(qIndex, 'up')">
                 <span class="material-icons text-sm">arrow_upward</span>
               </BaseButton>
-              <BaseButton variant="ghost" size="sm" :disabled="qIndex === questions.length - 1" @click="moveQuestion(qIndex, 'down')">
+              <BaseButton variant="ghost" size="sm" :disabled="qIndex === questions.length - 1" title="Mover para baixo" @click="moveQuestion(qIndex, 'down')">
                 <span class="material-icons text-sm">arrow_downward</span>
               </BaseButton>
-              <BaseButton variant="danger" size="sm" @click="removeQuestion(qIndex)">
+              <BaseButton variant="danger" size="sm" title="Excluir questão" @click="removeQuestion(qIndex)">
                 <span class="material-icons text-sm">delete</span>
               </BaseButton>
             </div>
           </div>
 
           <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1">Enunciado da Pergunta *</label>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1.5">Enunciado da Pergunta *</label>
             <BaseTextarea
               v-model="q.content"
-              :rows="2"
-              placeholder="Digite a pergunta para o aluno..."
+              :rows="3"
+              placeholder="Digite o enunciado completo da questão para o aluno..."
             />
           </div>
 
           <!-- Options Section (apenas para tipos objetivos: minigame/roleta/reforco) -->
-          <div v-if="usesOptions" class="space-y-2 pt-2">
+          <div v-if="usesOptions" class="space-y-3 pt-2">
             <div class="flex justify-between items-center">
-              <label class="text-xs font-bold uppercase tracking-wider text-secondary">Alternativas de Resposta</label>
+              <label class="text-xs font-semibold uppercase tracking-wider text-secondary">Alternativas de Resposta</label>
               <BaseButton variant="ghost" size="sm" @click="addOption(qIndex)">
-                <span class="material-icons text-xs mr-1">add</span> + Opção
+                <span class="material-icons text-xs mr-1">add</span> + Adicionar Opção
               </BaseButton>
             </div>
 
-            <div v-for="(opt, oIndex) in q.options" :key="oIndex" class="flex items-center space-x-3 bg-surface p-3 rounded-xl border border-line">
-              <input
-                type="radio"
-                :name="`correct_${qIndex}`"
-                :checked="opt.correct"
-                @change="setCorrectOption(qIndex, oIndex)"
-                title="Marcar como alternativa correta"
-                class="w-4 h-4 text-success bg-surface border-line"
-              />
-              <input v-model="opt.text" placeholder="Texto da opção" class="flex-1 bg-transparent border-none text-primary text-sm outline-none" />
-              <input v-model="opt.feedback" placeholder="Feedback ao escolher" class="w-48 bg-surface px-3 py-1 rounded-lg text-xs text-secondary border border-line outline-none" />
-              <BaseButton variant="ghost" size="sm" @click="removeOption(qIndex, oIndex)">
-                <span class="material-icons text-xs">close</span>
-              </BaseButton>
+            <div class="space-y-2">
+              <div v-for="(opt, oIndex) in q.options" :key="oIndex" class="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-surface p-3 rounded-lg border border-line">
+                <div class="flex items-center gap-2 shrink-0">
+                  <input
+                    type="radio"
+                    :name="`correct_${qIndex}`"
+                    :checked="opt.correct"
+                    @change="setCorrectOption(qIndex, oIndex)"
+                    title="Marcar como alternativa correta"
+                    class="w-4 h-4 text-success bg-surface border-line cursor-pointer"
+                  />
+                  <span class="text-xs font-medium text-secondary">{{ String.fromCharCode(65 + oIndex) }})</span>
+                </div>
+                <input
+                  v-model="opt.text"
+                  placeholder="Texto da alternativa..."
+                  class="flex-1 bg-surface-alt px-3 py-1.5 rounded-md border border-line text-primary text-sm outline-none focus:border-accent"
+                />
+                <input
+                  v-model="opt.feedback"
+                  placeholder="Feedback pedagógico (opcional)..."
+                  class="w-full sm:w-60 bg-surface-alt px-3 py-1.5 rounded-md text-xs text-secondary border border-line outline-none focus:border-accent"
+                />
+                <button
+                  type="button"
+                  class="p-1 text-secondary hover:text-danger rounded hover:bg-surface-alt transition-colors shrink-0 self-end sm:self-auto"
+                  title="Remover opção"
+                  @click="removeOption(qIndex, oIndex)"
+                >
+                  <span class="material-icons text-sm">close</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
