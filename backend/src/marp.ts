@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { db } from './db';
 import { sanitizeSlug } from './utils';
 import { THEME_LABELS, NEXT_THEME, normalizeTheme } from './marpTheme';
 
@@ -1108,4 +1109,26 @@ export function processMarpContent(
   }
 
   return { caminho: `materias/${materiaSlug}/aulas/${slug}.html` };
+}
+
+export function regenerateAllAulasHtml(): number {
+  try {
+    const aulas = db.query(`
+      SELECT a.id, a.titulo, a.conteudo_md, d.slug as materia_slug 
+      FROM aulas a 
+      JOIN disciplinas d ON a.disciplina_id = d.id
+    `).all() as Array<{ id: number; titulo: string; conteudo_md: string; materia_slug: string }>;
+
+    let count = 0;
+    for (const aula of aulas) {
+      if (aula.conteudo_md && aula.materia_slug) {
+        processMarpContent(aula.materia_slug, aula.titulo, aula.conteudo_md);
+        count++;
+      }
+    }
+    return count;
+  } catch (err) {
+    console.error('[marp] Falha ao sincronizar HTML das aulas:', err);
+    return 0;
+  }
 }

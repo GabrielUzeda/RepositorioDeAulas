@@ -77,9 +77,10 @@ export class MinigamePlayer {
                 <!-- START SCREEN -->
                 <div id="mg-start-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/95">
                     <h3 class="text-[#00d4ff] tracking-[4px] text-lg mb-4">SIMULAÇÃO TÁTICA</h3>
-                    <h1 id="mg-phase-title" class="text-4xl text-white text-center mb-10 shadow-cyan-500/50 drop-shadow-[0_0_10px_rgba(0,212,255,0.8)] max-w-2xl px-4">
+                    <h1 id="mg-phase-title" class="text-4xl text-white text-center mb-4 shadow-cyan-500/50 drop-shadow-[0_0_10px_rgba(0,212,255,0.8)] max-w-2xl px-4">
                         __MG_PHASE_TITLE__
                     </h1>
+                    <p id="mg-phase-desc" class="hidden text-gray-300 text-sm text-center mb-8 max-w-xl px-4 font-sans leading-relaxed"></p>
                     <button id="mg-btn-start" class="px-10 py-4 bg-transparent border-2 border-[#00d4ff] text-[#00d4ff] text-xl font-bold uppercase cursor-pointer transition-all hover:bg-[#00d4ff] hover:text-black hover:shadow-[0_0_30px_#00d4ff] hover:scale-105 mb-6">
                         INICIAR SISTEMA
                     </button>
@@ -178,10 +179,15 @@ export class MinigamePlayer {
         this.canvas = document.getElementById('mg-canvas');
         this.ctx = this.canvas.getContext('2d');
 
-        // Preencher título da fase de forma segura (sem innerHTML de dados do backend)
+        // Preencher título e descrição da fase de forma segura (sem innerHTML de dados do backend)
         const phaseTitle = document.getElementById('mg-phase-title');
         if (phaseTitle) {
             phaseTitle.textContent = String(this.activityData.titulo || 'Minigame');
+        }
+        const phaseDesc = document.getElementById('mg-phase-desc');
+        if (phaseDesc && this.activityData.descricao) {
+            phaseDesc.textContent = String(this.activityData.descricao);
+            phaseDesc.classList.remove('hidden');
         }
 
         // Setup Resize Listener
