@@ -230,7 +230,7 @@ Há 11 specs em `e2e/tests/`. Status verificados (todos 100% passando):
 | `aluno-atividades-avancadas.spec.ts` | ✅ atual | Fluxos de minigames/roleta/reforço e senhas de atividade |
 | `aluno-comprovante-email.spec.ts` | ✅ **novo** | Submissão de resposta com opt-in de e-mail e validação de entrega do comprovante via Mailhog |
 | `aluno-lgpd.spec.ts` | ✅ atual | Direito de consulta e exclusão de dados do aluno conforme LGPD |
-| `atividade-fluxo.spec.ts` | ✅ atual | Importação e exportação de JSON de atividades |
+| `atividade-fluxo.spec.ts` | ✅ atual | Fluxo de rascunhos do professor no editor e resolução do aluno |
 | `atividade-rascunhos.spec.ts` | ✅ atual | Salvamento e restauração de rascunhos de atividades (30 dias) |
 | `email-feedback.spec.ts` | ✅ atual | Entrega real de e-mails de feedback pedagógico via Mailhog |
 | `fluxo-completo.spec.ts` | ✅ atual | Jornada completa de ponta a ponta (Professor → Aluno → Avaliação → Feedback) |

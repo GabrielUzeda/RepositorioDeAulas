@@ -122,11 +122,11 @@ test.describe('Atividade — descrição, título e descrição de cada pergunta
     await expect(page.locator('h3', { hasText: materiaNome })).toBeVisible({ timeout: 15000 });
 
     await page.getByRole('tab', { name: /Atividades/ }).click();
-    await page.locator('h3', { hasText: atvTitulo }).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('h3', { hasText: atvTitulo })).toBeVisible({ timeout: 15000 });
     await page.locator('h3', { hasText: atvTitulo }).click();
 
     // Descrição da atividade visível para o aluno
-    await expect(page.getByText(atvDescricao)).toBeVisible();
+    await expect(page.getByRole('dialog').getByText(atvDescricao)).toBeVisible();
 
     // Identificação
     await page.getByLabel('Seu Nome *').fill('Aluno E2E Conteúdo');

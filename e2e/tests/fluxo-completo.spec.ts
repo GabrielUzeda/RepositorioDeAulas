@@ -81,12 +81,12 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     aulaCaminho = aulaBody.caminho;
     expect(aulaCaminho).toContain('materias/');
 
-    // --- Professor cria ATIVIDADE (normal, 1 questão objetiva) via API ---
+    // --- Professor cria ATIVIDADE (prova, 1 questão objetiva) via API ---
     atvTitulo = `Atividade ${uniqueName('FULL')}`;
     const atvRes = await api(request, 'post', '/atividades', profToken, {
       materia_id: materiaId,
       titulo: atvTitulo,
-      tipo: 'normal',
+      tipo: 'prova',
       allow_password: false,
       slug: uniqueName('atv'),
       json_data: JSON.stringify({

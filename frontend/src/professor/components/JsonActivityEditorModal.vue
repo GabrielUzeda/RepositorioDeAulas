@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
-import type { Atividade, Question, QuestionOption } from '@/shared/types';
+import { apiClient } from '@/shared/api/client';
+import type { Atividade, Question, QuestionOption, RascunhoEditor } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 import BaseSelect from '@/shared/components/BaseSelect.vue';
+import BaseBadge from '@/shared/components/BaseBadge.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
 
 const tipoOptions = [
@@ -41,6 +44,12 @@ const isSaving = ref(false);
 const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
 
+const currentDraftId = ref<number | null>(null);
+const showDraftsModal = ref(false);
+const isLoadingDrafts = ref(false);
+const isSavingDraft = ref(false);
+const drafts = ref<RascunhoEditor[]>([]);
+
 const usesOptions = computed(() => tipo.value !== 'normal' && tipo.value !== 'prova');
 const activeQuestion = computed(() => questions.value[activeQIndex.value] ?? null);
 
@@ -68,6 +77,7 @@ watch(
     isSaving.value = false;
     activeQIndex.value = 0;
     showBasicInfo.value = true;
+    currentDraftId.value = null;
     if (val) {
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
@@ -160,36 +170,102 @@ function handleSave() {
   });
 }
 
-function handleExportJson() {
-  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({ questions: questions.value }, null, 2));
-  const a = document.createElement('a');
-  a.setAttribute('href', dataStr);
-  a.setAttribute('download', `${titulo.value || 'atividade'}.json`);
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+async function handleSaveDraft() {
+  if (isSavingDraft.value) return;
+  isSavingDraft.value = true;
+  try {
+    const payload = {
+      rascunho_id: currentDraftId.value,
+      titulo: titulo.value || 'Sem título',
+      descricao: descricao.value,
+      tipo: tipo.value,
+      json_data: { questions: questions.value }
+    };
+    const res = await apiClient.post<{ id: number; expira_em: string; success: boolean }>('/professor/rascunhos-editor', payload);
+    if (res.success && res.data) {
+      currentDraftId.value = res.data.id;
+      useToast().success('Rascunho salvo com sucesso!');
+    } else {
+      useToast().error(res.error || 'Erro ao salvar rascunho');
+    }
+  } catch (e: any) {
+    useToast().error(e?.message || 'Erro ao salvar rascunho');
+  } finally {
+    isSavingDraft.value = false;
+  }
 }
 
-function handleImportJson(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    try {
-      const parsed = JSON.parse(event.target?.result as string);
-      const raw = Array.isArray(parsed?.questions) ? parsed.questions : Array.isArray(parsed?.perguntas) ? parsed.perguntas : null;
-      if (!raw) { useToast().error('Arquivo JSON não contém perguntas.'); return; }
-      if (parsed?.titulo) titulo.value = String(parsed.titulo);
-      if (parsed?.descricao) descricao.value = String(parsed.descricao);
-      if (parsed?.tipo) tipo.value = (parsed.tipo === 'game' ? 'minigame' : parsed.tipo);
-      if (parsed?.senha) { allowPassword.value = true; senha.value = String(parsed.senha); }
-      questions.value = raw.map(normalizeQuestion);
-      activeQIndex.value = 0;
-    } catch {
-      useToast().error('Arquivo JSON inválido!');
+async function openDraftsModal() {
+  showDraftsModal.value = true;
+  await fetchDrafts();
+}
+
+async function fetchDrafts() {
+  isLoadingDrafts.value = true;
+  try {
+    const res = await apiClient.get<RascunhoEditor[]>('/professor/rascunhos-editor');
+    if (res.success && Array.isArray(res.data)) {
+      drafts.value = res.data;
+    } else {
+      drafts.value = [];
     }
-  };
-  reader.readAsText(file);
+  } catch {
+    drafts.value = [];
+  } finally {
+    isLoadingDrafts.value = false;
+  }
+}
+
+function getDaysRemaining(expiraEm: string): number {
+  const diff = new Date(expiraEm).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function handleLoadDraft(draft: RascunhoEditor) {
+  try {
+    const parsed = typeof draft.json_data === 'string' ? JSON.parse(draft.json_data) : draft.json_data;
+    const raw = Array.isArray(parsed?.questions) ? parsed.questions : Array.isArray(parsed?.perguntas) ? parsed.perguntas : [];
+    titulo.value = draft.titulo || '';
+    descricao.value = draft.descricao || '';
+    tipo.value = ((draft.tipo === 'game' ? 'minigame' : draft.tipo) as any) || 'normal';
+    questions.value = raw.map(normalizeQuestion);
+    currentDraftId.value = draft.id;
+    activeQIndex.value = 0;
+    showBasicInfo.value = false;
+    showDraftsModal.value = false;
+    useToast().success('Rascunho carregado no editor!');
+  } catch {
+    useToast().error('Erro ao processar dados do rascunho.');
+  }
+}
+
+async function handleDeleteDraft(draftId: number) {
+  const res = await apiClient.delete(`/professor/rascunhos-editor/${draftId}`);
+  if (res.success) {
+    if (currentDraftId.value === draftId) {
+      currentDraftId.value = null;
+    }
+    drafts.value = drafts.value.filter((d) => d.id !== draftId);
+    useToast().success('Rascunho excluído com sucesso!');
+  } else {
+    useToast().error(res.error || 'Erro ao excluir rascunho.');
+  }
 }
 </script>
 
@@ -209,14 +285,13 @@ function handleImportJson(e: Event) {
         </div>
 
         <div class="flex items-center flex-wrap gap-2">
-          <label class="cursor-pointer px-3 py-1.5 bg-surface-alt hover:bg-surface border border-line text-secondary rounded-md text-xs font-semibold flex items-center gap-1 transition-colors">
-            <span class="material-icons text-sm">upload_file</span>
-            <span>Importar JSON</span>
-            <input type="file" accept=".json" @change="handleImportJson" class="hidden" />
-          </label>
-          <BaseButton variant="secondary" size="sm" @click="handleExportJson">
-            <span class="material-icons text-sm">download</span>
-            <span>Exportar JSON</span>
+          <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
+            <span class="material-icons text-sm">folder_open</span>
+            <span>Rascunhos</span>
+          </BaseButton>
+          <BaseButton variant="secondary" size="sm" :loading="isSavingDraft" @click="handleSaveDraft">
+            <span class="material-icons text-sm">bookmark</span>
+            <span>Salvar Rascunho</span>
           </BaseButton>
           <BaseButton variant="ghost" size="sm" :disabled="props.loading || isSaving" @click="emit('close')">Cancelar</BaseButton>
           <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">Salvar Atividade</BaseButton>
@@ -397,5 +472,65 @@ function handleImportJson(e: Event) {
         <EmptyState v-else-if="!showBasicInfo && questions.length === 0" icon="help_outline" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
       </main>
     </div>
+
+    <!-- Modal de Rascunhos -->
+    <BaseModal :model-value="showDraftsModal" @close="showDraftsModal = false" title="Rascunhos de Atividades" max-width="max-w-2xl">
+      <div v-if="isLoadingDrafts" class="py-12 flex justify-center items-center">
+        <BaseSpinner size="lg" />
+      </div>
+
+      <div v-else-if="drafts.length === 0" class="py-6">
+        <EmptyState
+          icon="folder_open"
+          title="Nenhum rascunho salvo"
+          message="Você ainda não possui rascunhos salvos. Use 'Salvar Rascunho' para guardar seu progresso na nuvem por até 30 dias."
+        />
+      </div>
+
+      <div v-else class="space-y-3">
+        <div class="p-3 bg-surface-alt border border-line rounded-lg text-xs text-secondary flex items-center justify-between">
+          <span>Total de rascunhos: <strong class="text-primary">{{ drafts.length }}/20</strong></span>
+          <span class="text-accent font-medium">Validade: 30 dias</span>
+        </div>
+
+        <div class="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+          <div
+            v-for="draft in drafts"
+            :key="draft.id"
+            class="p-4 bg-surface border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
+          >
+            <div class="space-y-1 min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h4 class="text-sm font-semibold text-primary truncate">{{ draft.titulo || 'Sem título' }}</h4>
+                <BaseBadge variant="secondary">{{ draft.tipo }}</BaseBadge>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-secondary flex-wrap">
+                <span>Atualizado em: {{ formatDate(draft.atualizado_em) }}</span>
+                <span>·</span>
+                <span class="text-accent font-medium">Expira em {{ getDaysRemaining(draft.expira_em) }} dias</span>
+              </div>
+              <p v-if="draft.descricao" class="text-xs text-secondary line-clamp-1 mt-1">{{ draft.descricao }}</p>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <BaseButton variant="primary" size="sm" @click="handleLoadDraft(draft)">
+                <span class="material-icons text-sm">file_download</span>
+                <span>Carregar</span>
+              </BaseButton>
+              <BaseButton variant="danger" size="sm" @click="handleDeleteDraft(draft.id)">
+                <span class="material-icons text-sm">delete</span>
+                <span>Excluir</span>
+              </BaseButton>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end">
+          <BaseButton variant="secondary" size="sm" @click="showDraftsModal = false">Fechar</BaseButton>
+        </div>
+      </template>
+    </BaseModal>
   </BaseModal>
 </template>

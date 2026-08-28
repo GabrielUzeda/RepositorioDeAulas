@@ -132,7 +132,7 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
     await page.getByRole('button', { name: 'Próximo' }).click();
 
     // Passo 1: Pergunta
-    await expect(page.getByText(/Qual é a capital do Brasil|Questão 1/)).toBeVisible();
+    await expect(page.getByText('Qual é a capital do Brasil?')).toBeVisible();
     await page.getByRole('button', { name: 'Brasília' }).click();
     await page.getByRole('button', { name: 'Próximo' }).click();
 
