@@ -195,12 +195,12 @@ FORMATO JSON OBRIGATÓRIO:
       method: 'POST',
       body: JSON.stringify({
         model: modelo,
+        stream: false,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' }
+        temperature: 0.3
       }),
       signal: AbortSignal.timeout(90000)
     });
@@ -215,7 +215,10 @@ FORMATO JSON OBRIGATÓRIO:
 
     let parsedQuestions: any[] = [];
     try {
-      const cleanJson = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+      const cleanJson = content
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
       const parsed = JSON.parse(cleanJson);
       parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
     } catch {
