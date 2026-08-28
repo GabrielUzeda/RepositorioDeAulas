@@ -336,7 +336,7 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   </div>
 </div>
 
-<div id="zoom-indicator-pill" class="zoom-indicator-pill">Zoom 1x</div>
+<div id="zoom-indicator-pill" class="zoom-indicator-pill">1x</div>
 
 <div id="progress-bar"></div>
 <div id="slides-container">

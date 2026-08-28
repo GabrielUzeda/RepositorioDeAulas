@@ -33,11 +33,8 @@ const deleteTargetId = ref<number | null>(null);
 
 const editingNotaStr = computed<string>({
   get: () => (editingNota.value === null ? '' : String(editingNota.value)),
-  set: (v: string) => {
-    editingNota.value = v === '' ? null : Number(v);
-  }
+  set: (v: string) => { editingNota.value = v === '' ? null : Number(v); }
 });
-
 
 const parsedQuestionsMap = computed<Question[]>(() => {
   if (!props.atividade?.json_data) return [];
@@ -46,28 +43,20 @@ const parsedQuestionsMap = computed<Question[]>(() => {
       ? JSON.parse(props.atividade.json_data)
       : props.atividade.json_data;
     return data.questions || [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 });
 
 function parseRespostas(raw: string | Record<string, string>): Array<{ key: string; label: string; value: string }> {
   if (!raw) return [];
-  
   let mapObj: Record<string, any> | null = null;
   if (typeof raw === 'object' && raw !== null) {
     mapObj = raw;
   } else if (typeof raw === 'string') {
     try {
       const parsed = JSON.parse(raw);
-      if (typeof parsed === 'object' && parsed !== null) {
-        mapObj = parsed;
-      }
-    } catch {
-      // Legacy plain text response
-    }
+      if (typeof parsed === 'object' && parsed !== null) mapObj = parsed;
+    } catch { }
   }
-
   if (mapObj) {
     return Object.entries(mapObj).map(([key, val]) => {
       const qIdx = Number(key);
@@ -76,7 +65,6 @@ function parseRespostas(raw: string | Record<string, string>): Array<{ key: stri
       return { key, label, value: String(val) };
     });
   }
-
   return [{ key: '0', label: 'Resposta Global', value: String(raw) }];
 }
 
@@ -102,6 +90,9 @@ async function fetchRespostas() {
     const res = await apiClient.get<RespostaAluno[]>(`/atividades/${props.atividade.id}/respostas`);
     if (res.success && res.data) {
       respostas.value = res.data;
+      if (respostas.value.length > 0 && !selectedResposta.value) {
+        handleSelectResposta(respostas.value[0]);
+      }
     } else {
       errorMessage.value = res.error || 'Erro ao carregar as respostas dos alunos.';
     }
@@ -121,18 +112,15 @@ function handleSelectResposta(resp: RespostaAluno) {
 async function handleSaveAvaliacao() {
   if (!selectedResposta.value || isSavingAvaliacao.value) return;
   isSavingAvaliacao.value = true;
-
   try {
     const res = await apiClient.put(`/respostas/${selectedResposta.value.id}/avaliacao`, {
       nota: editingNota.value,
       feedback: editingFeedback.value
     });
-
     if (res.success) {
       useToast().success('Avaliação Salva!');
       selectedResposta.value.nota = editingNota.value;
       selectedResposta.value.feedback = editingFeedback.value;
-      
       const idx = respostas.value.findIndex(r => r.id === selectedResposta.value?.id);
       if (idx !== -1) {
         respostas.value[idx].nota = editingNota.value;
@@ -159,7 +147,11 @@ async function handleDeleteResposta(id: number) {
     if (res.success) {
       respostas.value = respostas.value.filter((r) => r.id !== id);
       if (selectedResposta.value?.id === id) {
-        selectedResposta.value = null;
+        selectedResposta.value = respostas.value[0] ?? null;
+        if (selectedResposta.value) {
+          editingNota.value = selectedResposta.value.nota ?? null;
+          editingFeedback.value = selectedResposta.value.feedback ?? '';
+        }
       }
     } else {
       useToast().error('Erro ao excluir resposta.');
@@ -170,186 +162,193 @@ async function handleDeleteResposta(id: number) {
 }
 
 function onConfirmDelete() {
-  if (deleteTargetId.value !== null) {
-    handleDeleteResposta(deleteTargetId.value);
-  }
+  if (deleteTargetId.value !== null) handleDeleteResposta(deleteTargetId.value);
 }
 
 function formatDate(isoStr: string) {
-  try {
-    const d = new Date(isoStr);
-    return d.toLocaleString('pt-BR');
-  } catch {
-    return isoStr;
-  }
+  try { return new Date(isoStr).toLocaleString('pt-BR'); } catch { return isoStr; }
+}
+
+function scoreColor(nota: number | null | undefined) {
+  if (nota === null || nota === undefined) return 'text-secondary';
+  if (nota >= 70) return 'text-success';
+  if (nota >= 50) return 'text-accent';
+  return 'text-danger';
 }
 </script>
 
 <template>
   <BaseModal
     :model-value="props.show && !!props.atividade"
-    max-width="max-w-5xl"
+    max-width="max-w-6xl"
+    no-padding
     @close="emit('close')"
   >
     <template #header>
-      <div class="flex justify-between items-start border-b border-line pb-4 w-full">
-        <div>
-          <BaseBadge variant="accent">Respostas dos Alunos</BaseBadge>
-          <h2 class="text-2xl font-bold text-primary mt-2">{{ props.atividade?.titulo }}</h2>
-          <p class="text-secondary text-xs mt-0.5">Total de Envios: {{ respostas.length }}</p>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs shrink-0">
+            <span class="material-icons text-[20px]">analytics</span>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-primary leading-tight">{{ props.atividade?.titulo }}</h2>
+            <p class="text-xs text-secondary">{{ respostas.length }} resposta{{ respostas.length !== 1 ? 's' : '' }} submetida{{ respostas.length !== 1 ? 's' : '' }}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <BaseButton variant="secondary" size="sm" @click="emit('close')">Fechar</BaseButton>
         </div>
       </div>
     </template>
 
-    <!-- Main Content Area -->
-    <div class="space-y-6">
-      <div v-if="isLoading" class="text-center py-12 text-secondary flex flex-col items-center">
-        <BaseSpinner />
-        <p class="mt-2 text-sm">Carregando respostas dos alunos...</p>
-      </div>
+    <!-- Loading / error states -->
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-20 gap-3">
+      <BaseSpinner />
+      <p class="text-sm text-secondary">Carregando respostas dos alunos...</p>
+    </div>
 
-      <div v-else-if="errorMessage" class="p-6 bg-surface-alt border border-danger text-danger rounded-xl text-center space-y-2">
-        <span class="material-icons text-3xl">error_outline</span>
-        <p class="text-sm font-semibold">{{ errorMessage }}</p>
-      </div>
+    <div v-else-if="errorMessage" class="p-8 text-center space-y-2">
+      <span class="material-icons text-3xl text-danger">error_outline</span>
+      <p class="text-sm font-semibold text-danger">{{ errorMessage }}</p>
+    </div>
 
-      <EmptyState v-else-if="respostas.length === 0" icon="inbox" message="Nenhuma resposta registrada para esta atividade até o momento." />
+    <EmptyState v-else-if="respostas.length === 0" icon="inbox" message="Nenhuma resposta registrada para esta atividade até o momento." class="py-20" />
 
-      <div v-else class="space-y-6">
-        <!-- Submission Details & Evaluation Section if selected -->
-        <div v-if="selectedResposta" class="p-6 bg-surface-alt border border-accent/40 rounded-xl space-y-6 shadow-md transition-all">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-accent/20 text-accent font-bold flex items-center justify-center text-sm">
-                {{ selectedResposta.aluno_nome.charAt(0).toUpperCase() }}
-              </div>
-              <div>
-                <h4 class="font-bold text-primary text-base leading-tight">{{ selectedResposta.aluno_nome }}</h4>
-                <p class="text-secondary text-xs mt-0.5">{{ selectedResposta.aluno_email }} • Enviado em {{ formatDate(selectedResposta.criado_em) }}</p>
-              </div>
-            </div>
-            <BaseButton variant="secondary" size="sm" @click="selectedResposta = null">
-              <span class="material-icons text-sm">close</span>
-              <span>Fechar Detalhes</span>
-            </BaseButton>
+    <!-- Layout split: lista esq + detalhe dir -->
+    <div v-else class="flex min-h-0" style="height: calc(90vh - 120px)">
+
+      <!-- Lista de alunos (sidebar esquerda) -->
+      <aside class="w-72 shrink-0 flex flex-col border-r border-line overflow-y-auto bg-surface">
+        <div class="px-3 pt-3 pb-2 border-b border-line">
+          <p class="text-xs font-bold uppercase tracking-wider text-secondary">
+            Total de Envios: {{ respostas.length }}
+          </p>
+        </div>
+
+        <div
+          v-for="resp in respostas"
+          :key="resp.id"
+          class="group flex items-center gap-3 px-3 py-3 border-b border-line cursor-pointer transition-colors"
+          :class="selectedResposta?.id === resp.id ? 'bg-accent/10 border-l-2 border-l-accent' : 'hover:bg-surface-alt'"
+          @click="handleSelectResposta(resp)"
+        >
+          <!-- Avatar -->
+          <div
+            class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+            :class="selectedResposta?.id === resp.id ? 'bg-accent text-white' : 'bg-surface-alt text-secondary'"
+          >
+            {{ resp.aluno_nome.charAt(0).toUpperCase() }}
           </div>
 
-          <!-- Formulário de Avaliação (Nota e Feedback) -->
-          <div class="p-5 bg-surface rounded-xl border border-line shadow-xs space-y-4">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
-                <span class="material-icons text-sm text-accent">grade</span>
-                <span>Avaliação do Professor</span>
-              </span>
-              <span v-if="selectedResposta.nota !== null" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-accent/15 text-accent">
-                Nota atual: {{ selectedResposta.nota }}/100
-              </span>
-            </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-primary truncate">{{ resp.aluno_nome }}</p>
+            <p class="text-xs text-secondary truncate">{{ resp.aluno_email }}</p>
+          </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div class="sm:col-span-1">
-                <BaseInput
-                  v-model="editingNotaStr"
-                  label="Nota (0 a 100):"
-                  type="number"
-                  placeholder="Ex: 85"
-                />
+          <!-- Nota badge -->
+          <span
+            v-if="resp.nota !== null && resp.nota !== undefined"
+            class="text-xs font-bold shrink-0"
+            :class="scoreColor(resp.nota)"
+          >{{ resp.nota }}</span>
+          <span v-else class="text-xs text-secondary shrink-0 italic">—</span>
+        </div>
+      </aside>
+
+      <!-- Painel de detalhe (direita) -->
+      <main class="flex-1 min-w-0 flex flex-col overflow-hidden">
+
+        <!-- Nenhum selecionado -->
+        <EmptyState v-if="!selectedResposta" icon="person_search" message="Selecione um aluno à esquerda para ver e avaliar as respostas." class="my-auto" />
+
+        <template v-else>
+          <!-- Header do aluno selecionado (fixo) -->
+          <div class="shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-b border-line bg-surface-alt">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs">
+                {{ selectedResposta.aluno_nome.charAt(0).toUpperCase() }}
               </div>
-              <div class="sm:col-span-3">
-                <BaseTextarea
-                  v-model="editingFeedback"
-                  :rows="2"
-                  label="Comentário Pedagógico / Feedback:"
-                  placeholder="Escreva um comentário pedagógico para este aluno..."
-                />
+              <div class="min-w-0">
+                <h4 class="font-bold text-primary text-sm leading-tight truncate">{{ selectedResposta.aluno_nome }}</h4>
+                <p class="text-secondary text-xs truncate">{{ selectedResposta.aluno_email }} · {{ formatDate(selectedResposta.criado_em) }}</p>
               </div>
             </div>
-
-            <div class="flex justify-end pt-1">
-              <BaseButton
-                variant="primary"
-                size="sm"
-                :loading="isSavingAvaliacao"
-                @click="handleSaveAvaliacao"
-              >
-                <span class="material-icons text-xs">save</span>
-                <span>Salvar Avaliação</span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span v-if="selectedResposta.nota !== null && selectedResposta.nota !== undefined"
+                class="text-xs font-bold px-2.5 py-1 rounded-md bg-surface border border-line"
+                :class="scoreColor(selectedResposta.nota)">
+                Nota: {{ selectedResposta.nota }}/100
+              </span>
+              <BaseButton variant="danger" size="sm" title="Excluir resposta" @click="requestDeleteResposta(selectedResposta.id)">
+                <span class="material-icons text-sm">delete</span>
               </BaseButton>
             </div>
           </div>
-          
-          <!-- Respostas do Aluno por Pergunta -->
-          <div class="space-y-4">
-            <h5 class="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
-              <span class="material-icons text-sm text-accent">forum</span>
-              <span>Respostas Submetidas:</span>
-            </h5>
-            
-            <div class="space-y-3">
-              <div v-for="(item, idx) in parseRespostas(selectedResposta.respostas)" :key="idx" class="p-4 bg-surface rounded-xl border border-line space-y-2">
-                <div class="flex items-center gap-2 text-xs font-bold text-primary">
-                  <span class="px-2 py-0.5 bg-accent/15 text-accent rounded-md">Q{{ idx + 1 }}</span>
-                  <span class="leading-snug">{{ item.label }}</span>
+
+          <!-- Área scrollável: avaliação + respostas -->
+          <div class="flex-1 overflow-y-auto">
+
+            <!-- Formulário de avaliação (Feedback à esquerda, Nota + Salvar à direita) -->
+            <div class="sticky top-0 z-10 bg-surface-alt border-b border-line px-5 py-4 shadow-xs">
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-start gap-4">
+                <div class="flex-1 min-w-0">
+                  <BaseTextarea
+                    v-model="editingFeedback"
+                    :rows="3"
+                    label="Comentário Pedagógico / Feedback"
+                    placeholder="Escreva um comentário pedagógico para este aluno..."
+                  />
                 </div>
-                <div class="p-3 bg-surface-alt rounded-lg text-sm text-primary font-mono whitespace-pre-wrap border border-line leading-relaxed">
+                <div class="w-full sm:w-44 shrink-0 flex flex-col justify-between self-stretch gap-2">
+                  <BaseInput
+                    v-model="editingNotaStr"
+                    label="Nota (0-100)"
+                    type="number"
+                    placeholder="Ex: 85"
+                  />
+                  <BaseButton
+                    variant="primary"
+                    size="md"
+                    class="w-full inline-flex items-center justify-center gap-1.5"
+                    :loading="isSavingAvaliacao"
+                    @click="handleSaveAvaliacao"
+                  >
+                    <span class="material-icons text-xs">save</span>
+                    <span class="whitespace-nowrap">Salvar Avaliação</span>
+                  </BaseButton>
+                </div>
+              </div>
+            </div>
+
+            <!-- Respostas por pergunta -->
+            <div class="px-5 py-4 space-y-3">
+              <h5 class="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                <span class="material-icons text-sm text-accent">forum</span>
+                <span>Respostas Submetidas:</span>
+              </h5>
+
+              <div
+                v-for="(item, idx) in parseRespostas(selectedResposta.respostas)"
+                :key="idx"
+                class="rounded-xl border border-line overflow-hidden"
+              >
+                <div class="flex items-center gap-2 px-4 py-2 bg-surface-alt border-b border-line">
+                  <span class="px-2 py-0.5 bg-accent/15 text-accent rounded-md text-xs font-bold shrink-0">Q{{ idx + 1 }}</span>
+                  <span class="text-xs font-medium text-primary leading-snug">{{ item.label }}</span>
+                </div>
+                <div class="px-4 py-3 bg-surface text-sm text-primary font-mono whitespace-pre-wrap leading-relaxed">
                   {{ item.value || '(Sem resposta)' }}
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- Submissions Table -->
-        <div class="overflow-x-auto border border-line rounded-xl shadow-xs">
-          <table class="w-full text-left text-sm text-secondary">
-            <thead class="bg-surface text-secondary text-xs uppercase font-semibold border-b border-line">
-              <tr>
-                <th class="py-3 px-4">Aluno</th>
-                <th class="py-3 px-4">E-mail</th>
-                <th class="py-3 px-4">Data/Hora</th>
-                <th class="py-3 px-4 text-center">Nota</th>
-                <th class="py-3 px-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-line">
-              <tr v-for="resp in respostas" :key="resp.id" class="hover:bg-surface-alt/70 transition-colors">
-                <td class="py-3 px-4 font-bold text-primary">{{ resp.aluno_nome }}</td>
-                <td class="py-3 px-4 text-secondary">{{ resp.aluno_email }}</td>
-                <td class="py-3 px-4 text-secondary text-xs">{{ formatDate(resp.criado_em) }}</td>
-                <td class="py-3 px-4 text-center">
-                  <span
-                    v-if="resp.nota !== null && resp.nota !== undefined"
-                    class="px-2.5 py-1 bg-accent/20 text-accent font-bold rounded-lg text-xs"
-                  >
-                    {{ resp.nota }}/100
-                  </span>
-                  <span v-else class="text-secondary text-xs italic">Sem nota</span>
-                </td>
-                <td class="py-3 px-4 text-right space-x-2">
-                  <BaseButton
-                    variant="primary"
-                    size="sm"
-                    @click="handleSelectResposta(resp)"
-                  >
-                    Avaliar / Ver
-                  </BaseButton>
-                  <BaseButton
-                    variant="danger"
-                    size="sm"
-                    @click="requestDeleteResposta(resp.id)"
-                  >
-                    Excluir
-                  </BaseButton>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+        </template>
+      </main>
     </div>
 
     <template #footer>
-      <div class="flex justify-between items-center pt-4 border-t border-line text-xs text-secondary">
+      <div class="flex justify-between items-center text-xs text-secondary">
         <span>Em conformidade com o Artigo 18 da LGPD (Direito de eliminação de dados)</span>
         <BaseButton variant="secondary" @click="emit('close')">Fechar</BaseButton>
       </div>

@@ -59,17 +59,17 @@ test.describe('Professor — gravar, exportar e importar atividade (JSON)', () =
     await page.locator('select').selectOption('reforco');
     await page.getByPlaceholder('Ex: Avaliação de Algoritmos').fill(atvTitulo);
 
-    // Questão 1
+    // Questão 1 (painel exibe só a pergunta ativa)
     await page.getByRole('button', { name: 'Adicionar Pergunta' }).click();
-    await page.getByPlaceholder('Digite a pergunta para o aluno...').fill('Qual é a capital do Brasil?');
-    await page.getByPlaceholder('Texto da opção').first().fill('Brasília');
-    await page.getByPlaceholder('Texto da opção').nth(1).fill('Rio de Janeiro');
+    await page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...').fill('Qual é a capital do Brasil?');
+    await page.getByPlaceholder('Texto da alternativa...').first().fill('Brasília');
+    await page.getByPlaceholder('Texto da alternativa...').nth(1).fill('Rio de Janeiro');
 
-    // Questão 2
+    // Questão 2 (Adicionar Pergunta troca o painel para a nova questão)
     await page.getByRole('button', { name: 'Adicionar Pergunta' }).click();
-    await page.getByPlaceholder('Digite a pergunta para o aluno...').nth(1).fill('Quanto é 2 + 2?');
-    await page.getByPlaceholder('Texto da opção').nth(2).fill('4');
-    await page.getByPlaceholder('Texto da opção').nth(3).fill('5');
+    await page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...').fill('Quanto é 2 + 2?');
+    await page.getByPlaceholder('Texto da alternativa...').first().fill('4');
+    await page.getByPlaceholder('Texto da alternativa...').nth(1).fill('5');
 
     // --- EXPORTAÇÃO (download do JSON) ---
     const [download] = await Promise.all([
@@ -85,7 +85,7 @@ test.describe('Professor — gravar, exportar e importar atividade (JSON)', () =
 
     // --- GRAVAÇÃO ---
     await page.getByRole('button', { name: 'Salvar Atividade' }).click();
-    await expect(page.locator('p', { hasText: atvTitulo }).first()).toBeVisible();
+    await expect(page.locator('h4', { hasText: atvTitulo }).first()).toBeVisible();
 
     // --- IMPORTAÇÃO (JSON -> editor) ---
     const importTitulo = uniqueName('AtvImp');
@@ -118,9 +118,10 @@ test.describe('Professor — gravar, exportar e importar atividade (JSON)', () =
     await page.getByRole('button', { name: 'Nova Atividade' }).click();
     await page.locator('input[type="file"]').setInputFiles(importFile);
     await expect(page.getByPlaceholder('Ex: Avaliação de Algoritmos')).toHaveValue(importTitulo);
-    await expect(page.getByText('Perguntas (2)')).toBeVisible();
+    await expect(page.getByText('Perguntas')).toBeVisible();
+    await expect(page.getByText('2', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Salvar Atividade' }).click();
-    await expect(page.locator('p', { hasText: importTitulo }).first()).toBeVisible();
+    await expect(page.locator('h4', { hasText: importTitulo }).first()).toBeVisible();
   });
 });
 
