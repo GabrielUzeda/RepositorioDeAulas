@@ -309,7 +309,9 @@ function handleImportJson(e: Event) {
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2.5 flex-1 min-w-0">
               <span class="w-7 h-7 rounded-md bg-accent text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-xs">{{ activeQIndex + 1 }}</span>
+              <span v-if="tipo === 'minigame'" class="font-semibold text-primary text-sm">Pergunta {{ activeQIndex + 1 }}</span>
               <input
+                v-else
                 v-model="activeQuestion.title"
                 placeholder="Título/Tema da Questão (Ex: Questão 1)"
                 class="w-full bg-surface-alt px-3.5 py-2 rounded-md border border-line font-semibold text-primary text-sm outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
@@ -372,6 +374,7 @@ function handleImportJson(e: Event) {
                     class="w-full bg-surface-alt px-3 py-1.5 rounded-md border border-line text-primary text-sm outline-none focus:border-accent"
                   />
                   <input
+                    v-if="tipo !== 'minigame'"
                     v-model="opt.feedback"
                     placeholder="Feedback pedagógico (opcional)..."
                     class="w-full bg-surface-alt px-3 py-1.5 rounded-md text-xs text-secondary border border-line outline-none focus:border-accent"
