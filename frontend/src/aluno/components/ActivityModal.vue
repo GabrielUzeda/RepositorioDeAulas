@@ -133,7 +133,7 @@ async function handleRestoreDraft() {
 }
 
 function isValidEmailFormat(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return /^[^\s@]+@[^\s@]+(?:\.[^\s@]+)?$/.test(email);
 }
 
 const showDraftModal = ref(false);

@@ -43,7 +43,7 @@ export class MinigamePlayer {
 
             if (data.questions) {
                 this.questions = data.questions.map(q => {
-                    const correctOpt = (q.options || []).find(o => o.isCorrect) || (q.options ? q.options[0] : null);
+                    const correctOpt = (q.options || []).find(o => o.correct || o.isCorrect) || (q.options ? q.options[0] : null);
                     return {
                         enunciado: q.content || q.title,
                         alternativas: (q.options || []).map(o => o.text),
