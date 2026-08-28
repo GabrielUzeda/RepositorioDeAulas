@@ -2,7 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import { apiClient } from '@/shared/api/client';
-import type { Atividade, Question, QuestionOption, RascunhoEditor } from '@/shared/types';
+import type { Atividade, Question, QuestionOption, RascunhoEditor, Aula } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
@@ -11,6 +11,7 @@ import BaseSelect from '@/shared/components/BaseSelect.vue';
 import BaseBadge from '@/shared/components/BaseBadge.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
+import AiActivityModal from '@/professor/components/AiActivityModal.vue';
 
 const tipoOptions = [
   { label: 'Normal', value: 'normal' },
@@ -25,8 +26,10 @@ const props = withDefaults(
     show: boolean;
     atividade?: Atividade | null;
     loading?: boolean;
+    aulas?: Aula[];
+    disciplinaId?: number;
   }>(),
-  { loading: false }
+  { loading: false, aulas: () => [] }
 );
 
 const emit = defineEmits<{
@@ -44,6 +47,7 @@ const isSaving = ref(false);
 const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
 
+const showAiModal = ref(false);
 const currentDraftId = ref<number | null>(null);
 const showDraftsModal = ref(false);
 const isLoadingDrafts = ref(false);
@@ -267,6 +271,14 @@ async function handleDeleteDraft(draftId: number) {
     useToast().error(res.error || 'Erro ao excluir rascunho.');
   }
 }
+
+function handleApplyAiQuestions(generatedQuestions: Question[]) {
+  if (!generatedQuestions || generatedQuestions.length === 0) return;
+  questions.value = generatedQuestions.map(normalizeQuestion);
+  activeQIndex.value = 0;
+  showBasicInfo.value = false;
+  useToast().success(`${generatedQuestions.length} questões geradas por IA foram inseridas no editor!`);
+}
 </script>
 
 <template>
@@ -285,6 +297,10 @@ async function handleDeleteDraft(draftId: number) {
         </div>
 
         <div class="flex items-center flex-wrap gap-2">
+          <BaseButton variant="secondary" size="sm" @click="showAiModal = true">
+            <span class="material-icons text-sm text-accent">auto_awesome</span>
+            <span>Gerar com IA</span>
+          </BaseButton>
           <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
             <span class="material-icons text-sm">folder_open</span>
             <span>Rascunhos</span>
@@ -532,5 +548,16 @@ async function handleDeleteDraft(draftId: number) {
         </div>
       </template>
     </BaseModal>
+
+    <!-- Modal de Geração por IA -->
+    <AiActivityModal
+      :show="showAiModal"
+      :tipo="tipo"
+      :titulo="titulo"
+      :aulas="props.aulas"
+      :disciplina-id="props.disciplinaId"
+      @close="showAiModal = false"
+      @apply="handleApplyAiQuestions"
+    />
   </BaseModal>
 </template>

@@ -151,3 +151,24 @@ export interface RascunhoEditor {
   criado_em?: string;
   atualizado_em?: string;
 }
+
+export interface AiModel {
+  id: string;
+  name: string;
+  provider: string;
+  reasoning: boolean;
+  vision: boolean;
+  contextWindow?: number;
+  maxOutput?: number;
+}
+
+export interface GenerateActivityPayload {
+  modelo: string;
+  tipo: string;
+  titulo?: string;
+  tema?: string;
+  observacoes?: string;
+  quantidade: number;
+  disciplina_id?: number;
+  aulas_ids?: number[];
+}
