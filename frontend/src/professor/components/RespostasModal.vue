@@ -185,19 +185,13 @@ function scoreColor(nota: number | null | undefined) {
     @close="emit('close')"
   >
     <template #header>
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs shrink-0">
-            <span class="material-icons text-[20px]">analytics</span>
-          </div>
-          <div>
-            <h2 class="text-lg font-bold text-primary leading-tight">{{ props.atividade?.titulo }}</h2>
-            <p class="text-xs text-secondary">{{ respostas.length }} resposta{{ respostas.length !== 1 ? 's' : '' }} submetida{{ respostas.length !== 1 ? 's' : '' }}</p>
-          </div>
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs shrink-0">
+          <span class="material-icons text-[20px]">analytics</span>
         </div>
-
-        <div class="flex items-center gap-2">
-          <BaseButton variant="secondary" size="sm" @click="emit('close')">Fechar</BaseButton>
+        <div>
+          <h2 class="text-lg font-bold text-primary leading-tight">{{ props.atividade?.titulo }}</h2>
+          <p class="text-xs text-secondary">{{ respostas.length }} resposta{{ respostas.length !== 1 ? 's' : '' }} submetida{{ respostas.length !== 1 ? 's' : '' }}</p>
         </div>
       </div>
     </template>
