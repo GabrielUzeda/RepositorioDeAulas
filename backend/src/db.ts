@@ -148,6 +148,18 @@ CREATE TABLE IF NOT EXISTS rascunhos_atividades (
   atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rascunho_atv_email ON rascunhos_atividades(atividade_id, aluno_email_hash);
+
+CREATE TABLE IF NOT EXISTS rascunhos_editor (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  professor_id INTEGER NOT NULL REFERENCES professores(id) ON DELETE CASCADE,
+  titulo TEXT NOT NULL DEFAULT '',
+  descricao TEXT NOT NULL DEFAULT '',
+  tipo TEXT NOT NULL DEFAULT 'normal',
+  json_data TEXT NOT NULL DEFAULT '{}',
+  expira_em TEXT NOT NULL,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
 `);
 
 // [2] Índices para alta performance
@@ -160,6 +172,8 @@ CREATE INDEX IF NOT EXISTS idx_disciplinas_curso ON disciplinas(curso_id);
 CREATE INDEX IF NOT EXISTS idx_disciplina_feedbacks_disc ON disciplina_feedbacks(disciplina_id);
 CREATE INDEX IF NOT EXISTS idx_curso_professores_professor ON curso_professores(professor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_criado_em ON audit_logs(criado_em);
+CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_professor ON rascunhos_editor(professor_id);
+CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_expira_em ON rascunhos_editor(expira_em);
 `);
 
 // [3] Função de Seed Automático para ambiente Demo

@@ -1,5 +1,4 @@
-import { test, expect, Page, APIRequestContext } from '@playwright/test';
-import fs from 'fs';
+import { test, expect, APIRequestContext } from '@playwright/test';
 import {
   createCurso,
   createMateria,
@@ -20,7 +19,7 @@ async function api(request: APIRequestContext, method: 'post' | 'put' | 'delete'
   return request[method](`${E2E_BACKEND_URL}${path}`, { headers: { Authorization: `Bearer ${token}` }, data });
 }
 
-test.describe('Professor — gravar, exportar e importar atividade (JSON)', () => {
+test.describe('Professor — criar atividade e gerenciar rascunhos no editor', () => {
   let adminToken: string;
   let profEmail: string;
   let profPassword: string;
@@ -46,8 +45,8 @@ test.describe('Professor — gravar, exportar e importar atividade (JSON)', () =
     if (adminToken) await cleanupEntities(request, adminToken, cursoId, professorId);
   });
 
-  test('grava atividade com 2 questões, exporta e importa JSON', async ({ page }) => {
-    const atvTitulo = uniqueName('AtvGrav');
+  test('salva rascunho com 2 questões, restaura do backend, grava atividade e exclui rascunho', async ({ page }) => {
+    const atvTitulo = uniqueName('AtvRasc');
     await loginViaUI(page, profEmail, profPassword, /\/professor/);
     await expect(page.getByRole('heading', { name: 'Painel do Professor' })).toBeVisible();
     await page.locator('h3', { hasText: cursoNome }).click();
@@ -59,68 +58,52 @@ test.describe('Professor — gravar, exportar e importar atividade (JSON)', () =
     await page.locator('select').selectOption('reforco');
     await page.getByPlaceholder('Ex: Avaliação de Algoritmos').fill(atvTitulo);
 
-    // Questão 1
+    // Questão 1 (painel exibe só a pergunta ativa)
     await page.getByRole('button', { name: 'Adicionar Pergunta' }).click();
-    await page.getByPlaceholder('Digite a pergunta para o aluno...').fill('Qual é a capital do Brasil?');
-    await page.getByPlaceholder('Texto da opção').first().fill('Brasília');
-    await page.getByPlaceholder('Texto da opção').nth(1).fill('Rio de Janeiro');
+    await page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...').fill('Qual é a capital do Brasil?');
+    await page.getByPlaceholder('Texto da alternativa...').first().fill('Brasília');
+    await page.getByPlaceholder('Texto da alternativa...').nth(1).fill('Rio de Janeiro');
 
-    // Questão 2
+    // Questão 2 (Adicionar Pergunta troca o painel para a nova questão)
     await page.getByRole('button', { name: 'Adicionar Pergunta' }).click();
-    await page.getByPlaceholder('Digite a pergunta para o aluno...').nth(1).fill('Quanto é 2 + 2?');
-    await page.getByPlaceholder('Texto da opção').nth(2).fill('4');
-    await page.getByPlaceholder('Texto da opção').nth(3).fill('5');
+    await page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...').fill('Quanto é 2 + 2?');
+    await page.getByPlaceholder('Texto da alternativa...').first().fill('4');
+    await page.getByPlaceholder('Texto da alternativa...').nth(1).fill('5');
 
-    // --- EXPORTAÇÃO (download do JSON) ---
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Exportar JSON' }).click(),
-    ]);
-    const dlPath = await download.path();
-    const exported = JSON.parse(fs.readFileSync(dlPath!, 'utf-8'));
-    expect(exported.questions.length).toBe(2);
-    expect(
-      exported.questions[0].options.some((o: any) => o.text === 'Brasília' && o.correct === true)
-    ).toBeTruthy();
+    // --- SALVAR RASCUNHO NA NUVEM ---
+    await page.getByRole('button', { name: 'Salvar Rascunho' }).click();
+    await expect(page.getByText('Rascunho salvo com sucesso!')).toBeVisible();
 
-    // --- GRAVAÇÃO ---
-    await page.getByRole('button', { name: 'Salvar Atividade' }).click();
-    await expect(page.locator('p', { hasText: atvTitulo }).first()).toBeVisible();
+    // Fechar o editor
+    await page.getByRole('button', { name: 'Cancelar' }).click();
 
-    // --- IMPORTAÇÃO (JSON -> editor) ---
-    const importTitulo = uniqueName('AtvImp');
-    const importFile = '/tmp/import-atv.json';
-    fs.writeFileSync(
-      importFile,
-      JSON.stringify({
-        titulo: importTitulo,
-        tipo: 'reforco',
-        questions: [
-          {
-            title: 'Q import 1',
-            content: 'Importada 1?',
-            options: [
-              { text: 'Sim', correct: true, feedback: 'ok' },
-              { text: 'Não', correct: false, feedback: 'no' },
-            ],
-          },
-          {
-            title: 'Q import 2',
-            content: 'Importada 2?',
-            options: [
-              { text: 'A', correct: true, feedback: 'ok' },
-              { text: 'B', correct: false, feedback: 'no' },
-            ],
-          },
-        ],
-      })
-    );
+    // --- REABRIR EDITOR E CARREGAR RASCUNHO ---
     await page.getByRole('button', { name: 'Nova Atividade' }).click();
-    await page.locator('input[type="file"]').setInputFiles(importFile);
-    await expect(page.getByPlaceholder('Ex: Avaliação de Algoritmos')).toHaveValue(importTitulo);
-    await expect(page.getByText('Perguntas (2)')).toBeVisible();
+    await page.getByRole('button', { name: 'Rascunhos' }).click();
+    await expect(page.getByText('Rascunhos de Atividades', { exact: true })).toBeVisible();
+    await expect(page.getByText(atvTitulo, { exact: true })).toBeVisible();
+
+    // Clicar em carregar rascunho
+    await page.getByRole('button', { name: 'Carregar' }).first().click();
+    await expect(page.getByText('Rascunho carregado no editor!', { exact: true })).toBeVisible();
+
+    // Verificar se as 2 perguntas foram restauradas
+    await expect(page.getByText('Perguntas', { exact: true })).toBeVisible();
+    await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
+
+    // --- GRAVAR ATIVIDADE DEFINITIVA ---
     await page.getByRole('button', { name: 'Salvar Atividade' }).click();
-    await expect(page.locator('p', { hasText: importTitulo }).first()).toBeVisible();
+    await expect(page.locator('h4', { hasText: atvTitulo }).first()).toBeVisible();
+
+    // --- EXCLUIR RASCUNHO APÓS USO ---
+    await page.getByRole('button', { name: 'Nova Atividade' }).click();
+    await page.getByRole('button', { name: 'Rascunhos' }).click();
+    const draftsModal = page.getByLabel('Rascunhos de Atividades');
+    await expect(draftsModal.getByRole('heading', { name: atvTitulo })).toBeVisible();
+    await draftsModal.getByRole('button', { name: 'Excluir' }).first().click();
+    await expect(page.getByText('Rascunho excluído com sucesso!', { exact: true })).toBeVisible();
+    await draftsModal.getByText('Fechar').click();
+    await page.getByRole('button', { name: 'Cancelar' }).click();
   });
 });
 
@@ -196,13 +179,13 @@ test.describe('Aluno — visualizar e corrigir atividade (resposta por questão)
     await page.getByRole('button', { name: 'Próximo' }).click();
 
     // Passo 1: Pergunta 1
-    await expect(page.getByText('Q1')).toBeVisible();
-    await page.getByRole('button', { name: /Brasília/ }).click();
+    await expect(page.getByRole('button', { name: 'Brasília', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Brasília', exact: true }).click();
     await page.getByRole('button', { name: 'Próximo' }).click();
 
     // Passo 2: Pergunta 2
-    await expect(page.getByText('Q2')).toBeVisible();
-    await page.getByRole('button', { name: /^4/ }).click();
+    await expect(page.getByRole('button', { name: '4', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '4', exact: true }).click();
     await page.getByRole('button', { name: 'Próximo' }).click();
 
     // Passo 3: Revisão e Envio

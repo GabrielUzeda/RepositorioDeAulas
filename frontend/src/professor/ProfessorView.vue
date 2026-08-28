@@ -13,6 +13,7 @@ import CursoCard from '@/aluno/components/CursoCard.vue';
 import DisciplinaCard from '@/aluno/components/DisciplinaCard.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseBadge from '@/shared/components/BaseBadge.vue';
 import BaseSkeleton from '@/shared/components/BaseSkeleton.vue';
 import BackButton from '@/shared/components/BackButton.vue';
 import ConfirmDialog from '../shared/components/ConfirmDialog.vue';
@@ -546,6 +547,7 @@ function handleOpenRespostas(atividade: Atividade) {
             <BaseButton
               variant="primary"
               size="sm"
+              class="whitespace-nowrap shrink-0 inline-flex items-center gap-1.5"
               @click="showFeedbackConsolidadoModal = true"
             >
               <span class="material-icons text-sm">mark_email_read</span>
@@ -603,39 +605,47 @@ function handleOpenRespostas(atividade: Atividade) {
                 @dragstart="onDragStart('aula', idx, $event)"
                 @dragover="onDragOver($event)"
                 @drop="onDrop('aula', idx, $event)"
-                class="p-4 bg-surface-alt border border-line rounded-2xl flex items-center justify-between transition-all duration-200"
+                class="group relative bg-surface-alt rounded-lg border border-line flex flex-col overflow-hidden transition-all duration-base"
                 :class="{
-                  'border-accent/60 cursor-grab active:cursor-grabbing hover:shadow-card': isReorderingAulas,
-                  'hover:border-secondary': !isReorderingAulas
+                  'border-accent/60 cursor-grab active:cursor-grabbing shadow-card': isReorderingAulas,
+                  'hover:border-line-strong hover:shadow-card': !isReorderingAulas
                 }"
               >
-                <div class="flex items-center space-x-3 truncate">
-                  <span class="material-icons text-accent text-lg shrink-0">
-                    {{ isReorderingAulas ? 'drag_indicator' : 'slideshow' }}
-                  </span>
-                  <div class="truncate">
-                    <p class="text-primary text-xs font-bold truncate">{{ aula.titulo }}</p>
-                    <p class="text-secondary text-[10px] truncate">{{ aula.descricao }}</p>
-                  </div>
-                </div>
+                <!-- Top accent bar -->
+                <div class="h-1.5 w-full bg-accent" />
 
-                <div class="flex items-center space-x-1 shrink-0 ml-2">
-                  <div v-if="isReorderingAulas" class="flex items-center space-x-1 mr-1">
-                    <button @click="moveAula(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
-                      <span class="material-icons text-base">arrow_upward</span>
-                    </button>
-                    <button @click="moveAula(idx, 'down')" :disabled="idx === localAulas.length - 1" title="Mover para baixo" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
-                      <span class="material-icons text-base">arrow_downward</span>
-                    </button>
+                <div class="p-4 flex flex-col gap-3 flex-1">
+                  <div class="flex items-center gap-3">
+                    <div class="flex-shrink-0 w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs">
+                      <span class="material-icons text-[18px]">
+                        {{ isReorderingAulas ? 'drag_indicator' : (aula.icone || 'slideshow') }}
+                      </span>
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                      <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ aula.titulo }}</h4>
+                      <p class="text-xs text-secondary leading-relaxed truncate">{{ aula.descricao || 'Apresentação em slides Marp' }}</p>
+                    </div>
+
+                    <div class="flex items-center space-x-1 shrink-0 ml-2">
+                      <div v-if="isReorderingAulas" class="flex items-center space-x-1">
+                        <button @click="moveAula(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none rounded">
+                          <span class="material-icons text-base">arrow_upward</span>
+                        </button>
+                        <button @click="moveAula(idx, 'down')" :disabled="idx === localAulas.length - 1" title="Mover para baixo" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none rounded">
+                          <span class="material-icons text-base">arrow_downward</span>
+                        </button>
+                      </div>
+                      <template v-else>
+                        <button @click="handleOpenMarpModal(aula)" title="Editar Aula" class="p-1.5 text-secondary hover:text-primary rounded-lg hover:bg-surface transition-colors">
+                          <span class="material-icons text-sm">edit</span>
+                        </button>
+                        <button @click="handleDeleteAula(aula.id)" title="Excluir Aula" class="p-1.5 text-secondary hover:text-danger rounded-lg hover:bg-surface transition-colors">
+                          <span class="material-icons text-sm">delete</span>
+                        </button>
+                      </template>
+                    </div>
                   </div>
-                  <template v-else>
-                    <button @click="handleOpenMarpModal(aula)" title="Editar Aula" class="p-1.5 text-secondary hover:text-primary rounded-lg hover:bg-surface">
-                      <span class="material-icons text-sm">edit</span>
-                    </button>
-                    <button @click="handleDeleteAula(aula.id)" title="Excluir Aula" class="p-1.5 text-secondary hover:text-danger rounded-lg hover:bg-surface">
-                      <span class="material-icons text-sm">delete</span>
-                    </button>
-                  </template>
                 </div>
               </div>
             </div>
@@ -670,9 +680,9 @@ function handleOpenRespostas(atividade: Atividade) {
             </div>
 
             <div v-if="cursoStore.loadingContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true" aria-label="Carregando atividades">
-              <div v-for="n in 3" :key="n" class="p-4 bg-surface-alt border border-line rounded-2xl flex flex-col justify-between space-y-3">
+              <div v-for="n in 3" :key="n" class="p-4 bg-surface-alt border border-line rounded-lg flex flex-col justify-between space-y-3">
                 <div class="flex items-center space-x-3 w-full">
-                  <BaseSkeleton width="w-6" height="h-6" rounded="rounded-md" />
+                  <BaseSkeleton width="w-9" height="h-9" rounded="rounded-md" />
                   <div class="flex-1 space-y-1.5">
                     <BaseSkeleton height="h-3.5" width="w-3/4" />
                     <BaseSkeleton height="h-2.5" width="w-1/2" />
@@ -692,46 +702,58 @@ function handleOpenRespostas(atividade: Atividade) {
                 @dragstart="onDragStart('atividade', idx, $event)"
                 @dragover="onDragOver($event)"
                 @drop="onDrop('atividade', idx, $event)"
-                class="p-4 bg-surface-alt border border-line rounded-2xl flex flex-col justify-between space-y-3 transition-all duration-200"
+                class="group relative bg-surface-alt rounded-lg border border-line flex flex-col overflow-hidden transition-all duration-base"
                 :class="{
-                  'border-accent/60 cursor-grab active:cursor-grabbing hover:shadow-card': isReorderingAtividades,
-                  'hover:border-secondary': !isReorderingAtividades
+                  'border-accent/60 cursor-grab active:cursor-grabbing shadow-card': isReorderingAtividades,
+                  'hover:border-line-strong hover:shadow-card': !isReorderingAtividades
                 }"
               >
-                <div class="flex items-start justify-between">
-                  <div class="flex items-center space-x-3 truncate">
-                    <span class="material-icons text-accent text-lg shrink-0">
-                      {{ isReorderingAtividades ? 'drag_indicator' : 'assignment' }}
-                    </span>
-                    <div class="truncate">
-                      <p class="text-primary text-xs font-bold truncate">{{ atv.titulo }}</p>
-                      <p class="text-secondary text-[10px] truncate">{{ atv.tipo || 'normal' }}</p>
+                <!-- Top accent bar -->
+                <div class="h-1.5 w-full bg-accent" />
+
+                <div class="p-4 flex flex-col gap-3 flex-1 justify-between">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div class="flex-shrink-0 w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs">
+                        <span class="material-icons text-[18px]">
+                          {{ isReorderingAtividades ? 'drag_indicator' : (atv.icone || 'assignment') }}
+                        </span>
+                      </div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                          <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ atv.titulo }}</h4>
+                        </div>
+                        <p class="text-xs text-secondary leading-relaxed truncate">{{ atv.descricao || 'Atividade interativa' }}</p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-1 shrink-0 ml-2">
+                      <div v-if="isReorderingAtividades" class="flex items-center space-x-1">
+                        <button @click="moveAtividade(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none rounded">
+                          <span class="material-icons text-base">arrow_upward</span>
+                        </button>
+                        <button @click="moveAtividade(idx, 'down')" :disabled="idx === localAtividades.length - 1" title="Mover para baixo" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none rounded">
+                          <span class="material-icons text-base">arrow_downward</span>
+                        </button>
+                      </div>
+                      <template v-else>
+                        <button @click="handleOpenActivityEditor(atv)" title="Editar Atividade" class="p-1.5 text-secondary hover:text-primary rounded-lg hover:bg-surface transition-colors">
+                          <span class="material-icons text-sm">edit</span>
+                        </button>
+                        <button @click="handleDeleteActivity(atv.id)" title="Excluir Atividade" class="p-1.5 text-secondary hover:text-danger rounded-lg hover:bg-surface transition-colors">
+                          <span class="material-icons text-sm">delete</span>
+                        </button>
+                      </template>
                     </div>
                   </div>
-                  <div class="flex items-center space-x-1 shrink-0 ml-2">
-                    <div v-if="isReorderingAtividades" class="flex items-center space-x-1 mr-1">
-                      <button @click="moveAtividade(idx, 'up')" :disabled="idx === 0" title="Mover para cima" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
-                        <span class="material-icons text-base">arrow_upward</span>
-                      </button>
-                      <button @click="moveAtividade(idx, 'down')" :disabled="idx === localAtividades.length - 1" title="Mover para baixo" class="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:pointer-events-none">
-                        <span class="material-icons text-base">arrow_downward</span>
-                      </button>
-                    </div>
-                    <template v-else>
-                      <button @click="handleOpenActivityEditor(atv)" title="Editar Atividade" class="p-1.5 text-secondary hover:text-primary rounded-lg hover:bg-surface">
-                        <span class="material-icons text-sm">edit</span>
-                      </button>
-                      <button @click="handleDeleteActivity(atv.id)" title="Excluir Atividade" class="p-1.5 text-secondary hover:text-danger rounded-lg hover:bg-surface">
-                        <span class="material-icons text-sm">delete</span>
-                      </button>
-                    </template>
+
+                  <div v-if="!isReorderingAtividades" class="pt-2 border-t border-line">
+                    <BaseButton variant="secondary" size="xs" block @click="handleOpenRespostas(atv)">
+                      <span class="material-icons text-xs">analytics</span>
+                      <span>Ver Respostas dos Alunos</span>
+                    </BaseButton>
                   </div>
                 </div>
-
-                <BaseButton v-if="!isReorderingAtividades" variant="secondary" size="xs" block @click="handleOpenRespostas(atv)">
-                  <span class="material-icons text-xs">analytics</span>
-                  <span>Ver Respostas dos Alunos</span>
-                </BaseButton>
               </div>
             </div>
           </div>

@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
-import type { Atividade, Question, QuestionOption } from '@/shared/types';
+import { apiClient } from '@/shared/api/client';
+import type { Atividade, Question, QuestionOption, RascunhoEditor } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 import BaseSelect from '@/shared/components/BaseSelect.vue';
+import BaseBadge from '@/shared/components/BaseBadge.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
 
 const tipoOptions = [
   { label: 'Normal', value: 'normal' },
   { label: 'Prova', value: 'prova' },
-  { label: 'Minigame Tático', value: 'minigame' },
+  { label: 'Minigame de Naves', value: 'minigame' },
   { label: 'Roleta do Conhecimento', value: 'roleta' },
-  { label: 'Reforço (Modo Zen)', value: 'reforco' },
+  { label: 'Reforço', value: 'reforco' },
 ];
 
 const props = withDefaults(
@@ -23,9 +26,7 @@ const props = withDefaults(
     atividade?: Atividade | null;
     loading?: boolean;
   }>(),
-  {
-    loading: false,
-  }
+  { loading: false }
 );
 
 const emit = defineEmits<{
@@ -40,8 +41,17 @@ const allowPassword = ref(false);
 const senha = ref('');
 const questions = ref<Question[]>([]);
 const isSaving = ref(false);
+const activeQIndex = ref(0);
+const showBasicInfo = ref(true);
+
+const currentDraftId = ref<number | null>(null);
+const showDraftsModal = ref(false);
+const isLoadingDrafts = ref(false);
+const isSavingDraft = ref(false);
+const drafts = ref<RascunhoEditor[]>([]);
 
 const usesOptions = computed(() => tipo.value !== 'normal' && tipo.value !== 'prova');
+const activeQuestion = computed(() => questions.value[activeQIndex.value] ?? null);
 
 function normalizeQuestion(q: any): Question {
   let options: QuestionOption[] | undefined;
@@ -65,6 +75,9 @@ watch(
   () => props.show,
   (val) => {
     isSaving.value = false;
+    activeQIndex.value = 0;
+    showBasicInfo.value = true;
+    currentDraftId.value = null;
     if (val) {
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
@@ -72,7 +85,6 @@ watch(
         tipo.value = (props.atividade.tipo as any) || 'normal';
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
-
         if (props.atividade.json_data) {
           try {
             const parsed = typeof props.atividade.json_data === 'string'
@@ -99,25 +111,24 @@ watch(
 
 function addQuestion() {
   const base = { title: `Questão ${questions.value.length + 1}`, content: '' };
-  if (usesOptions.value) {
-    questions.value.push({
-      ...base,
-      options: [
-        { text: 'Opção 1', correct: true, feedback: 'Correto!' },
-        { text: 'Opção 2', correct: false, feedback: 'Incorreto.' }
-      ]
-    });
-  } else {
-    questions.value.push(base);
-  }
+  const newQ: Question = usesOptions.value
+    ? { ...base, options: [{ text: 'Opção 1', correct: true, feedback: 'Correto!' }, { text: 'Opção 2', correct: false, feedback: 'Incorreto.' }] }
+    : base;
+  questions.value.push(newQ);
+  activeQIndex.value = questions.value.length - 1;
+  showBasicInfo.value = false;
 }
 
 function handleTypeChange() {
   questions.value = [];
+  activeQIndex.value = 0;
 }
 
 function removeQuestion(index: number) {
   questions.value.splice(index, 1);
+  if (activeQIndex.value >= questions.value.length) {
+    activeQIndex.value = Math.max(0, questions.value.length - 1);
+  }
 }
 
 function moveQuestion(index: number, direction: 'up' | 'down') {
@@ -126,17 +137,14 @@ function moveQuestion(index: number, direction: 'up' | 'down') {
     const temp = questions.value[index];
     questions.value[index] = questions.value[target];
     questions.value[target] = temp;
+    activeQIndex.value = target;
   }
 }
 
 function addOption(qIndex: number) {
   const q = questions.value[qIndex];
   if (!q.options) q.options = [];
-  q.options.push({
-    text: `Opção ${q.options.length + 1}`,
-    correct: false,
-    feedback: ''
-  });
+  q.options.push({ text: `Opção ${q.options.length + 1}`, correct: false, feedback: '' });
 }
 
 function removeOption(qIndex: number, oIndex: number) {
@@ -145,17 +153,13 @@ function removeOption(qIndex: number, oIndex: number) {
 
 function setCorrectOption(qIndex: number, oIndex: number) {
   const opts = questions.value[qIndex].options;
-  if (opts) {
-    opts.forEach((o, idx) => {
-      o.correct = idx === oIndex;
-    });
-  }
+  if (opts) opts.forEach((o, idx) => { o.correct = idx === oIndex; });
 }
 
 function handleSave() {
   if (isSaving.value || props.loading) return;
   isSaving.value = true;
-  const payload: Partial<Atividade> = {
+  emit('save', {
     titulo: titulo.value,
     descricao: descricao.value,
     tipo: tipo.value,
@@ -163,195 +167,370 @@ function handleSave() {
     senha: allowPassword.value ? senha.value : null,
     caminho: titulo.value.toLowerCase().replace(/\s+/g, '_'),
     json_data: JSON.stringify({ questions: questions.value })
-  };
-
-  emit('save', payload);
+  });
 }
 
-function handleExportJson() {
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ questions: questions.value }, null, 2));
-  const downloadAnchor = document.createElement('a');
-  downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `${titulo.value || 'atividade'}.json`);
-  document.body.appendChild(downloadAnchor);
-  downloadAnchor.click();
-  downloadAnchor.remove();
-}
-
-function handleImportJson(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    try {
-      const parsed = JSON.parse(event.target?.result as string);
-      const raw = Array.isArray(parsed?.questions) ? parsed.questions : Array.isArray(parsed?.perguntas) ? parsed.perguntas : null;
-      if (!raw) {
-        useToast().error('Arquivo JSON não contém perguntas.');
-        return;
-      }
-      if (parsed?.titulo) titulo.value = String(parsed.titulo);
-      if (parsed?.descricao) descricao.value = String(parsed.descricao);
-      if (parsed?.tipo) tipo.value = (parsed.tipo === 'game' ? 'minigame' : parsed.tipo);
-      if (parsed?.senha) {
-        allowPassword.value = true;
-        senha.value = String(parsed.senha);
-      }
-      questions.value = raw.map(normalizeQuestion);
-    } catch {
-      useToast().error('Arquivo JSON inválido!');
+async function handleSaveDraft() {
+  if (isSavingDraft.value) return;
+  isSavingDraft.value = true;
+  try {
+    const payload = {
+      rascunho_id: currentDraftId.value,
+      titulo: titulo.value || 'Sem título',
+      descricao: descricao.value,
+      tipo: tipo.value,
+      json_data: { questions: questions.value }
+    };
+    const res = await apiClient.post<{ id: number; expira_em: string; success: boolean }>('/professor/rascunhos-editor', payload);
+    if (res.success && res.data) {
+      currentDraftId.value = res.data.id;
+      useToast().success('Rascunho salvo com sucesso!');
+    } else {
+      useToast().error(res.error || 'Erro ao salvar rascunho');
     }
-  };
-  reader.readAsText(file);
+  } catch (e: any) {
+    useToast().error(e?.message || 'Erro ao salvar rascunho');
+  } finally {
+    isSavingDraft.value = false;
+  }
+}
+
+async function openDraftsModal() {
+  showDraftsModal.value = true;
+  await fetchDrafts();
+}
+
+async function fetchDrafts() {
+  isLoadingDrafts.value = true;
+  try {
+    const res = await apiClient.get<RascunhoEditor[]>('/professor/rascunhos-editor');
+    if (res.success && Array.isArray(res.data)) {
+      drafts.value = res.data;
+    } else {
+      drafts.value = [];
+    }
+  } catch {
+    drafts.value = [];
+  } finally {
+    isLoadingDrafts.value = false;
+  }
+}
+
+function getDaysRemaining(expiraEm: string): number {
+  const diff = new Date(expiraEm).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function handleLoadDraft(draft: RascunhoEditor) {
+  try {
+    const parsed = typeof draft.json_data === 'string' ? JSON.parse(draft.json_data) : draft.json_data;
+    const raw = Array.isArray(parsed?.questions) ? parsed.questions : Array.isArray(parsed?.perguntas) ? parsed.perguntas : [];
+    titulo.value = draft.titulo || '';
+    descricao.value = draft.descricao || '';
+    tipo.value = ((draft.tipo === 'game' ? 'minigame' : draft.tipo) as any) || 'normal';
+    questions.value = raw.map(normalizeQuestion);
+    currentDraftId.value = draft.id;
+    activeQIndex.value = 0;
+    showBasicInfo.value = false;
+    showDraftsModal.value = false;
+    useToast().success('Rascunho carregado no editor!');
+  } catch {
+    useToast().error('Erro ao processar dados do rascunho.');
+  }
+}
+
+async function handleDeleteDraft(draftId: number) {
+  const res = await apiClient.delete(`/professor/rascunhos-editor/${draftId}`);
+  if (res.success) {
+    if (currentDraftId.value === draftId) {
+      currentDraftId.value = null;
+    }
+    drafts.value = drafts.value.filter((d) => d.id !== draftId);
+    useToast().success('Rascunho excluído com sucesso!');
+  } else {
+    useToast().error(res.error || 'Erro ao excluir rascunho.');
+  }
 }
 </script>
 
 <template>
-  <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-4xl">
+  <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-6xl" no-padding>
+    <!-- Header fixo -->
     <template #header>
-      <div class="flex items-center justify-between gap-4 w-full border-b border-line pb-4">
-        <div class="flex items-center space-x-3">
-          <span class="material-icons text-accent">quiz</span>
-          <h2 class="text-xl font-bold text-primary">{{ props.atividade ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs shrink-0">
+            <span class="material-icons text-[20px]">quiz</span>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-primary leading-tight">{{ props.atividade ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
+            <p class="text-xs text-secondary">{{ questions.length }} pergunta{{ questions.length !== 1 ? 's' : '' }} · {{ tipo }}</p>
+          </div>
         </div>
 
-        <div class="flex items-center space-x-3">
-          <label class="cursor-pointer px-3 py-1.5 bg-surface-alt hover:bg-surface text-secondary rounded-lg text-xs font-semibold flex items-center space-x-1">
-            <span class="material-icons text-sm">upload_file</span>
-            <span>Importar JSON</span>
-            <input type="file" accept=".json" @change="handleImportJson" class="hidden" />
-          </label>
-
-          <BaseButton variant="secondary" size="sm" @click="handleExportJson">
-            <span class="material-icons text-sm">download</span>
-            <span>Exportar JSON</span>
+        <div class="flex items-center flex-wrap gap-2">
+          <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
+            <span class="material-icons text-sm">folder_open</span>
+            <span>Rascunhos</span>
           </BaseButton>
-
+          <BaseButton variant="secondary" size="sm" :loading="isSavingDraft" @click="handleSaveDraft">
+            <span class="material-icons text-sm">bookmark</span>
+            <span>Salvar Rascunho</span>
+          </BaseButton>
           <BaseButton variant="ghost" size="sm" :disabled="props.loading || isSaving" @click="emit('close')">Cancelar</BaseButton>
           <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">Salvar Atividade</BaseButton>
         </div>
       </div>
     </template>
 
-    <div class="space-y-6">
-      <!-- Basic Info Box -->
-      <div class="bg-surface p-6 rounded-2xl border border-line space-y-4 shadow-lg">
-        <h3 class="text-lg font-bold text-primary border-b border-line pb-2">Informações Básicas</h3>
+    <!-- Layout split: sidebar esq + painel dir -->
+    <div class="flex h-full min-h-0" style="height: calc(90vh - 130px)">
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <BaseInput
-            v-model="titulo"
-            type="text"
-            label="Título da Atividade *"
-            placeholder="Ex: Avaliação de Algoritmos"
-          />
+      <!-- Sidebar: informações + lista de perguntas -->
+      <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto">
+        <!-- Info básica collapsible -->
+        <button
+          class="flex items-center justify-between px-4 py-3 text-xs font-bold uppercase tracking-wider text-secondary hover:bg-surface-alt transition-colors border-b border-line"
+          @click="showBasicInfo = !showBasicInfo; activeQIndex = -1"
+        >
+          <span class="flex items-center gap-1.5">
+            <span class="material-icons text-sm text-accent">info</span>
+            Informações
+          </span>
+          <span class="material-icons text-sm transition-transform" :class="showBasicInfo ? 'rotate-180' : ''">expand_more</span>
+        </button>
 
-          <BaseSelect
-            v-model="tipo"
-            :options="tipoOptions"
-            label="Tipo de Atividade"
-            @change="handleTypeChange"
-          />
-
-          <div class="md:col-span-2">
-            <BaseTextarea
-              v-model="descricao"
-              :rows="2"
-              label="Descrição"
-              placeholder="Breve resumo da atividade..."
-            />
+        <!-- Lista de perguntas -->
+        <div class="flex-1 overflow-y-auto">
+          <div class="px-3 pt-3 pb-1 flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-secondary">Perguntas</span>
+            <span class="text-xs text-secondary bg-surface-alt px-1.5 py-0.5 rounded-full">{{ questions.length }}</span>
           </div>
 
-          <div class="md:col-span-2 flex items-center space-x-3 pt-2">
-            <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
-            <label for="allowPassword" class="text-sm font-medium text-secondary cursor-pointer">Exigir senha individual de acesso para os alunos</label>
-          </div>
+          <EmptyState v-if="questions.length === 0" icon="help_outline" message="Nenhuma pergunta ainda." class="py-6 px-3" />
 
-          <div v-if="allowPassword" class="md:col-span-2">
-            <BaseInput
-              v-model="senha"
-              type="password"
-              label="Senha da Atividade *"
-              placeholder="Digite a senha exclusiva"
-            />
+          <div
+            v-for="(q, idx) in questions"
+            :key="idx"
+            class="group mx-2 mb-1 rounded-lg border cursor-pointer transition-all"
+            :class="activeQIndex === idx && !showBasicInfo
+              ? 'border-accent bg-accent/10 shadow-sm'
+              : 'border-transparent hover:border-line hover:bg-surface-alt'"
+            @click="activeQIndex = idx; showBasicInfo = false"
+          >
+            <div class="px-3 py-2.5 flex items-start gap-2">
+              <span class="mt-0.5 w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
+                :class="activeQIndex === idx && !showBasicInfo ? 'bg-accent text-white' : 'bg-surface-alt text-secondary'">
+                {{ idx + 1 }}
+              </span>
+              <p class="text-xs text-primary leading-snug line-clamp-2 flex-1">{{ q.content || q.title || 'Sem enunciado' }}</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Questions Section -->
-      <div class="space-y-4">
-        <div class="flex justify-between items-center">
-          <h3 class="text-xl font-bold text-primary">Perguntas ({{ questions.length }})</h3>
-          <BaseButton variant="primary" size="sm" @click="addQuestion">
+        <!-- Botão adicionar -->
+        <div class="shrink-0 p-3 border-t border-line">
+          <BaseButton variant="primary" size="sm" block @click="addQuestion">
             <span class="material-icons text-sm">add</span>
             <span>Adicionar Pergunta</span>
           </BaseButton>
         </div>
+      </aside>
 
-        <EmptyState v-if="questions.length === 0" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
+      <!-- Painel direito -->
+      <main class="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5">
 
-        <div v-if="!usesOptions" class="p-3 bg-surface border border-line rounded-xl text-secondary text-xs">
-          <span class="material-icons text-sm align-middle mr-1 text-accent">edit_note</span>
-          <span>Atividade do tipo <strong class="text-secondary">{{ tipo }}</strong>: as perguntas são <strong class="text-secondary">discursivas</strong> (resposta em texto). Não são exibidas alternativas.</span>
+        <!-- Painel: informações básicas -->
+        <div v-if="showBasicInfo" class="space-y-4">
+          <div v-if="!usesOptions" class="p-3 bg-surface-alt border border-line rounded-lg text-secondary text-xs flex items-center gap-2">
+            <span class="material-icons text-base text-accent">edit_note</span>
+            <span>Tipo <strong class="text-primary">{{ tipo }}</strong>: perguntas <strong class="text-primary">discursivas</strong> (resposta livre).</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" />
+            <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" />
+            <div class="md:col-span-2">
+              <BaseTextarea v-model="descricao" :rows="4" label="Descrição / Orientações" placeholder="Breve resumo ou instruções da atividade para os alunos..." />
+            </div>
+            <div class="md:col-span-2 flex items-center gap-3">
+              <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
+              <label for="allowPassword" class="text-sm font-medium text-secondary cursor-pointer">Exigir senha individual de acesso para os alunos</label>
+            </div>
+            <div v-if="allowPassword" class="md:col-span-2">
+              <BaseInput v-model="senha" type="password" label="Senha da Atividade *" placeholder="Digite a senha exclusiva" />
+            </div>
+          </div>
         </div>
 
-        <div
-          v-for="(q, qIndex) in questions"
-          :key="qIndex"
-          class="bg-surface p-6 rounded-2xl border border-line space-y-4 shadow-md"
-        >
-          <div class="flex justify-between items-center border-b border-line pb-3">
-            <input v-model="q.title" placeholder="Título/Tema da Questão" class="bg-surface px-3 py-1.5 rounded-lg border border-line font-bold text-accent text-sm outline-none focus:ring-2 focus:ring-accent w-64" />
-            <div class="flex items-center space-x-1">
-              <BaseButton variant="ghost" size="sm" :disabled="qIndex === 0" @click="moveQuestion(qIndex, 'up')">
+        <!-- Painel: pergunta ativa -->
+        <template v-else-if="activeQuestion !== null">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 flex-1 min-w-0">
+              <span class="w-7 h-7 rounded-md bg-accent text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-xs">{{ activeQIndex + 1 }}</span>
+              <span v-if="tipo === 'minigame'" class="font-semibold text-primary text-sm">Pergunta {{ activeQIndex + 1 }}</span>
+              <input
+                v-else
+                v-model="activeQuestion.title"
+                placeholder="Título/Tema da Questão (Ex: Questão 1)"
+                class="w-full bg-surface-alt px-3.5 py-2 rounded-md border border-line font-semibold text-primary text-sm outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+              />
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <BaseButton variant="ghost" size="sm" :disabled="activeQIndex === 0" title="Mover para cima" @click="moveQuestion(activeQIndex, 'up')">
                 <span class="material-icons text-sm">arrow_upward</span>
               </BaseButton>
-              <BaseButton variant="ghost" size="sm" :disabled="qIndex === questions.length - 1" @click="moveQuestion(qIndex, 'down')">
+              <BaseButton variant="ghost" size="sm" :disabled="activeQIndex === questions.length - 1" title="Mover para baixo" @click="moveQuestion(activeQIndex, 'down')">
                 <span class="material-icons text-sm">arrow_downward</span>
               </BaseButton>
-              <BaseButton variant="danger" size="sm" @click="removeQuestion(qIndex)">
+              <BaseButton variant="danger" size="sm" title="Excluir questão" @click="removeQuestion(activeQIndex)">
                 <span class="material-icons text-sm">delete</span>
               </BaseButton>
             </div>
           </div>
 
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1">Enunciado da Pergunta *</label>
+          <div class="flex flex-col gap-1.5">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-secondary">Enunciado da Pergunta *</label>
             <BaseTextarea
-              v-model="q.content"
-              :rows="2"
-              placeholder="Digite a pergunta para o aluno..."
+              v-model="activeQuestion.content"
+              :rows="6"
+              class="w-full"
+              placeholder="Digite o enunciado completo da questão para o aluno..."
             />
           </div>
 
-          <!-- Options Section (apenas para tipos objetivos: minigame/roleta/reforco) -->
-          <div v-if="usesOptions" class="space-y-2 pt-2">
+          <!-- Alternativas -->
+          <div v-if="usesOptions" class="space-y-3">
             <div class="flex justify-between items-center">
-              <label class="text-xs font-bold uppercase tracking-wider text-secondary">Alternativas de Resposta</label>
-              <BaseButton variant="ghost" size="sm" @click="addOption(qIndex)">
-                <span class="material-icons text-xs mr-1">add</span> + Opção
+              <label class="text-xs font-semibold uppercase tracking-wider text-secondary">Alternativas de Resposta</label>
+              <BaseButton variant="ghost" size="sm" @click="addOption(activeQIndex)">
+                <span class="material-icons text-xs mr-1">add</span> + Adicionar Opção
               </BaseButton>
             </div>
 
-            <div v-for="(opt, oIndex) in q.options" :key="oIndex" class="flex items-center space-x-3 bg-surface p-3 rounded-xl border border-line">
-              <input
-                type="radio"
-                :name="`correct_${qIndex}`"
-                :checked="opt.correct"
-                @change="setCorrectOption(qIndex, oIndex)"
-                title="Marcar como alternativa correta"
-                class="w-4 h-4 text-success bg-surface border-line"
-              />
-              <input v-model="opt.text" placeholder="Texto da opção" class="flex-1 bg-transparent border-none text-primary text-sm outline-none" />
-              <input v-model="opt.feedback" placeholder="Feedback ao escolher" class="w-48 bg-surface px-3 py-1 rounded-lg text-xs text-secondary border border-line outline-none" />
-              <BaseButton variant="ghost" size="sm" @click="removeOption(qIndex, oIndex)">
-                <span class="material-icons text-xs">close</span>
+            <div class="space-y-2">
+              <div
+                v-for="(opt, oIndex) in activeQuestion.options"
+                :key="oIndex"
+                class="flex items-start gap-3 p-3 rounded-lg border transition-colors"
+                :class="opt.correct ? 'border-success/50 bg-success/5' : 'border-line bg-surface'"
+              >
+                <div class="flex items-center gap-2 pt-1 shrink-0">
+                  <input
+                    type="radio"
+                    :name="`correct_${activeQIndex}`"
+                    :checked="opt.correct"
+                    @change="setCorrectOption(activeQIndex, oIndex)"
+                    title="Marcar como alternativa correta"
+                    class="w-4 h-4 text-success bg-surface border-line cursor-pointer"
+                  />
+                  <span class="text-xs font-bold" :class="opt.correct ? 'text-success' : 'text-secondary'">{{ String.fromCharCode(65 + oIndex) }}</span>
+                </div>
+                <div class="flex-1 min-w-0 space-y-2">
+                  <input
+                    v-model="opt.text"
+                    placeholder="Texto da alternativa..."
+                    class="w-full bg-surface-alt px-3 py-1.5 rounded-md border border-line text-primary text-sm outline-none focus:border-accent"
+                  />
+                  <input
+                    v-if="tipo !== 'minigame'"
+                    v-model="opt.feedback"
+                    placeholder="Feedback pedagógico (opcional)..."
+                    class="w-full bg-surface-alt px-3 py-1.5 rounded-md text-xs text-secondary border border-line outline-none focus:border-accent"
+                  />
+                </div>
+                <button
+                  type="button"
+                  class="p-1 text-secondary hover:text-danger rounded hover:bg-surface-alt transition-colors shrink-0 mt-1"
+                  title="Remover opção"
+                  @click="removeOption(activeQIndex, oIndex)"
+                >
+                  <span class="material-icons text-sm">close</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Estado vazio (nenhuma pergunta, tela inicial de perguntas) -->
+        <EmptyState v-else-if="!showBasicInfo && questions.length === 0" icon="help_outline" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
+      </main>
+    </div>
+
+    <!-- Modal de Rascunhos -->
+    <BaseModal :model-value="showDraftsModal" @close="showDraftsModal = false" title="Rascunhos de Atividades" max-width="max-w-2xl">
+      <div v-if="isLoadingDrafts" class="py-12 flex justify-center items-center">
+        <BaseSpinner size="lg" />
+      </div>
+
+      <div v-else-if="drafts.length === 0" class="py-6">
+        <EmptyState
+          icon="folder_open"
+          title="Nenhum rascunho salvo"
+          message="Você ainda não possui rascunhos salvos. Use 'Salvar Rascunho' para guardar seu progresso na nuvem por até 30 dias."
+        />
+      </div>
+
+      <div v-else class="space-y-3">
+        <div class="p-3 bg-surface-alt border border-line rounded-lg text-xs text-secondary flex items-center justify-between">
+          <span>Total de rascunhos: <strong class="text-primary">{{ drafts.length }}/20</strong></span>
+          <span class="text-accent font-medium">Validade: 30 dias</span>
+        </div>
+
+        <div class="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+          <div
+            v-for="draft in drafts"
+            :key="draft.id"
+            class="p-4 bg-surface border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
+          >
+            <div class="space-y-1 min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h4 class="text-sm font-semibold text-primary truncate">{{ draft.titulo || 'Sem título' }}</h4>
+                <BaseBadge variant="secondary">{{ draft.tipo }}</BaseBadge>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-secondary flex-wrap">
+                <span>Atualizado em: {{ formatDate(draft.atualizado_em) }}</span>
+                <span>·</span>
+                <span class="text-accent font-medium">Expira em {{ getDaysRemaining(draft.expira_em) }} dias</span>
+              </div>
+              <p v-if="draft.descricao" class="text-xs text-secondary line-clamp-1 mt-1">{{ draft.descricao }}</p>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <BaseButton variant="primary" size="sm" @click="handleLoadDraft(draft)">
+                <span class="material-icons text-sm">file_download</span>
+                <span>Carregar</span>
+              </BaseButton>
+              <BaseButton variant="danger" size="sm" @click="handleDeleteDraft(draft.id)">
+                <span class="material-icons text-sm">delete</span>
+                <span>Excluir</span>
               </BaseButton>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      <template #footer>
+        <div class="flex justify-end">
+          <BaseButton variant="secondary" size="sm" @click="showDraftsModal = false">Fechar</BaseButton>
+        </div>
+      </template>
+    </BaseModal>
   </BaseModal>
 </template>

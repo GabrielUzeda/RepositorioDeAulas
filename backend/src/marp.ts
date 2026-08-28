@@ -336,7 +336,7 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   </div>
 </div>
 
-<div id="zoom-indicator-pill" class="zoom-indicator-pill">Zoom 1x</div>
+<div id="zoom-indicator-pill" class="zoom-indicator-pill">1x</div>
 
 <div id="progress-bar"></div>
 <div id="slides-container">
@@ -352,7 +352,7 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   <div class="divider"></div>
   <button class="ctrl-btn" id="btn-zoom" title="Lupa / Zoom (Z)">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-    <span id="zoom-text">Zoom 1x</span>
+    <span id="zoom-text">1x</span>
   </button>
   <div class="divider"></div>
   <span id="clock-display" class="clock-display" title="Hora Atual">00:00</span>
@@ -649,9 +649,9 @@ function updateZoomUI() {
   const zoomText = document.getElementById('zoom-text');
   const levelStr = currentZoom <= 1.01 ? '1x' : (Number.isInteger(currentZoom) ? currentZoom + 'x' : currentZoom.toFixed(1) + 'x');
   if (zoomText) {
-    zoomText.textContent = 'Zoom ' + levelStr;
+    zoomText.textContent = levelStr;
   }
-  showZoomPill('Zoom ' + levelStr);
+  showZoomPill(levelStr);
 }
 
 function applySlideZoom() {
@@ -685,7 +685,7 @@ function resetZoom() {
   });
   if (slidesContainer) slidesContainer.style.cursor = '';
   const zoomText = document.getElementById('zoom-text');
-  if (zoomText) zoomText.textContent = 'Zoom 1x';
+  if (zoomText) zoomText.textContent = '1x';
 }
 
 function toggleZoom(focalX, focalY) {

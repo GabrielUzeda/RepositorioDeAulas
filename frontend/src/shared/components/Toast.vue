@@ -10,14 +10,14 @@
           @mouseenter="pause(t.id)"
           @mouseleave="resume(t.id)"
         >
-          <div class="flex items-start gap-3">
-            <span class="material-icons text-xl shrink-0 mt-0.5" :class="getTextClass(t.type)">{{ getIcon(t.type) }}</span>
-            <div class="flex-1 min-w-0 pr-1">
+          <div class="flex items-center gap-3">
+            <span class="material-icons text-xl shrink-0" :class="getTextClass(t.type)">{{ getIcon(t.type) }}</span>
+            <div class="flex-1 min-w-0 pr-1 flex flex-col justify-center">
               <p v-if="t.title" class="text-sm font-semibold text-primary leading-tight mb-0.5">{{ t.title }}</p>
               <p class="text-xs sm:text-sm text-secondary leading-snug break-words">{{ t.message }}</p>
               <button
                 v-if="t.action"
-                class="mt-2 text-xs font-semibold text-accent hover:underline focus:outline-none"
+                class="mt-1.5 text-xs font-semibold text-accent hover:underline focus:outline-none self-start"
                 @click="t.action.onClick"
               >
                 {{ t.action.label }}

@@ -42,7 +42,7 @@ animation: fade-up
     expect(html).toContain('translate3d');
     expect(html).toContain('00:00');
     expect(html).toContain('id="zoom-indicator-pill"');
-    expect(html).toContain('Zoom 1x');
+    expect(html).toContain('1x');
     
     // Validar que os blocos de script compilam sem SyntaxError
     const allScripts = Array.from(html.matchAll(/<script(?![^>]*src=)>([\s\S]*?)<\/script>/g));

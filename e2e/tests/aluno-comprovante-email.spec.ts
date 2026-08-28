@@ -44,6 +44,18 @@ function decodeQuotedPrintable(s: string): string {
   return Buffer.from(bin, 'binary').toString('utf-8');
 }
 
+function decodeMimeHeader(s: string): string {
+  let prev = '';
+  let cur = s;
+  while (prev !== cur) {
+    prev = cur;
+    cur = cur.replace(/(=\?UTF-8\?Q\?.*?\?=)\s+(=\?UTF-8\?Q\?.*?\?=)/gi, '$1$2');
+  }
+  return cur.replace(/=\?UTF-8\?Q\?(.*?)\?=/gi, (_match, p1) => {
+    return decodeQuotedPrintable(p1.replace(/_/g, ' '));
+  });
+}
+
 test.describe('Aluno — Envio de Comprovante de Resposta por E-mail (Mailhog)', () => {
   let adminToken: string;
   let professorId: number;
@@ -160,9 +172,8 @@ test.describe('Aluno — Envio de Comprovante de Resposta por E-mail (Mailhog)',
           const items: any[] = data.items || [];
           foundMsg = items.find((m) => {
             const headers = m.Content?.Headers || {};
-            const subject = (headers.Subject || []).join(' ');
             const to = (headers.To || []).join(' ');
-            return subject.includes('[Rascunho]') && to.toLowerCase().includes(draftEmail.toLowerCase());
+            return to.toLowerCase().includes(draftEmail.toLowerCase());
           });
           if (foundMsg) break;
         }
@@ -174,7 +185,8 @@ test.describe('Aluno — Envio de Comprovante de Resposta por E-mail (Mailhog)',
 
     expect(foundMsg).toBeTruthy();
     const headers = foundMsg.Content?.Headers || {};
-    const subject = (headers.Subject || []).join(' ');
+    const rawSubject = (headers.Subject || []).join(' ');
+    const subject = decodeMimeHeader(rawSubject);
     expect(subject).toContain('[Rascunho]');
     expect(subject).toContain(atvTitulo);
 

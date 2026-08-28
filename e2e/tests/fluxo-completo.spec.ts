@@ -81,12 +81,12 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     aulaCaminho = aulaBody.caminho;
     expect(aulaCaminho).toContain('materias/');
 
-    // --- Professor cria ATIVIDADE (normal, 1 questão objetiva) via API ---
+    // --- Professor cria ATIVIDADE (prova, 1 questão objetiva) via API ---
     atvTitulo = `Atividade ${uniqueName('FULL')}`;
     const atvRes = await api(request, 'post', '/atividades', profToken, {
       materia_id: materiaId,
       titulo: atvTitulo,
-      tipo: 'normal',
+      tipo: 'prova',
       allow_password: false,
       slug: uniqueName('atv'),
       json_data: JSON.stringify({
@@ -175,12 +175,11 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     await page.locator('h3', { hasText: materiaNome }).click();
     await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
 
-    // Abre respostas da atividade
+    // Abre respostas da atividade (primeiro aluno auto-selecionado)
     await page.getByRole('button', { name: 'Ver Respostas dos Alunos' }).click();
     await expect(page.getByText(`Total de Envios: 1`)).toBeVisible({ timeout: 10000 });
 
     // Avalia
-    await page.getByRole('button', { name: 'Avaliar / Ver' }).first().click();
     await page.getByPlaceholder('Ex: 85').fill(String(notaEsperada));
     await page.getByPlaceholder('Escreva um comentário pedagógico para este aluno...').fill(feedbackAtividade);
     await page.getByRole('button', { name: 'Salvar Avaliação' }).click();

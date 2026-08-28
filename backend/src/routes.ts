@@ -1837,6 +1837,94 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
   return c.json({ success: true, message: `${totalEnviados} e-mails de feedback enviados com sucesso`, enviados: totalEnviados });
 });
 
+// ---------- Professor: Rascunhos do Editor ----------
+
+app.get('/professor/rascunhos-editor', professorAuth, async (c) => {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
+
+  // Lazy cleanup de rascunhos expirados
+  dbq("DELETE FROM rascunhos_editor WHERE expira_em < strftime('%Y-%m-%dT%H:%M:%SZ', 'now')").run();
+
+  const rascunhos = dbq(`
+    SELECT id, professor_id, titulo, descricao, tipo, json_data, expira_em, criado_em, atualizado_em
+    FROM rascunhos_editor
+    WHERE professor_id = ?
+    ORDER BY atualizado_em DESC
+  `).all(prof.id);
+
+  return c.json(rascunhos);
+});
+
+app.post('/professor/rascunhos-editor', professorAuth, async (c) => {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
+
+  const body = await parseBody(c);
+  if (!body) return c.json({ success: false, error: 'Corpo da requisição inválido' }, 400);
+
+  const titulo = typeof body.titulo === 'string' ? body.titulo.trim() : 'Sem título';
+  const descricao = typeof body.descricao === 'string' ? body.descricao : '';
+  const tipo = typeof body.tipo === 'string' ? body.tipo : 'normal';
+  const jsonDataStr = normalizeJsonData(body.json_data) || '{}';
+
+  const expiraDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  if (body.rascunho_id) {
+    const rascunhoId = Number(body.rascunho_id);
+    const existente = dbq('SELECT id FROM rascunhos_editor WHERE id = ? AND professor_id = ?').get(rascunhoId, prof.id) as any;
+    if (existente) {
+      dbq(`
+        UPDATE rascunhos_editor
+        SET titulo = ?, descricao = ?, tipo = ?, json_data = ?, expira_em = ?, atualizado_em = (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        WHERE id = ?
+      `).run(titulo, descricao, tipo, jsonDataStr, expiraDate, existente.id);
+
+      return c.json({ id: existente.id, expira_em: expiraDate, success: true });
+    }
+  }
+
+  const countRow = dbq('SELECT COUNT(*) as total FROM rascunhos_editor WHERE professor_id = ?').get(prof.id) as any;
+  if (countRow && countRow.total >= 20) {
+    return c.json({ success: false, error: 'Limite máximo de 20 rascunhos atingido.' }, 400);
+  }
+
+  const insertRes = dbq(`
+    INSERT INTO rascunhos_editor (professor_id, titulo, descricao, tipo, json_data, expira_em)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(prof.id, titulo, descricao, tipo, jsonDataStr, expiraDate);
+
+  const newId = Number(insertRes.lastInsertRowid);
+  return c.json({ id: newId, expira_em: expiraDate, success: true });
+});
+
+app.get('/professor/rascunhos-editor/:id', professorAuth, async (c) => {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
+
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.json({ error: 'ID inválido' }, 400);
+
+  const rascunho = dbq('SELECT * FROM rascunhos_editor WHERE id = ? AND professor_id = ?').get(id, prof.id) as any;
+  if (!rascunho) {
+    return c.json({ error: 'Rascunho não encontrado' }, 404);
+  }
+
+  return c.json(rascunho);
+});
+
+app.delete('/professor/rascunhos-editor/:id', professorAuth, async (c) => {
+  const prof = getProfessor(c);
+  if (!prof) return c.body(null, 401);
+
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.json({ error: 'ID inválido' }, 400);
+
+  dbq('DELETE FROM rascunhos_editor WHERE id = ? AND professor_id = ?').run(id, prof.id);
+
+  return c.json({ success: true });
+});
+
 function renderSlidePasswordPromptHtml(hasError: boolean): string {
   return `<!DOCTYPE html>
 <html lang="pt-BR">

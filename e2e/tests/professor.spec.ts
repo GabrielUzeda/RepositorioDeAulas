@@ -70,49 +70,49 @@ test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
     await page.getByPlaceholder('Descrição rápida da aula...').fill('Aula criada pela UI');
     await page.getByPlaceholder('Digite seu código Marp Markdown aqui...').fill('# Slide 1\n\nConteudo do slide.\n\n---\n\n# Slide 2');
     await page.getByRole('button', { name: 'Salvar Aula' }).click();
-    await expect(page.locator('p', { hasText: aulaTitulo }).first()).toBeVisible();
+    await expect(page.locator('h4', { hasText: aulaTitulo }).first()).toBeVisible();
 
     // ---------- Aula: UPDATE ----------
     const aulaEditada = `${aulaTitulo} Editada`;
-    const aulaCard = page.locator('p', { hasText: aulaTitulo }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    const aulaCard = page.locator('h4', { hasText: aulaTitulo }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
     await aulaCard.locator('button[title="Editar Aula"]').click();
     await page.getByPlaceholder('Título da Aula').fill(aulaEditada);
     await page.getByRole('button', { name: 'Salvar Aula' }).click();
-    await expect(page.locator('p', { hasText: aulaEditada }).first()).toBeVisible();
+    await expect(page.locator('h4', { hasText: aulaEditada }).first()).toBeVisible();
 
     // ---------- Aula: DELETE ----------
-    const aulaCardEdit = page.locator('p', { hasText: aulaEditada }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    const aulaCardEdit = page.locator('h4', { hasText: aulaEditada }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
     await aulaCardEdit.locator('button[title="Excluir Aula"]').click();
     await page.getByRole('button', { name: 'Excluir' }).click();
-    await expect(page.locator('p', { hasText: aulaEditada })).toHaveCount(0);
+    await expect(page.locator('h4', { hasText: aulaEditada })).toHaveCount(0);
 
     // ---------- Atividade: CREATE ----------
     const atvTitulo = uniqueName('AtvUI');
     await page.getByRole('button', { name: 'Nova Atividade' }).click();
     await page.locator('select').selectOption('reforco');
     await page.getByPlaceholder('Ex: Avaliação de Algoritmos').fill(atvTitulo);
-    await page.getByPlaceholder('Breve resumo da atividade...').fill('Atividade criada pela UI');
+    await page.getByPlaceholder('Breve resumo ou instruções da atividade para os alunos...').fill('Atividade criada pela UI');
     await page.getByRole('button', { name: 'Adicionar Pergunta' }).click();
-    await page.getByPlaceholder('Digite a pergunta para o aluno...').fill('Qual é a capital do Brasil?');
-    await page.getByPlaceholder('Texto da opção').first().fill('Brasília');
+    await page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...').fill('Qual é a capital do Brasil?');
+    await page.getByPlaceholder('Texto da alternativa...').first().fill('Brasília');
     await page.locator('input[type="radio"]').first().check();
-    await page.getByPlaceholder('Texto da opção').nth(1).fill('Rio de Janeiro');
+    await page.getByPlaceholder('Texto da alternativa...').nth(1).fill('Rio de Janeiro');
     await page.getByRole('button', { name: 'Salvar Atividade' }).click();
-    await expect(page.locator('p', { hasText: atvTitulo }).first()).toBeVisible();
+    await expect(page.locator('h4', { hasText: atvTitulo }).first()).toBeVisible();
 
     // ---------- Atividade: UPDATE ----------
     const atvEditada = `${atvTitulo} Editada`;
-    const atvCard = page.locator('p', { hasText: atvTitulo }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    const atvCard = page.locator('h4', { hasText: atvTitulo }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
     await atvCard.locator('button[title="Editar Atividade"]').click();
     await page.getByPlaceholder('Ex: Avaliação de Algoritmos').fill(atvEditada);
     await page.getByRole('button', { name: 'Salvar Atividade' }).click();
-    await expect(page.locator('p', { hasText: atvEditada }).first()).toBeVisible();
+    await expect(page.locator('h4', { hasText: atvEditada }).first()).toBeVisible();
 
     // ---------- Atividade: DELETE ----------
-    const atvCardEdit = page.locator('p', { hasText: atvEditada }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    const atvCardEdit = page.locator('h4', { hasText: atvEditada }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
     await atvCardEdit.locator('button[title="Excluir Atividade"]').click();
     await page.getByRole('button', { name: 'Excluir' }).click();
-    await expect(page.locator('p', { hasText: atvEditada })).toHaveCount(0);
+    await expect(page.locator('h4', { hasText: atvEditada })).toHaveCount(0);
 
     // ---------- Volta para lista de disciplinas e exclui ----------
     await page.getByRole('button', { name: 'Voltar' }).click();

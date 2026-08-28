@@ -139,3 +139,15 @@ export interface ApiResponse<T = any> {
   error?: string;
   status?: number;
 }
+
+export interface RascunhoEditor {
+  id: number;
+  professor_id: number;
+  titulo: string;
+  descricao: string;
+  tipo: string;
+  json_data: string;
+  expira_em: string;
+  criado_em?: string;
+  atualizado_em?: string;
+}
