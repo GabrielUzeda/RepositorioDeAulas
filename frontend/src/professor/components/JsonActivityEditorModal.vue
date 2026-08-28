@@ -12,9 +12,9 @@ import EmptyState from '@/shared/components/EmptyState.vue';
 const tipoOptions = [
   { label: 'Normal', value: 'normal' },
   { label: 'Prova', value: 'prova' },
-  { label: 'Minigame Tático', value: 'minigame' },
+  { label: 'Minigame de Naves', value: 'minigame' },
   { label: 'Roleta do Conhecimento', value: 'roleta' },
-  { label: 'Reforço (Modo Zen)', value: 'reforco' },
+  { label: 'Reforço', value: 'reforco' },
 ];
 
 const props = withDefaults(
