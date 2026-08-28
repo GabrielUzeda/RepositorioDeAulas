@@ -786,6 +786,8 @@ function handleOpenRespostas(atividade: Atividade) {
       :show="showActivityEditorModal"
       :atividade="editingActivity"
       :loading="isSavingActivity"
+      :aulas="cursoStore.aulas"
+      :disciplina-id="selectedDisciplina?.id"
       @close="showActivityEditorModal = false"
       @save="handleSaveActivity"
     />

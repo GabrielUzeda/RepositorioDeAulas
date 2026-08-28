@@ -8,6 +8,7 @@ import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail } 
 import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter, extractClientIp } from './auth';
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent, resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
+import { aiRouter } from './ai';
 
 const app = new Hono();
 
@@ -105,6 +106,9 @@ const loginLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10, message: 
 const registerLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, message: 'Muitas tentativas de registro. Aguarde 10 minutos.' });
 const submissionLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 20, message: 'Muitas submissões de resposta. Aguarde 1 minuto.' });
 const draftLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10, message: 'Muitas requisições de rascunho. Aguarde 1 minuto.' });
+
+app.route('/ai', aiRouter);
+app.route('/api/ai', aiRouter);
 
 const dbq = (sql: string) => db.query<Record<string, any>, any[]>(sql);
 
