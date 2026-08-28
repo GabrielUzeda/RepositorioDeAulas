@@ -84,7 +84,8 @@ aiRouter.get('/models', professorAuth, async (c) => {
 });
 
 aiRouter.post('/generate-activity', professorAuth, async (c) => {
-  const prof = c.get('professor');
+  const professorId = Number(c.get('professorId'));
+  const professorRole = c.get('professorRole') || 'professor';
   let body: any;
   try {
     body = await c.req.json();
@@ -110,15 +111,27 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
   let aulasContexto = '';
   if (Array.isArray(aulas_ids) && aulas_ids.length > 0) {
     const placeholders = aulas_ids.map(() => '?').join(',');
-    const query = `
-      SELECT a.id, a.titulo, a.conteudo_md 
-      FROM aulas a
-      JOIN disciplinas d ON a.disciplina_id = d.id
-      JOIN curso_professores cp ON d.curso_id = cp.curso_id
-      WHERE cp.professor_id = ? AND a.id IN (${placeholders})
-      ORDER BY a.ordem ASC
-    `;
-    const aulas = db.query(query).all(prof.id, ...aulas_ids) as { id: number; titulo: string; conteudo_md: string }[];
+    let aulas: { id: number; titulo: string; conteudo_md: string }[] = [];
+
+    if (professorRole === 'admin') {
+      const query = `
+        SELECT a.id, a.titulo, a.conteudo_md 
+        FROM aulas a
+        WHERE a.id IN (${placeholders})
+        ORDER BY a.ordem ASC
+      `;
+      aulas = db.query(query).all(...aulas_ids) as { id: number; titulo: string; conteudo_md: string }[];
+    } else {
+      const query = `
+        SELECT a.id, a.titulo, a.conteudo_md 
+        FROM aulas a
+        JOIN disciplinas d ON a.disciplina_id = d.id
+        JOIN curso_professores cp ON d.curso_id = cp.curso_id
+        WHERE cp.professor_id = ? AND a.id IN (${placeholders})
+        ORDER BY a.ordem ASC
+      `;
+      aulas = db.query(query).all(professorId, ...aulas_ids) as { id: number; titulo: string; conteudo_md: string }[];
+    }
     
     if (aulas.length > 0) {
       aulasContexto = aulas
