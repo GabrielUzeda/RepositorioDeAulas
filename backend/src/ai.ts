@@ -24,7 +24,9 @@ export interface AiModelItem {
 }
 
 async function fetchFrom9Router(endpoint: string, options: RequestInit = {}) {
-  const cleanBase = NINE_ROUTER_URL.replace(/\/v1\/?$/, '');
+  const customUrl = process.env.NINE_ROUTER_URL;
+  const baseUrl = customUrl || 'http://127.0.0.1:20128/v1';
+  const cleanBase = baseUrl.replace(/\/v1\/?$/, '');
   const url = endpoint.startsWith('http') ? endpoint : `${cleanBase}${endpoint}`;
   
   const headers = new Headers(options.headers || {});
@@ -35,16 +37,35 @@ async function fetchFrom9Router(endpoint: string, options: RequestInit = {}) {
     headers.set('Content-Type', 'application/json');
   }
 
-  return fetch(url, {
-    ...options,
-    headers,
-  });
+  // Se estiver usando URL default 127.0.0.1, usa timeout inicial de 1.5s para fallback rápido no Docker dev
+  const isDefaultLocal = !customUrl && url.includes('127.0.0.1:20128');
+  const initialSignal = isDefaultLocal ? AbortSignal.timeout(1500) : options.signal;
+
+  try {
+    return await fetch(url, {
+      ...options,
+      headers,
+      signal: initialSignal,
+    });
+  } catch (err) {
+    if (isDefaultLocal) {
+      const fallbackUrl = url.replace('127.0.0.1:20128', 'host.docker.internal:20128');
+      try {
+        return await fetch(fallbackUrl, {
+          ...options,
+          headers,
+          signal: options.signal || AbortSignal.timeout(4000),
+        });
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 aiRouter.get('/health', professorAuth, async (c) => {
   try {
     const res = await fetchFrom9Router('/api/health', {
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(3500),
     });
     if (res.ok) {
       const data = await res.json().catch(() => ({ ok: true }));
@@ -59,7 +80,7 @@ aiRouter.get('/health', professorAuth, async (c) => {
 aiRouter.get('/models', professorAuth, async (c) => {
   try {
     const res = await fetchFrom9Router('/v1/models', {
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(3500),
     });
     if (!res.ok) {
       return c.json({ success: false, error: `9router returned HTTP ${res.status}` }, 502);
