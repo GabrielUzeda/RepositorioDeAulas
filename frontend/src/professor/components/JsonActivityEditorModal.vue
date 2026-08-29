@@ -3,12 +3,14 @@ import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
-import type { Atividade, Question, QuestionOption, Aula } from '@/shared/types';
+import type { Atividade, Question, QuestionOption, RascunhoEditor, Aula } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 import BaseSelect from '@/shared/components/BaseSelect.vue';
+import BaseBadge from '@/shared/components/BaseBadge.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
 import AiActivityModal from '@/professor/components/AiActivityModal.vue';
@@ -48,6 +50,12 @@ const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
 
 const showAiModal = ref(false);
+const showDraftsModal = ref(false);
+const isLoadingDrafts = ref(false);
+const isSavingDraft = ref(false);
+const drafts = ref<RascunhoEditor[]>([]);
+const currentDraftId = ref<number | null>(null);
+
 const showConfirmClear = ref(false);
 const isInitializing = ref(true);
 
@@ -111,6 +119,7 @@ watch(
     isSaving.value = false;
     activeQIndex.value = 0;
     showBasicInfo.value = true;
+    currentDraftId.value = null;
     isInitializing.value = true;
     if (val) {
       if (props.atividade) {
@@ -238,6 +247,105 @@ async function handleSave() {
   });
 }
 
+async function handleSaveDraft() {
+  if (isSavingDraft.value) return;
+  isSavingDraft.value = true;
+  try {
+    const payload = {
+      rascunho_id: currentDraftId.value,
+      titulo: titulo.value || 'Sem título',
+      descricao: descricao.value,
+      tipo: tipo.value,
+      json_data: { questions: questions.value }
+    };
+    const res = await apiClient.post<{ id: number; expira_em: string; success: boolean }>('/professor/rascunhos-editor', payload);
+    if (res.success && res.data) {
+      currentDraftId.value = res.data.id;
+      useToast().success('Rascunho salvo na nuvem com validade de 30 dias!');
+      await fetchDrafts();
+    } else {
+      useToast().error(res.error || 'Erro ao salvar rascunho');
+    }
+  } catch (e: any) {
+    useToast().error(e?.message || 'Erro ao salvar rascunho');
+  } finally {
+    isSavingDraft.value = false;
+  }
+}
+
+async function openDraftsModal() {
+  showDraftsModal.value = true;
+  await fetchDrafts();
+}
+
+async function fetchDrafts() {
+  isLoadingDrafts.value = true;
+  try {
+    const res = await apiClient.get<RascunhoEditor[]>('/professor/rascunhos-editor');
+    if (res.success && Array.isArray(res.data)) {
+      drafts.value = res.data;
+    } else {
+      drafts.value = [];
+    }
+  } catch {
+    drafts.value = [];
+  } finally {
+    isLoadingDrafts.value = false;
+  }
+}
+
+function getDaysRemaining(expiraEm: string): number {
+  const diff = new Date(expiraEm).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function handleLoadDraft(draft: RascunhoEditor) {
+  try {
+    const parsed = typeof draft.json_data === 'string' ? JSON.parse(draft.json_data) : draft.json_data;
+    const raw = Array.isArray(parsed?.questions) ? parsed.questions : Array.isArray(parsed?.perguntas) ? parsed.perguntas : [];
+    titulo.value = draft.titulo || '';
+    descricao.value = draft.descricao || '';
+    tipo.value = ((draft.tipo === 'game' ? 'minigame' : draft.tipo) as any) || 'normal';
+    questions.value = raw.map(normalizeQuestion);
+    currentDraftId.value = draft.id;
+    activeQIndex.value = 0;
+    showBasicInfo.value = false;
+    showDraftsModal.value = false;
+    useToast().success('Rascunho carregado no editor!');
+  } catch {
+    useToast().error('Erro ao processar dados do rascunho.');
+  }
+}
+
+async function handleDeleteDraft(draftId: number) {
+  const res = await apiClient.delete(`/professor/rascunhos-editor/${draftId}`);
+  if (res.success) {
+    if (currentDraftId.value === draftId) {
+      currentDraftId.value = null;
+    }
+    drafts.value = drafts.value.filter((d) => d.id !== draftId);
+    useToast().success('Rascunho excluído com sucesso!');
+  } else {
+    useToast().error(res.error || 'Erro ao excluir rascunho.');
+  }
+}
+
 function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco' } | Question[]) {
   const generatedQuestions = Array.isArray(payload) ? payload : payload.questions;
   const appliedTipo = !Array.isArray(payload) && payload.tipo ? payload.tipo : undefined;
@@ -269,7 +377,7 @@ function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal
               <span class="text-line">|</span>
               <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                Rascunho automático
+                Rascunho automático ativo
               </span>
             </p>
           </div>
@@ -280,11 +388,14 @@ function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal
             <span class="material-icons text-sm text-accent">auto_awesome</span>
             <span>Gerar com IA</span>
           </BaseButton>
+          <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
+            <span class="material-icons text-sm">folder_open</span>
+            <span>Rascunhos</span>
+          </BaseButton>
           <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
             <span class="material-icons text-sm">delete_sweep</span>
             <span>Limpar Tudo</span>
           </BaseButton>
-          <BaseButton variant="ghost" size="sm" :disabled="props.loading || isSaving" @click="emit('close')">Cancelar</BaseButton>
           <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">Salvar Atividade</BaseButton>
         </div>
       </div>
@@ -463,6 +574,82 @@ function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal
         <EmptyState v-else-if="!showBasicInfo && questions.length === 0" icon="help_outline" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
       </main>
     </div>
+
+    <!-- Modal de Rascunhos -->
+    <BaseModal :model-value="showDraftsModal" @close="showDraftsModal = false" title="Rascunhos de Atividades" max-width="max-w-2xl">
+      <div v-if="isLoadingDrafts" class="py-12 flex justify-center items-center">
+        <BaseSpinner size="lg" />
+      </div>
+
+      <div v-else class="space-y-4">
+        <!-- Banner informativo LGPD / Expiração de 30 dias -->
+        <div class="p-3.5 bg-surface-alt border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-1.5 font-semibold text-primary">
+              <span class="material-icons text-base text-accent">schedule</span>
+              <span>Rascunhos salvos por até 30 dias</span>
+            </div>
+            <p class="text-secondary">Os rascunhos na nuvem expiram automaticamente após 30 dias de inatividade.</p>
+          </div>
+
+          <BaseButton variant="primary" size="sm" :loading="isSavingDraft" class="shrink-0" @click="handleSaveDraft">
+            <span class="material-icons text-sm">bookmark_add</span>
+            <span>Salvar Rascunho Atual</span>
+          </BaseButton>
+        </div>
+
+        <div v-if="drafts.length === 0" class="py-6">
+          <EmptyState
+            icon="folder_open"
+            title="Nenhum rascunho salvo na nuvem"
+            message="O editor salva suas alterações localmente em tempo real. Você também pode clicar no botão acima para guardar este rascunho na nuvem por 30 dias."
+          />
+        </div>
+
+        <div v-else class="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
+          <div class="flex items-center justify-between text-xs text-secondary px-1 pb-1">
+            <span>Rascunhos salvos: <strong class="text-primary">{{ drafts.length }}/20</strong></span>
+            <span>Validade máxima: 30 dias</span>
+          </div>
+
+          <div
+            v-for="draft in drafts"
+            :key="draft.id"
+            class="p-4 bg-surface border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
+          >
+            <div class="space-y-1 min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h4 class="text-sm font-semibold text-primary truncate">{{ draft.titulo || 'Sem título' }}</h4>
+                <BaseBadge variant="secondary">{{ draft.tipo }}</BaseBadge>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-secondary flex-wrap">
+                <span>Atualizado em: {{ formatDate(draft.atualizado_em) }}</span>
+                <span>·</span>
+                <span class="text-accent font-medium">Expira em {{ getDaysRemaining(draft.expira_em) }} dias</span>
+              </div>
+              <p v-if="draft.descricao" class="text-xs text-secondary line-clamp-1 mt-1">{{ draft.descricao }}</p>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <BaseButton variant="primary" size="sm" @click="handleLoadDraft(draft)">
+                <span class="material-icons text-sm">file_download</span>
+                <span>Carregar</span>
+              </BaseButton>
+              <BaseButton variant="danger" size="sm" @click="handleDeleteDraft(draft.id)">
+                <span class="material-icons text-sm">delete</span>
+                <span>Excluir</span>
+              </BaseButton>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end">
+          <BaseButton variant="secondary" size="sm" @click="showDraftsModal = false">Fechar</BaseButton>
+        </div>
+      </template>
+    </BaseModal>
 
     <!-- Diálogo de confirmação para Limpar Tudo -->
     <ConfirmDialog
