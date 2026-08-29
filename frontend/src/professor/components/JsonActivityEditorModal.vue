@@ -291,7 +291,7 @@ function handleApplyAiQuestions(generatedQuestions: Question[]) {
             <span class="material-icons text-[20px]">quiz</span>
           </div>
           <div>
-            <h2 class="text-lg font-bold text-primary leading-tight">{{ props.atividade ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
+            <h2 class="text-lg font-bold text-primary leading-tight">{{ (props.atividade && props.atividade.id && props.atividade.id > 0) ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
             <p class="text-xs text-secondary">{{ questions.length }} pergunta{{ questions.length !== 1 ? 's' : '' }} · {{ tipo }}</p>
           </div>
         </div>

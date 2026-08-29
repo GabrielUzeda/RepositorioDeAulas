@@ -210,8 +210,48 @@ FORMATO JSON OBRIGATÓRIO:
       return c.json({ success: false, error: `Erro na IA (${aiResponse.status}): ${errText.slice(0, 120)}` }, 502);
     }
 
-    const aiData = await aiResponse.json();
-    const content = aiData?.choices?.[0]?.message?.content || '';
+    let rawText = await aiResponse.text();
+    let content = '';
+
+    // 1. Tenta parse direto de JSON
+    try {
+      const aiData = JSON.parse(rawText);
+      if (aiData?.choices?.[0]?.message?.content) {
+        content = aiData.choices[0].message.content;
+      }
+    } catch {}
+
+    // 2. Se não encontrou, processa chunks de SSE linha por linha
+    if (!content) {
+      const lines = rawText.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data:') && !trimmed.includes('[DONE]')) {
+          const jsonPart = trimmed.replace(/^data:\s*/, '');
+          try {
+            const parsed = JSON.parse(jsonPart);
+            if (parsed?.choices?.[0]?.message?.content) {
+              content = parsed.choices[0].message.content;
+            } else if (parsed?.choices?.[0]?.delta?.content) {
+              content += parsed.choices[0].delta.content;
+            }
+          } catch {}
+        }
+      }
+    }
+
+    // 3. Fallback: regex caso haja JSON bruto envolvido por marcadores
+    if (!content) {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const aiData = JSON.parse(jsonMatch[0]);
+          content = aiData?.choices?.[0]?.message?.content || '';
+        } catch {
+          content = '';
+        }
+      }
+    }
 
     let parsedQuestions: any[] = [];
     try {
@@ -222,13 +262,20 @@ FORMATO JSON OBRIGATÓRIO:
       const parsed = JSON.parse(cleanJson);
       parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
     } catch {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
+      const objMatch = content.match(/\{[\s\S]*\}/);
+      if (objMatch) {
         try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : [];
-        } catch {
-          parsedQuestions = [];
+          const parsed = JSON.parse(objMatch[0]);
+          parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
+        } catch {}
+      }
+      if (parsedQuestions.length === 0) {
+        const arrMatch = content.match(/\[[\s\S]*\]/);
+        if (arrMatch) {
+          try {
+            const parsed = JSON.parse(arrMatch[0]);
+            if (Array.isArray(parsed)) parsedQuestions = parsed;
+          } catch {}
         }
       }
     }
