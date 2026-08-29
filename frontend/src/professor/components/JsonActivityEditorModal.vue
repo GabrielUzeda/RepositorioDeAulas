@@ -3,7 +3,7 @@ import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
-import type { Atividade, Question, QuestionOption, RascunhoEditor, Aula, AiModel } from '@/shared/types';
+import type { Atividade, Question, QuestionOption, RascunhoEditor, Aula } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
@@ -55,11 +55,7 @@ const aiTema = ref('');
 const aiObservacoes = ref('');
 const aiQuantidadeStr = ref('5');
 const aiSelectedAulas = ref<number[]>([]);
-const aiSelectedModel = ref('qwenproxy/qwen3.8-max-thinking');
-const aiModels = ref<AiModel[]>([]);
-const isLoadingAiModels = ref(false);
 const isGeneratingAi = ref(false);
-const is9RouterOnline = ref<boolean | null>(null);
 
 const showDraftsModal = ref(false);
 const isLoadingDrafts = ref(false);
@@ -78,28 +74,6 @@ const draftStorageKey = computed(() => {
     return `prof_editor_draft_atv_${props.atividade.id}`;
   }
   return `prof_editor_draft_new_${props.disciplinaId ?? 'global'}`;
-});
-
-const modelOptions = computed(() => {
-  if (aiModels.value.length === 0) {
-    return [
-      { label: 'Qwen 3.8 Max Thinking (Padrão)', value: 'qwenproxy/qwen3.8-max-thinking' },
-      { label: 'DeepSeek V4 Flash', value: 'kimchi/deepseek-v4-flash' },
-      { label: 'Gemini 3.7 Flash High', value: 'ag/gemini-3.7-flash-high' },
-      { label: 'Claude Sonnet 4.6', value: 'ag/claude-sonnet-4-6' },
-      { label: 'Kimi K2.7', value: 'kimchi/kimi-k2.7' },
-    ];
-  }
-  return aiModels.value.map((m) => {
-    const badges: string[] = [];
-    if (m.reasoning) badges.push('Raciocínio');
-    if (m.vision) badges.push('Visão');
-    const badgeText = badges.length > 0 ? ` [${badges.join(', ')}]` : '';
-    return {
-      label: `${m.name} (${m.provider})${badgeText}`,
-      value: m.id,
-    };
-  });
 });
 
 function normalizeQuestion(q: any): Question {
@@ -159,7 +133,6 @@ watch(
     isInitializing.value = true;
     if (val) {
       aiSelectedAulas.value = props.aulas.map((a) => a.id);
-      fetchAiModelsAndHealth();
 
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
@@ -213,44 +186,6 @@ watch(
   }
 );
 
-async function fetchAiModelsAndHealth() {
-  isLoadingAiModels.value = true;
-  try {
-    const [healthRes, modelsRes] = await Promise.allSettled([
-      apiClient.get<{ ok: boolean; status: string }>('/ai/health'),
-      apiClient.get<{ success: boolean; models: AiModel[] }>('/ai/models'),
-    ]);
-
-    if (healthRes.status === 'fulfilled' && healthRes.value?.success) {
-      is9RouterOnline.value = true;
-    } else {
-      is9RouterOnline.value = false;
-    }
-
-    if (modelsRes.status === 'fulfilled' && modelsRes.value?.success && Array.isArray(modelsRes.value.data?.models)) {
-      aiModels.value = modelsRes.value.data.models;
-      if (aiModels.value.length > 0 && !aiModels.value.some((m) => m.id === aiSelectedModel.value)) {
-        const preferred = aiModels.value.find((m) => m.id.includes('qwen3.8') || m.reasoning) || aiModels.value[0];
-        aiSelectedModel.value = preferred.id;
-      }
-    }
-  } catch {
-    is9RouterOnline.value = false;
-  } finally {
-    isLoadingAiModels.value = false;
-  }
-}
-
-async function handleSyncAiModels() {
-  info('Sincronizando modelos com 9router...');
-  await fetchAiModelsAndHealth();
-  if (is9RouterOnline.value) {
-    success(`9router online! ${aiModels.value.length} modelos disponíveis.`);
-  } else {
-    error('9router inacessível no momento.');
-  }
-}
-
 function toggleAiAula(aulaId: number) {
   const idx = aiSelectedAulas.value.indexOf(aulaId);
   if (idx > -1) {
@@ -278,7 +213,6 @@ async function handleGenerateAiQuestions() {
   isGeneratingAi.value = true;
   try {
     const payload = {
-      modelo: aiSelectedModel.value,
       tipo: tipo.value,
       titulo: titulo.value.trim(),
       tema: aiTema.value.trim(),
@@ -621,46 +555,20 @@ async function handleDeleteDraft(draftId: number) {
 
           <!-- Seção 2: Gerador de Questões por IA (Embutido) -->
           <div class="p-5 bg-surface-alt/60 border border-accent/30 rounded-2xl space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line/60 pb-3">
-              <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-md bg-accent/15 text-accent flex items-center justify-center">
-                  <span class="material-icons text-lg">auto_awesome</span>
-                </div>
-                <div>
-                  <h3 class="text-sm font-bold text-primary flex items-center gap-2">
-                    <span>Gerador de Questões por IA</span>
-                    <span
-                      class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                      :class="is9RouterOnline ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'"
-                    >
-                      <span class="w-1.5 h-1.5 rounded-full" :class="is9RouterOnline ? 'bg-emerald-500' : 'bg-amber-500'"></span>
-                      {{ is9RouterOnline ? '9router Conectado' : 'Status 9router' }}
-                    </span>
-                  </h3>
-                  <p class="text-xs text-secondary">Gera novas perguntas e adiciona ao final da lista sem sobrescrever o conteúdo atual</p>
-                </div>
+            <div class="flex items-center gap-2 border-b border-line/60 pb-3">
+              <div class="w-7 h-7 rounded-md bg-accent/15 text-accent flex items-center justify-center">
+                <span class="material-icons text-lg">auto_awesome</span>
               </div>
-
-              <BaseButton variant="ghost" size="sm" :loading="isLoadingAiModels" @click="handleSyncAiModels">
-                <span class="material-icons text-sm">sync</span>
-                <span>Atualizar Modelos</span>
-              </BaseButton>
+              <div>
+                <h3 class="text-sm font-bold text-primary">Gerador de Questões por IA</h3>
+                <p class="text-xs text-secondary">Gera novas perguntas e adiciona ao final da lista sem sobrescrever o conteúdo atual</p>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-              <!-- Modelo de IA -->
-              <div class="md:col-span-8">
-                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Modelo de IA (9router)</label>
-                <BaseSelect
-                  v-model="aiSelectedModel"
-                  :options="modelOptions"
-                  :disabled="isGeneratingAi || isLoadingAiModels"
-                />
-              </div>
-
               <!-- Quantidade de Questões -->
-              <div class="md:col-span-4">
-                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Qtd. a Gerar</label>
+              <div class="md:col-span-12 sm:md:col-span-4">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Qtd. de Questões</label>
                 <BaseInput
                   v-model="aiQuantidadeStr"
                   type="number"
@@ -672,7 +580,7 @@ async function handleDeleteDraft(draftId: number) {
               </div>
 
               <!-- Tema / Tópico Específico -->
-              <div class="md:col-span-12">
+              <div class="md:col-span-12 sm:md:col-span-8">
                 <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Tema / Tópico Específico (Opcional se houver aulas)</label>
                 <BaseInput
                   v-model="aiTema"
