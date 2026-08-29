@@ -206,7 +206,7 @@ const isSavingActivity = ref(false);
 
 async function handleSaveActivity(payload: any) {
   if (!selectedDisciplina.value || isSavingActivity.value) return;
-  const isEditing = Boolean(editingActivity.value);
+  const isEditing = Boolean(editingActivity.value && editingActivity.value.id && editingActivity.value.id > 0);
   const data = {
     ...payload,
     disciplina_id: selectedDisciplina.value.id
