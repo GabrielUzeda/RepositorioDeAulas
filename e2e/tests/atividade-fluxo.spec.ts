@@ -45,7 +45,7 @@ test.describe('Professor — criar atividade e gerenciar rascunhos no editor', (
     if (adminToken) await cleanupEntities(request, adminToken, cursoId, professorId);
   });
 
-  test('salva rascunho com 2 questões, restaura do backend, grava atividade e exclui rascunho', async ({ page }) => {
+  test('salva rascunho automaticamente, restaura ao reabrir, testa limpar tudo e grava atividade', async ({ page }) => {
     const atvTitulo = uniqueName('AtvRasc');
     await loginViaUI(page, profEmail, profPassword, /\/professor/);
     await expect(page.getByRole('heading', { name: 'Painel do Professor' })).toBeVisible();
@@ -70,40 +70,33 @@ test.describe('Professor — criar atividade e gerenciar rascunhos no editor', (
     await page.getByPlaceholder('Texto da alternativa...').first().fill('4');
     await page.getByPlaceholder('Texto da alternativa...').nth(1).fill('5');
 
-    // --- SALVAR RASCUNHO NA NUVEM ---
-    await page.getByRole('button', { name: 'Salvar Rascunho' }).click();
-    await expect(page.getByText('Rascunho salvo com sucesso!')).toBeVisible();
-
-    // Fechar o editor
+    // Aguarda debounce do rascunho automático e fecha editor
+    await page.waitForTimeout(600);
     await page.getByRole('button', { name: 'Cancelar' }).click();
 
-    // --- REABRIR EDITOR E CARREGAR RASCUNHO ---
+    // --- REABRIR EDITOR E VERIFICAR RESTAURAÇÃO AUTOMÁTICA ---
     await page.getByRole('button', { name: 'Nova Atividade' }).click();
-    await page.getByRole('button', { name: 'Rascunhos' }).click();
-    await expect(page.getByText('Rascunhos de Atividades', { exact: true })).toBeVisible();
-    await expect(page.getByText(atvTitulo, { exact: true })).toBeVisible();
-
-    // Clicar em carregar rascunho
-    await page.getByRole('button', { name: 'Carregar' }).first().click();
-    await expect(page.getByText('Rascunho carregado no editor!', { exact: true })).toBeVisible();
-
-    // Verificar se as 2 perguntas foram restauradas
     await expect(page.getByText('Perguntas', { exact: true })).toBeVisible();
     await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
 
-    // --- GRAVAR ATIVIDADE DEFINITIVA ---
+    // --- TESTAR BOTÃO LIMPAR TUDO COM CONFIRMAÇÃO ---
+    await page.getByRole('button', { name: 'Limpar Tudo' }).click();
+    await expect(page.getByText('Tem certeza de que deseja limpar todos os campos e perguntas do editor?')).toBeVisible();
+    await page.getByRole('button', { name: 'Limpar Tudo' }).last().click();
+    await expect(page.getByText('Editor limpo com sucesso!')).toBeVisible();
+    await expect(page.getByText('Nenhuma pergunta adicionada.')).toBeVisible();
+
+    // --- PREENCHE NOVAMENTE E GRAVA ATIVIDADE DEFINITIVA ---
+    await page.getByRole('button', { name: 'Informações' }).click();
+    await page.locator('select').selectOption('reforco');
+    await page.getByPlaceholder('Ex: Avaliação de Algoritmos').fill(atvTitulo);
+    await page.getByRole('button', { name: 'Adicionar Pergunta' }).click();
+    await page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...').fill('Qual é a capital do Brasil?');
+    await page.getByPlaceholder('Texto da alternativa...').first().fill('Brasília');
+    await page.getByPlaceholder('Texto da alternativa...').nth(1).fill('Rio de Janeiro');
+
     await page.getByRole('button', { name: 'Salvar Atividade' }).click();
     await expect(page.locator('h4', { hasText: atvTitulo }).first()).toBeVisible();
-
-    // --- EXCLUIR RASCUNHO APÓS USO ---
-    await page.getByRole('button', { name: 'Nova Atividade' }).click();
-    await page.getByRole('button', { name: 'Rascunhos' }).click();
-    const draftsModal = page.getByLabel('Rascunhos de Atividades');
-    await expect(draftsModal.getByRole('heading', { name: atvTitulo })).toBeVisible();
-    await draftsModal.getByRole('button', { name: 'Excluir' }).first().click();
-    await expect(page.getByText('Rascunho excluído com sucesso!', { exact: true })).toBeVisible();
-    await draftsModal.getByText('Fechar').click();
-    await page.getByRole('button', { name: 'Cancelar' }).click();
   });
 });
 

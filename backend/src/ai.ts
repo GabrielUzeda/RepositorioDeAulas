@@ -210,7 +210,7 @@ FORMATO JSON OBRIGATÓRIO:
       return c.json({ success: false, error: `Erro na IA (${aiResponse.status}): ${errText.slice(0, 120)}` }, 502);
     }
 
-    let rawText = await aiResponse.text();
+    const rawText = await aiResponse.text();
     let content = '';
 
     // 1. Tenta parse direto de JSON

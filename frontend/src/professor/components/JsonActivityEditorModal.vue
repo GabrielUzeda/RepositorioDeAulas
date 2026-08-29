@@ -2,15 +2,15 @@
 import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import { apiClient } from '@/shared/api/client';
-import type { Atividade, Question, QuestionOption, RascunhoEditor, Aula } from '@/shared/types';
+import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
+import type { Atividade, Question, QuestionOption, Aula } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 import BaseSelect from '@/shared/components/BaseSelect.vue';
-import BaseBadge from '@/shared/components/BaseBadge.vue';
-import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
+import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
 import AiActivityModal from '@/professor/components/AiActivityModal.vue';
 
 const tipoOptions = [
@@ -48,14 +48,18 @@ const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
 
 const showAiModal = ref(false);
-const currentDraftId = ref<number | null>(null);
-const showDraftsModal = ref(false);
-const isLoadingDrafts = ref(false);
-const isSavingDraft = ref(false);
-const drafts = ref<RascunhoEditor[]>([]);
+const showConfirmClear = ref(false);
+const isInitializing = ref(true);
 
 const usesOptions = computed(() => tipo.value !== 'normal' && tipo.value !== 'prova');
 const activeQuestion = computed(() => questions.value[activeQIndex.value] ?? null);
+
+const draftStorageKey = computed(() => {
+  if (props.atividade?.id && props.atividade.id > 0) {
+    return `prof_editor_draft_atv_${props.atividade.id}`;
+  }
+  return `prof_editor_draft_new_${props.disciplinaId ?? 'global'}`;
+});
 
 function normalizeQuestion(q: any): Question {
   let options: QuestionOption[] | undefined;
@@ -75,13 +79,39 @@ function normalizeQuestion(q: any): Question {
   };
 }
 
+let autoSaveTimeout: any = null;
+function scheduleAutoSave() {
+  if (isInitializing.value || !props.show) return;
+  if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+  autoSaveTimeout = setTimeout(async () => {
+    const draftData = {
+      titulo: titulo.value,
+      descricao: descricao.value,
+      tipo: tipo.value,
+      allowPassword: allowPassword.value,
+      senha: senha.value,
+      questions: questions.value,
+      updatedAt: Date.now()
+    };
+    await secureSet(draftStorageKey.value, JSON.stringify(draftData));
+  }, 400);
+}
+
+watch(
+  [titulo, descricao, tipo, allowPassword, senha, questions],
+  () => {
+    scheduleAutoSave();
+  },
+  { deep: true }
+);
+
 watch(
   () => props.show,
-  (val) => {
+  async (val) => {
     isSaving.value = false;
     activeQIndex.value = 0;
     showBasicInfo.value = true;
-    currentDraftId.value = null;
+    isInitializing.value = true;
     if (val) {
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
@@ -102,16 +132,43 @@ watch(
           questions.value = [];
         }
       } else {
-        titulo.value = '';
-        descricao.value = '';
-        tipo.value = 'normal';
-        allowPassword.value = false;
-        senha.value = '';
-        questions.value = [];
+        const savedDraft = await secureGet(draftStorageKey.value);
+        if (savedDraft) {
+          try {
+            const parsed = JSON.parse(savedDraft);
+            titulo.value = parsed.titulo || '';
+            descricao.value = parsed.descricao || '';
+            tipo.value = parsed.tipo || 'normal';
+            allowPassword.value = !!parsed.allowPassword;
+            senha.value = parsed.senha || '';
+            questions.value = (Array.isArray(parsed.questions) ? parsed.questions : []).map(normalizeQuestion);
+            if (questions.value.length > 0) {
+              showBasicInfo.value = false;
+            }
+          } catch {
+            resetToEmpty();
+          }
+        } else {
+          resetToEmpty();
+        }
       }
+      setTimeout(() => {
+        isInitializing.value = false;
+      }, 50);
     }
   }
 );
+
+function resetToEmpty() {
+  titulo.value = '';
+  descricao.value = '';
+  tipo.value = 'normal';
+  allowPassword.value = false;
+  senha.value = '';
+  questions.value = [];
+  activeQIndex.value = 0;
+  showBasicInfo.value = true;
+}
 
 function addQuestion() {
   const base = { title: `Questão ${questions.value.length + 1}`, content: '' };
@@ -160,9 +217,16 @@ function setCorrectOption(qIndex: number, oIndex: number) {
   if (opts) opts.forEach((o, idx) => { o.correct = idx === oIndex; });
 }
 
-function handleSave() {
+async function handleClearAll() {
+  resetToEmpty();
+  await secureRemove(draftStorageKey.value);
+  useToast().success('Editor limpo com sucesso!');
+}
+
+async function handleSave() {
   if (isSaving.value || props.loading) return;
   isSaving.value = true;
+  await secureRemove(draftStorageKey.value);
   emit('save', {
     titulo: titulo.value,
     descricao: descricao.value,
@@ -174,110 +238,18 @@ function handleSave() {
   });
 }
 
-async function handleSaveDraft() {
-  if (isSavingDraft.value) return;
-  isSavingDraft.value = true;
-  try {
-    const payload = {
-      rascunho_id: currentDraftId.value,
-      titulo: titulo.value || 'Sem título',
-      descricao: descricao.value,
-      tipo: tipo.value,
-      json_data: { questions: questions.value }
-    };
-    const res = await apiClient.post<{ id: number; expira_em: string; success: boolean }>('/professor/rascunhos-editor', payload);
-    if (res.success && res.data) {
-      currentDraftId.value = res.data.id;
-      useToast().success('Rascunho salvo com sucesso!');
-    } else {
-      useToast().error(res.error || 'Erro ao salvar rascunho');
-    }
-  } catch (e: any) {
-    useToast().error(e?.message || 'Erro ao salvar rascunho');
-  } finally {
-    isSavingDraft.value = false;
-  }
-}
-
-async function openDraftsModal() {
-  showDraftsModal.value = true;
-  await fetchDrafts();
-}
-
-async function fetchDrafts() {
-  isLoadingDrafts.value = true;
-  try {
-    const res = await apiClient.get<RascunhoEditor[]>('/professor/rascunhos-editor');
-    if (res.success && Array.isArray(res.data)) {
-      drafts.value = res.data;
-    } else {
-      drafts.value = [];
-    }
-  } catch {
-    drafts.value = [];
-  } finally {
-    isLoadingDrafts.value = false;
-  }
-}
-
-function getDaysRemaining(expiraEm: string): number {
-  const diff = new Date(expiraEm).getTime() - Date.now();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-}
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '';
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return dateStr;
-  }
-}
-
-function handleLoadDraft(draft: RascunhoEditor) {
-  try {
-    const parsed = typeof draft.json_data === 'string' ? JSON.parse(draft.json_data) : draft.json_data;
-    const raw = Array.isArray(parsed?.questions) ? parsed.questions : Array.isArray(parsed?.perguntas) ? parsed.perguntas : [];
-    titulo.value = draft.titulo || '';
-    descricao.value = draft.descricao || '';
-    tipo.value = ((draft.tipo === 'game' ? 'minigame' : draft.tipo) as any) || 'normal';
-    questions.value = raw.map(normalizeQuestion);
-    currentDraftId.value = draft.id;
-    activeQIndex.value = 0;
-    showBasicInfo.value = false;
-    showDraftsModal.value = false;
-    useToast().success('Rascunho carregado no editor!');
-  } catch {
-    useToast().error('Erro ao processar dados do rascunho.');
-  }
-}
-
-async function handleDeleteDraft(draftId: number) {
-  const res = await apiClient.delete(`/professor/rascunhos-editor/${draftId}`);
-  if (res.success) {
-    if (currentDraftId.value === draftId) {
-      currentDraftId.value = null;
-    }
-    drafts.value = drafts.value.filter((d) => d.id !== draftId);
-    useToast().success('Rascunho excluído com sucesso!');
-  } else {
-    useToast().error(res.error || 'Erro ao excluir rascunho.');
-  }
-}
-
-function handleApplyAiQuestions(generatedQuestions: Question[]) {
+function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco' } | Question[]) {
+  const generatedQuestions = Array.isArray(payload) ? payload : payload.questions;
+  const appliedTipo = !Array.isArray(payload) && payload.tipo ? payload.tipo : undefined;
+  
   if (!generatedQuestions || generatedQuestions.length === 0) return;
+  if (appliedTipo) {
+    tipo.value = appliedTipo;
+  }
   questions.value = generatedQuestions.map(normalizeQuestion);
   activeQIndex.value = 0;
   showBasicInfo.value = false;
-  useToast().success(`${generatedQuestions.length} questões geradas por IA foram inseridas no editor!`);
+  useToast().success(`${generatedQuestions.length} questões geradas por IA (${appliedTipo || tipo.value}) foram inseridas no editor!`);
 }
 </script>
 
@@ -292,7 +264,14 @@ function handleApplyAiQuestions(generatedQuestions: Question[]) {
           </div>
           <div>
             <h2 class="text-lg font-bold text-primary leading-tight">{{ (props.atividade && props.atividade.id && props.atividade.id > 0) ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
-            <p class="text-xs text-secondary">{{ questions.length }} pergunta{{ questions.length !== 1 ? 's' : '' }} · {{ tipo }}</p>
+            <p class="text-xs text-secondary flex items-center gap-1.5 mt-0.5">
+              <span>{{ questions.length }} pergunta{{ questions.length !== 1 ? 's' : '' }} · {{ tipo }}</span>
+              <span class="text-line">|</span>
+              <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Rascunho automático
+              </span>
+            </p>
           </div>
         </div>
 
@@ -301,13 +280,9 @@ function handleApplyAiQuestions(generatedQuestions: Question[]) {
             <span class="material-icons text-sm text-accent">auto_awesome</span>
             <span>Gerar com IA</span>
           </BaseButton>
-          <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
-            <span class="material-icons text-sm">folder_open</span>
-            <span>Rascunhos</span>
-          </BaseButton>
-          <BaseButton variant="secondary" size="sm" :loading="isSavingDraft" @click="handleSaveDraft">
-            <span class="material-icons text-sm">bookmark</span>
-            <span>Salvar Rascunho</span>
+          <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
+            <span class="material-icons text-sm">delete_sweep</span>
+            <span>Limpar Tudo</span>
           </BaseButton>
           <BaseButton variant="ghost" size="sm" :disabled="props.loading || isSaving" @click="emit('close')">Cancelar</BaseButton>
           <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">Salvar Atividade</BaseButton>
@@ -489,65 +464,16 @@ function handleApplyAiQuestions(generatedQuestions: Question[]) {
       </main>
     </div>
 
-    <!-- Modal de Rascunhos -->
-    <BaseModal :model-value="showDraftsModal" @close="showDraftsModal = false" title="Rascunhos de Atividades" max-width="max-w-2xl">
-      <div v-if="isLoadingDrafts" class="py-12 flex justify-center items-center">
-        <BaseSpinner size="lg" />
-      </div>
-
-      <div v-else-if="drafts.length === 0" class="py-6">
-        <EmptyState
-          icon="folder_open"
-          title="Nenhum rascunho salvo"
-          message="Você ainda não possui rascunhos salvos. Use 'Salvar Rascunho' para guardar seu progresso na nuvem por até 30 dias."
-        />
-      </div>
-
-      <div v-else class="space-y-3">
-        <div class="p-3 bg-surface-alt border border-line rounded-lg text-xs text-secondary flex items-center justify-between">
-          <span>Total de rascunhos: <strong class="text-primary">{{ drafts.length }}/20</strong></span>
-          <span class="text-accent font-medium">Validade: 30 dias</span>
-        </div>
-
-        <div class="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
-          <div
-            v-for="draft in drafts"
-            :key="draft.id"
-            class="p-4 bg-surface border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
-          >
-            <div class="space-y-1 min-w-0 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h4 class="text-sm font-semibold text-primary truncate">{{ draft.titulo || 'Sem título' }}</h4>
-                <BaseBadge variant="secondary">{{ draft.tipo }}</BaseBadge>
-              </div>
-              <div class="flex items-center gap-2 text-xs text-secondary flex-wrap">
-                <span>Atualizado em: {{ formatDate(draft.atualizado_em) }}</span>
-                <span>·</span>
-                <span class="text-accent font-medium">Expira em {{ getDaysRemaining(draft.expira_em) }} dias</span>
-              </div>
-              <p v-if="draft.descricao" class="text-xs text-secondary line-clamp-1 mt-1">{{ draft.descricao }}</p>
-            </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <BaseButton variant="primary" size="sm" @click="handleLoadDraft(draft)">
-                <span class="material-icons text-sm">file_download</span>
-                <span>Carregar</span>
-              </BaseButton>
-              <BaseButton variant="danger" size="sm" @click="handleDeleteDraft(draft.id)">
-                <span class="material-icons text-sm">delete</span>
-                <span>Excluir</span>
-              </BaseButton>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex justify-end">
-          <BaseButton variant="secondary" size="sm" @click="showDraftsModal = false">Fechar</BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+    <!-- Diálogo de confirmação para Limpar Tudo -->
+    <ConfirmDialog
+      v-model="showConfirmClear"
+      title="Limpar Tudo"
+      message="Tem certeza de que deseja limpar todos os campos e perguntas do editor? Esta ação não pode ser desfeita."
+      :danger="true"
+      confirm-text="Limpar Tudo"
+      cancel-text="Cancelar"
+      @confirm="handleClearAll"
+    />
 
     <!-- Modal de Geração por IA -->
     <AiActivityModal
