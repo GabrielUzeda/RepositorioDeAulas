@@ -22,7 +22,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'apply', questions: Question[]): void;
+  (e: 'apply', payload: { questions: Question[]; tipo: 'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco' } | Question[]): void;
 }>();
 
 const { success, error, info } = useToast();
@@ -189,7 +189,7 @@ async function handleGenerate() {
 
 function handleApplyQuestions() {
   if (generatedQuestions.value.length === 0) return;
-  emit('apply', generatedQuestions.value);
+  emit('apply', { questions: generatedQuestions.value, tipo: selectedTipo.value });
   emit('close');
 }
 </script>
