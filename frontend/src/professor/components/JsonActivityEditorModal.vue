@@ -3,7 +3,7 @@ import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
-import type { Atividade, Question, QuestionOption, RascunhoEditor, Aula } from '@/shared/types';
+import type { Atividade, Question, QuestionOption, RascunhoEditor, Aula, AiModel } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
@@ -13,7 +13,6 @@ import BaseBadge from '@/shared/components/BaseBadge.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
-import AiActivityModal from '@/professor/components/AiActivityModal.vue';
 
 const tipoOptions = [
   { label: 'Normal', value: 'normal' },
@@ -39,6 +38,8 @@ const emit = defineEmits<{
   (e: 'save', payload: Partial<Atividade>): void;
 }>();
 
+const { success, error, info } = useToast();
+
 const titulo = ref('');
 const descricao = ref('');
 const tipo = ref<'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco'>('normal');
@@ -49,7 +50,17 @@ const isSaving = ref(false);
 const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
 
-const showAiModal = ref(false);
+// --- IA Generation State (Embutido no painel Geral) ---
+const aiTema = ref('');
+const aiObservacoes = ref('');
+const aiQuantidadeStr = ref('5');
+const aiSelectedAulas = ref<number[]>([]);
+const aiSelectedModel = ref('qwenproxy/qwen3.8-max-thinking');
+const aiModels = ref<AiModel[]>([]);
+const isLoadingAiModels = ref(false);
+const isGeneratingAi = ref(false);
+const is9RouterOnline = ref<boolean | null>(null);
+
 const showDraftsModal = ref(false);
 const isLoadingDrafts = ref(false);
 const isSavingDraft = ref(false);
@@ -67,6 +78,28 @@ const draftStorageKey = computed(() => {
     return `prof_editor_draft_atv_${props.atividade.id}`;
   }
   return `prof_editor_draft_new_${props.disciplinaId ?? 'global'}`;
+});
+
+const modelOptions = computed(() => {
+  if (aiModels.value.length === 0) {
+    return [
+      { label: 'Qwen 3.8 Max Thinking (Padrão)', value: 'qwenproxy/qwen3.8-max-thinking' },
+      { label: 'DeepSeek V4 Flash', value: 'kimchi/deepseek-v4-flash' },
+      { label: 'Gemini 3.7 Flash High', value: 'ag/gemini-3.7-flash-high' },
+      { label: 'Claude Sonnet 4.6', value: 'ag/claude-sonnet-4-6' },
+      { label: 'Kimi K2.7', value: 'kimchi/kimi-k2.7' },
+    ];
+  }
+  return aiModels.value.map((m) => {
+    const badges: string[] = [];
+    if (m.reasoning) badges.push('Raciocínio');
+    if (m.vision) badges.push('Visão');
+    const badgeText = badges.length > 0 ? ` [${badges.join(', ')}]` : '';
+    return {
+      label: `${m.name} (${m.provider})${badgeText}`,
+      value: m.id,
+    };
+  });
 });
 
 function normalizeQuestion(q: any): Question {
@@ -99,6 +132,9 @@ function scheduleAutoSave() {
       allowPassword: allowPassword.value,
       senha: senha.value,
       questions: questions.value,
+      aiTema: aiTema.value,
+      aiObservacoes: aiObservacoes.value,
+      aiQuantidadeStr: aiQuantidadeStr.value,
       updatedAt: Date.now()
     };
     await secureSet(draftStorageKey.value, JSON.stringify(draftData));
@@ -106,7 +142,7 @@ function scheduleAutoSave() {
 }
 
 watch(
-  [titulo, descricao, tipo, allowPassword, senha, questions],
+  [titulo, descricao, tipo, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
   () => {
     scheduleAutoSave();
   },
@@ -122,12 +158,18 @@ watch(
     currentDraftId.value = null;
     isInitializing.value = true;
     if (val) {
+      aiSelectedAulas.value = props.aulas.map((a) => a.id);
+      fetchAiModelsAndHealth();
+
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
         descricao.value = props.atividade.descricao || '';
         tipo.value = (props.atividade.tipo as any) || 'normal';
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
+        aiTema.value = '';
+        aiObservacoes.value = '';
+        aiQuantidadeStr.value = '5';
         if (props.atividade.json_data) {
           try {
             const parsed = typeof props.atividade.json_data === 'string'
@@ -150,6 +192,9 @@ watch(
             tipo.value = parsed.tipo || 'normal';
             allowPassword.value = !!parsed.allowPassword;
             senha.value = parsed.senha || '';
+            aiTema.value = parsed.aiTema || '';
+            aiObservacoes.value = parsed.aiObservacoes || '';
+            aiQuantidadeStr.value = parsed.aiQuantidadeStr || '5';
             questions.value = (Array.isArray(parsed.questions) ? parsed.questions : []).map(normalizeQuestion);
             if (questions.value.length > 0) {
               showBasicInfo.value = false;
@@ -168,6 +213,105 @@ watch(
   }
 );
 
+async function fetchAiModelsAndHealth() {
+  isLoadingAiModels.value = true;
+  try {
+    const [healthRes, modelsRes] = await Promise.allSettled([
+      apiClient.get<{ ok: boolean; status: string }>('/ai/health'),
+      apiClient.get<{ success: boolean; models: AiModel[] }>('/ai/models'),
+    ]);
+
+    if (healthRes.status === 'fulfilled' && healthRes.value?.success) {
+      is9RouterOnline.value = true;
+    } else {
+      is9RouterOnline.value = false;
+    }
+
+    if (modelsRes.status === 'fulfilled' && modelsRes.value?.success && Array.isArray(modelsRes.value.data?.models)) {
+      aiModels.value = modelsRes.value.data.models;
+      if (aiModels.value.length > 0 && !aiModels.value.some((m) => m.id === aiSelectedModel.value)) {
+        const preferred = aiModels.value.find((m) => m.id.includes('qwen3.8') || m.reasoning) || aiModels.value[0];
+        aiSelectedModel.value = preferred.id;
+      }
+    }
+  } catch {
+    is9RouterOnline.value = false;
+  } finally {
+    isLoadingAiModels.value = false;
+  }
+}
+
+async function handleSyncAiModels() {
+  info('Sincronizando modelos com 9router...');
+  await fetchAiModelsAndHealth();
+  if (is9RouterOnline.value) {
+    success(`9router online! ${aiModels.value.length} modelos disponíveis.`);
+  } else {
+    error('9router inacessível no momento.');
+  }
+}
+
+function toggleAiAula(aulaId: number) {
+  const idx = aiSelectedAulas.value.indexOf(aulaId);
+  if (idx > -1) {
+    aiSelectedAulas.value.splice(idx, 1);
+  } else {
+    aiSelectedAulas.value.push(aulaId);
+  }
+}
+
+function selectAllAiAulas() {
+  if (aiSelectedAulas.value.length === props.aulas.length) {
+    aiSelectedAulas.value = [];
+  } else {
+    aiSelectedAulas.value = props.aulas.map((a) => a.id);
+  }
+}
+
+async function handleGenerateAiQuestions() {
+  if (isGeneratingAi.value) return;
+  if (!aiTema.value.trim() && !titulo.value.trim() && aiSelectedAulas.value.length === 0) {
+    error('Informe um tema, título da atividade ou selecione ao menos uma aula para contextualizar a IA.');
+    return;
+  }
+
+  isGeneratingAi.value = true;
+  try {
+    const payload = {
+      modelo: aiSelectedModel.value,
+      tipo: tipo.value,
+      titulo: titulo.value.trim(),
+      tema: aiTema.value.trim(),
+      observacoes: aiObservacoes.value.trim(),
+      quantidade: Number(aiQuantidadeStr.value) || 5,
+      disciplina_id: props.disciplinaId,
+      aulas_ids: aiSelectedAulas.value,
+    };
+
+    const res = await apiClient.post<{
+      success: boolean;
+      questions: Question[];
+      modelo_utilizado: string;
+      total_gerado: number;
+    }>('/ai/generate-activity', payload);
+
+    if (res.success && Array.isArray(res.data?.questions) && res.data.questions.length > 0) {
+      const normalized = res.data.questions.map(normalizeQuestion);
+      const startIndex = questions.value.length;
+      questions.value.push(...normalized);
+      activeQIndex.value = startIndex;
+      showBasicInfo.value = false;
+      success(`${normalized.length} questões geradas por IA foram adicionadas com sucesso!`);
+    } else {
+      error(res.error || 'A IA não retornou questões compatíveis.');
+    }
+  } catch (e: any) {
+    error(e?.message || 'Falha ao comunicar com o serviço de IA.');
+  } finally {
+    isGeneratingAi.value = false;
+  }
+}
+
 function resetToEmpty() {
   titulo.value = '';
   descricao.value = '';
@@ -175,6 +319,9 @@ function resetToEmpty() {
   allowPassword.value = false;
   senha.value = '';
   questions.value = [];
+  aiTema.value = '';
+  aiObservacoes.value = '';
+  aiQuantidadeStr.value = '5';
   activeQIndex.value = 0;
   showBasicInfo.value = true;
 }
@@ -229,7 +376,7 @@ function setCorrectOption(qIndex: number, oIndex: number) {
 async function handleClearAll() {
   resetToEmpty();
   await secureRemove(draftStorageKey.value);
-  useToast().success('Editor limpo com sucesso!');
+  success('Editor limpo com sucesso!');
 }
 
 async function handleSave() {
@@ -261,13 +408,13 @@ async function handleSaveDraft() {
     const res = await apiClient.post<{ id: number; expira_em: string; success: boolean }>('/professor/rascunhos-editor', payload);
     if (res.success && res.data) {
       currentDraftId.value = res.data.id;
-      useToast().success('Rascunho salvo na nuvem com validade de 30 dias!');
+      success('Rascunho salvo na nuvem com validade de 30 dias!');
       await fetchDrafts();
     } else {
-      useToast().error(res.error || 'Erro ao salvar rascunho');
+      error(res.error || 'Erro ao salvar rascunho');
     }
   } catch (e: any) {
-    useToast().error(e?.message || 'Erro ao salvar rascunho');
+    error(e?.message || 'Erro ao salvar rascunho');
   } finally {
     isSavingDraft.value = false;
   }
@@ -327,9 +474,9 @@ function handleLoadDraft(draft: RascunhoEditor) {
     activeQIndex.value = 0;
     showBasicInfo.value = false;
     showDraftsModal.value = false;
-    useToast().success('Rascunho carregado no editor!');
+    success('Rascunho carregado no editor!');
   } catch {
-    useToast().error('Erro ao processar dados do rascunho.');
+    error('Erro ao processar dados do rascunho.');
   }
 }
 
@@ -340,24 +487,10 @@ async function handleDeleteDraft(draftId: number) {
       currentDraftId.value = null;
     }
     drafts.value = drafts.value.filter((d) => d.id !== draftId);
-    useToast().success('Rascunho excluído com sucesso!');
+    success('Rascunho excluído com sucesso!');
   } else {
-    useToast().error(res.error || 'Erro ao excluir rascunho.');
+    error(res.error || 'Erro ao excluir rascunho.');
   }
-}
-
-function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco' } | Question[]) {
-  const generatedQuestions = Array.isArray(payload) ? payload : payload.questions;
-  const appliedTipo = !Array.isArray(payload) && payload.tipo ? payload.tipo : undefined;
-  
-  if (!generatedQuestions || generatedQuestions.length === 0) return;
-  if (appliedTipo) {
-    tipo.value = appliedTipo;
-  }
-  questions.value = generatedQuestions.map(normalizeQuestion);
-  activeQIndex.value = 0;
-  showBasicInfo.value = false;
-  useToast().success(`${generatedQuestions.length} questões geradas por IA (${appliedTipo || tipo.value}) foram inseridas no editor!`);
 }
 </script>
 
@@ -384,10 +517,6 @@ function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal
         </div>
 
         <div class="flex items-center flex-wrap gap-2">
-          <BaseButton variant="secondary" size="sm" @click="showAiModal = true">
-            <span class="material-icons text-sm text-accent">auto_awesome</span>
-            <span>Gerar com IA</span>
-          </BaseButton>
           <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
             <span class="material-icons text-sm">folder_open</span>
             <span>Rascunhos</span>
@@ -406,14 +535,14 @@ function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal
 
       <!-- Sidebar: informações + lista de perguntas -->
       <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto">
-        <!-- Info básica collapsible -->
+        <!-- Info básica collapsible (Renomeada para Geral) -->
         <button
           class="flex items-center justify-between px-4 py-3 text-xs font-bold uppercase tracking-wider text-secondary hover:bg-surface-alt transition-colors border-b border-line"
           @click="showBasicInfo = !showBasicInfo; activeQIndex = -1"
         >
           <span class="flex items-center gap-1.5">
-            <span class="material-icons text-sm text-accent">info</span>
-            Informações
+            <span class="material-icons text-sm text-accent">tune</span>
+            Geral
           </span>
           <span class="material-icons text-sm transition-transform" :class="showBasicInfo ? 'rotate-180' : ''">expand_more</span>
         </button>
@@ -458,25 +587,166 @@ function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal
       <!-- Painel direito -->
       <main class="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5">
 
-        <!-- Painel: informações básicas -->
-        <div v-if="showBasicInfo" class="space-y-4">
+        <!-- Painel: Geral (Configuração da Atividade + Gerador de IA Integrado) -->
+        <div v-if="showBasicInfo" class="space-y-6">
           <div v-if="!usesOptions" class="p-3 bg-surface-alt border border-line rounded-lg text-secondary text-xs flex items-center gap-2">
             <span class="material-icons text-base text-accent">edit_note</span>
             <span>Tipo <strong class="text-primary">{{ tipo }}</strong>: perguntas <strong class="text-primary">discursivas</strong> (resposta livre).</span>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" />
-            <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" />
-            <div class="md:col-span-2">
-              <BaseTextarea v-model="descricao" :rows="4" label="Descrição / Orientações" placeholder="Breve resumo ou instruções da atividade para os alunos..." />
+          <!-- Seção 1: Dados da Atividade -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between border-b border-line pb-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                <span class="material-icons text-base text-accent">settings</span>
+                Configurações da Atividade
+              </h3>
             </div>
-            <div class="md:col-span-2 flex items-center gap-3">
-              <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
-              <label for="allowPassword" class="text-sm font-medium text-secondary cursor-pointer">Exigir senha individual de acesso para os alunos</label>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" />
+              <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" />
+              <div class="md:col-span-2">
+                <BaseTextarea v-model="descricao" :rows="3" label="Descrição / Orientações para Alunos" placeholder="Breve resumo ou instruções da atividade..." />
+              </div>
+              <div class="md:col-span-2 flex items-center gap-3">
+                <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
+                <label for="allowPassword" class="text-sm font-medium text-secondary cursor-pointer">Exigir senha individual de acesso para os alunos</label>
+              </div>
+              <div v-if="allowPassword" class="md:col-span-2">
+                <BaseInput v-model="senha" type="password" label="Senha da Atividade *" placeholder="Digite a senha exclusiva" />
+              </div>
             </div>
-            <div v-if="allowPassword" class="md:col-span-2">
-              <BaseInput v-model="senha" type="password" label="Senha da Atividade *" placeholder="Digite a senha exclusiva" />
+          </div>
+
+          <!-- Seção 2: Gerador de Questões por IA (Embutido) -->
+          <div class="p-5 bg-surface-alt/60 border border-accent/30 rounded-2xl space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line/60 pb-3">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-md bg-accent/15 text-accent flex items-center justify-center">
+                  <span class="material-icons text-lg">auto_awesome</span>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-primary flex items-center gap-2">
+                    <span>Gerador de Questões por IA</span>
+                    <span
+                      class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      :class="is9RouterOnline ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'"
+                    >
+                      <span class="w-1.5 h-1.5 rounded-full" :class="is9RouterOnline ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                      {{ is9RouterOnline ? '9router Conectado' : 'Status 9router' }}
+                    </span>
+                  </h3>
+                  <p class="text-xs text-secondary">Gera novas perguntas e adiciona ao final da lista sem sobrescrever o conteúdo atual</p>
+                </div>
+              </div>
+
+              <BaseButton variant="ghost" size="sm" :loading="isLoadingAiModels" @click="handleSyncAiModels">
+                <span class="material-icons text-sm">sync</span>
+                <span>Atualizar Modelos</span>
+              </BaseButton>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <!-- Modelo de IA -->
+              <div class="md:col-span-8">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Modelo de IA (9router)</label>
+                <BaseSelect
+                  v-model="aiSelectedModel"
+                  :options="modelOptions"
+                  :disabled="isGeneratingAi || isLoadingAiModels"
+                />
+              </div>
+
+              <!-- Quantidade de Questões -->
+              <div class="md:col-span-4">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Qtd. a Gerar</label>
+                <BaseInput
+                  v-model="aiQuantidadeStr"
+                  type="number"
+                  min="1"
+                  max="20"
+                  placeholder="Ex: 5"
+                  :disabled="isGeneratingAi"
+                />
+              </div>
+
+              <!-- Tema / Tópico Específico -->
+              <div class="md:col-span-12">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Tema / Tópico Específico (Opcional se houver aulas)</label>
+                <BaseInput
+                  v-model="aiTema"
+                  placeholder="Ex: Condicionais e Laços de Repetição em TypeScript"
+                  :disabled="isGeneratingAi"
+                />
+              </div>
+
+              <!-- Observações ou Instruções Pedagógicas -->
+              <div class="md:col-span-12">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Observações ou Instruções Pedagógicas para a IA</label>
+                <BaseTextarea
+                  v-model="aiObservacoes"
+                  :rows="2"
+                  placeholder="Ex: Nível intermediário, inclua exemplos práticos de código e explicações claras em cada alternativa..."
+                  :disabled="isGeneratingAi"
+                />
+              </div>
+
+              <!-- Aulas para Contexto -->
+              <div class="md:col-span-12">
+                <div class="flex items-center justify-between mb-2">
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-secondary">
+                    Aulas de Referência para Contexto da IA ({{ aiSelectedAulas.length }}/{{ props.aulas.length }})
+                  </label>
+                  <button
+                    v-if="props.aulas.length > 0"
+                    type="button"
+                    class="text-xs text-accent hover:underline font-medium"
+                    :disabled="isGeneratingAi"
+                    @click="selectAllAiAulas"
+                  >
+                    {{ aiSelectedAulas.length === props.aulas.length ? 'Desmarcar todas' : 'Selecionar todas' }}
+                  </button>
+                </div>
+
+                <div v-if="props.aulas.length === 0" class="p-3 bg-surface border border-line rounded-lg text-xs text-secondary text-center">
+                  Nenhuma aula cadastrada nesta disciplina. A IA utilizará o tema e o título da atividade.
+                </div>
+
+                <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+                  <div
+                    v-for="aula in props.aulas"
+                    :key="aula.id"
+                    class="flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-colors"
+                    :class="aiSelectedAulas.includes(aula.id) ? 'border-accent/40 bg-accent/5 text-primary' : 'border-line bg-surface hover:bg-surface-alt text-secondary'"
+                    @click="toggleAiAula(aula.id)"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="aiSelectedAulas.includes(aula.id)"
+                      class="rounded border-line text-accent focus:ring-accent"
+                      @click.stop="toggleAiAula(aula.id)"
+                    />
+                    <span class="material-icons text-sm text-secondary">slideshow</span>
+                    <span class="font-medium truncate flex-1">{{ aula.titulo }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Botão Gerar e Adicionar Questões -->
+              <div class="md:col-span-12 pt-2">
+                <BaseButton
+                  variant="primary"
+                  size="md"
+                  block
+                  :loading="isGeneratingAi"
+                  :disabled="isGeneratingAi || (!aiTema.trim() && !titulo.trim() && aiSelectedAulas.length === 0)"
+                  @click="handleGenerateAiQuestions"
+                >
+                  <span class="material-icons text-base">auto_awesome</span>
+                  <span>{{ isGeneratingAi ? 'Gerando e Adicionando Questões com IA...' : 'Gerar e Adicionar Questões na Atividade' }}</span>
+                </BaseButton>
+              </div>
             </div>
           </div>
         </div>
@@ -548,7 +818,7 @@ function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal
                   <input
                     v-model="opt.text"
                     placeholder="Texto da alternativa..."
-                    class="w-full bg-surface-alt px-3 py-1.5 rounded-md border border-line text-primary text-sm outline-none focus:border-accent"
+                    class="w-full bg-surface-alt px-3.5 py-2 rounded-md border border-line text-primary text-sm outline-none focus:ring-2 focus:ring-accent focus:border-accent"
                   />
                   <input
                     v-if="tipo !== 'minigame'"
@@ -660,17 +930,6 @@ function handleApplyAiQuestions(payload: { questions: Question[]; tipo?: 'normal
       confirm-text="Limpar Tudo"
       cancel-text="Cancelar"
       @confirm="handleClearAll"
-    />
-
-    <!-- Modal de Geração por IA -->
-    <AiActivityModal
-      :show="showAiModal"
-      :tipo="tipo"
-      :titulo="titulo"
-      :aulas="props.aulas"
-      :disciplina-id="props.disciplinaId"
-      @close="showAiModal = false"
-      @apply="handleApplyAiQuestions"
     />
   </BaseModal>
 </template>
