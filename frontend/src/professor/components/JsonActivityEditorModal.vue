@@ -432,40 +432,26 @@ async function handleDeleteDraft(draftId: number) {
   <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-6xl" no-padding>
     <!-- Header fixo -->
     <template #header>
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs shrink-0">
-            <span class="material-icons text-[20px]">quiz</span>
-          </div>
-          <div>
-            <h2 class="text-lg font-bold text-primary leading-tight">{{ (props.atividade && props.atividade.id && props.atividade.id > 0) ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
-            <p class="text-xs text-secondary flex items-center gap-1.5 mt-0.5">
-              <span>{{ questions.length }} pergunta{{ questions.length !== 1 ? 's' : '' }} · {{ tipo }}</span>
-              <span class="text-line">|</span>
-              <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                Rascunho automático ativo
-              </span>
-            </p>
-          </div>
+      <div class="flex items-center gap-3 w-full">
+        <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs shrink-0">
+          <span class="material-icons text-[20px]">quiz</span>
         </div>
-
-        <div class="flex items-center flex-wrap gap-2">
-          <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
-            <span class="material-icons text-sm">folder_open</span>
-            <span>Rascunhos</span>
-          </BaseButton>
-          <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
-            <span class="material-icons text-sm">delete_sweep</span>
-            <span>Limpar Tudo</span>
-          </BaseButton>
-          <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">Salvar Atividade</BaseButton>
+        <div>
+          <h2 class="text-lg font-bold text-primary leading-tight">{{ (props.atividade && props.atividade.id && props.atividade.id > 0) ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
+          <p class="text-xs text-secondary flex items-center gap-1.5 mt-0.5">
+            <span>{{ questions.length }} pergunta{{ questions.length !== 1 ? 's' : '' }} · {{ tipo }}</span>
+            <span class="text-line">|</span>
+            <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Rascunho automático ativo
+            </span>
+          </p>
         </div>
       </div>
     </template>
 
     <!-- Layout split: sidebar esq + painel dir -->
-    <div class="flex h-full min-h-0" style="height: calc(90vh - 130px)">
+    <div class="flex h-full min-h-0" style="height: calc(90vh - 170px)">
 
       <!-- Sidebar: informações + lista de perguntas -->
       <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto">
@@ -753,91 +739,114 @@ async function handleDeleteDraft(draftId: number) {
       </main>
     </div>
 
-    <!-- Modal de Rascunhos -->
-    <BaseModal :model-value="showDraftsModal" @close="showDraftsModal = false" title="Rascunhos de Atividades" max-width="max-w-2xl">
-      <div v-if="isLoadingDrafts" class="py-12 flex justify-center items-center">
-        <BaseSpinner size="lg" />
-      </div>
-
-      <div v-else class="space-y-4">
-        <!-- Banner informativo LGPD / Expiração de 30 dias -->
-        <div class="p-3.5 bg-surface-alt border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div class="space-y-0.5">
-            <div class="flex items-center gap-1.5 font-semibold text-primary">
-              <span class="material-icons text-base text-accent">schedule</span>
-              <span>Rascunhos salvos por até 30 dias</span>
-            </div>
-            <p class="text-secondary">Os rascunhos na nuvem expiram automaticamente após 30 dias de inatividade.</p>
-          </div>
-
-          <BaseButton variant="primary" size="sm" :loading="isSavingDraft" class="shrink-0" @click="handleSaveDraft">
-            <span class="material-icons text-sm">bookmark_add</span>
-            <span>Salvar Rascunho Atual</span>
+    <!-- Footer com ações da atividade -->
+    <template #footer>
+      <div class="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 w-full">
+        <div>
+          <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
+            <span class="material-icons text-sm">delete_sweep</span>
+            <span>Limpar Tudo</span>
           </BaseButton>
         </div>
 
-        <div v-if="drafts.length === 0" class="py-6">
-          <EmptyState
-            icon="folder_open"
-            title="Nenhum rascunho salvo na nuvem"
-            message="O editor salva suas alterações localmente em tempo real. Você também pode clicar no botão acima para guardar este rascunho na nuvem por 30 dias."
-          />
+        <div class="flex items-center flex-wrap gap-2">
+          <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
+            <span class="material-icons text-sm">folder_open</span>
+            <span>Rascunhos</span>
+          </BaseButton>
+          <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">
+            <span class="material-icons text-sm">save</span>
+            <span>Salvar Atividade</span>
+          </BaseButton>
+        </div>
+      </div>
+    </template>
+  </BaseModal>
+
+  <!-- Modal de Rascunhos -->
+  <BaseModal :model-value="showDraftsModal" @close="showDraftsModal = false" title="Rascunhos de Atividades" max-width="max-w-2xl">
+    <div v-if="isLoadingDrafts" class="py-12 flex justify-center items-center">
+      <BaseSpinner size="lg" />
+    </div>
+
+    <div v-else class="space-y-4">
+      <!-- Banner informativo LGPD / Expiração de 30 dias -->
+      <div class="p-3.5 bg-surface-alt border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5 font-semibold text-primary">
+            <span class="material-icons text-base text-accent">schedule</span>
+            <span>Rascunhos salvos por até 30 dias</span>
+          </div>
+          <p class="text-secondary">Os rascunhos na nuvem expiram automaticamente após 30 dias de inatividade.</p>
         </div>
 
-        <div v-else class="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
-          <div class="flex items-center justify-between text-xs text-secondary px-1 pb-1">
-            <span>Rascunhos salvos: <strong class="text-primary">{{ drafts.length }}/20</strong></span>
-            <span>Validade máxima: 30 dias</span>
+        <BaseButton variant="primary" size="sm" :loading="isSavingDraft" class="shrink-0" @click="handleSaveDraft">
+          <span class="material-icons text-sm">bookmark_add</span>
+          <span>Salvar Rascunho Atual</span>
+        </BaseButton>
+      </div>
+
+      <div v-if="drafts.length === 0" class="py-6">
+        <EmptyState
+          icon="folder_open"
+          title="Nenhum rascunho salvo na nuvem"
+          message="O editor salva suas alterações localmente em tempo real. Você também pode clicar no botão acima para guardar este rascunho na nuvem por 30 dias."
+        />
+      </div>
+
+      <div v-else class="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
+        <div class="flex items-center justify-between text-xs text-secondary px-1 pb-1">
+          <span>Rascunhos salvos: <strong class="text-primary">{{ drafts.length }}/20</strong></span>
+          <span>Validade máxima: 30 dias</span>
+        </div>
+
+        <div
+          v-for="draft in drafts"
+          :key="draft.id"
+          class="p-4 bg-surface border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
+        >
+          <div class="space-y-1 min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h4 class="text-sm font-semibold text-primary truncate">{{ draft.titulo || 'Sem título' }}</h4>
+              <BaseBadge variant="secondary">{{ draft.tipo }}</BaseBadge>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-secondary flex-wrap">
+              <span>Atualizado em: {{ formatDate(draft.atualizado_em) }}</span>
+              <span>·</span>
+              <span class="text-accent font-medium">Expira em {{ getDaysRemaining(draft.expira_em) }} dias</span>
+            </div>
+            <p v-if="draft.descricao" class="text-xs text-secondary line-clamp-1 mt-1">{{ draft.descricao }}</p>
           </div>
 
-          <div
-            v-for="draft in drafts"
-            :key="draft.id"
-            class="p-4 bg-surface border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
-          >
-            <div class="space-y-1 min-w-0 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h4 class="text-sm font-semibold text-primary truncate">{{ draft.titulo || 'Sem título' }}</h4>
-                <BaseBadge variant="secondary">{{ draft.tipo }}</BaseBadge>
-              </div>
-              <div class="flex items-center gap-2 text-xs text-secondary flex-wrap">
-                <span>Atualizado em: {{ formatDate(draft.atualizado_em) }}</span>
-                <span>·</span>
-                <span class="text-accent font-medium">Expira em {{ getDaysRemaining(draft.expira_em) }} dias</span>
-              </div>
-              <p v-if="draft.descricao" class="text-xs text-secondary line-clamp-1 mt-1">{{ draft.descricao }}</p>
-            </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <BaseButton variant="primary" size="sm" @click="handleLoadDraft(draft)">
-                <span class="material-icons text-sm">file_download</span>
-                <span>Carregar</span>
-              </BaseButton>
-              <BaseButton variant="danger" size="sm" @click="handleDeleteDraft(draft.id)">
-                <span class="material-icons text-sm">delete</span>
-                <span>Excluir</span>
-              </BaseButton>
-            </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <BaseButton variant="primary" size="sm" @click="handleLoadDraft(draft)">
+              <span class="material-icons text-sm">file_download</span>
+              <span>Carregar</span>
+            </BaseButton>
+            <BaseButton variant="danger" size="sm" @click="handleDeleteDraft(draft.id)">
+              <span class="material-icons text-sm">delete</span>
+              <span>Excluir</span>
+            </BaseButton>
           </div>
         </div>
       </div>
+    </div>
 
-      <template #footer>
-        <div class="flex justify-end">
-          <BaseButton variant="secondary" size="sm" @click="showDraftsModal = false">Fechar</BaseButton>
-        </div>
-      </template>
-    </BaseModal>
-
-    <!-- Diálogo de confirmação para Limpar Tudo -->
-    <ConfirmDialog
-      v-model="showConfirmClear"
-      title="Limpar Tudo"
-      message="Tem certeza de que deseja limpar todos os campos e perguntas do editor? Esta ação não pode ser desfeita."
-      :danger="true"
-      confirm-text="Limpar Tudo"
-      cancel-text="Cancelar"
-      @confirm="handleClearAll"
-    />
+    <template #footer>
+      <div class="flex justify-end">
+        <BaseButton variant="secondary" size="sm" @click="showDraftsModal = false">Fechar</BaseButton>
+      </div>
+    </template>
   </BaseModal>
+
+  <!-- Diálogo de confirmação para Limpar Tudo -->
+  <ConfirmDialog
+    v-model="showConfirmClear"
+    title="Limpar Tudo"
+    message="Tem certeza de que deseja limpar todos os campos e perguntas do editor? Esta ação não pode ser desfeita."
+    :danger="true"
+    confirm-text="Limpar Tudo"
+    cancel-text="Cancelar"
+    @confirm="handleClearAll"
+  />
 </template>
