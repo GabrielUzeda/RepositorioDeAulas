@@ -181,6 +181,7 @@ function scoreColor(nota: number | null | undefined) {
   <BaseModal
     :model-value="props.show && !!props.atividade"
     max-width="max-w-6xl"
+    allow-fullscreen
     no-padding
     @close="emit('close')"
   >
@@ -210,7 +211,7 @@ function scoreColor(nota: number | null | undefined) {
     <EmptyState v-else-if="respostas.length === 0" icon="inbox" message="Nenhuma resposta registrada para esta atividade até o momento." class="py-20" />
 
     <!-- Layout split: lista esq + detalhe dir -->
-    <div v-else class="flex min-h-0" style="height: calc(90vh - 120px)">
+    <div v-else class="flex h-full min-h-[60vh] flex-1">
 
       <!-- Lista de alunos (sidebar esquerda) -->
       <aside class="w-72 shrink-0 flex flex-col border-r border-line overflow-y-auto bg-surface">
