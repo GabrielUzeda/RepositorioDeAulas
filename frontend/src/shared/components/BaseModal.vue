@@ -1,19 +1,34 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
-const props = defineProps<{
-  modelValue: boolean
-  title?: string
-  maxWidth?: string
-  noPadding?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean
+    title?: string
+    maxWidth?: string
+    noPadding?: boolean
+    allowFullscreen?: boolean
+  }>(),
+  {
+    maxWidth: 'max-w-2xl',
+    noPadding: false,
+    allowFullscreen: false,
+  }
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   'close': []
 }>()
 
+const isFullscreen = ref(false)
+
+function toggleFullscreen() {
+  isFullscreen.value = !isFullscreen.value
+}
+
 function fechar() {
+  isFullscreen.value = false
   emit('update:modelValue', false)
   emit('close')
 }
@@ -31,7 +46,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <Transition name="modal-fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="fixed inset-0 z-50 flex items-center justify-center"
+        :class="isFullscreen ? 'p-0' : 'p-4'"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="title ? 'modal-title' : undefined"
@@ -45,8 +61,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
         <!-- Panel -->
         <div
-          class="relative z-10 w-full flex flex-col bg-surface-alt border border-line rounded-2xl shadow-modal max-h-[90vh]"
-          :class="maxWidth || 'max-w-2xl'"
+          class="relative z-10 w-full flex flex-col bg-surface-alt border border-line shadow-modal transition-all duration-200"
+          :class="[
+            isFullscreen
+              ? 'fixed inset-0 h-full max-h-full rounded-none border-none'
+              : `rounded-2xl max-h-[90vh] ${props.maxWidth || 'max-w-2xl'}`
+          ]"
         >
           <!-- Header -->
           <div class="shrink-0 flex items-center justify-between gap-4 px-6 pt-5 pb-4 border-b border-line">
@@ -58,13 +78,25 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               >{{ title }}</h2>
             </slot>
 
-            <button
-              class="ml-auto flex-shrink-0 -mt-0.5 p-1.5 rounded-md text-muted hover:text-primary hover:bg-surface transition-colors duration-base"
-              @click="fechar"
-              aria-label="Fechar modal"
-            >
-              <span class="material-icons text-[20px]">close</span>
-            </button>
+            <div class="ml-auto flex items-center gap-1 shrink-0 -mt-0.5">
+              <button
+                v-if="props.allowFullscreen"
+                class="p-1.5 rounded-md text-muted hover:text-primary hover:bg-surface transition-colors duration-base"
+                :title="isFullscreen ? 'Restaurar tamanho' : 'Modo tela cheia'"
+                :aria-label="isFullscreen ? 'Restaurar tamanho' : 'Modo tela cheia'"
+                @click="toggleFullscreen"
+              >
+                <span class="material-icons text-[20px]">{{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</span>
+              </button>
+
+              <button
+                class="p-1.5 rounded-md text-muted hover:text-primary hover:bg-surface transition-colors duration-base"
+                @click="fechar"
+                aria-label="Fechar modal"
+              >
+                <span class="material-icons text-[20px]">close</span>
+              </button>
+            </div>
           </div>
 
           <!-- Body -->

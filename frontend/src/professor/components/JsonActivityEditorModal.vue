@@ -429,7 +429,7 @@ async function handleDeleteDraft(draftId: number) {
 </script>
 
 <template>
-  <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-6xl" no-padding>
+  <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-6xl" allow-fullscreen no-padding>
     <!-- Header fixo -->
     <template #header>
       <div class="flex items-center gap-3 w-full">
@@ -451,7 +451,7 @@ async function handleDeleteDraft(draftId: number) {
     </template>
 
     <!-- Layout split: sidebar esq + painel dir -->
-    <div class="flex h-full min-h-0 rounded-b-2xl overflow-hidden" style="height: calc(90vh - 85px)">
+    <div class="flex h-full min-h-[60vh] flex-1 rounded-b-2xl overflow-hidden">
 
       <!-- Sidebar: informações + lista de perguntas -->
       <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto rounded-bl-2xl">
