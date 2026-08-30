@@ -485,8 +485,8 @@ async function handleDeleteDraft(draftId: number) {
               : 'border-transparent hover:border-line hover:bg-surface-alt'"
             @click="activeQIndex = idx; showBasicInfo = false"
           >
-            <div class="px-3 py-2.5 flex items-start gap-2">
-              <span class="mt-0.5 w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
+            <div class="px-3 py-2.5 flex items-center gap-2">
+              <span class="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 leading-none"
                 :class="activeQIndex === idx && !showBasicInfo ? 'bg-accent text-white' : 'bg-surface-alt text-secondary'">
                 {{ idx + 1 }}
               </span>
