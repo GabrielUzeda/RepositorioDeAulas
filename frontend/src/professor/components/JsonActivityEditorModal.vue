@@ -498,7 +498,7 @@ async function handleDeleteDraft(draftId: number) {
         </div>
 
         <!-- Botão adicionar pergunta na sidebar -->
-        <div class="shrink-0 p-3 border-t border-line">
+        <div class="shrink-0 h-14 px-3 border-t border-line flex items-center bg-surface">
           <BaseButton variant="primary" size="sm" block @click="addQuestion">
             <span class="material-icons text-sm">add</span>
             <span>Adicionar Pergunta</span>
@@ -741,8 +741,8 @@ async function handleDeleteDraft(draftId: number) {
         <EmptyState v-else-if="!showBasicInfo && questions.length === 0" icon="help_outline" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
       </main>
 
-      <!-- Barra de ações ao lado direito do Adicionar Pergunta (alinhada à direita e com mesma altura/padding) -->
-      <footer class="shrink-0 p-3 border-t border-line bg-surface flex items-center justify-end gap-2 rounded-br-2xl">
+      <!-- Barra de ações ao lado direito do Adicionar Pergunta (alinhada à direita e com mesma altura/padding exato de h-14) -->
+      <footer class="shrink-0 h-14 px-4 border-t border-line bg-surface flex items-center justify-end gap-2 rounded-br-2xl">
         <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
           <span class="material-icons text-sm">delete_sweep</span>
           <span>Limpar Tudo</span>
