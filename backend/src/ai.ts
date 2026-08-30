@@ -24,7 +24,9 @@ export interface AiModelItem {
 }
 
 async function fetchFrom9Router(endpoint: string, options: RequestInit = {}) {
-  const cleanBase = NINE_ROUTER_URL.replace(/\/v1\/?$/, '');
+  const customUrl = process.env.NINE_ROUTER_URL;
+  const baseUrl = customUrl || 'http://127.0.0.1:20128/v1';
+  const cleanBase = baseUrl.replace(/\/v1\/?$/, '');
   const url = endpoint.startsWith('http') ? endpoint : `${cleanBase}${endpoint}`;
   
   const headers = new Headers(options.headers || {});
@@ -35,16 +37,35 @@ async function fetchFrom9Router(endpoint: string, options: RequestInit = {}) {
     headers.set('Content-Type', 'application/json');
   }
 
-  return fetch(url, {
-    ...options,
-    headers,
-  });
+  // Se estiver usando URL default 127.0.0.1, usa timeout inicial de 1.5s para fallback rápido no Docker dev
+  const isDefaultLocal = !customUrl && url.includes('127.0.0.1:20128');
+  const initialSignal = isDefaultLocal ? AbortSignal.timeout(1500) : options.signal;
+
+  try {
+    return await fetch(url, {
+      ...options,
+      headers,
+      signal: initialSignal,
+    });
+  } catch (err) {
+    if (isDefaultLocal) {
+      const fallbackUrl = url.replace('127.0.0.1:20128', 'host.docker.internal:20128');
+      try {
+        return await fetch(fallbackUrl, {
+          ...options,
+          headers,
+          signal: options.signal || AbortSignal.timeout(4000),
+        });
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 aiRouter.get('/health', professorAuth, async (c) => {
   try {
     const res = await fetchFrom9Router('/api/health', {
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(3500),
     });
     if (res.ok) {
       const data = await res.json().catch(() => ({ ok: true }));
@@ -59,7 +80,7 @@ aiRouter.get('/health', professorAuth, async (c) => {
 aiRouter.get('/models', professorAuth, async (c) => {
   try {
     const res = await fetchFrom9Router('/v1/models', {
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(3500),
     });
     if (!res.ok) {
       return c.json({ success: false, error: `9router returned HTTP ${res.status}` }, 502);
@@ -190,134 +211,169 @@ FORMATO JSON OBRIGATÓRIO:
 
   userPrompt += `\nGere as ${quantidade} questões no formato JSON especificado.`;
 
-  try {
-    const aiResponse = await fetchFrom9Router('/v1/chat/completions', {
-      method: 'POST',
-      body: JSON.stringify({
-        model: modelo,
-        stream: false,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3
-      }),
-      signal: AbortSignal.timeout(90000)
-    });
+  // Fallback prioritário de modelos:
+  // 1. DeepSeek V4 Flash (rápido e direto)
+  // 2. Qwen 3.7 Plus (qualidade e raciocínio)
+  // 3. Gemini 3.7 Flash Low (estável e rápido)
+  const candidateModels = [
+    'ocg/deepseek-v4-flash',
+    'kimchi/deepseek-v4-flash',
+    'deepseek-v4-flash',
+    'ocg/qwen3.7-plus',
+    'qwenproxy/qwen3.7-plus',
+    'ag/gemini-3.7-flash-low',
+  ];
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text().catch(() => '');
-      return c.json({ success: false, error: `Erro na IA (${aiResponse.status}): ${errText.slice(0, 120)}` }, 502);
-    }
+  const modelsToTry = modelo && !candidateModels.includes(modelo)
+    ? [modelo, ...candidateModels]
+    : candidateModels;
 
-    let rawText = await aiResponse.text();
-    let content = '';
+  let lastError = 'Nenhum provedor de IA respondeu com sucesso';
+  let successfulResponse: { questions: any[]; modelo: string } | null = null;
 
-    // 1. Tenta parse direto de JSON
+  for (const currentModel of modelsToTry) {
     try {
-      const aiData = JSON.parse(rawText);
-      if (aiData?.choices?.[0]?.message?.content) {
-        content = aiData.choices[0].message.content;
-      }
-    } catch {}
+      const aiResponse = await fetchFrom9Router('/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({
+          model: currentModel,
+          stream: false,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.3
+        }),
+        signal: AbortSignal.timeout(45000)
+      });
 
-    // 2. Se não encontrou, processa chunks de SSE linha por linha
-    if (!content) {
-      const lines = rawText.split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data:') && !trimmed.includes('[DONE]')) {
-          const jsonPart = trimmed.replace(/^data:\s*/, '');
+      if (!aiResponse.ok) {
+        const errText = await aiResponse.text().catch(() => '');
+        lastError = `[${currentModel}] HTTP ${aiResponse.status}: ${errText.slice(0, 150)}`;
+        continue;
+      }
+
+      const rawText = await aiResponse.text();
+      let content = '';
+
+      // 1. Tenta parse direto de JSON
+      try {
+        const aiData = JSON.parse(rawText);
+        if (aiData?.error) {
+          lastError = `[${currentModel}] ${aiData.error.message || JSON.stringify(aiData.error)}`;
+          continue;
+        }
+        if (aiData?.choices?.[0]?.message?.content) {
+          content = aiData.choices[0].message.content;
+        }
+      } catch {}
+
+      // 2. Se não encontrou, processa chunks de SSE linha por linha
+      if (!content) {
+        const lines = rawText.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data:') && !trimmed.includes('[DONE]')) {
+            const jsonPart = trimmed.replace(/^data:\s*/, '');
+            try {
+              const parsed = JSON.parse(jsonPart);
+              if (parsed?.choices?.[0]?.message?.content) {
+                content = parsed.choices[0].message.content;
+              } else if (parsed?.choices?.[0]?.delta?.content) {
+                content += parsed.choices[0].delta.content;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      // 3. Fallback: regex caso haja JSON bruto envolvido por marcadores
+      if (!content) {
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
           try {
-            const parsed = JSON.parse(jsonPart);
-            if (parsed?.choices?.[0]?.message?.content) {
-              content = parsed.choices[0].message.content;
-            } else if (parsed?.choices?.[0]?.delta?.content) {
-              content += parsed.choices[0].delta.content;
-            }
+            const aiData = JSON.parse(jsonMatch[0]);
+            content = aiData?.choices?.[0]?.message?.content || '';
+          } catch {
+            content = '';
+          }
+        }
+      }
+
+      let parsedQuestions: any[] = [];
+      try {
+        const cleanJson = content
+          .replace(/```json/gi, '')
+          .replace(/```/g, '')
+          .trim();
+        const parsed = JSON.parse(cleanJson);
+        parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
+      } catch {
+        const objMatch = content.match(/\{[\s\S]*\}/);
+        if (objMatch) {
+          try {
+            const parsed = JSON.parse(objMatch[0]);
+            parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
           } catch {}
         }
-      }
-    }
-
-    // 3. Fallback: regex caso haja JSON bruto envolvido por marcadores
-    if (!content) {
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const aiData = JSON.parse(jsonMatch[0]);
-          content = aiData?.choices?.[0]?.message?.content || '';
-        } catch {
-          content = '';
+        if (parsedQuestions.length === 0) {
+          const arrMatch = content.match(/\[[\s\S]*\]/);
+          if (arrMatch) {
+            try {
+              const parsed = JSON.parse(arrMatch[0]);
+              if (Array.isArray(parsed)) parsedQuestions = parsed;
+            } catch {}
+          }
         }
       }
-    }
 
-    let parsedQuestions: any[] = [];
-    try {
-      const cleanJson = content
-        .replace(/```json/gi, '')
-        .replace(/```/g, '')
-        .trim();
-      const parsed = JSON.parse(cleanJson);
-      parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
-    } catch {
-      const objMatch = content.match(/\{[\s\S]*\}/);
-      if (objMatch) {
-        try {
-          const parsed = JSON.parse(objMatch[0]);
-          parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
-        } catch {}
+      if (parsedQuestions.length > 0) {
+        successfulResponse = {
+          questions: parsedQuestions,
+          modelo: currentModel,
+        };
+        break;
+      } else {
+        lastError = `[${currentModel}] Resposta retornada sem formato JSON esperado.`;
       }
-      if (parsedQuestions.length === 0) {
-        const arrMatch = content.match(/\[[\s\S]*\]/);
-        if (arrMatch) {
-          try {
-            const parsed = JSON.parse(arrMatch[0]);
-            if (Array.isArray(parsed)) parsedQuestions = parsed;
-          } catch {}
-        }
-      }
+    } catch (e: any) {
+      lastError = `[${currentModel}] ${e.message || 'Erro de conexão/timeout'}`;
     }
-
-    if (parsedQuestions.length === 0) {
-      return c.json({
-        success: false,
-        error: 'A IA respondeu mas não foi possível estruturar as questões em formato compatível.',
-        raw_output: content.slice(0, 500)
-      }, 502);
-    }
-
-    const normalizedQuestions = parsedQuestions.map((q: any, index: number) => {
-      const rawOptions = Array.isArray(q.options) ? q.options : (Array.isArray(q.alternativas) ? q.alternativas : []);
-      const options = rawOptions.map((opt: any) => ({
-        text: String(opt.text || opt.label || opt.opcao || '').trim(),
-        correct: Boolean(opt.correct || opt.isCorrect || opt.correta),
-        feedback: tipo === 'minigame' ? '' : String(opt.feedback || opt.justificativa || '').trim()
-      }));
-
-      const hasCorrect = options.some(o => o.correct);
-      if (!hasCorrect && options.length > 0) {
-        options[0].correct = true;
-      }
-
-      return {
-        title: String(q.title || `Questão ${index + 1}`),
-        content: String(q.content || q.enunciado || q.pergunta || '').trim(),
-        options: options.length > 0 ? options : undefined
-      };
-    });
-
-    return c.json({
-      success: true,
-      questions: normalizedQuestions,
-      modelo_utilizado: modelo,
-      total_gerado: normalizedQuestions.length
-    });
-
-  } catch (e: any) {
-    return c.json({ success: false, error: e.message || 'Falha na comunicação com o provedor de IA' }, 500);
   }
+
+  if (!successfulResponse) {
+    return c.json({
+      success: false,
+      error: `Falha na geração com IA em todos os provedores: ${lastError}`,
+    }, 502);
+  }
+
+  const normalizedQuestions = successfulResponse.questions.map((q: any, index: number) => {
+    const rawOptions = Array.isArray(q.options) ? q.options : (Array.isArray(q.alternativas) ? q.alternativas : []);
+    const options = rawOptions.map((opt: any) => ({
+      text: String(opt.text || opt.label || opt.opcao || '').trim(),
+      correct: Boolean(opt.correct || opt.isCorrect || opt.correta),
+      feedback: tipo === 'minigame' ? '' : String(opt.feedback || opt.justificativa || '').trim()
+    }));
+
+    const hasCorrect = options.some((o: any) => o.correct);
+    if (!hasCorrect && options.length > 0) {
+      options[0].correct = true;
+    }
+
+    return {
+      title: String(q.title || `Questão ${index + 1}`),
+      content: String(q.content || q.enunciado || q.pergunta || '').trim(),
+      options: options.length > 0 ? options : undefined
+    };
+  });
+
+  return c.json({
+    success: true,
+    questions: normalizedQuestions,
+    modelo_utilizado: successfulResponse.modelo,
+    total_gerado: normalizedQuestions.length
+  });
 });
 
 export { aiRouter };

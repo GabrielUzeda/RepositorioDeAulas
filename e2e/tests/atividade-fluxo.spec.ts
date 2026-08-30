@@ -45,7 +45,7 @@ test.describe('Professor — criar atividade e gerenciar rascunhos no editor', (
     if (adminToken) await cleanupEntities(request, adminToken, cursoId, professorId);
   });
 
-  test('salva rascunho com 2 questões, restaura do backend, grava atividade e exclui rascunho', async ({ page }) => {
+  test('salva rascunho automaticamente, restaura ao reabrir, testa limpar tudo e grava atividade', async ({ page }) => {
     const atvTitulo = uniqueName('AtvRasc');
     await loginViaUI(page, profEmail, profPassword, /\/professor/);
     await expect(page.getByRole('heading', { name: 'Painel do Professor' })).toBeVisible();
@@ -70,25 +70,34 @@ test.describe('Professor — criar atividade e gerenciar rascunhos no editor', (
     await page.getByPlaceholder('Texto da alternativa...').first().fill('4');
     await page.getByPlaceholder('Texto da alternativa...').nth(1).fill('5');
 
-    // --- SALVAR RASCUNHO NA NUVEM ---
-    await page.getByRole('button', { name: 'Salvar Rascunho' }).click();
-    await expect(page.getByText('Rascunho salvo com sucesso!')).toBeVisible();
-
-    // Fechar o editor
-    await page.getByRole('button', { name: 'Cancelar' }).click();
-
-    // --- REABRIR EDITOR E CARREGAR RASCUNHO ---
-    await page.getByRole('button', { name: 'Nova Atividade' }).click();
+    // --- SALVAR RASCUNHO NA NUVEM VIA MODAL DE RASCUNHOS (com aviso de 30 dias) ---
     await page.getByRole('button', { name: 'Rascunhos' }).click();
-    await expect(page.getByText('Rascunhos de Atividades', { exact: true })).toBeVisible();
+    await expect(page.getByText('Rascunhos salvos por até 30 dias')).toBeVisible();
+    await page.getByRole('button', { name: 'Salvar Rascunho Atual' }).click();
+    await expect(page.getByText('Rascunho salvo na nuvem com validade de 30 dias!')).toBeVisible();
     await expect(page.getByText(atvTitulo, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Fechar' }).click();
 
-    // Clicar em carregar rascunho
+    // Fecha o editor pelo botão de fechar do BaseModal
+    await page.getByLabel('Fechar modal').click();
+
+    // --- REABRIR EDITOR E VERIFICAR RESTAURAÇÃO AUTOMÁTICA ---
+    await page.getByRole('button', { name: 'Nova Atividade' }).click();
+    await expect(page.getByText('Perguntas', { exact: true })).toBeVisible();
+    await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
+
+    // --- TESTAR BOTÃO LIMPAR TUDO COM CONFIRMAÇÃO ---
+    await page.getByRole('button', { name: 'Limpar Tudo' }).click();
+    await expect(page.getByText('Tem certeza de que deseja limpar todos os campos e perguntas do editor?')).toBeVisible();
+    await page.getByRole('button', { name: 'Limpar Tudo' }).last().click();
+    await expect(page.getByText('Editor limpo com sucesso!')).toBeVisible();
+    await expect(page.getByText('Nenhuma pergunta adicionada.')).toBeVisible();
+
+    // --- RESTAURAR DA NUVEM VIA MODAL DE RASCUNHOS ---
+    await page.getByRole('button', { name: 'Rascunhos' }).click();
+    await expect(page.getByText(atvTitulo, { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Carregar' }).first().click();
     await expect(page.getByText('Rascunho carregado no editor!', { exact: true })).toBeVisible();
-
-    // Verificar se as 2 perguntas foram restauradas
-    await expect(page.getByText('Perguntas', { exact: true })).toBeVisible();
     await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
 
     // --- GRAVAR ATIVIDADE DEFINITIVA ---
@@ -103,7 +112,7 @@ test.describe('Professor — criar atividade e gerenciar rascunhos no editor', (
     await draftsModal.getByRole('button', { name: 'Excluir' }).first().click();
     await expect(page.getByText('Rascunho excluído com sucesso!', { exact: true })).toBeVisible();
     await draftsModal.getByText('Fechar').click();
-    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await page.getByLabel('Fechar modal').click();
   });
 });
 

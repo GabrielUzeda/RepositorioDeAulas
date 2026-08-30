@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import { apiClient } from '@/shared/api/client';
+import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
 import type { Atividade, Question, QuestionOption, RascunhoEditor, Aula } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
@@ -11,7 +12,7 @@ import BaseSelect from '@/shared/components/BaseSelect.vue';
 import BaseBadge from '@/shared/components/BaseBadge.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
-import AiActivityModal from '@/professor/components/AiActivityModal.vue';
+import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
 
 const tipoOptions = [
   { label: 'Normal', value: 'normal' },
@@ -37,6 +38,8 @@ const emit = defineEmits<{
   (e: 'save', payload: Partial<Atividade>): void;
 }>();
 
+const { success, error, info } = useToast();
+
 const titulo = ref('');
 const descricao = ref('');
 const tipo = ref<'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco'>('normal');
@@ -47,15 +50,31 @@ const isSaving = ref(false);
 const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
 
-const showAiModal = ref(false);
-const currentDraftId = ref<number | null>(null);
+// --- IA Generation State (Embutido no painel Geral) ---
+const aiTema = ref('');
+const aiObservacoes = ref('');
+const aiQuantidadeStr = ref('5');
+const aiSelectedAulas = ref<number[]>([]);
+const isGeneratingAi = ref(false);
+
 const showDraftsModal = ref(false);
 const isLoadingDrafts = ref(false);
 const isSavingDraft = ref(false);
 const drafts = ref<RascunhoEditor[]>([]);
+const currentDraftId = ref<number | null>(null);
+
+const showConfirmClear = ref(false);
+const isInitializing = ref(true);
 
 const usesOptions = computed(() => tipo.value !== 'normal' && tipo.value !== 'prova');
 const activeQuestion = computed(() => questions.value[activeQIndex.value] ?? null);
+
+const draftStorageKey = computed(() => {
+  if (props.atividade?.id && props.atividade.id > 0) {
+    return `prof_editor_draft_atv_${props.atividade.id}`;
+  }
+  return `prof_editor_draft_new_${props.disciplinaId ?? 'global'}`;
+});
 
 function normalizeQuestion(q: any): Question {
   let options: QuestionOption[] | undefined;
@@ -75,20 +94,55 @@ function normalizeQuestion(q: any): Question {
   };
 }
 
+let autoSaveTimeout: any = null;
+function scheduleAutoSave() {
+  if (isInitializing.value || !props.show) return;
+  if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+  autoSaveTimeout = setTimeout(async () => {
+    const draftData = {
+      titulo: titulo.value,
+      descricao: descricao.value,
+      tipo: tipo.value,
+      allowPassword: allowPassword.value,
+      senha: senha.value,
+      questions: questions.value,
+      aiTema: aiTema.value,
+      aiObservacoes: aiObservacoes.value,
+      aiQuantidadeStr: aiQuantidadeStr.value,
+      updatedAt: Date.now()
+    };
+    await secureSet(draftStorageKey.value, JSON.stringify(draftData));
+  }, 400);
+}
+
+watch(
+  [titulo, descricao, tipo, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
+  () => {
+    scheduleAutoSave();
+  },
+  { deep: true }
+);
+
 watch(
   () => props.show,
-  (val) => {
+  async (val) => {
     isSaving.value = false;
     activeQIndex.value = 0;
     showBasicInfo.value = true;
     currentDraftId.value = null;
+    isInitializing.value = true;
     if (val) {
+      aiSelectedAulas.value = props.aulas.map((a) => a.id);
+
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
         descricao.value = props.atividade.descricao || '';
         tipo.value = (props.atividade.tipo as any) || 'normal';
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
+        aiTema.value = '';
+        aiObservacoes.value = '';
+        aiQuantidadeStr.value = '5';
         if (props.atividade.json_data) {
           try {
             const parsed = typeof props.atividade.json_data === 'string'
@@ -102,16 +156,109 @@ watch(
           questions.value = [];
         }
       } else {
-        titulo.value = '';
-        descricao.value = '';
-        tipo.value = 'normal';
-        allowPassword.value = false;
-        senha.value = '';
-        questions.value = [];
+        const savedDraft = await secureGet(draftStorageKey.value);
+        if (savedDraft) {
+          try {
+            const parsed = JSON.parse(savedDraft);
+            titulo.value = parsed.titulo || '';
+            descricao.value = parsed.descricao || '';
+            tipo.value = parsed.tipo || 'normal';
+            allowPassword.value = !!parsed.allowPassword;
+            senha.value = parsed.senha || '';
+            aiTema.value = parsed.aiTema || '';
+            aiObservacoes.value = parsed.aiObservacoes || '';
+            aiQuantidadeStr.value = parsed.aiQuantidadeStr || '5';
+            questions.value = (Array.isArray(parsed.questions) ? parsed.questions : []).map(normalizeQuestion);
+            if (questions.value.length > 0) {
+              showBasicInfo.value = false;
+            }
+          } catch {
+            resetToEmpty();
+          }
+        } else {
+          resetToEmpty();
+        }
       }
+      setTimeout(() => {
+        isInitializing.value = false;
+      }, 50);
     }
   }
 );
+
+function toggleAiAula(aulaId: number) {
+  const idx = aiSelectedAulas.value.indexOf(aulaId);
+  if (idx > -1) {
+    aiSelectedAulas.value.splice(idx, 1);
+  } else {
+    aiSelectedAulas.value.push(aulaId);
+  }
+}
+
+function selectAllAiAulas() {
+  if (aiSelectedAulas.value.length === props.aulas.length) {
+    aiSelectedAulas.value = [];
+  } else {
+    aiSelectedAulas.value = props.aulas.map((a) => a.id);
+  }
+}
+
+async function handleGenerateAiQuestions() {
+  if (isGeneratingAi.value) return;
+  if (!aiTema.value.trim() && !titulo.value.trim() && aiSelectedAulas.value.length === 0) {
+    error('Informe um tema, título da atividade ou selecione ao menos uma aula para contextualizar a IA.');
+    return;
+  }
+
+  isGeneratingAi.value = true;
+  try {
+    const payload = {
+      tipo: tipo.value,
+      titulo: titulo.value.trim(),
+      tema: aiTema.value.trim(),
+      observacoes: aiObservacoes.value.trim(),
+      quantidade: Number(aiQuantidadeStr.value) || 5,
+      disciplina_id: props.disciplinaId,
+      aulas_ids: aiSelectedAulas.value,
+    };
+
+    const res = await apiClient.post<{
+      success: boolean;
+      questions: Question[];
+      modelo_utilizado: string;
+      total_gerado: number;
+    }>('/ai/generate-activity', payload);
+
+    if (res.success && Array.isArray(res.data?.questions) && res.data.questions.length > 0) {
+      const normalized = res.data.questions.map(normalizeQuestion);
+      const startIndex = questions.value.length;
+      questions.value.push(...normalized);
+      activeQIndex.value = startIndex;
+      showBasicInfo.value = false;
+      success(`${normalized.length} questões geradas por IA foram adicionadas com sucesso!`);
+    } else {
+      error(res.error || 'A IA não retornou questões compatíveis.');
+    }
+  } catch (e: any) {
+    error(e?.message || 'Falha ao comunicar com o serviço de IA.');
+  } finally {
+    isGeneratingAi.value = false;
+  }
+}
+
+function resetToEmpty() {
+  titulo.value = '';
+  descricao.value = '';
+  tipo.value = 'normal';
+  allowPassword.value = false;
+  senha.value = '';
+  questions.value = [];
+  aiTema.value = '';
+  aiObservacoes.value = '';
+  aiQuantidadeStr.value = '5';
+  activeQIndex.value = 0;
+  showBasicInfo.value = true;
+}
 
 function addQuestion() {
   const base = { title: `Questão ${questions.value.length + 1}`, content: '' };
@@ -160,9 +307,16 @@ function setCorrectOption(qIndex: number, oIndex: number) {
   if (opts) opts.forEach((o, idx) => { o.correct = idx === oIndex; });
 }
 
-function handleSave() {
+async function handleClearAll() {
+  resetToEmpty();
+  await secureRemove(draftStorageKey.value);
+  success('Editor limpo com sucesso!');
+}
+
+async function handleSave() {
   if (isSaving.value || props.loading) return;
   isSaving.value = true;
+  await secureRemove(draftStorageKey.value);
   emit('save', {
     titulo: titulo.value,
     descricao: descricao.value,
@@ -188,12 +342,13 @@ async function handleSaveDraft() {
     const res = await apiClient.post<{ id: number; expira_em: string; success: boolean }>('/professor/rascunhos-editor', payload);
     if (res.success && res.data) {
       currentDraftId.value = res.data.id;
-      useToast().success('Rascunho salvo com sucesso!');
+      success('Rascunho salvo na nuvem com validade de 30 dias!');
+      await fetchDrafts();
     } else {
-      useToast().error(res.error || 'Erro ao salvar rascunho');
+      error(res.error || 'Erro ao salvar rascunho');
     }
   } catch (e: any) {
-    useToast().error(e?.message || 'Erro ao salvar rascunho');
+    error(e?.message || 'Erro ao salvar rascunho');
   } finally {
     isSavingDraft.value = false;
   }
@@ -253,9 +408,9 @@ function handleLoadDraft(draft: RascunhoEditor) {
     activeQIndex.value = 0;
     showBasicInfo.value = false;
     showDraftsModal.value = false;
-    useToast().success('Rascunho carregado no editor!');
+    success('Rascunho carregado no editor!');
   } catch {
-    useToast().error('Erro ao processar dados do rascunho.');
+    error('Erro ao processar dados do rascunho.');
   }
 }
 
@@ -266,68 +421,48 @@ async function handleDeleteDraft(draftId: number) {
       currentDraftId.value = null;
     }
     drafts.value = drafts.value.filter((d) => d.id !== draftId);
-    useToast().success('Rascunho excluído com sucesso!');
+    success('Rascunho excluído com sucesso!');
   } else {
-    useToast().error(res.error || 'Erro ao excluir rascunho.');
+    error(res.error || 'Erro ao excluir rascunho.');
   }
-}
-
-function handleApplyAiQuestions(generatedQuestions: Question[]) {
-  if (!generatedQuestions || generatedQuestions.length === 0) return;
-  questions.value = generatedQuestions.map(normalizeQuestion);
-  activeQIndex.value = 0;
-  showBasicInfo.value = false;
-  useToast().success(`${generatedQuestions.length} questões geradas por IA foram inseridas no editor!`);
 }
 </script>
 
 <template>
-  <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-6xl" no-padding>
+  <BaseModal :model-value="props.show" @close="emit('close')" max-width="max-w-6xl" allow-fullscreen no-padding>
     <!-- Header fixo -->
     <template #header>
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs shrink-0">
-            <span class="material-icons text-[20px]">quiz</span>
-          </div>
-          <div>
-            <h2 class="text-lg font-bold text-primary leading-tight">{{ (props.atividade && props.atividade.id && props.atividade.id > 0) ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
-            <p class="text-xs text-secondary">{{ questions.length }} pergunta{{ questions.length !== 1 ? 's' : '' }} · {{ tipo }}</p>
-          </div>
+      <div class="flex items-center gap-3 w-full">
+        <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white shadow-xs shrink-0">
+          <span class="material-icons text-[20px]">quiz</span>
         </div>
-
-        <div class="flex items-center flex-wrap gap-2">
-          <BaseButton variant="secondary" size="sm" @click="showAiModal = true">
-            <span class="material-icons text-sm text-accent">auto_awesome</span>
-            <span>Gerar com IA</span>
-          </BaseButton>
-          <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
-            <span class="material-icons text-sm">folder_open</span>
-            <span>Rascunhos</span>
-          </BaseButton>
-          <BaseButton variant="secondary" size="sm" :loading="isSavingDraft" @click="handleSaveDraft">
-            <span class="material-icons text-sm">bookmark</span>
-            <span>Salvar Rascunho</span>
-          </BaseButton>
-          <BaseButton variant="ghost" size="sm" :disabled="props.loading || isSaving" @click="emit('close')">Cancelar</BaseButton>
-          <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">Salvar Atividade</BaseButton>
+        <div>
+          <h2 class="text-lg font-bold text-primary leading-tight">{{ (props.atividade && props.atividade.id && props.atividade.id > 0) ? 'Editar Atividade' : 'Nova Atividade Interativa' }}</h2>
+          <p class="text-xs text-secondary flex items-center gap-1.5 mt-0.5">
+            <span>{{ questions.length }} pergunta{{ questions.length !== 1 ? 's' : '' }} · {{ tipo }}</span>
+            <span class="text-line">|</span>
+            <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Rascunho automático ativo
+            </span>
+          </p>
         </div>
       </div>
     </template>
 
     <!-- Layout split: sidebar esq + painel dir -->
-    <div class="flex h-full min-h-0" style="height: calc(90vh - 130px)">
+    <div class="flex h-full min-h-[60vh] flex-1 rounded-b-2xl overflow-hidden">
 
       <!-- Sidebar: informações + lista de perguntas -->
-      <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto">
-        <!-- Info básica collapsible -->
+      <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto rounded-bl-2xl">
+        <!-- Info básica collapsible (Renomeada para Geral) -->
         <button
           class="flex items-center justify-between px-4 py-3 text-xs font-bold uppercase tracking-wider text-secondary hover:bg-surface-alt transition-colors border-b border-line"
           @click="showBasicInfo = !showBasicInfo; activeQIndex = -1"
         >
           <span class="flex items-center gap-1.5">
-            <span class="material-icons text-sm text-accent">info</span>
-            Informações
+            <span class="material-icons text-sm text-accent">tune</span>
+            Geral
           </span>
           <span class="material-icons text-sm transition-transform" :class="showBasicInfo ? 'rotate-180' : ''">expand_more</span>
         </button>
@@ -350,9 +485,11 @@ function handleApplyAiQuestions(generatedQuestions: Question[]) {
               : 'border-transparent hover:border-line hover:bg-surface-alt'"
             @click="activeQIndex = idx; showBasicInfo = false"
           >
-            <div class="px-3 py-2.5 flex items-start gap-2">
-              <span class="mt-0.5 w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
-                :class="activeQIndex === idx && !showBasicInfo ? 'bg-accent text-white' : 'bg-surface-alt text-secondary'">
+            <div class="px-3 py-2.5 flex items-center gap-2">
+              <span
+                class="w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center text-center shrink-0 leading-none select-none aspect-square"
+                :class="activeQIndex === idx && !showBasicInfo ? 'bg-accent text-white' : 'bg-surface-alt text-secondary'"
+              >
                 {{ idx + 1 }}
               </span>
               <p class="text-xs text-primary leading-snug line-clamp-2 flex-1">{{ q.content || q.title || 'Sem enunciado' }}</p>
@@ -360,8 +497,8 @@ function handleApplyAiQuestions(generatedQuestions: Question[]) {
           </div>
         </div>
 
-        <!-- Botão adicionar -->
-        <div class="shrink-0 p-3 border-t border-line">
+        <!-- Botão adicionar pergunta na sidebar -->
+        <div class="shrink-0 h-14 px-3 border-t border-line flex items-center bg-surface">
           <BaseButton variant="primary" size="sm" block @click="addQuestion">
             <span class="material-icons text-sm">add</span>
             <span>Adicionar Pergunta</span>
@@ -369,28 +506,144 @@ function handleApplyAiQuestions(generatedQuestions: Question[]) {
         </div>
       </aside>
 
-      <!-- Painel direito -->
-      <main class="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5">
+      <!-- Painel direito com scroll independente -->
+      <div class="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface rounded-br-2xl">
+        <main class="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5">
 
-        <!-- Painel: informações básicas -->
-        <div v-if="showBasicInfo" class="space-y-4">
+        <!-- Painel: Geral (Configuração da Atividade + Gerador de IA Integrado) -->
+        <div v-if="showBasicInfo" class="space-y-6">
           <div v-if="!usesOptions" class="p-3 bg-surface-alt border border-line rounded-lg text-secondary text-xs flex items-center gap-2">
             <span class="material-icons text-base text-accent">edit_note</span>
             <span>Tipo <strong class="text-primary">{{ tipo }}</strong>: perguntas <strong class="text-primary">discursivas</strong> (resposta livre).</span>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" />
-            <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" />
-            <div class="md:col-span-2">
-              <BaseTextarea v-model="descricao" :rows="4" label="Descrição / Orientações" placeholder="Breve resumo ou instruções da atividade para os alunos..." />
+          <!-- Seção 1: Dados da Atividade -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between border-b border-line pb-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                <span class="material-icons text-base text-accent">settings</span>
+                Configurações da Atividade
+              </h3>
             </div>
-            <div class="md:col-span-2 flex items-center gap-3">
-              <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
-              <label for="allowPassword" class="text-sm font-medium text-secondary cursor-pointer">Exigir senha individual de acesso para os alunos</label>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" />
+              <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" />
+              <div class="md:col-span-2">
+                <BaseTextarea v-model="descricao" :rows="3" label="Descrição / Orientações para Alunos" placeholder="Breve resumo ou instruções da atividade..." />
+              </div>
+              <div class="md:col-span-2 flex items-center gap-3">
+                <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
+                <label for="allowPassword" class="text-sm font-medium text-secondary cursor-pointer">Exigir senha individual de acesso para os alunos</label>
+              </div>
+              <div v-if="allowPassword" class="md:col-span-2">
+                <BaseInput v-model="senha" type="password" label="Senha da Atividade *" placeholder="Digite a senha exclusiva" />
+              </div>
             </div>
-            <div v-if="allowPassword" class="md:col-span-2">
-              <BaseInput v-model="senha" type="password" label="Senha da Atividade *" placeholder="Digite a senha exclusiva" />
+          </div>
+
+          <!-- Seção 2: Gerador de Questões por IA (Embutido) -->
+          <div class="p-5 bg-surface-alt/60 border border-accent/30 rounded-2xl space-y-4">
+            <div class="flex items-center gap-2 border-b border-line/60 pb-3">
+              <div class="w-7 h-7 rounded-md bg-accent/15 text-accent flex items-center justify-center">
+                <span class="material-icons text-lg">auto_awesome</span>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-primary">Gerador de Questões por IA</h3>
+                <p class="text-xs text-secondary">Gera novas perguntas e adiciona ao final da lista sem sobrescrever o conteúdo atual</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <!-- Quantidade de Questões -->
+              <div class="md:col-span-12 sm:md:col-span-4">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Qtd. de Questões</label>
+                <BaseInput
+                  v-model="aiQuantidadeStr"
+                  type="number"
+                  min="1"
+                  max="20"
+                  placeholder="Ex: 5"
+                  :disabled="isGeneratingAi"
+                />
+              </div>
+
+              <!-- Tema / Tópico Específico -->
+              <div class="md:col-span-12 sm:md:col-span-8">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Tema / Tópico Específico (Opcional se houver aulas)</label>
+                <BaseInput
+                  v-model="aiTema"
+                  placeholder="Ex: Condicionais e Laços de Repetição em TypeScript"
+                  :disabled="isGeneratingAi"
+                />
+              </div>
+
+              <!-- Observações ou Instruções Pedagógicas -->
+              <div class="md:col-span-12">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Observações ou Instruções Pedagógicas para a IA</label>
+                <BaseTextarea
+                  v-model="aiObservacoes"
+                  :rows="2"
+                  placeholder="Ex: Nível intermediário, inclua exemplos práticos de código e explicações claras em cada alternativa..."
+                  :disabled="isGeneratingAi"
+                />
+              </div>
+
+              <!-- Aulas para Contexto -->
+              <div class="md:col-span-12">
+                <div class="flex items-center justify-between mb-2">
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-secondary">
+                    Aulas de Referência para Contexto da IA ({{ aiSelectedAulas.length }}/{{ props.aulas.length }})
+                  </label>
+                  <button
+                    v-if="props.aulas.length > 0"
+                    type="button"
+                    class="text-xs text-accent hover:underline font-medium"
+                    :disabled="isGeneratingAi"
+                    @click="selectAllAiAulas"
+                  >
+                    {{ aiSelectedAulas.length === props.aulas.length ? 'Desmarcar todas' : 'Selecionar todas' }}
+                  </button>
+                </div>
+
+                <div v-if="props.aulas.length === 0" class="p-3 bg-surface border border-line rounded-lg text-xs text-secondary text-center">
+                  Nenhuma aula cadastrada nesta disciplina. A IA utilizará o tema e o título da atividade.
+                </div>
+
+                <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+                  <div
+                    v-for="aula in props.aulas"
+                    :key="aula.id"
+                    class="flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-colors"
+                    :class="aiSelectedAulas.includes(aula.id) ? 'border-accent/40 bg-accent/5 text-primary' : 'border-line bg-surface hover:bg-surface-alt text-secondary'"
+                    @click="toggleAiAula(aula.id)"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="aiSelectedAulas.includes(aula.id)"
+                      class="rounded border-line text-accent focus:ring-accent"
+                      @click.stop="toggleAiAula(aula.id)"
+                    />
+                    <span class="material-icons text-sm text-secondary">slideshow</span>
+                    <span class="font-medium truncate flex-1">{{ aula.titulo }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Botão Gerar e Adicionar Questões -->
+              <div class="md:col-span-12 pt-2">
+                <BaseButton
+                  variant="primary"
+                  size="md"
+                  block
+                  :loading="isGeneratingAi"
+                  :disabled="isGeneratingAi || (!aiTema.trim() && !titulo.trim() && aiSelectedAulas.length === 0)"
+                  @click="handleGenerateAiQuestions"
+                >
+                  <span class="material-icons text-base">auto_awesome</span>
+                  <span>{{ isGeneratingAi ? 'Gerando e Adicionando Questões com IA...' : 'Gerar e Adicionar Questões na Atividade' }}</span>
+                </BaseButton>
+              </div>
             </div>
           </div>
         </div>
@@ -462,7 +715,7 @@ function handleApplyAiQuestions(generatedQuestions: Question[]) {
                   <input
                     v-model="opt.text"
                     placeholder="Texto da alternativa..."
-                    class="w-full bg-surface-alt px-3 py-1.5 rounded-md border border-line text-primary text-sm outline-none focus:border-accent"
+                    class="w-full bg-surface-alt px-3.5 py-2 rounded-md border border-line text-primary text-sm outline-none focus:ring-2 focus:ring-accent focus:border-accent"
                   />
                   <input
                     v-if="tipo !== 'minigame'"
@@ -487,77 +740,112 @@ function handleApplyAiQuestions(generatedQuestions: Question[]) {
         <!-- Estado vazio (nenhuma pergunta, tela inicial de perguntas) -->
         <EmptyState v-else-if="!showBasicInfo && questions.length === 0" icon="help_outline" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
       </main>
+
+      <!-- Barra de ações ao lado direito do Adicionar Pergunta (alinhada à direita e com mesma altura/padding exato de h-14) -->
+      <footer class="shrink-0 h-14 px-4 border-t border-line bg-surface flex items-center justify-end gap-2 rounded-br-2xl">
+        <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
+          <span class="material-icons text-sm">delete_sweep</span>
+          <span>Limpar Tudo</span>
+        </BaseButton>
+
+        <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
+          <span class="material-icons text-sm">folder_open</span>
+          <span>Rascunhos</span>
+        </BaseButton>
+
+        <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">
+          <span class="material-icons text-sm">save</span>
+          <span>Salvar Atividade</span>
+        </BaseButton>
+      </footer>
+    </div>
+  </div>
+</BaseModal>
+
+  <!-- Modal de Rascunhos -->
+  <BaseModal :model-value="showDraftsModal" @close="showDraftsModal = false" title="Rascunhos de Atividades" max-width="max-w-2xl">
+    <div v-if="isLoadingDrafts" class="py-12 flex justify-center items-center">
+      <BaseSpinner size="lg" />
     </div>
 
-    <!-- Modal de Rascunhos -->
-    <BaseModal :model-value="showDraftsModal" @close="showDraftsModal = false" title="Rascunhos de Atividades" max-width="max-w-2xl">
-      <div v-if="isLoadingDrafts" class="py-12 flex justify-center items-center">
-        <BaseSpinner size="lg" />
+    <div v-else class="space-y-4">
+      <!-- Banner informativo LGPD / Expiração de 30 dias -->
+      <div class="p-3.5 bg-surface-alt border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5 font-semibold text-primary">
+            <span class="material-icons text-base text-accent">schedule</span>
+            <span>Rascunhos salvos por até 30 dias</span>
+          </div>
+          <p class="text-secondary">Os rascunhos na nuvem expiram automaticamente após 30 dias de inatividade.</p>
+        </div>
+
+        <BaseButton variant="primary" size="sm" :loading="isSavingDraft" class="shrink-0" @click="handleSaveDraft">
+          <span class="material-icons text-sm">bookmark_add</span>
+          <span>Salvar Rascunho Atual</span>
+        </BaseButton>
       </div>
 
-      <div v-else-if="drafts.length === 0" class="py-6">
+      <div v-if="drafts.length === 0" class="py-6">
         <EmptyState
           icon="folder_open"
-          title="Nenhum rascunho salvo"
-          message="Você ainda não possui rascunhos salvos. Use 'Salvar Rascunho' para guardar seu progresso na nuvem por até 30 dias."
+          title="Nenhum rascunho salvo na nuvem"
+          message="O editor salva suas alterações localmente em tempo real. Você também pode clicar no botão acima para guardar este rascunho na nuvem por 30 dias."
         />
       </div>
 
-      <div v-else class="space-y-3">
-        <div class="p-3 bg-surface-alt border border-line rounded-lg text-xs text-secondary flex items-center justify-between">
-          <span>Total de rascunhos: <strong class="text-primary">{{ drafts.length }}/20</strong></span>
-          <span class="text-accent font-medium">Validade: 30 dias</span>
+      <div v-else class="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
+        <div class="flex items-center justify-between text-xs text-secondary px-1 pb-1">
+          <span>Rascunhos salvos: <strong class="text-primary">{{ drafts.length }}/20</strong></span>
+          <span>Validade máxima: 30 dias</span>
         </div>
 
-        <div class="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
-          <div
-            v-for="draft in drafts"
-            :key="draft.id"
-            class="p-4 bg-surface border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
-          >
-            <div class="space-y-1 min-w-0 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h4 class="text-sm font-semibold text-primary truncate">{{ draft.titulo || 'Sem título' }}</h4>
-                <BaseBadge variant="secondary">{{ draft.tipo }}</BaseBadge>
-              </div>
-              <div class="flex items-center gap-2 text-xs text-secondary flex-wrap">
-                <span>Atualizado em: {{ formatDate(draft.atualizado_em) }}</span>
-                <span>·</span>
-                <span class="text-accent font-medium">Expira em {{ getDaysRemaining(draft.expira_em) }} dias</span>
-              </div>
-              <p v-if="draft.descricao" class="text-xs text-secondary line-clamp-1 mt-1">{{ draft.descricao }}</p>
+        <div
+          v-for="draft in drafts"
+          :key="draft.id"
+          class="p-4 bg-surface border border-line rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
+        >
+          <div class="space-y-1 min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h4 class="text-sm font-semibold text-primary truncate">{{ draft.titulo || 'Sem título' }}</h4>
+              <BaseBadge variant="secondary">{{ draft.tipo }}</BaseBadge>
             </div>
+            <div class="flex items-center gap-2 text-xs text-secondary flex-wrap">
+              <span>Atualizado em: {{ formatDate(draft.atualizado_em) }}</span>
+              <span>·</span>
+              <span class="text-accent font-medium">Expira em {{ getDaysRemaining(draft.expira_em) }} dias</span>
+            </div>
+            <p v-if="draft.descricao" class="text-xs text-secondary line-clamp-1 mt-1">{{ draft.descricao }}</p>
+          </div>
 
-            <div class="flex items-center gap-2 shrink-0">
-              <BaseButton variant="primary" size="sm" @click="handleLoadDraft(draft)">
-                <span class="material-icons text-sm">file_download</span>
-                <span>Carregar</span>
-              </BaseButton>
-              <BaseButton variant="danger" size="sm" @click="handleDeleteDraft(draft.id)">
-                <span class="material-icons text-sm">delete</span>
-                <span>Excluir</span>
-              </BaseButton>
-            </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <BaseButton variant="primary" size="sm" @click="handleLoadDraft(draft)">
+              <span class="material-icons text-sm">file_download</span>
+              <span>Carregar</span>
+            </BaseButton>
+            <BaseButton variant="danger" size="sm" @click="handleDeleteDraft(draft.id)">
+              <span class="material-icons text-sm">delete</span>
+              <span>Excluir</span>
+            </BaseButton>
           </div>
         </div>
       </div>
+    </div>
 
-      <template #footer>
-        <div class="flex justify-end">
-          <BaseButton variant="secondary" size="sm" @click="showDraftsModal = false">Fechar</BaseButton>
-        </div>
-      </template>
-    </BaseModal>
-
-    <!-- Modal de Geração por IA -->
-    <AiActivityModal
-      :show="showAiModal"
-      :tipo="tipo"
-      :titulo="titulo"
-      :aulas="props.aulas"
-      :disciplina-id="props.disciplinaId"
-      @close="showAiModal = false"
-      @apply="handleApplyAiQuestions"
-    />
+    <template #footer>
+      <div class="flex justify-end">
+        <BaseButton variant="secondary" size="sm" @click="showDraftsModal = false">Fechar</BaseButton>
+      </div>
+    </template>
   </BaseModal>
+
+  <!-- Diálogo de confirmação para Limpar Tudo -->
+  <ConfirmDialog
+    v-model="showConfirmClear"
+    title="Limpar Tudo"
+    message="Tem certeza de que deseja limpar todos os campos e perguntas do editor? Esta ação não pode ser desfeita."
+    :danger="true"
+    confirm-text="Limpar Tudo"
+    cancel-text="Cancelar"
+    @confirm="handleClearAll"
+  />
 </template>
