@@ -451,10 +451,10 @@ async function handleDeleteDraft(draftId: number) {
     </template>
 
     <!-- Layout split: sidebar esq + painel dir -->
-    <div class="flex h-full min-h-0" style="height: calc(90vh - 85px)">
+    <div class="flex h-full min-h-0 rounded-b-2xl overflow-hidden" style="height: calc(90vh - 85px)">
 
       <!-- Sidebar: informações + lista de perguntas -->
-      <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto">
+      <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto rounded-bl-2xl">
         <!-- Info básica collapsible (Renomeada para Geral) -->
         <button
           class="flex items-center justify-between px-4 py-3 text-xs font-bold uppercase tracking-wider text-secondary hover:bg-surface-alt transition-colors border-b border-line"
@@ -505,7 +505,7 @@ async function handleDeleteDraft(draftId: number) {
       </aside>
 
       <!-- Painel direito com scroll independente -->
-      <div class="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface">
+      <div class="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface rounded-br-2xl">
         <main class="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5">
 
         <!-- Painel: Geral (Configuração da Atividade + Gerador de IA Integrado) -->
@@ -739,25 +739,22 @@ async function handleDeleteDraft(draftId: number) {
         <EmptyState v-else-if="!showBasicInfo && questions.length === 0" icon="help_outline" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
       </main>
 
-      <!-- Barra de ações ao lado direito do Adicionar Pergunta (fora do container da sidebar) -->
-      <footer class="shrink-0 px-6 py-3 border-t border-line bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
-            <span class="material-icons text-sm">delete_sweep</span>
-            <span>Limpar Tudo</span>
-          </BaseButton>
-        </div>
+      <!-- Barra de ações ao lado direito do Adicionar Pergunta (alinhada à direita e com mesma altura/padding) -->
+      <footer class="shrink-0 p-3 border-t border-line bg-surface flex items-center justify-end gap-2 rounded-br-2xl">
+        <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
+          <span class="material-icons text-sm">delete_sweep</span>
+          <span>Limpar Tudo</span>
+        </BaseButton>
 
-        <div class="flex items-center flex-wrap gap-2">
-          <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
-            <span class="material-icons text-sm">folder_open</span>
-            <span>Rascunhos</span>
-          </BaseButton>
-          <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">
-            <span class="material-icons text-sm">save</span>
-            <span>Salvar Atividade</span>
-          </BaseButton>
-        </div>
+        <BaseButton variant="secondary" size="sm" @click="openDraftsModal">
+          <span class="material-icons text-sm">folder_open</span>
+          <span>Rascunhos</span>
+        </BaseButton>
+
+        <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">
+          <span class="material-icons text-sm">save</span>
+          <span>Salvar Atividade</span>
+        </BaseButton>
       </footer>
     </div>
   </div>
