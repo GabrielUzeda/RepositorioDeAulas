@@ -451,7 +451,7 @@ async function handleDeleteDraft(draftId: number) {
     </template>
 
     <!-- Layout split: sidebar esq + painel dir -->
-    <div class="flex h-full min-h-0" style="height: calc(90vh - 170px)">
+    <div class="flex h-full min-h-0" style="height: calc(90vh - 85px)">
 
       <!-- Sidebar: informações + lista de perguntas -->
       <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto">
@@ -495,7 +495,7 @@ async function handleDeleteDraft(draftId: number) {
           </div>
         </div>
 
-        <!-- Botão adicionar -->
+        <!-- Botão adicionar pergunta na sidebar -->
         <div class="shrink-0 p-3 border-t border-line">
           <BaseButton variant="primary" size="sm" block @click="addQuestion">
             <span class="material-icons text-sm">add</span>
@@ -504,8 +504,9 @@ async function handleDeleteDraft(draftId: number) {
         </div>
       </aside>
 
-      <!-- Painel direito -->
-      <main class="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5">
+      <!-- Painel direito com scroll independente -->
+      <div class="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface">
+        <main class="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5">
 
         <!-- Painel: Geral (Configuração da Atividade + Gerador de IA Integrado) -->
         <div v-if="showBasicInfo" class="space-y-6">
@@ -737,11 +738,9 @@ async function handleDeleteDraft(draftId: number) {
         <!-- Estado vazio (nenhuma pergunta, tela inicial de perguntas) -->
         <EmptyState v-else-if="!showBasicInfo && questions.length === 0" icon="help_outline" title="Nenhuma pergunta adicionada." message="Clique em &quot;Adicionar Pergunta&quot; para começar." />
       </main>
-    </div>
 
-    <!-- Footer com ações da atividade -->
-    <template #footer>
-      <div class="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 w-full">
+      <!-- Barra de ações ao lado direito do Adicionar Pergunta (fora do container da sidebar) -->
+      <footer class="shrink-0 px-6 py-3 border-t border-line bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
             <span class="material-icons text-sm">delete_sweep</span>
@@ -759,9 +758,10 @@ async function handleDeleteDraft(draftId: number) {
             <span>Salvar Atividade</span>
           </BaseButton>
         </div>
-      </div>
-    </template>
-  </BaseModal>
+      </footer>
+    </div>
+  </div>
+</BaseModal>
 
   <!-- Modal de Rascunhos -->
   <BaseModal :model-value="showDraftsModal" @close="showDraftsModal = false" title="Rascunhos de Atividades" max-width="max-w-2xl">
