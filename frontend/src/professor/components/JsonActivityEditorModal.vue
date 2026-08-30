@@ -486,8 +486,10 @@ async function handleDeleteDraft(draftId: number) {
             @click="activeQIndex = idx; showBasicInfo = false"
           >
             <div class="px-3 py-2.5 flex items-center gap-2">
-              <span class="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 leading-none"
-                :class="activeQIndex === idx && !showBasicInfo ? 'bg-accent text-white' : 'bg-surface-alt text-secondary'">
+              <span
+                class="w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center text-center shrink-0 leading-none select-none aspect-square"
+                :class="activeQIndex === idx && !showBasicInfo ? 'bg-accent text-white' : 'bg-surface-alt text-secondary'"
+              >
                 {{ idx + 1 }}
               </span>
               <p class="text-xs text-primary leading-snug line-clamp-2 flex-1">{{ q.content || q.title || 'Sem enunciado' }}</p>
