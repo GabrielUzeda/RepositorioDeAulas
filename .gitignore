@@ -28,6 +28,7 @@ build/
 database/data/
 backend/database/data/
 backend/data/
+backend/frontend_static/
 frontend/src/turmas/
 
 # Database Backups

@@ -57,17 +57,33 @@ const aulaOptions = computed(() => [
   ...props.aulas.map((a) => ({ label: a.titulo, value: String(a.id) })),
 ]);
 
-watch(aulaId, (val) => {
-  if (val && !aiSelectedAulas.value.includes(Number(val))) {
-    aiSelectedAulas.value.push(Number(val));
+const effectiveLinkedAulas = computed<Aula[]>(() => {
+  if (aulaId.value) {
+    const selectedId = Number(aulaId.value);
+    const found = props.aulas.find((a) => a.id === selectedId);
+    return found ? [found] : [];
   }
+  if (props.atividade?.aula_ids && props.atividade.aula_ids.length > 0) {
+    const ids = new Set(props.atividade.aula_ids);
+    return props.aulas.filter((a) => ids.has(a.id));
+  }
+  if (props.atividade?.aula_id) {
+    const found = props.aulas.find((a) => a.id === props.atividade.aula_id);
+    return found ? [found] : [];
+  }
+  if (props.defaultAulaId) {
+    const found = props.aulas.find((a) => a.id === props.defaultAulaId);
+    return found ? [found] : [];
+  }
+  return [];
 });
+
+const hasLinkedAulas = computed(() => effectiveLinkedAulas.value.length > 0);
 
 // --- IA Generation State (Embutido no painel Geral) ---
 const aiTema = ref('');
 const aiObservacoes = ref('');
 const aiQuantidadeStr = ref('5');
-const aiSelectedAulas = ref<number[]>([]);
 const isGeneratingAi = ref(false);
 
 const showDraftsModal = ref(false);
@@ -146,13 +162,11 @@ watch(
     currentDraftId.value = null;
     isInitializing.value = true;
     if (val) {
-      aiSelectedAulas.value = props.aulas.map((a) => a.id);
-
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
         descricao.value = props.atividade.descricao || '';
         tipo.value = (props.atividade.tipo as any) || 'normal';
-        aulaId.value = props.atividade.aula_id ? String(props.atividade.aula_id) : '';
+        aulaId.value = props.atividade.aula_id ? String(props.atividade.aula_id) : (props.atividade.aula_ids && props.atividade.aula_ids.length > 0 ? String(props.atividade.aula_ids[0]) : '');
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
         aiTema.value = '';
@@ -196,10 +210,6 @@ watch(
         }
       }
 
-      if (aulaId.value && !aiSelectedAulas.value.includes(Number(aulaId.value))) {
-        aiSelectedAulas.value.push(Number(aulaId.value));
-      }
-
       setTimeout(() => {
         isInitializing.value = false;
       }, 50);
@@ -207,41 +217,25 @@ watch(
   }
 );
 
-function toggleAiAula(aulaIdVal: number) {
-  const idx = aiSelectedAulas.value.indexOf(aulaIdVal);
-  if (idx > -1) {
-    aiSelectedAulas.value.splice(idx, 1);
-  } else {
-    aiSelectedAulas.value.push(aulaIdVal);
-  }
-}
-
-function selectAllAiAulas() {
-  if (aiSelectedAulas.value.length === props.aulas.length) {
-    aiSelectedAulas.value = [];
-  } else {
-    aiSelectedAulas.value = props.aulas.map((a) => a.id);
-  }
-}
-
 async function handleGenerateAiQuestions() {
   if (isGeneratingAi.value) return;
-  if (!aiTema.value.trim() && !titulo.value.trim() && aiSelectedAulas.value.length === 0) {
-    error('Informe um tema, título da atividade ou selecione ao menos uma aula para contextualizar a IA.');
+  if (!hasLinkedAulas.value && !aiTema.value.trim() && !titulo.value.trim()) {
+    error('Informe o tema ou tópico específico para gerar questões com IA em atividades gerais.');
     return;
   }
 
   isGeneratingAi.value = true;
   try {
+    const targetAulasIds = effectiveLinkedAulas.value.map((a) => a.id);
     const payload = {
       tipo: tipo.value,
       titulo: titulo.value.trim(),
-      tema: aiTema.value.trim(),
+      tema: hasLinkedAulas.value ? (aiTema.value.trim() || effectiveLinkedAulas.value.map((a) => a.titulo).join(', ')) : aiTema.value.trim(),
       observacoes: aiObservacoes.value.trim(),
       quantidade: Number(aiQuantidadeStr.value) || 5,
       disciplina_id: props.disciplinaId,
-      aula_id: aulaId.value ? Number(aulaId.value) : null,
-      aulas_ids: aiSelectedAulas.value,
+      aula_id: targetAulasIds.length > 0 ? targetAulasIds[0] : null,
+      aulas_ids: targetAulasIds,
     };
 
     const res = await apiClient.post<{
@@ -579,9 +573,31 @@ async function handleDeleteDraft(draftId: number) {
               </div>
             </div>
 
+            <!-- Banner de Contexto Automático por Aula Vinculada -->
+            <div v-if="hasLinkedAulas" class="p-3 bg-accent/10 border border-accent/30 rounded-xl flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 shadow-xs">
+                <span class="material-icons text-base">auto_awesome</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-bold text-accent uppercase tracking-wider">Contexto Automático por Aula</span>
+                  <span
+                    v-for="aula in effectiveLinkedAulas"
+                    :key="aula.id"
+                    class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface border border-accent/40 text-primary truncate max-w-[240px]"
+                  >
+                    {{ aula.titulo }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-secondary mt-0.5">
+                  A IA utilizará automaticamente o conteúdo teórico e os slides das aulas vinculadas como referência pedagógica.
+                </p>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
               <!-- Quantidade de Questões -->
-              <div class="md:col-span-12 sm:md:col-span-4">
+              <div :class="[ hasLinkedAulas ? 'md:col-span-12' : 'md:col-span-4' ]">
                 <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Qtd. de Questões</label>
                 <BaseInput
                   v-model="aiQuantidadeStr"
@@ -593,13 +609,14 @@ async function handleDeleteDraft(draftId: number) {
                 />
               </div>
 
-              <!-- Tema / Tópico Específico -->
-              <div class="md:col-span-12 sm:md:col-span-8">
-                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Tema / Tópico Específico (Opcional se houver aulas)</label>
+              <!-- Tema / Tópico Específico (Exibido apenas quando NÃO há aulas vinculadas) -->
+              <div v-if="!hasLinkedAulas" class="md:col-span-8">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Tema / Tópico Específico *</label>
                 <BaseInput
                   v-model="aiTema"
                   placeholder="Ex: Condicionais e Laços de Repetição em TypeScript"
                   :disabled="isGeneratingAi"
+                  required
                 />
               </div>
 
@@ -614,57 +631,17 @@ async function handleDeleteDraft(draftId: number) {
                 />
               </div>
 
-              <!-- Aulas para Contexto -->
-              <div class="md:col-span-12">
-                <div class="flex items-center justify-between mb-2">
-                  <label class="block text-xs font-semibold uppercase tracking-wider text-secondary">
-                    Aulas de Referência para Contexto da IA ({{ aiSelectedAulas.length }}/{{ props.aulas.length }})
-                  </label>
-                  <button
-                    v-if="props.aulas.length > 0"
-                    type="button"
-                    class="text-xs text-accent hover:underline font-medium"
-                    :disabled="isGeneratingAi"
-                    @click="selectAllAiAulas"
-                  >
-                    {{ aiSelectedAulas.length === props.aulas.length ? 'Desmarcar todas' : 'Selecionar todas' }}
-                  </button>
-                </div>
-
-                <div v-if="props.aulas.length === 0" class="p-3 bg-surface border border-line rounded-lg text-xs text-secondary text-center">
-                  Nenhuma aula cadastrada nesta disciplina. A IA utilizará o tema e o título da atividade.
-                </div>
-
-                <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
-                  <div
-                    v-for="aula in props.aulas"
-                    :key="aula.id"
-                    class="flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-colors"
-                    :class="aiSelectedAulas.includes(aula.id) ? 'border-accent/40 bg-accent/5 text-primary' : 'border-line bg-surface hover:bg-surface-alt text-secondary'"
-                    @click="toggleAiAula(aula.id)"
-                  >
-                    <input
-                      type="checkbox"
-                      :checked="aiSelectedAulas.includes(aula.id)"
-                      class="rounded border-line text-accent focus:ring-accent"
-                      @click.stop="toggleAiAula(aula.id)"
-                    />
-                    <span class="material-icons text-sm text-secondary">slideshow</span>
-                    <span class="font-medium truncate flex-1">{{ aula.titulo }}</span>
-                  </div>
-                </div>
-              </div>
-
               <!-- Botão Gerar e Adicionar Questões -->
-              <div class="md:col-span-12 pt-2">
+              <div class="md:col-span-12 pt-1">
                 <BaseButton
                   variant="primary"
                   size="md"
                   block
                   :loading="isGeneratingAi"
-                  :disabled="isGeneratingAi || (!aiTema.trim() && !titulo.trim() && aiSelectedAulas.length === 0)"
+                  :disabled="isGeneratingAi || (!hasLinkedAulas && !aiTema.trim() && !titulo.trim())"
                   @click="handleGenerateAiQuestions"
                 >
+                  <span class="material-icons text-base">auto_awesome</span>
                   <span class="material-icons text-base">auto_awesome</span>
                   <span>{{ isGeneratingAi ? 'Gerando e Adicionando Questões com IA...' : 'Gerar e Adicionar Questões na Atividade' }}</span>
                 </BaseButton>
