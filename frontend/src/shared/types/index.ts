@@ -64,6 +64,8 @@ export interface Question {
 export interface Atividade {
   id: number;
   disciplina_id: number;
+  aula_id?: number | null;
+  aula_ids?: number[];
   external_id?: string;
   slug?: string;
   titulo: string;

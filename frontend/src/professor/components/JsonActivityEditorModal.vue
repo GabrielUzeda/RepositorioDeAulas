@@ -26,6 +26,7 @@ const props = withDefaults(
   defineProps<{
     show: boolean;
     atividade?: Atividade | null;
+    defaultAulaId?: number | null;
     loading?: boolean;
     aulas?: Aula[];
     disciplinaId?: number;
@@ -43,12 +44,24 @@ const { success, error, info } = useToast();
 const titulo = ref('');
 const descricao = ref('');
 const tipo = ref<'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco'>('normal');
+const aulaId = ref<string | number>('');
 const allowPassword = ref(false);
 const senha = ref('');
 const questions = ref<Question[]>([]);
 const isSaving = ref(false);
 const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
+
+const aulaOptions = computed(() => [
+  { label: 'Nenhuma (Atividade Geral)', value: '' },
+  ...props.aulas.map((a) => ({ label: a.titulo, value: String(a.id) })),
+]);
+
+watch(aulaId, (val) => {
+  if (val && !aiSelectedAulas.value.includes(Number(val))) {
+    aiSelectedAulas.value.push(Number(val));
+  }
+});
 
 // --- IA Generation State (Embutido no painel Geral) ---
 const aiTema = ref('');
@@ -103,6 +116,7 @@ function scheduleAutoSave() {
       titulo: titulo.value,
       descricao: descricao.value,
       tipo: tipo.value,
+      aulaId: aulaId.value,
       allowPassword: allowPassword.value,
       senha: senha.value,
       questions: questions.value,
@@ -116,7 +130,7 @@ function scheduleAutoSave() {
 }
 
 watch(
-  [titulo, descricao, tipo, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
+  [titulo, descricao, tipo, aulaId, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
   () => {
     scheduleAutoSave();
   },
@@ -138,6 +152,7 @@ watch(
         titulo.value = props.atividade.titulo || '';
         descricao.value = props.atividade.descricao || '';
         tipo.value = (props.atividade.tipo as any) || 'normal';
+        aulaId.value = props.atividade.aula_id ? String(props.atividade.aula_id) : '';
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
         aiTema.value = '';
@@ -163,6 +178,7 @@ watch(
             titulo.value = parsed.titulo || '';
             descricao.value = parsed.descricao || '';
             tipo.value = parsed.tipo || 'normal';
+            aulaId.value = parsed.aulaId !== undefined ? String(parsed.aulaId) : (props.defaultAulaId ? String(props.defaultAulaId) : '');
             allowPassword.value = !!parsed.allowPassword;
             senha.value = parsed.senha || '';
             aiTema.value = parsed.aiTema || '';
@@ -179,6 +195,11 @@ watch(
           resetToEmpty();
         }
       }
+
+      if (aulaId.value && !aiSelectedAulas.value.includes(Number(aulaId.value))) {
+        aiSelectedAulas.value.push(Number(aulaId.value));
+      }
+
       setTimeout(() => {
         isInitializing.value = false;
       }, 50);
@@ -186,12 +207,12 @@ watch(
   }
 );
 
-function toggleAiAula(aulaId: number) {
-  const idx = aiSelectedAulas.value.indexOf(aulaId);
+function toggleAiAula(aulaIdVal: number) {
+  const idx = aiSelectedAulas.value.indexOf(aulaIdVal);
   if (idx > -1) {
     aiSelectedAulas.value.splice(idx, 1);
   } else {
-    aiSelectedAulas.value.push(aulaId);
+    aiSelectedAulas.value.push(aulaIdVal);
   }
 }
 
@@ -219,6 +240,7 @@ async function handleGenerateAiQuestions() {
       observacoes: aiObservacoes.value.trim(),
       quantidade: Number(aiQuantidadeStr.value) || 5,
       disciplina_id: props.disciplinaId,
+      aula_id: aulaId.value ? Number(aulaId.value) : null,
       aulas_ids: aiSelectedAulas.value,
     };
 
@@ -250,6 +272,7 @@ function resetToEmpty() {
   titulo.value = '';
   descricao.value = '';
   tipo.value = 'normal';
+  aulaId.value = props.defaultAulaId ? String(props.defaultAulaId) : '';
   allowPassword.value = false;
   senha.value = '';
   questions.value = [];
@@ -321,6 +344,7 @@ async function handleSave() {
     titulo: titulo.value,
     descricao: descricao.value,
     tipo: tipo.value,
+    aula_id: aulaId.value ? Number(aulaId.value) : null,
     allow_password: allowPassword.value,
     senha: allowPassword.value ? senha.value : null,
     caminho: titulo.value.toLowerCase().replace(/\s+/g, '_'),
@@ -474,7 +498,7 @@ async function handleDeleteDraft(draftId: number) {
             <span class="text-xs text-secondary bg-surface-alt px-1.5 py-0.5 rounded-full">{{ questions.length }}</span>
           </div>
 
-          <EmptyState v-if="questions.length === 0" icon="help_outline" message="Nenhuma pergunta ainda." class="py-6 px-3" />
+          <EmptyState v-if="questions.length === 0" icon="help_outline" message="Nenhuma pergunta adicionada." class="py-6 px-3" />
 
           <div
             v-for="(q, idx) in questions"
@@ -527,10 +551,11 @@ async function handleDeleteDraft(draftId: number) {
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" />
+              <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" class="md:col-span-2" />
               <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" />
+              <BaseSelect v-model="aulaId" :options="aulaOptions" label="Vincular a uma Aula (Opcional)" />
               <div class="md:col-span-2">
-                <BaseTextarea v-model="descricao" :rows="3" label="Descrição / Orientações para Alunos" placeholder="Breve resumo ou instruções da atividade..." />
+                <BaseTextarea v-model="descricao" :rows="3" label="Descrição / Orientações para Alunos" placeholder="Breve resumo ou instruções da atividade para os alunos..." />
               </div>
               <div class="md:col-span-2 flex items-center gap-3">
                 <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
@@ -743,6 +768,10 @@ async function handleDeleteDraft(draftId: number) {
 
       <!-- Barra de ações ao lado direito do Adicionar Pergunta (alinhada à direita e com mesma altura/padding exato de h-14) -->
       <footer class="shrink-0 h-14 px-4 border-t border-line bg-surface flex items-center justify-end gap-2 rounded-br-2xl">
+        <BaseButton variant="ghost" size="sm" @click="emit('close')">
+          <span>Cancelar</span>
+        </BaseButton>
+
         <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
           <span class="material-icons text-sm">delete_sweep</span>
           <span>Limpar Tudo</span>

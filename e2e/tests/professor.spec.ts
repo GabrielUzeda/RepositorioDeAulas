@@ -88,8 +88,8 @@ test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
 
     // ---------- Atividade: CREATE ----------
     const atvTitulo = uniqueName('AtvUI');
-    await page.getByRole('button', { name: 'Nova Atividade' }).click();
-    await page.locator('select').selectOption('reforco');
+    await page.getByRole('button', { name: 'Nova Atividade' }).first().click();
+    await page.getByLabel('Tipo de Atividade').selectOption('reforco');
     await page.getByPlaceholder('Ex: Avaliação de Algoritmos').fill(atvTitulo);
     await page.getByPlaceholder('Breve resumo ou instruções da atividade para os alunos...').fill('Atividade criada pela UI');
     await page.getByRole('button', { name: 'Adicionar Pergunta' }).click();
@@ -102,14 +102,14 @@ test.describe('Professor — CRUD de Disciplinas, Aulas e Atividades', () => {
 
     // ---------- Atividade: UPDATE ----------
     const atvEditada = `${atvTitulo} Editada`;
-    const atvCard = page.locator('h4', { hasText: atvTitulo }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    const atvCard = page.locator('h4', { hasText: atvTitulo }).locator('xpath=ancestor::div[contains(@class,"rounded")][1]');
     await atvCard.locator('button[title="Editar Atividade"]').click();
     await page.getByPlaceholder('Ex: Avaliação de Algoritmos').fill(atvEditada);
     await page.getByRole('button', { name: 'Salvar Atividade' }).click();
     await expect(page.locator('h4', { hasText: atvEditada }).first()).toBeVisible();
 
     // ---------- Atividade: DELETE ----------
-    const atvCardEdit = page.locator('h4', { hasText: atvEditada }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]');
+    const atvCardEdit = page.locator('h4', { hasText: atvEditada }).locator('xpath=ancestor::div[contains(@class,"rounded")][1]');
     await atvCardEdit.locator('button[title="Excluir Atividade"]').click();
     await page.getByRole('button', { name: 'Excluir' }).click();
     await expect(page.locator('h4', { hasText: atvEditada })).toHaveCount(0);
