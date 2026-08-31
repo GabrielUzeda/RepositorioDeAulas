@@ -63,16 +63,19 @@ const effectiveLinkedAulas = computed<Aula[]>(() => {
     const found = props.aulas.find((a) => a.id === selectedId);
     return found ? [found] : [];
   }
-  if (props.atividade?.aula_ids && props.atividade.aula_ids.length > 0) {
-    const ids = new Set(props.atividade.aula_ids);
+  const atvAulaIds = props.atividade?.aula_ids;
+  if (atvAulaIds && atvAulaIds.length > 0) {
+    const ids = new Set(atvAulaIds);
     return props.aulas.filter((a) => ids.has(a.id));
   }
-  if (props.atividade?.aula_id) {
-    const found = props.aulas.find((a) => a.id === props.atividade.aula_id);
+  const atvAulaId = props.atividade?.aula_id;
+  if (atvAulaId) {
+    const found = props.aulas.find((a) => a.id === atvAulaId);
     return found ? [found] : [];
   }
   if (props.defaultAulaId) {
-    const found = props.aulas.find((a) => a.id === props.defaultAulaId);
+    const defId = props.defaultAulaId;
+    const found = props.aulas.find((a) => a.id === defId);
     return found ? [found] : [];
   }
   return [];
