@@ -92,7 +92,7 @@ test.describe('Atividade — descrição, título e descrição de cada pergunta
     await expect(page.getByText(atvDescricao)).toBeVisible();
 
     // Abre o editor da atividade
-    await page.locator('h4', { hasText: atvTitulo }).locator('xpath=ancestor::div[contains(@class,"p-4")][1]')
+    await page.locator('h4', { hasText: atvTitulo }).locator('xpath=ancestor::div[contains(@class,"rounded")][1]')
       .locator('button[title="Editar Atividade"]').click();
     await expect(page.getByRole('heading', { name: 'Editar Atividade' })).toBeVisible();
 

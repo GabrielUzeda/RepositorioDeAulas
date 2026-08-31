@@ -114,7 +114,24 @@ const dbq = (sql: string) => db.query<Record<string, any>, any[]>(sql);
 
 function mapAtividade(row: any) {
   if (row == null) return row;
-  return { ...row, allow_password: row.allow_password == null ? null : !!row.allow_password };
+  let aula_ids: number[] = [];
+  if (row.aula_ids_json) {
+    try {
+      const parsed = JSON.parse(row.aula_ids_json);
+      if (Array.isArray(parsed)) aula_ids = parsed.filter((n: any) => n != null);
+    } catch {}
+  }
+  if (aula_ids.length === 0 && row.aula_id) {
+    aula_ids = [Number(row.aula_id)];
+  }
+  const out = {
+    ...row,
+    aula_ids,
+    aula_id: aula_ids.length > 0 ? aula_ids[0] : (row.aula_id ?? null),
+    allow_password: row.allow_password == null ? null : !!row.allow_password
+  };
+  delete out.aula_ids_json;
+  return out;
 }
 
 function stripGabarito(row: any): any {
@@ -140,8 +157,8 @@ function stripGabarito(row: any): any {
   return out;
 }
 
-function parseId(v: string | undefined): number | null {
-  if (v === undefined || v === '') return null;
+function parseId(v: any): number | null {
+  if (v === undefined || v === '' || v === null) return null;
   const n = Number(v);
   return Number.isInteger(n) ? n : null;
 }
@@ -435,16 +452,27 @@ async function createAtividade(c: any) {
   const disciplinaId = parseId(String(body.disciplina_id ?? body.materia_id));
   if (disciplinaId === null) return c.text('', 400);
   if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
+  
+  let aulaIds: number[] = [];
+  if (Array.isArray(body.aula_ids)) {
+    aulaIds = body.aula_ids.map(Number).filter((n: number) => Number.isInteger(n));
+  } else if (body.aula_id != null && body.aula_id !== '') {
+    const single = parseId(body.aula_id);
+    if (single !== null) aulaIds = [single];
+  }
+
+  const primaryAulaId = aulaIds.length > 0 ? aulaIds[0] : null;
   const externalId = body.external_id != null ? sanitizeSlug(body.external_id) : null;
   const caminho = sanitizePathOrUrl((body.caminho ?? '') || (body.slug ?? ''));
   const r = db
     .query(
-      `INSERT INTO atividades (disciplina_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO atividades (disciplina_id, aula_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`
     )
     .get(
       disciplinaId,
+      primaryAulaId,
       externalId,
       body.titulo ?? '',
       body.descricao ?? null,
@@ -455,8 +483,16 @@ async function createAtividade(c: any) {
       body.senha ?? null,
       body.allow_password == null ? null : body.allow_password ? 1 : 0,
       body.ordem ?? 0
-    );
-  return c.json(mapAtividade(r), 201);
+    ) as any;
+
+  if (r && r.id && aulaIds.length > 0) {
+    const ins = db.query('INSERT OR IGNORE INTO aula_atividades (aula_id, atividade_id) VALUES (?, ?)');
+    for (const aId of aulaIds) {
+      ins.run(aId, r.id);
+    }
+  }
+
+  return c.json(mapAtividade({ ...r, aula_ids_json: JSON.stringify(aulaIds) }), 201);
 }
 
 async function updateAtividade(c: any) {
@@ -471,10 +507,24 @@ async function updateAtividade(c: any) {
   if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
   const externalId = body.external_id != null ? sanitizeSlug(body.external_id) : null;
   const caminho = sanitizePathOrUrl((body.caminho ?? '') || (body.slug ?? ''));
+
+  let hasAulaUpdate = false;
+  let aulaIds: number[] = [];
+  if ('aula_ids' in body && Array.isArray(body.aula_ids)) {
+    hasAulaUpdate = true;
+    aulaIds = body.aula_ids.map(Number).filter((n: number) => Number.isInteger(n));
+  } else if ('aula_id' in body) {
+    hasAulaUpdate = true;
+    const single = parseId(body.aula_id);
+    if (single !== null) aulaIds = [single];
+  }
+
+  const primaryAulaId = hasAulaUpdate ? (aulaIds.length > 0 ? aulaIds[0] : null) : ((dbq('SELECT aula_id FROM atividades WHERE id = ?').get(id) as any)?.aula_id ?? null);
+
   const r = db
     .query(
       `UPDATE atividades
-       SET disciplina_id = ?, external_id = ?, titulo = ?, descricao = ?, caminho = ?, icone = ?,
+       SET disciplina_id = ?, aula_id = ?, external_id = ?, titulo = ?, descricao = ?, caminho = ?, icone = ?,
            json_data = ?, tipo = ?, senha = ?, allow_password = ?, ordem = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
        WHERE id = ?
@@ -482,6 +532,7 @@ async function updateAtividade(c: any) {
     )
     .get(
       disciplinaId,
+      primaryAulaId,
       externalId,
       body.titulo ?? '',
       body.descricao ?? null,
@@ -493,9 +544,22 @@ async function updateAtividade(c: any) {
       body.allow_password == null ? null : body.allow_password ? 1 : 0,
       body.ordem ?? 0,
       id
-    );
+    ) as any;
   if (!r) return c.text('Atividade not found', 404);
-  return c.json(mapAtividade(r), 200);
+
+  if (hasAulaUpdate) {
+    dbq('DELETE FROM aula_atividades WHERE atividade_id = ?').run(id);
+    if (aulaIds.length > 0) {
+      const ins = db.query('INSERT OR IGNORE INTO aula_atividades (aula_id, atividade_id) VALUES (?, ?)');
+      for (const aId of aulaIds) {
+        ins.run(aId, id);
+      }
+    }
+  }
+
+  const finalAulaIds = (dbq('SELECT aula_id FROM aula_atividades WHERE atividade_id = ?').all(id) as any[]).map(x => x.aula_id);
+
+  return c.json(mapAtividade({ ...r, aula_ids_json: JSON.stringify(finalAulaIds) }), 200);
 }
 
 // ---------- Route registration ----------
@@ -766,13 +830,21 @@ app.get('/atividades', async (c) => {
   const disciplina = dbq('SELECT * FROM disciplinas WHERE id = ?').get(disciplinaId) as any;
   if (!disciplina) return c.text('Disciplina não encontrada', 404);
 
+  const selectQuery = `
+    SELECT a.*,
+      (SELECT json_group_array(aa.aula_id) FROM aula_atividades aa WHERE aa.atividade_id = a.id) AS aula_ids_json
+    FROM atividades a
+    WHERE a.disciplina_id = ?
+    ORDER BY a.ordem, a.titulo
+  `;
+
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);
       if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, disciplina.curso_id)) {
-        const rows = dbq('SELECT * FROM atividades WHERE disciplina_id = ? ORDER BY ordem, titulo').all(disciplinaId);
+        const rows = dbq(selectQuery).all(disciplinaId);
         return c.json(rows.map(mapAtividade));
       }
     }
@@ -783,16 +855,21 @@ app.get('/atividades', async (c) => {
     const senha = readCursoSenha(c);
     if ((curso.senha ?? null) !== senha) return c.text('Senha do curso incorreta', 401);
   }
-  const rows = dbq('SELECT * FROM atividades WHERE disciplina_id = ? ORDER BY ordem, titulo').all(disciplinaId);
-  return c.json(rows.map(stripGabarito));
+  const rows = dbq(selectQuery).all(disciplinaId);
+  return c.json(rows.map(mapAtividade).map(stripGabarito));
 });
 
 app.get('/atividades/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const atv = dbq('SELECT * FROM atividades WHERE id = ?').get(id) as any;
-  if (!atv) return c.text('Atividade not found', 404);
-  atv.allow_password = atv.allow_password == null ? null : !!atv.allow_password;
+  const atvRow = dbq(`
+    SELECT a.*,
+      (SELECT json_group_array(aa.aula_id) FROM aula_atividades aa WHERE aa.atividade_id = a.id) AS aula_ids_json
+    FROM atividades a
+    WHERE a.id = ?
+  `).get(id) as any;
+  if (!atvRow) return c.text('Atividade not found', 404);
+  const atv = mapAtividade(atvRow);
 
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {

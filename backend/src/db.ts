@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS aulas (
 CREATE TABLE IF NOT EXISTS atividades (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   disciplina_id INTEGER NOT NULL REFERENCES disciplinas(id) ON DELETE CASCADE,
+  aula_id INTEGER REFERENCES aulas(id) ON DELETE SET NULL,
   external_id TEXT,
   titulo TEXT NOT NULL,
   descricao TEXT,
@@ -162,6 +163,28 @@ CREATE TABLE IF NOT EXISTS rascunhos_editor (
 );
 `);
 
+// Migrações defensivas para colunas adicionadas e relacionamentos N:N
+try {
+  db.run('ALTER TABLE atividades ADD COLUMN aula_id INTEGER REFERENCES aulas(id) ON DELETE SET NULL');
+} catch {}
+
+try {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS aula_atividades (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      aula_id INTEGER NOT NULL REFERENCES aulas(id) ON DELETE CASCADE,
+      atividade_id INTEGER NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
+      ordem INTEGER DEFAULT 0,
+      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      UNIQUE(aula_id, atividade_id)
+    )
+  `);
+  db.run(`
+    INSERT OR IGNORE INTO aula_atividades (aula_id, atividade_id)
+    SELECT aula_id, id FROM atividades WHERE aula_id IS NOT NULL
+  `);
+} catch {}
+
 // [2] Índices para alta performance
 db.run(`
 CREATE INDEX IF NOT EXISTS idx_ranking_atividade_pontuacao ON ranking(atividade_id, pontuacao DESC);
@@ -174,6 +197,9 @@ CREATE INDEX IF NOT EXISTS idx_curso_professores_professor ON curso_professores(
 CREATE INDEX IF NOT EXISTS idx_audit_logs_criado_em ON audit_logs(criado_em);
 CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_professor ON rascunhos_editor(professor_id);
 CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_expira_em ON rascunhos_editor(expira_em);
+CREATE INDEX IF NOT EXISTS idx_atividades_aula ON atividades(aula_id);
+CREATE INDEX IF NOT EXISTS idx_aula_atividades_aula ON aula_atividades(aula_id);
+CREATE INDEX IF NOT EXISTS idx_aula_atividades_atv ON aula_atividades(atividade_id);
 `);
 
 // [3] Função de Seed Automático para ambiente Demo

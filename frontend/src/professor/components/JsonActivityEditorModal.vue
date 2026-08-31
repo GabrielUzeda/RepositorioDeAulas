@@ -26,6 +26,7 @@ const props = withDefaults(
   defineProps<{
     show: boolean;
     atividade?: Atividade | null;
+    defaultAulaId?: number | null;
     loading?: boolean;
     aulas?: Aula[];
     disciplinaId?: number;
@@ -43,6 +44,7 @@ const { success, error, info } = useToast();
 const titulo = ref('');
 const descricao = ref('');
 const tipo = ref<'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco'>('normal');
+const aulaId = ref<string | number>('');
 const allowPassword = ref(false);
 const senha = ref('');
 const questions = ref<Question[]>([]);
@@ -50,11 +52,41 @@ const isSaving = ref(false);
 const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
 
+const aulaOptions = computed(() => [
+  { label: 'Nenhuma (Atividade Geral)', value: '' },
+  ...props.aulas.map((a) => ({ label: a.titulo, value: String(a.id) })),
+]);
+
+const effectiveLinkedAulas = computed<Aula[]>(() => {
+  if (aulaId.value) {
+    const selectedId = Number(aulaId.value);
+    const found = props.aulas.find((a) => a.id === selectedId);
+    return found ? [found] : [];
+  }
+  const atvAulaIds = props.atividade?.aula_ids;
+  if (atvAulaIds && atvAulaIds.length > 0) {
+    const ids = new Set(atvAulaIds);
+    return props.aulas.filter((a) => ids.has(a.id));
+  }
+  const atvAulaId = props.atividade?.aula_id;
+  if (atvAulaId) {
+    const found = props.aulas.find((a) => a.id === atvAulaId);
+    return found ? [found] : [];
+  }
+  if (props.defaultAulaId) {
+    const defId = props.defaultAulaId;
+    const found = props.aulas.find((a) => a.id === defId);
+    return found ? [found] : [];
+  }
+  return [];
+});
+
+const hasLinkedAulas = computed(() => effectiveLinkedAulas.value.length > 0);
+
 // --- IA Generation State (Embutido no painel Geral) ---
 const aiTema = ref('');
 const aiObservacoes = ref('');
 const aiQuantidadeStr = ref('5');
-const aiSelectedAulas = ref<number[]>([]);
 const isGeneratingAi = ref(false);
 
 const showDraftsModal = ref(false);
@@ -103,6 +135,7 @@ function scheduleAutoSave() {
       titulo: titulo.value,
       descricao: descricao.value,
       tipo: tipo.value,
+      aulaId: aulaId.value,
       allowPassword: allowPassword.value,
       senha: senha.value,
       questions: questions.value,
@@ -116,7 +149,7 @@ function scheduleAutoSave() {
 }
 
 watch(
-  [titulo, descricao, tipo, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
+  [titulo, descricao, tipo, aulaId, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
   () => {
     scheduleAutoSave();
   },
@@ -132,12 +165,11 @@ watch(
     currentDraftId.value = null;
     isInitializing.value = true;
     if (val) {
-      aiSelectedAulas.value = props.aulas.map((a) => a.id);
-
       if (props.atividade) {
         titulo.value = props.atividade.titulo || '';
         descricao.value = props.atividade.descricao || '';
         tipo.value = (props.atividade.tipo as any) || 'normal';
+        aulaId.value = props.atividade.aula_id ? String(props.atividade.aula_id) : (props.atividade.aula_ids && props.atividade.aula_ids.length > 0 ? String(props.atividade.aula_ids[0]) : '');
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
         aiTema.value = '';
@@ -163,6 +195,7 @@ watch(
             titulo.value = parsed.titulo || '';
             descricao.value = parsed.descricao || '';
             tipo.value = parsed.tipo || 'normal';
+            aulaId.value = parsed.aulaId !== undefined ? String(parsed.aulaId) : (props.defaultAulaId ? String(props.defaultAulaId) : '');
             allowPassword.value = !!parsed.allowPassword;
             senha.value = parsed.senha || '';
             aiTema.value = parsed.aiTema || '';
@@ -179,6 +212,7 @@ watch(
           resetToEmpty();
         }
       }
+
       setTimeout(() => {
         isInitializing.value = false;
       }, 50);
@@ -186,40 +220,25 @@ watch(
   }
 );
 
-function toggleAiAula(aulaId: number) {
-  const idx = aiSelectedAulas.value.indexOf(aulaId);
-  if (idx > -1) {
-    aiSelectedAulas.value.splice(idx, 1);
-  } else {
-    aiSelectedAulas.value.push(aulaId);
-  }
-}
-
-function selectAllAiAulas() {
-  if (aiSelectedAulas.value.length === props.aulas.length) {
-    aiSelectedAulas.value = [];
-  } else {
-    aiSelectedAulas.value = props.aulas.map((a) => a.id);
-  }
-}
-
 async function handleGenerateAiQuestions() {
   if (isGeneratingAi.value) return;
-  if (!aiTema.value.trim() && !titulo.value.trim() && aiSelectedAulas.value.length === 0) {
-    error('Informe um tema, título da atividade ou selecione ao menos uma aula para contextualizar a IA.');
+  if (!hasLinkedAulas.value && !aiTema.value.trim() && !titulo.value.trim()) {
+    error('Informe o tema ou tópico específico para gerar questões com IA em atividades gerais.');
     return;
   }
 
   isGeneratingAi.value = true;
   try {
+    const targetAulasIds = effectiveLinkedAulas.value.map((a) => a.id);
     const payload = {
       tipo: tipo.value,
       titulo: titulo.value.trim(),
-      tema: aiTema.value.trim(),
+      tema: hasLinkedAulas.value ? (aiTema.value.trim() || effectiveLinkedAulas.value.map((a) => a.titulo).join(', ')) : aiTema.value.trim(),
       observacoes: aiObservacoes.value.trim(),
       quantidade: Number(aiQuantidadeStr.value) || 5,
       disciplina_id: props.disciplinaId,
-      aulas_ids: aiSelectedAulas.value,
+      aula_id: targetAulasIds.length > 0 ? targetAulasIds[0] : null,
+      aulas_ids: targetAulasIds,
     };
 
     const res = await apiClient.post<{
@@ -250,6 +269,7 @@ function resetToEmpty() {
   titulo.value = '';
   descricao.value = '';
   tipo.value = 'normal';
+  aulaId.value = props.defaultAulaId ? String(props.defaultAulaId) : '';
   allowPassword.value = false;
   senha.value = '';
   questions.value = [];
@@ -321,6 +341,7 @@ async function handleSave() {
     titulo: titulo.value,
     descricao: descricao.value,
     tipo: tipo.value,
+    aula_id: aulaId.value ? Number(aulaId.value) : null,
     allow_password: allowPassword.value,
     senha: allowPassword.value ? senha.value : null,
     caminho: titulo.value.toLowerCase().replace(/\s+/g, '_'),
@@ -474,7 +495,7 @@ async function handleDeleteDraft(draftId: number) {
             <span class="text-xs text-secondary bg-surface-alt px-1.5 py-0.5 rounded-full">{{ questions.length }}</span>
           </div>
 
-          <EmptyState v-if="questions.length === 0" icon="help_outline" message="Nenhuma pergunta ainda." class="py-6 px-3" />
+          <EmptyState v-if="questions.length === 0" icon="help_outline" message="Nenhuma pergunta adicionada." class="py-6 px-3" />
 
           <div
             v-for="(q, idx) in questions"
@@ -527,10 +548,11 @@ async function handleDeleteDraft(draftId: number) {
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" />
+              <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" class="md:col-span-2" />
               <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" />
+              <BaseSelect v-model="aulaId" :options="aulaOptions" label="Vincular a uma Aula (Opcional)" />
               <div class="md:col-span-2">
-                <BaseTextarea v-model="descricao" :rows="3" label="Descrição / Orientações para Alunos" placeholder="Breve resumo ou instruções da atividade..." />
+                <BaseTextarea v-model="descricao" :rows="3" label="Descrição / Orientações para Alunos" placeholder="Breve resumo ou instruções da atividade para os alunos..." />
               </div>
               <div class="md:col-span-2 flex items-center gap-3">
                 <input type="checkbox" id="allowPassword" v-model="allowPassword" class="w-4 h-4 text-accent rounded border-line bg-surface" />
@@ -554,9 +576,31 @@ async function handleDeleteDraft(draftId: number) {
               </div>
             </div>
 
+            <!-- Banner de Contexto Automático por Aula Vinculada -->
+            <div v-if="hasLinkedAulas" class="p-3 bg-accent/10 border border-accent/30 rounded-xl flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 shadow-xs">
+                <span class="material-icons text-base">auto_awesome</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-bold text-accent uppercase tracking-wider">Contexto Automático por Aula</span>
+                  <span
+                    v-for="aula in effectiveLinkedAulas"
+                    :key="aula.id"
+                    class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface border border-accent/40 text-primary truncate max-w-[240px]"
+                  >
+                    {{ aula.titulo }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-secondary mt-0.5">
+                  A IA utilizará automaticamente o conteúdo teórico e os slides das aulas vinculadas como referência pedagógica.
+                </p>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
               <!-- Quantidade de Questões -->
-              <div class="md:col-span-12 sm:md:col-span-4">
+              <div :class="[ hasLinkedAulas ? 'md:col-span-12' : 'md:col-span-4' ]">
                 <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Qtd. de Questões</label>
                 <BaseInput
                   v-model="aiQuantidadeStr"
@@ -568,13 +612,14 @@ async function handleDeleteDraft(draftId: number) {
                 />
               </div>
 
-              <!-- Tema / Tópico Específico -->
-              <div class="md:col-span-12 sm:md:col-span-8">
-                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Tema / Tópico Específico (Opcional se houver aulas)</label>
+              <!-- Tema / Tópico Específico (Exibido apenas quando NÃO há aulas vinculadas) -->
+              <div v-if="!hasLinkedAulas" class="md:col-span-8">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1">Tema / Tópico Específico *</label>
                 <BaseInput
                   v-model="aiTema"
                   placeholder="Ex: Condicionais e Laços de Repetição em TypeScript"
                   :disabled="isGeneratingAi"
+                  required
                 />
               </div>
 
@@ -589,57 +634,17 @@ async function handleDeleteDraft(draftId: number) {
                 />
               </div>
 
-              <!-- Aulas para Contexto -->
-              <div class="md:col-span-12">
-                <div class="flex items-center justify-between mb-2">
-                  <label class="block text-xs font-semibold uppercase tracking-wider text-secondary">
-                    Aulas de Referência para Contexto da IA ({{ aiSelectedAulas.length }}/{{ props.aulas.length }})
-                  </label>
-                  <button
-                    v-if="props.aulas.length > 0"
-                    type="button"
-                    class="text-xs text-accent hover:underline font-medium"
-                    :disabled="isGeneratingAi"
-                    @click="selectAllAiAulas"
-                  >
-                    {{ aiSelectedAulas.length === props.aulas.length ? 'Desmarcar todas' : 'Selecionar todas' }}
-                  </button>
-                </div>
-
-                <div v-if="props.aulas.length === 0" class="p-3 bg-surface border border-line rounded-lg text-xs text-secondary text-center">
-                  Nenhuma aula cadastrada nesta disciplina. A IA utilizará o tema e o título da atividade.
-                </div>
-
-                <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
-                  <div
-                    v-for="aula in props.aulas"
-                    :key="aula.id"
-                    class="flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-colors"
-                    :class="aiSelectedAulas.includes(aula.id) ? 'border-accent/40 bg-accent/5 text-primary' : 'border-line bg-surface hover:bg-surface-alt text-secondary'"
-                    @click="toggleAiAula(aula.id)"
-                  >
-                    <input
-                      type="checkbox"
-                      :checked="aiSelectedAulas.includes(aula.id)"
-                      class="rounded border-line text-accent focus:ring-accent"
-                      @click.stop="toggleAiAula(aula.id)"
-                    />
-                    <span class="material-icons text-sm text-secondary">slideshow</span>
-                    <span class="font-medium truncate flex-1">{{ aula.titulo }}</span>
-                  </div>
-                </div>
-              </div>
-
               <!-- Botão Gerar e Adicionar Questões -->
-              <div class="md:col-span-12 pt-2">
+              <div class="md:col-span-12 pt-1">
                 <BaseButton
                   variant="primary"
                   size="md"
                   block
                   :loading="isGeneratingAi"
-                  :disabled="isGeneratingAi || (!aiTema.trim() && !titulo.trim() && aiSelectedAulas.length === 0)"
+                  :disabled="isGeneratingAi || (!hasLinkedAulas && !aiTema.trim() && !titulo.trim())"
                   @click="handleGenerateAiQuestions"
                 >
+                  <span class="material-icons text-base">auto_awesome</span>
                   <span class="material-icons text-base">auto_awesome</span>
                   <span>{{ isGeneratingAi ? 'Gerando e Adicionando Questões com IA...' : 'Gerar e Adicionar Questões na Atividade' }}</span>
                 </BaseButton>
@@ -743,6 +748,10 @@ async function handleDeleteDraft(draftId: number) {
 
       <!-- Barra de ações ao lado direito do Adicionar Pergunta (alinhada à direita e com mesma altura/padding exato de h-14) -->
       <footer class="shrink-0 h-14 px-4 border-t border-line bg-surface flex items-center justify-end gap-2 rounded-br-2xl">
+        <BaseButton variant="ghost" size="sm" @click="emit('close')">
+          <span>Cancelar</span>
+        </BaseButton>
+
         <BaseButton variant="danger" size="sm" @click="showConfirmClear = true" title="Limpar todo o formulário e perguntas">
           <span class="material-icons text-sm">delete_sweep</span>
           <span>Limpar Tudo</span>
