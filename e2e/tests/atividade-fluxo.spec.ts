@@ -54,8 +54,8 @@ test.describe('Professor — criar atividade e gerenciar rascunhos no editor', (
     await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
 
     // --- NOVA ATIVIDADE (tipo objetivo: reforco) ---
-    await page.getByRole('button', { name: 'Nova Atividade' }).click();
-    await page.locator('select').selectOption('reforco');
+    await page.getByRole('button', { name: 'Nova Atividade' }).first().click();
+    await page.getByLabel('Tipo de Atividade').selectOption('reforco');
     await page.getByPlaceholder('Ex: Avaliação de Algoritmos').fill(atvTitulo);
 
     // Questão 1 (painel exibe só a pergunta ativa)
@@ -76,13 +76,13 @@ test.describe('Professor — criar atividade e gerenciar rascunhos no editor', (
     await page.getByRole('button', { name: 'Salvar Rascunho Atual' }).click();
     await expect(page.getByText('Rascunho salvo na nuvem com validade de 30 dias!')).toBeVisible();
     await expect(page.getByText(atvTitulo, { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Fechar' }).click();
+    await page.getByRole('dialog', { name: 'Rascunhos de Atividades' }).getByLabel('Fechar modal').click();
 
     // Fecha o editor pelo botão de fechar do BaseModal
-    await page.getByLabel('Fechar modal').click();
+    await page.getByRole('dialog').filter({ hasText: 'Nova Atividade' }).getByLabel('Fechar modal').click();
 
     // --- REABRIR EDITOR E VERIFICAR RESTAURAÇÃO AUTOMÁTICA ---
-    await page.getByRole('button', { name: 'Nova Atividade' }).click();
+    await page.getByRole('button', { name: 'Nova Atividade' }).first().click();
     await expect(page.getByText('Perguntas', { exact: true })).toBeVisible();
     await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
 
@@ -105,14 +105,14 @@ test.describe('Professor — criar atividade e gerenciar rascunhos no editor', (
     await expect(page.locator('h4', { hasText: atvTitulo }).first()).toBeVisible();
 
     // --- EXCLUIR RASCUNHO APÓS USO ---
-    await page.getByRole('button', { name: 'Nova Atividade' }).click();
+    await page.getByRole('button', { name: 'Nova Atividade' }).first().click();
     await page.getByRole('button', { name: 'Rascunhos' }).click();
-    const draftsModal = page.getByLabel('Rascunhos de Atividades');
+    const draftsModal = page.getByRole('dialog', { name: 'Rascunhos de Atividades' });
     await expect(draftsModal.getByRole('heading', { name: atvTitulo })).toBeVisible();
     await draftsModal.getByRole('button', { name: 'Excluir' }).first().click();
     await expect(page.getByText('Rascunho excluído com sucesso!', { exact: true })).toBeVisible();
-    await draftsModal.getByText('Fechar').click();
-    await page.getByLabel('Fechar modal').click();
+    await draftsModal.getByLabel('Fechar modal').click();
+    await page.getByRole('dialog').filter({ hasText: 'Nova Atividade' }).getByLabel('Fechar modal').click();
   });
 });
 

@@ -133,7 +133,7 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 - `usuarios` (admin/professor), `cursos` (com coluna `senha`), `curso_professores`
 - `disciplinas` (curso_id, slug, nome, cor, icone, descricao)
 - `aulas` (disciplina_id, titulo, **caminho** → `materias/{slug}/aulas/{slug}.html`, descricao, ordem, conteudo_md)
-- `atividades` (disciplina_id, external_id, titulo, descricao, caminho, icone, `json_data`, tipo, senha, allow_password, ordem)
+- `atividades` (disciplina_id, aula_id [NULL=geral], external_id, titulo, descricao, caminho, icone, `json_data`, tipo, senha, allow_password, ordem)
 - `respostas_alunos` (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas [criptografadas], acertos, total, pontuacao, **nota REAL, feedback TEXT, enviado_em**, consulta_token, criado_em)
 - `rascunhos_atividades` (codigo_recuperacao, atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas_json [criptografadas], expira_em [30 dias], criado_em, atualizado_em)
 - `disciplina_feedbacks` (disciplina_id, aluno_email_hash [NULL=turma], feedback_geral, enviado_em, criado_em, atualizado_em, UNIQUE(disciplina_id, aluno_email_hash))
@@ -219,7 +219,7 @@ O sistema suporta 4 tipos principais de atividades interativas (armazenadas na c
 ## 8. Testes E2E (Playwright via Docker — caminho oficial)
 
 ### Escopo
-Há 11 specs em `e2e/tests/`. Status verificados (todos 100% passando):
+Há 12 specs em `e2e/tests/`. Status verificados (todos 100% passando — 26/26 testes):
 
 | Spec | Status | Cobre |
 |---|---|---|
@@ -228,12 +228,15 @@ Há 11 specs em `e2e/tests/`. Status verificados (todos 100% passando):
 | `professor.spec.ts` | ✅ **atualizado** | CRUD de disciplinas, aulas (Marp), atividades e reordenação via UI |
 | `aluno.spec.ts` | ✅ atual | Acesso anônimo, modal de senha de curso, visualização de aulas em popup e envio de respostas |
 | `aluno-atividades-avancadas.spec.ts` | ✅ atual | Fluxos de minigames/roleta/reforço e senhas de atividade |
-| `aluno-comprovante-email.spec.ts` | ✅ **novo** | Submissão de resposta com opt-in de e-mail e validação de entrega do comprovante via Mailhog |
+| `aluno-comprovante-email.spec.ts` | ✅ atual | Submissão de resposta com opt-in de e-mail e validação de entrega do comprovante via Mailhog |
 | `aluno-lgpd.spec.ts` | ✅ atual | Direito de consulta e exclusão de dados do aluno conforme LGPD |
+| `atividade-conteudo.spec.ts` | ✅ atual | Descrição da atividade, título e descrições individuais de cada pergunta |
 | `atividade-fluxo.spec.ts` | ✅ atual | Fluxo de rascunhos do professor no editor e resolução do aluno |
+| `atividade-ia.spec.ts` | ✅ **atualizado** | Painel do gerador de atividades por IA integrado na aba Geral |
 | `atividade-rascunhos.spec.ts` | ✅ atual | Salvamento e restauração de rascunhos de atividades (30 dias) |
 | `email-feedback.spec.ts` | ✅ atual | Entrega real de e-mails de feedback pedagógico via Mailhog |
 | `fluxo-completo.spec.ts` | ✅ atual | Jornada completa de ponta a ponta (Professor → Aluno → Avaliação → Feedback) |
+| `relacao-aula-atividade.spec.ts` | ✅ **novo** | Matriz completa: aula sem atividade, aula com atividade vinculada e atividade geral, com visão do professor e resolução do aluno |
 
 ### Como executar
 ```bash

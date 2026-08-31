@@ -43,7 +43,7 @@ test.describe('Professor — Modal de Geração de Atividades por IA (9router)',
     if (adminToken) await cleanupEntities(request, adminToken, cursoId, professorId);
   });
 
-  test('abre modal de IA, verifica elementos visuais, modelos e opções de tema/aulas', async ({ page }) => {
+  test('verifica elementos visuais do gerador de IA integrado na aba Geral', async ({ page }) => {
     await loginViaUI(page, profEmail, profPassword, /\/professor/);
     await expect(page.getByRole('heading', { name: 'Painel do Professor' })).toBeVisible();
     await page.locator('h3', { hasText: cursoNome }).click();
@@ -51,21 +51,16 @@ test.describe('Professor — Modal de Geração de Atividades por IA (9router)',
     await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
 
     // Abrir o editor de atividade
-    await page.getByRole('button', { name: 'Nova Atividade' }).click();
-    await expect(page.getByRole('button', { name: 'Gerar com IA' })).toBeVisible();
+    await page.getByRole('button', { name: 'Nova Atividade' }).first().click();
 
-    // Clicar em "Gerar com IA"
-    await page.getByRole('button', { name: 'Gerar com IA' }).click();
+    // Validar painel de IA integrado na aba Geral
+    await expect(page.getByRole('heading', { name: 'Gerador de Questões por IA' })).toBeVisible();
+    await expect(page.getByText('Tema / Tópico Específico (Opcional se houver aulas)')).toBeVisible();
+    await expect(page.getByText('Observações ou Instruções Pedagógicas para a IA')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Gerar e Adicionar Questões na Atividade/i })).toBeVisible();
 
-    // Validar modal de IA aberto
-    await expect(page.getByRole('heading', { name: /Gerador de Atividades por IA/i })).toBeVisible();
-    await expect(page.getByText(/Tema \/ Tópico Principal/i)).toBeVisible();
-    await expect(page.getByText(/Observações ou Instruções Pedagógicas/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Gerar Questões com IA/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Atualizar Modelos/i })).toBeVisible();
-
-    // Fechar o modal de IA
-    await page.locator('.max-w-5xl').getByRole('button', { name: 'Cancelar' }).click();
-    await expect(page.getByRole('heading', { name: 'Nova Atividade Interativa' })).toBeVisible();
+    // Fechar o editor
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
   });
 });

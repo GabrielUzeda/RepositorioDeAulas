@@ -336,19 +336,25 @@ describe('Auth Module & Multi-Professor System', () => {
   });
 
   test('Rate Limiter blocks excessive login requests', async () => {
-    for (let i = 0; i < 100; i++) {
-      await app.request('/auth/login', {
+    const prev = process.env.DISABLE_RATE_LIMIT;
+    process.env.DISABLE_RATE_LIMIT = 'false';
+    try {
+      for (let i = 0; i < 100; i++) {
+        await app.request('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '192.168.1.99' },
+          body: JSON.stringify({ email: 'fake@local', password: '123' }),
+        });
+      }
+      const blockedRes = await app.request('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '192.168.1.99' },
         body: JSON.stringify({ email: 'fake@local', password: '123' }),
       });
+      expect(blockedRes.status).toBe(429);
+    } finally {
+      process.env.DISABLE_RATE_LIMIT = prev;
     }
-    const blockedRes = await app.request('/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '192.168.1.99' },
-      body: JSON.stringify({ email: 'fake@local', password: '123' }),
-    });
-    expect(blockedRes.status).toBe(429);
   });
 
   test('Submeter, listar e excluir respostas de alunos (LGPD)', async () => {
@@ -593,5 +599,203 @@ describe('Auth Module & Multi-Professor System', () => {
     for (const f of [htmlAbs, mdAbs]) {
       if (existsSync(f)) unlinkSync(f);
     }
+  });
+
+  test('Relação opcional entre Aula e Atividade (aula_id)', async () => {
+    const adminToken = await signJwt({ sub: 1, role: 'admin' });
+
+    // 1. Cria uma disciplina para teste
+    const discRes = await app.request('/disciplinas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        curso_id: 1,
+        slug: `disc-relacao-${Date.now()}`,
+        nome: 'Disciplina Relação Aula-Atividade',
+      }),
+    });
+    expect(discRes.status).toBe(201);
+    const disc = await discRes.json();
+
+    // 2. Cria uma aula
+    const aulaRes = await app.request('/aulas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        disciplina_id: disc.id,
+        titulo: 'Aula de Teste Relação',
+        descricao: 'Descrição aula',
+        markdown: '# Aula 1 Teste',
+      }),
+    });
+    expect(aulaRes.status).toBe(201);
+    const aula = await aulaRes.json();
+
+    // 3. Cria uma atividade vinculada à aula (aula_id)
+    const atvRes = await app.request('/atividades', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        disciplina_id: disc.id,
+        aula_id: aula.id,
+        titulo: 'Atividade Vinculada à Aula',
+        tipo: 'normal',
+        json_data: JSON.stringify({ questions: [] }),
+      }),
+    });
+    expect(atvRes.status).toBe(201);
+    const atv = await atvRes.json();
+    expect(atv.aula_id).toBe(aula.id);
+
+    // 4. Lista atividades e verifica aula_id
+    const listRes = await app.request(`/atividades?disciplina_id=${disc.id}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(listRes.status).toBe(200);
+    const list = await listRes.json();
+    const found = list.find((a: any) => a.id === atv.id);
+    expect(found).toBeDefined();
+    expect(found.aula_id).toBe(aula.id);
+
+    // 5. Atualiza atividade desvinculando da aula (aula_id: null)
+    const updateRes = await app.request(`/atividades/${atv.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        disciplina_id: disc.id,
+        aula_id: null,
+        titulo: 'Atividade Agora Geral',
+      }),
+    });
+    expect(updateRes.status).toBe(200);
+    const updated = await updateRes.json();
+    expect(updated.aula_id).toBeNull();
+
+    // 6. Vincula novamente e exclui a aula -> aula_id deve virar NULL (ON DELETE SET NULL)
+    await app.request(`/atividades/${atv.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        disciplina_id: disc.id,
+        aula_id: aula.id,
+        titulo: 'Atividade Re-vinculada',
+      }),
+    });
+
+    const delAulaRes = await app.request(`/aulas/${aula.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(delAulaRes.status).toBe(204);
+
+    const checkAtv = db.query('SELECT aula_id FROM atividades WHERE id = ?').get(atv.id) as any;
+    expect(checkAtv.aula_id).toBeNull();
+  });
+
+  test('Relação N:N: Uma atividade pode ser vinculada a múltiplas aulas simultaneamente (aula_ids)', async () => {
+    const adminToken = await signJwt({ sub: 1, role: 'admin' });
+
+    // 1. Cria uma disciplina
+    const discRes = await app.request('/disciplinas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        curso_id: 1,
+        slug: `disc-multi-aula-${Date.now()}`,
+        nome: 'Disciplina Multi Aula Atividade',
+      }),
+    });
+    expect(discRes.status).toBe(201);
+    const disc = await discRes.json();
+
+    // 2. Cria duas aulas na mesma disciplina
+    const aula1Res = await app.request('/aulas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ disciplina_id: disc.id, titulo: 'Aula 1 Multi', markdown: '# A1' }),
+    });
+    const aula2Res = await app.request('/aulas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ disciplina_id: disc.id, titulo: 'Aula 2 Multi', markdown: '# A2' }),
+    });
+    const aula1 = await aula1Res.json();
+    const aula2 = await aula2Res.json();
+
+    // 3. Cria atividade vinculada a AMBAS as aulas (aula_ids: [aula1.id, aula2.id])
+    const atvRes = await app.request('/atividades', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        disciplina_id: disc.id,
+        aula_ids: [aula1.id, aula2.id],
+        titulo: 'Atividade Compartilhada em 2 Aulas',
+        tipo: 'normal',
+        json_data: JSON.stringify({ questions: [] }),
+      }),
+    });
+    expect(atvRes.status).toBe(201);
+    const atv = await atvRes.json();
+    expect(atv.aula_ids).toBeDefined();
+    expect(atv.aula_ids).toContain(aula1.id);
+    expect(atv.aula_ids).toContain(aula2.id);
+
+    // 4. Lista atividades e valida que aula_ids contém ambas as aulas
+    const listRes = await app.request(`/atividades?disciplina_id=${disc.id}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(listRes.status).toBe(200);
+    const list = await listRes.json();
+    const found = list.find((a: any) => a.id === atv.id);
+    expect(found).toBeDefined();
+    expect(found.aula_ids).toContain(aula1.id);
+    expect(found.aula_ids).toContain(aula2.id);
+
+    // 5. Atualiza removendo da Aula 1 e mantendo apenas Aula 2
+    const updateRes = await app.request(`/atividades/${atv.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        disciplina_id: disc.id,
+        aula_ids: [aula2.id],
+        titulo: 'Atividade Agora Somente Aula 2',
+      }),
+    });
+    expect(updateRes.status).toBe(200);
+    const updated = await updateRes.json();
+    expect(updated.aula_ids).not.toContain(aula1.id);
+    expect(updated.aula_ids).toContain(aula2.id);
+
+    // 6. Exclui a Aula 2 -> a tabela relacional aula_atividades limpa via CASCADE
+    const delAula2Res = await app.request(`/aulas/${aula2.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(delAula2Res.status).toBe(204);
+
+    const relRows = db.query('SELECT * FROM aula_atividades WHERE atividade_id = ?').all(atv.id);
+    expect(relRows.length).toBe(0);
   });
 });

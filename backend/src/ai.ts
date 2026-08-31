@@ -123,15 +123,21 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     quantidade = 5,
     disciplina_id,
     aulas_ids = [],
+    aula_id,
   } = body;
 
-  if (!tema && !titulo && aulas_ids.length === 0) {
+  const targetAulasIds: number[] = Array.isArray(aulas_ids) ? [...aulas_ids.map(Number)] : [];
+  if (aula_id && !targetAulasIds.includes(Number(aula_id))) {
+    targetAulasIds.push(Number(aula_id));
+  }
+
+  if (!tema && !titulo && targetAulasIds.length === 0) {
     return c.json({ success: false, error: 'Informe um tema, título ou selecione ao menos uma aula para contextualizar' }, 400);
   }
 
   let aulasContexto = '';
-  if (Array.isArray(aulas_ids) && aulas_ids.length > 0) {
-    const placeholders = aulas_ids.map(() => '?').join(',');
+  if (targetAulasIds.length > 0) {
+    const placeholders = targetAulasIds.map(() => '?').join(',');
     let aulas: { id: number; titulo: string; conteudo_md: string }[] = [];
 
     if (professorRole === 'admin') {
@@ -141,7 +147,7 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
         WHERE a.id IN (${placeholders})
         ORDER BY a.ordem ASC
       `;
-      aulas = db.query(query).all(...aulas_ids) as { id: number; titulo: string; conteudo_md: string }[];
+      aulas = db.query(query).all(...targetAulasIds) as { id: number; titulo: string; conteudo_md: string }[];
     } else {
       const query = `
         SELECT a.id, a.titulo, a.conteudo_md 
@@ -151,7 +157,7 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
         WHERE cp.professor_id = ? AND a.id IN (${placeholders})
         ORDER BY a.ordem ASC
       `;
-      aulas = db.query(query).all(professorId, ...aulas_ids) as { id: number; titulo: string; conteudo_md: string }[];
+      aulas = db.query(query).all(professorId, ...targetAulasIds) as { id: number; titulo: string; conteudo_md: string }[];
     }
     
     if (aulas.length > 0) {
