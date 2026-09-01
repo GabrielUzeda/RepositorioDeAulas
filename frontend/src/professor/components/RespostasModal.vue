@@ -41,14 +41,29 @@ const ALLOWED_TAGS = new Set([
   'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'SPAN', 'A', 'DIV'
 ]);
 
+function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
+  if (!str.includes('&lt;') && !str.includes('&gt;') && !str.includes('&amp;') && !str.includes('&quot;')) {
+    return str;
+  }
+  try {
+    const txt = document.createElement('textarea');
+    txt.innerHTML = str;
+    return txt.value;
+  } catch {
+    return str;
+  }
+}
+
 function sanitizeRichText(html: string): string {
   if (!html) return '<span class="text-secondary opacity-60">(Sem resposta)</span>';
-  if (!/<[a-z][\s\S]*>/i.test(html)) {
-    return html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+  let decoded = decodeHtmlEntities(html);
+  if (!/<[a-z][\s\S]*>/i.test(decoded)) {
+    return decoded.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
   }
   try {
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
+    const doc = parser.parseFromString(decoded, 'text/html');
     const sanitizeNode = (node: Node) => {
       if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as HTMLElement;
@@ -72,9 +87,9 @@ function sanitizeRichText(html: string): string {
       }
     };
     sanitizeNode(doc.body);
-    return doc.body.innerHTML || html;
+    return doc.body.innerHTML || decoded;
   } catch (_e) {
-    return html;
+    return decoded;
   }
 }
 
@@ -375,7 +390,7 @@ function scoreColor(nota: number | null | undefined) {
                   <span class="text-xs font-medium text-primary leading-snug">{{ item.label }}</span>
                 </div>
                 <div
-                  class="px-4 py-3 bg-surface text-sm text-primary leading-relaxed border-t border-line/40 prose dark:prose-invert max-w-none"
+                  class="px-4 py-3 bg-surface text-sm text-primary leading-relaxed border-t border-line/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-accent [&_blockquote]:pl-3 [&_blockquote]:italic [&_pre]:bg-surface-alt [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:font-mono [&_pre]:text-xs [&_pre]:border [&_pre]:border-line [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs max-w-none"
                   v-html="sanitizeRichText(item.value)"
                 ></div>
               </div>
