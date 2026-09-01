@@ -23,6 +23,7 @@ const emit = defineEmits(['update:modelValue']);
 
 const editor = ref<HTMLElement | null>(null);
 const isFullscreen = ref(false);
+const isFocused = ref(false);
 const editorId = props.id || `rte-${Math.random().toString(36).substr(2, 9)}`;
 
 const charCount = computed(() => {
@@ -111,6 +112,30 @@ const insertCodeBlock = () => {
   exec('insertHTML', codeHTML);
 };
 
+const setupEditorDefaults = () => {
+  try {
+    document.execCommand('defaultParagraphSeparator', false, 'p');
+  } catch (_e) {
+    // Ignore execCommand unsupported browser warning
+  }
+};
+
+const handleFocus = () => {
+  isFocused.value = true;
+  setupEditorDefaults();
+};
+
+const handleBlur = () => {
+  isFocused.value = false;
+  updateValue();
+};
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    setupEditorDefaults();
+  }
+};
+
 const updateValue = () => {
   if (editor.value) {
     const rawHTML = editor.value.innerHTML;
@@ -122,12 +147,17 @@ const updateValue = () => {
 onMounted(() => {
   if (editor.value) {
     editor.value.innerHTML = sanitizeHTML(props.modelValue || '');
+    setupEditorDefaults();
   }
 });
 
 watch(() => props.modelValue, (newVal) => {
-  if (editor.value && editor.value.innerHTML !== newVal) {
-    editor.value.innerHTML = sanitizeHTML(newVal || '');
+  if (editor.value && !isFocused.value) {
+    const currentClean = sanitizeHTML(editor.value.innerHTML);
+    const targetClean = sanitizeHTML(newVal || '');
+    if (currentClean !== targetClean) {
+      editor.value.innerHTML = targetClean;
+    }
   }
 });
 
@@ -166,6 +196,9 @@ const toggleFullscreen = () => {
         :id="editorId"
         contenteditable="true"
         @input="updateValue"
+        @focus="handleFocus"
+        @blur="handleBlur"
+        @keydown="handleKeydown"
         :style="{ minHeight: isFullscreen ? '90vh' : minHeight }"
         :class="['p-4 outline-none text-primary bg-transparent', disabled ? 'opacity-50 cursor-not-allowed' : '']"
         :placeholder="placeholder"
