@@ -1,0 +1,77 @@
+debito:
+enter no rich text volta para o inicio, sendo necessario ter shift + enter para pular a linha 
+o email dos alunos e as respostas gerados do rich text geram tags htmls nao lidas pelo email / modal do professor 
+nova atividade pode vincular mais de uma aula ao mesmo tempo ou nenhuma (atualmente ele praticamente obriga o professor a selecionar uma aula)
+aviso de erro nao se dispensa sozinho,precisa dispensar lentamente, cerca de 3 vezes mais lento do que o de sucesso.
+diminuir o tempo do cache da senha do aluno para 4h, verificar viabilidade de usar webcrypto para proteger mais o sistema e resolver problemas como conferir a senha via url no html de aula, acho que isso é uma falha de segurança, ou estou errado?
+
+# Débitos técnicos
+
+### 1. Comportamento do Enter no Rich Text
+
+**Problema:** Ao pressionar `Enter` no editor Rich Text, o cursor retorna para o início do conteúdo em vez de criar uma nova linha/parágrafo. Atualmente, é necessário utilizar `Shift + Enter` para quebrar a linha.
+
+**Impacto:** Comportamento pouco intuitivo e diferente do esperado em editores de texto, prejudicando a experiência de criação e edição de conteúdo.
+
+**Objetivo:** Corrigir o comportamento do `Enter` para que ele crie uma nova linha/parágrafo normalmente. Também mapear outras inconsitencias e corrigi-las 
+
+---
+
+### 2. HTML não interpretado nas respostas e e-mails
+
+**Problema:** O conteúdo gerado pelo Rich Text está sendo enviado com tags HTML visíveis no conteúdo dos e-mails dos alunos e nas respostas exibidas no modal do professor.
+
+**Impacto:** O usuário final pode visualizar tags como `<p>`, `<strong>`, `<br>`, entre outras, em vez da formatação esperada.
+
+**Objetivo:** Garantir que o conteúdo produzido pelo Rich Text seja corretamente interpretado/renderizado nos e-mails e no modal do professor, ou que as tags sejam sanitizadas/convertidas adequadamente antes da exibição.
+
+---
+
+### 3. Associação de aulas na criação de uma nova atividade
+
+**Problema:** Atualmente, a criação de uma nova atividade praticamente obriga o professor a selecionar uma aula. Além disso, o fluxo não contempla adequadamente a possibilidade de vincular múltiplas aulas à mesma atividade ou nao vincular nenhuma.
+
+**Objetivo:** Permitir que uma atividade:
+
+* seja vinculada a nenhuma aula;
+* seja vinculada a uma única aula; ou
+* seja vinculada a múltiplas aulas simultaneamente.
+
+O fluxo de criação não deve obrigar a seleção de uma aula quando essa associação não for necessária.
+
+Isso tem que ser aplicavel, tanto no botao de nova atividade quando na edição de uma atividade. 
+
+---
+
+### 4. Tempo de exibição dos avisos de erro
+
+**Problema:** Os avisos de erro permanecem visíveis por um período indeterminado, sendo necessário dispensá-los manualmente. Preciso adiciomar um timeout de dispensa assim como existe no caso de sucesso mas o tempo de exibição deve ser aproximadamente três vezes maior.
+
+**Impacto:** Interfere no fluxo de uso e gera inconsistência no comportamento dos feedbacks da interface.
+
+**Objetivo:** Revisar o comportamento e o tempo de exibição dos avisos de erro, garantindo um padrão consistente com os avisos de sucesso e evitando que o usuário precise dispensá-los manualmente quando não for necessário.
+
+---
+
+### 5. Cache e segurança da senha do aluno
+
+**Problema:** A senha do aluno permanece armazenada em cache por um período que pode ser maior do que o necessário. Além disso, é necessário revisar a forma como a senha é manipulada e verificar possíveis exposições no HTML das aulas.
+
+**Objetivos:**
+
+* Reduzir o tempo de cache da senha do aluno para **4 horas**;
+* Avaliar a viabilidade de utilizar **Web Crypto API** para aumentar a proteção dos dados sensíveis;
+* Revisar a implementação atual para identificar se a senha ou informações que permitam sua validação estão sendo expostas no HTML das aulas;
+* Remover qualquer informação sensível desnecessária do conteúdo entregue ao cliente;
+* Garantir que a validação/autenticação da senha seja realizada de forma segura, preferencialmente no servidor, sem depender de informações sensíveis expostas no frontend.
+
+**Observação de segurança:** Se a senha propriamente dita, um hash reutilizável, um segredo ou algum mecanismo que permita validar a senha estiver sendo disponibilizado no HTML enviado ao navegador, isso pode representar uma vulnerabilidade. O fato de estar no HTML não significa automaticamente que a senha esteja exposta em texto puro, mas **qualquer segredo enviado ao frontend deve ser considerado acessível ao usuário e potencialmente extraível**. A Web Crypto API pode ajudar em determinados cenários de criptografia no cliente, mas não corrige, por si só, o problema de um segredo que não deveria ser enviado ao cliente.
+
+---
+
+### 6. Visualização segura de Scripts HTML/JS de alunos (Débito Técnico / Futura Feature)
+
+**Problema:** Em aulas de programação web onde os alunos enviam trechos de código HTML com `<script>` ou eventos JavaScript, o sanitizador do modal de respostas e e-mails remove as tags `<script>` por segurança contra XSS.
+
+**Objetivo Futuro:** Criar um componente de visualização/inspetor de código dedicado no modal do professor (ex.: bloco com sintaxe destacada `<pre><code>` ou sandbox isolado em iframe `srcdoc` sem acesso a cookies/localStorage do sistema) para que o professor de matérias como HTML/CSS/JS consiga inspecionar e avaliar scripts submetidos pelos alunos com 100% de segurança contra stored XSS.
+
