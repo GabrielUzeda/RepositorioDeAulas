@@ -44,7 +44,7 @@ const { success, error, info } = useToast();
 const titulo = ref('');
 const descricao = ref('');
 const tipo = ref<'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco'>('normal');
-const aulaId = ref<string | number>('');
+const selectedAulaIds = ref<number[]>([]);
 const allowPassword = ref(false);
 const senha = ref('');
 const questions = ref<Question[]>([]);
@@ -52,31 +52,19 @@ const isSaving = ref(false);
 const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
 
-const aulaOptions = computed(() => [
-  { label: 'Nenhuma (Atividade Geral)', value: '' },
-  ...props.aulas.map((a) => ({ label: a.titulo, value: String(a.id) })),
-]);
+const isAulaSelected = (id: number) => selectedAulaIds.value.includes(id);
+const toggleAulaSelection = (id: number) => {
+  if (isAulaSelected(id)) {
+    selectedAulaIds.value = selectedAulaIds.value.filter((aId) => aId !== id);
+  } else {
+    selectedAulaIds.value.push(id);
+  }
+};
 
 const effectiveLinkedAulas = computed<Aula[]>(() => {
-  if (aulaId.value) {
-    const selectedId = Number(aulaId.value);
-    const found = props.aulas.find((a) => a.id === selectedId);
-    return found ? [found] : [];
-  }
-  const atvAulaIds = props.atividade?.aula_ids;
-  if (atvAulaIds && atvAulaIds.length > 0) {
-    const ids = new Set(atvAulaIds);
+  if (selectedAulaIds.value.length > 0) {
+    const ids = new Set(selectedAulaIds.value);
     return props.aulas.filter((a) => ids.has(a.id));
-  }
-  const atvAulaId = props.atividade?.aula_id;
-  if (atvAulaId) {
-    const found = props.aulas.find((a) => a.id === atvAulaId);
-    return found ? [found] : [];
-  }
-  if (props.defaultAulaId) {
-    const defId = props.defaultAulaId;
-    const found = props.aulas.find((a) => a.id === defId);
-    return found ? [found] : [];
   }
   return [];
 });
@@ -135,7 +123,7 @@ function scheduleAutoSave() {
       titulo: titulo.value,
       descricao: descricao.value,
       tipo: tipo.value,
-      aulaId: aulaId.value,
+      selectedAulaIds: selectedAulaIds.value,
       allowPassword: allowPassword.value,
       senha: senha.value,
       questions: questions.value,
@@ -149,7 +137,7 @@ function scheduleAutoSave() {
 }
 
 watch(
-  [titulo, descricao, tipo, aulaId, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
+  [titulo, descricao, tipo, selectedAulaIds, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
   () => {
     scheduleAutoSave();
   },
@@ -169,7 +157,13 @@ watch(
         titulo.value = props.atividade.titulo || '';
         descricao.value = props.atividade.descricao || '';
         tipo.value = (props.atividade.tipo as any) || 'normal';
-        aulaId.value = props.atividade.aula_id ? String(props.atividade.aula_id) : (props.atividade.aula_ids && props.atividade.aula_ids.length > 0 ? String(props.atividade.aula_ids[0]) : '');
+        if (props.atividade.aula_ids && Array.isArray(props.atividade.aula_ids) && props.atividade.aula_ids.length > 0) {
+          selectedAulaIds.value = [...props.atividade.aula_ids];
+        } else if (props.atividade.aula_id) {
+          selectedAulaIds.value = [props.atividade.aula_id];
+        } else {
+          selectedAulaIds.value = [];
+        }
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
         aiTema.value = '';
@@ -195,7 +189,13 @@ watch(
             titulo.value = parsed.titulo || '';
             descricao.value = parsed.descricao || '';
             tipo.value = parsed.tipo || 'normal';
-            aulaId.value = parsed.aulaId !== undefined ? String(parsed.aulaId) : (props.defaultAulaId ? String(props.defaultAulaId) : '');
+            if (Array.isArray(parsed.selectedAulaIds)) {
+              selectedAulaIds.value = parsed.selectedAulaIds;
+            } else if (parsed.aulaId) {
+              selectedAulaIds.value = [Number(parsed.aulaId)];
+            } else {
+              selectedAulaIds.value = props.defaultAulaId ? [props.defaultAulaId] : [];
+            }
             allowPassword.value = !!parsed.allowPassword;
             senha.value = parsed.senha || '';
             aiTema.value = parsed.aiTema || '';
@@ -269,7 +269,7 @@ function resetToEmpty() {
   titulo.value = '';
   descricao.value = '';
   tipo.value = 'normal';
-  aulaId.value = props.defaultAulaId ? String(props.defaultAulaId) : '';
+  selectedAulaIds.value = props.defaultAulaId ? [props.defaultAulaId] : [];
   allowPassword.value = false;
   senha.value = '';
   questions.value = [];
@@ -337,11 +337,14 @@ async function handleSave() {
   if (isSaving.value || props.loading) return;
   isSaving.value = true;
   await secureRemove(draftStorageKey.value);
+  const targetAulaIds = selectedAulaIds.value;
+  const primaryAulaId = targetAulaIds.length > 0 ? targetAulaIds[0] : null;
   emit('save', {
     titulo: titulo.value,
     descricao: descricao.value,
     tipo: tipo.value,
-    aula_id: aulaId.value ? Number(aulaId.value) : null,
+    aula_id: primaryAulaId,
+    aula_ids: targetAulaIds,
     allow_password: allowPassword.value,
     senha: allowPassword.value ? senha.value : null,
     caminho: titulo.value.toLowerCase().replace(/\s+/g, '_'),
@@ -549,8 +552,38 @@ async function handleDeleteDraft(draftId: number) {
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" class="md:col-span-2" />
-              <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" />
-              <BaseSelect v-model="aulaId" :options="aulaOptions" label="Vincular a uma Aula (Opcional)" />
+              <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" class="md:col-span-2" />
+              <div class="md:col-span-2">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1.5 flex items-center justify-between">
+                  <span>Vincular Aulas (Opcional - selecione 0, 1 ou mais)</span>
+                  <span class="text-[11px] font-normal text-secondary">
+                    {{ selectedAulaIds.length === 0 ? 'Nenhuma aula vinculada (Atividade Geral)' : `${selectedAulaIds.length} aula(s) selecionada(s)` }}
+                  </span>
+                </label>
+                <div v-if="props.aulas.length === 0" class="text-xs text-secondary italic py-1">
+                  Nenhuma aula cadastrada nesta disciplina.
+                </div>
+                <div v-else class="flex flex-wrap gap-2 p-2.5 bg-surface border border-line rounded-xl max-h-36 overflow-y-auto">
+                  <button
+                    type="button"
+                    @click="selectedAulaIds = []"
+                    :class="['px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border flex items-center gap-1.5', selectedAulaIds.length === 0 ? 'bg-accent text-white border-accent' : 'bg-surface-alt text-secondary border-line hover:border-accent']"
+                  >
+                    <span class="material-icons text-xs">{{ selectedAulaIds.length === 0 ? 'check_circle' : 'radio_button_unchecked' }}</span>
+                    Nenhuma (Atividade Geral)
+                  </button>
+                  <button
+                    v-for="aula in props.aulas"
+                    :key="aula.id"
+                    type="button"
+                    @click="toggleAulaSelection(aula.id)"
+                    :class="['px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border flex items-center gap-1.5', isAulaSelected(aula.id) ? 'bg-accent/15 text-accent border-accent font-semibold' : 'bg-surface-alt text-primary border-line hover:border-accent']"
+                  >
+                    <span class="material-icons text-xs text-accent">{{ isAulaSelected(aula.id) ? 'check_box' : 'check_box_outline_blank' }}</span>
+                    {{ aula.titulo }}
+                  </button>
+                </div>
+              </div>
               <div class="md:col-span-2">
                 <BaseTextarea v-model="descricao" :rows="3" label="Descrição / Orientações para Alunos" placeholder="Breve resumo ou instruções da atividade para os alunos..." />
               </div>
