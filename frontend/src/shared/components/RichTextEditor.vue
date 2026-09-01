@@ -31,8 +31,18 @@ const charCount = computed(() => {
 });
 
 const exec = (command: string, value: string | null = null) => {
-  document.execCommand(command, false, value || undefined);
-  editor.value?.focus();
+  if (!editor.value) return;
+  editor.value.focus();
+  try {
+    if (command === 'formatBlock' && value) {
+      document.execCommand('formatBlock', false, `<${value}>`);
+    } else {
+      document.execCommand(command, false, value || undefined);
+    }
+  } catch (_e) {
+    // Fallback if browser requires command without brackets
+    document.execCommand(command, false, value || undefined);
+  }
   updateValue();
 };
 
@@ -116,7 +126,7 @@ const setupEditorDefaults = () => {
   try {
     document.execCommand('defaultParagraphSeparator', false, 'p');
   } catch (_e) {
-    // Ignore execCommand unsupported browser warning
+    // Ignore unsupported browser warning
   }
 };
 
@@ -128,12 +138,6 @@ const handleFocus = () => {
 const handleBlur = () => {
   isFocused.value = false;
   updateValue();
-};
-
-const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    setupEditorDefaults();
-  }
 };
 
 const updateValue = () => {
@@ -174,17 +178,17 @@ const toggleFullscreen = () => {
 
     <div :class="['border rounded-md overflow-hidden bg-surface-alt transition-all', error ? 'border-danger' : 'border-line focus-within:ring-2 ring-accent']">
       <!-- Toolbar -->
-      <div class="flex flex-wrap gap-1 p-2 border-b border-line bg-surface">
-        <button type="button" @click="exec('bold')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Negrito"><i class="material-icons text-sm">format_bold</i></button>
-        <button type="button" @click="exec('italic')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Itálico"><i class="material-icons text-sm">format_italic</i></button>
-        <button type="button" @click="exec('formatBlock', 'h2')" class="p-1.5 hover:bg-surface-alt rounded text-primary font-bold text-xs" title="Título">H2</button>
-        <button type="button" @click="exec('insertUnorderedList')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Lista"><i class="material-icons text-sm">format_list_bulleted</i></button>
-        <button type="button" @click="exec('insertOrderedList')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Lista Num."><i class="material-icons text-sm">format_list_numbered</i></button>
-        <button type="button" @click="exec('formatBlock', 'blockquote')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Citação"><i class="material-icons text-sm">format_quote</i></button>
-        <button type="button" @click="insertCodeBlock" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Bloco de Código"><i class="material-icons text-sm">code</i></button>
-        <button type="button" @click="exec('removeFormat')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Limpar"><i class="material-icons text-sm">format_clear</i></button>
+      <div class="flex flex-wrap gap-1 p-2 border-b border-line bg-surface select-none">
+        <button type="button" @mousedown.prevent="exec('bold')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Negrito"><i class="material-icons text-sm">format_bold</i></button>
+        <button type="button" @mousedown.prevent="exec('italic')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Itálico"><i class="material-icons text-sm">format_italic</i></button>
+        <button type="button" @mousedown.prevent="exec('formatBlock', 'h2')" class="p-1.5 hover:bg-surface-alt rounded text-primary font-bold text-xs" title="Título">H2</button>
+        <button type="button" @mousedown.prevent="exec('insertUnorderedList')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Lista"><i class="material-icons text-sm">format_list_bulleted</i></button>
+        <button type="button" @mousedown.prevent="exec('insertOrderedList')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Lista Num."><i class="material-icons text-sm">format_list_numbered</i></button>
+        <button type="button" @mousedown.prevent="exec('formatBlock', 'blockquote')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Citação"><i class="material-icons text-sm">format_quote</i></button>
+        <button type="button" @mousedown.prevent="insertCodeBlock" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Bloco de Código"><i class="material-icons text-sm">code</i></button>
+        <button type="button" @mousedown.prevent="exec('removeFormat')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Limpar"><i class="material-icons text-sm">format_clear</i></button>
         <div class="ml-auto">
-          <button type="button" @click="toggleFullscreen" class="p-1.5 hover:bg-surface-alt rounded text-primary" :title="isFullscreen ? 'Sair' : 'Expandir'">
+          <button type="button" @mousedown.prevent="toggleFullscreen" class="p-1.5 hover:bg-surface-alt rounded text-primary" :title="isFullscreen ? 'Sair' : 'Expandir'">
             <i class="material-icons text-sm">{{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</i>
           </button>
         </div>
@@ -198,9 +202,9 @@ const toggleFullscreen = () => {
         @input="updateValue"
         @focus="handleFocus"
         @blur="handleBlur"
-        @keydown="handleKeydown"
         :style="{ minHeight: isFullscreen ? '90vh' : minHeight }"
-        :class="['p-4 outline-none text-primary bg-transparent', disabled ? 'opacity-50 cursor-not-allowed' : '']"
+        class="p-4 outline-none text-primary bg-transparent rich-text-content"
+        :class="[disabled ? 'opacity-50 cursor-not-allowed' : '']"
         :placeholder="placeholder"
       ></div>
       
@@ -214,3 +218,58 @@ const toggleFullscreen = () => {
     <p v-if="hint && !error" class="text-xs text-secondary mt-1">{{ hint }}</p>
   </div>
 </template>
+
+<style scoped>
+.rich-text-content :deep(h2),
+.rich-text-content :deep(h3) {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--c-primary);
+}
+
+.rich-text-content :deep(ul) {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.rich-text-content :deep(ol) {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.rich-text-content :deep(li) {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.rich-text-content :deep(blockquote) {
+  border-left: 4px solid var(--c-accent);
+  padding-left: 0.75rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+  color: var(--c-secondary);
+}
+
+.rich-text-content :deep(p) {
+  margin-bottom: 0.5rem;
+}
+
+.rich-text-content :deep(pre) {
+  background-color: var(--c-surface-alt);
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--c-line);
+  font-family: monospace;
+  font-size: 0.75rem;
+  overflow-x: auto;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+</style>
