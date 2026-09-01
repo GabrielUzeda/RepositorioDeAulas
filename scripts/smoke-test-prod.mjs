@@ -5,8 +5,8 @@
  */
 
 const BASE = process.env.PROD_API_URL || 'https://aulas.uzedasolucoes.com.br/api';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'teste@admin.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'asdqwe123';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@escola.com';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ProfessorUzeda!';
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'uzeda.dev@gmail.com';
 
 async function main() {
