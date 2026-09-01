@@ -22,6 +22,7 @@ export interface ToastOptions {
 }
 
 const DEFAULT_DURATION = 3500
+const ERROR_DEFAULT_DURATION = 10500 // ~3x da duração de sucesso
 
 const state = reactive<{ toasts: ToastItem[] }>({ toasts: [] })
 const timers = new Map<number, { timer: ReturnType<typeof setTimeout>; endTime: number; remaining?: number }>()
@@ -63,8 +64,8 @@ function resume(id: number): void {
 
 function push(type: ToastType, message: string, opts?: ToastOptions): number {
   const id = ++counter
-  const duration = opts?.duration ?? DEFAULT_DURATION
-  const persistent = opts?.persistent ?? type === 'error'
+  const duration = opts?.duration ?? (type === 'error' ? ERROR_DEFAULT_DURATION : DEFAULT_DURATION)
+  const persistent = opts?.persistent ?? false
   
   const toast: ToastItem = { 
     id, type, message, title: opts?.title, persistent, duration, 
