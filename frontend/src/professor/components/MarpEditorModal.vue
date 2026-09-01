@@ -17,9 +17,12 @@ const props = withDefaults(
     descricao?: string;
     markdown?: string;
     loading?: boolean;
+    aulas?: import('@/shared/types').Aula[];
+    disciplinaId?: number;
   }>(),
   {
     loading: false,
+    aulas: () => [],
   }
 );
 
@@ -72,6 +75,69 @@ let mermaidReady = false;
 let findMatches: Array<{ start: number; end: number }> = [];
 let currentMatchIndex = -1;
 let isResizing = false;
+
+// AI Lesson Generation Panel
+const showAiPanel = ref(false);
+const aiTema = ref('');
+const aiObservacoes = ref('');
+const aiAulasContextoIds = ref<number[]>([]);
+const isGeneratingAula = ref(false);
+
+const { error: toastError, success: toastSuccess } = useToast();
+
+async function handleGenerateAulaIA() {
+  if (isGeneratingAula.value) return;
+  if (!aiTema.value.trim() && aiAulasContextoIds.value.length === 0) {
+    toastError('Informe um tema ou selecione aulas de referência antes de gerar.');
+    return;
+  }
+  isGeneratingAula.value = true;
+  try {
+    const payload: Record<string, any> = {
+      tema: aiTema.value.trim(),
+      aulas_contexto_ids: aiAulasContextoIds.value,
+      observacoes: aiObservacoes.value.trim(),
+    };
+    if (props.disciplinaId) payload.disciplina_id = props.disciplinaId;
+
+    const res = await apiClient.post<{ success: boolean; conteudo_md: string; titulo_sugerido: string; modelo_utilizado: string }>('/ai/generate-aula', payload);
+    if (!res.success || !res.data?.conteudo_md) {
+      toastError(res.error || 'Resposta inválida da IA.');
+      return;
+    }
+    const data = res.data;
+    markdownInput.value = data.conteudo_md;
+    if (data.titulo_sugerido && !titleInput.value) {
+      titleInput.value = data.titulo_sugerido;
+    }
+    showAiPanel.value = false;
+    toastSuccess(`Aula gerada com sucesso (${data.modelo_utilizado})!`);
+    await nextTick();
+    renderSlides(data.conteudo_md);
+  } catch (e: any) {
+    toastError(e.message || 'Falha ao conectar ao serviço de IA.');
+  } finally {
+    isGeneratingAula.value = false;
+  }
+}
+
+function toggleAulaContexto(aulaId: number) {
+  const idx = aiAulasContextoIds.value.indexOf(aulaId);
+  if (idx === -1) {
+    aiAulasContextoIds.value.push(aulaId);
+  } else {
+    aiAulasContextoIds.value.splice(idx, 1);
+  }
+}
+
+watch(showAiPanel, (open) => {
+  if (open && props.aulas && props.aulas.length > 0) {
+    const ultima = props.aulas[props.aulas.length - 1];
+    if (!aiAulasContextoIds.value.includes(ultima.id)) {
+      aiAulasContextoIds.value.push(ultima.id);
+    }
+  }
+});
 
 const clockText = ref('00:00');
 function updateClock() {
@@ -1585,11 +1651,96 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <div class="sep"></div>
+      <BaseButton :variant="showAiPanel ? 'primary' : 'secondary'" size="sm" @click.stop="showAiPanel = !showAiPanel" title="Gerar Aula com IA">
+        <span class="material-icons" style="font-size:15px;vertical-align:middle;margin-right:3px;">auto_awesome</span>
+        IA
+      </BaseButton>
+
         <!-- Action Buttons -->
         <div class="flex items-center space-x-2 ml-auto">
           <BaseButton variant="ghost" size="sm" :disabled="props.loading || isSaving" @click="emit('close')">Cancelar</BaseButton>
           <BaseButton variant="primary" size="sm" :loading="props.loading || isSaving" @click="handleSave">Salvar Aula</BaseButton>
         </div>
+    </div>
+
+    <!-- AI LESSON GENERATION PANEL -->
+    <div v-if="showAiPanel" class="ai-panel">
+      <div class="ai-panel-inner">
+        <div class="ai-panel-header">
+          <span class="material-icons" style="font-size:16px;color:var(--c-accent)">auto_awesome</span>
+          <span class="ai-panel-title">Gerar Aula com IA</span>
+          <span class="ai-panel-hint">O markdown gerado substituirá o conteúdo atual do editor.</span>
+          <button class="ai-close-btn" @click="showAiPanel = false" title="Fechar painel">
+            <span class="material-icons" style="font-size:16px">close</span>
+          </button>
+        </div>
+        <div class="ai-panel-body">
+          <!-- Tema -->
+          <div class="ai-field">
+            <label class="ai-label">Tema / Assunto da Aula<span v-if="aiAulasContextoIds.length === 0" class="ai-required">*</span></label>
+            <input
+              v-model="aiTema"
+              class="ai-input"
+              placeholder="Ex: Introdução à Lógica de Programação"
+              :disabled="isGeneratingAula"
+            />
+          </div>
+
+          <!-- Observações -->
+          <div class="ai-field">
+            <label class="ai-label">Observações (opcional)</label>
+            <textarea
+              v-model="aiObservacoes"
+              class="ai-textarea"
+              placeholder="Detalhes, requisitos específicos ou preferências para a geração (ex: use exemplos ligados ao dia a dia da turma, aprofunde um tópico específico, inclua uma atividade prática)."
+              :disabled="isGeneratingAula"
+              rows="3"
+            ></textarea>
+          </div>
+
+          <!-- Aulas de referência -->
+          <div class="ai-field" v-if="props.aulas && props.aulas.length > 0">
+            <label class="ai-label">Usar aulas anteriores como referência?
+              <span class="material-icons ai-info" title="Recomendação: adicione a última aula para contexto sequencial da aula.">info_outline</span>
+            </label>
+            <div class="ai-aulas-list">
+              <label
+                v-for="aula in props.aulas"
+                :key="aula.id"
+                class="ai-aula-check"
+                :class="{ 'ai-aula-check--selected': aiAulasContextoIds.includes(aula.id) }"
+              >
+                <input
+                  type="checkbox"
+                  :value="aula.id"
+                  :checked="aiAulasContextoIds.includes(aula.id)"
+                  @change="toggleAulaContexto(aula.id)"
+                  :disabled="isGeneratingAula"
+                  class="sr-only"
+                />
+                <span class="material-icons ai-check-icon">{{ aiAulasContextoIds.includes(aula.id) ? 'check_box' : 'check_box_outline_blank' }}</span>
+                <span class="ai-aula-title">{{ aula.titulo }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Generate button -->
+          <div class="ai-panel-actions">
+            <BaseButton
+              variant="primary"
+              size="sm"
+              :loading="isGeneratingAula"
+              :disabled="isGeneratingAula || (!aiTema.trim() && aiAulasContextoIds.length === 0)"
+              @click="handleGenerateAulaIA"
+            >
+              <span v-if="!isGeneratingAula" class="material-icons" style="font-size:15px;vertical-align:middle;margin-right:3px;">bolt</span>
+              {{ isGeneratingAula ? 'Gerando aula...' : 'Gerar Aula' }}
+            </BaseButton>
+            <BaseButton variant="ghost" size="sm" :disabled="isGeneratingAula" @click="showAiPanel = false">Cancelar</BaseButton>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- MAIN SPLIT -->
@@ -1759,6 +1910,68 @@ onBeforeUnmount(() => {
   border-color: var(--c-accent);
   box-shadow: 0 0 0 2px var(--c-accent-light);
 }
+
+/* AI LESSON PANEL */
+.ai-panel {
+  background: var(--c-surface-alt);
+  border-bottom: 2px solid var(--c-accent);
+  z-index: 90;
+  flex-shrink: 0;
+}
+.ai-panel-inner { max-width: 960px; margin: 0 auto; padding: 12px 20px; }
+.ai-panel-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.ai-panel-title { font-size: 13px; font-weight: 700; color: var(--c-primary); }
+.ai-panel-hint { font-size: 11px; color: var(--c-muted); flex: 1; }
+.ai-close-btn {
+  display:flex; align-items:center; justify-content:center;
+  width:24px; height:24px; border-radius:4px; border:none;
+  background:transparent; color:var(--c-secondary); cursor:pointer;
+}
+.ai-close-btn:hover { background:var(--c-line); color:var(--c-primary); }
+.ai-panel-body { display: flex; flex-direction: column; gap: 10px; }
+.ai-field { display: flex; flex-direction: column; gap: 4px; }
+.ai-label { font-size: 11px; font-weight: 600; color: var(--c-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.ai-required { color: var(--c-danger); margin-left: 2px; }
+.ai-info {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; margin-left: 4px; border-radius: 50%;
+  font-size: 13px;
+  color: var(--c-primary); background: var(--c-line); cursor: help;
+  vertical-align: middle; line-height: 1;
+}
+.ai-input {
+  height: 32px; padding: 0 10px;
+  background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 6px;
+  color: var(--c-primary); font-size: 13px; font-family: var(--font-sans); outline:none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.ai-input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 2px var(--c-accent-light); }
+.ai-input:disabled { opacity:0.5; cursor:not-allowed; }
+.ai-textarea {
+  padding: 8px 10px; resize: vertical; min-height: 60px;
+  background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 6px;
+  color: var(--c-primary); font-size: 13px; font-family: var(--font-sans); outline:none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.ai-textarea:focus { border-color: var(--c-accent); box-shadow: 0 0 0 2px var(--c-accent-light); }
+.ai-textarea:disabled { opacity:0.5; cursor:not-allowed; }
+.ai-aulas-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-aula-check {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 4px 10px 4px 6px;
+  border: 1px solid var(--c-line); border-radius: 6px;
+  font-size: 12px; color: var(--c-secondary);
+  background: var(--c-surface);
+  transition: all .15s; user-select: none;
+}
+.ai-aula-check:hover { border-color: var(--c-accent); color: var(--c-primary); }
+.ai-aula-check--selected { border-color: var(--c-accent); background: var(--c-accent-light); color: var(--c-accent); }
+.ai-check-icon { font-size: 16px !important; flex-shrink: 0; }
+.ai-aula-title { font-size: 12px; }
+.ai-panel-actions { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
 
 #editor-pane {
   width: 42%; min-width: 320px;

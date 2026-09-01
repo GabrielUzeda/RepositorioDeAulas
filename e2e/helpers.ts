@@ -1,4 +1,5 @@
-import { APIRequestContext, expect, Page } from '@playwright/test';
+import { expect } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 import { ADMIN_EMAIL, ADMIN_PASSWORD, E2E_BACKEND_URL } from './playwright.config';
 
 export { ADMIN_EMAIL, ADMIN_PASSWORD, E2E_BACKEND_URL };
