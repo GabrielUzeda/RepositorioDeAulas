@@ -553,35 +553,53 @@ async function handleDeleteDraft(draftId: number) {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" class="md:col-span-2" />
               <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" class="md:col-span-2" />
-              <div class="md:col-span-2">
-                <label class="block text-xs font-semibold uppercase tracking-wider text-secondary mb-1.5 flex items-center justify-between">
-                  <span>Vincular Aulas (Opcional - selecione 0, 1 ou mais)</span>
-                  <span class="text-[11px] font-normal text-secondary">
-                    {{ selectedAulaIds.length === 0 ? 'Nenhuma aula vinculada (Atividade Geral)' : `${selectedAulaIds.length} aula(s) selecionada(s)` }}
+              <div class="md:col-span-2 space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="block text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+                    <span class="material-icons text-sm text-accent">link</span>
+                    <span>Vincular Aulas</span>
+                  </label>
+                  <span class="text-xs font-medium text-accent bg-accent/10 px-2 py-0.5 rounded-full">
+                    {{ selectedAulaIds.length === 0 ? 'Atividade Geral (0 aulas)' : `${selectedAulaIds.length} aula(s) selecionada(s)` }}
                   </span>
-                </label>
-                <div v-if="props.aulas.length === 0" class="text-xs text-secondary italic py-1">
-                  Nenhuma aula cadastrada nesta disciplina.
                 </div>
-                <div v-else class="flex flex-wrap gap-2 p-2.5 bg-surface border border-line rounded-xl max-h-36 overflow-y-auto">
-                  <button
-                    type="button"
+                
+                <p class="text-xs text-secondary">
+                  Você pode selecionar <strong>múltiplas aulas</strong> simultaneamente ou deixar <strong>nenhuma aula</strong> selecionada para tornar a atividade geral da disciplina.
+                </p>
+
+                <div v-if="props.aulas.length === 0" class="p-3 bg-surface-alt border border-line rounded-xl text-xs text-secondary italic">
+                  Nenhuma aula cadastrada nesta disciplina. A atividade será criada como Atividade Geral.
+                </div>
+
+                <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-surface border border-line rounded-xl max-h-48 overflow-y-auto">
+                  <!-- Opção 0: Atividade Geral -->
+                  <label
                     @click="selectedAulaIds = []"
-                    :class="['px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border flex items-center gap-1.5', selectedAulaIds.length === 0 ? 'bg-accent text-white border-accent' : 'bg-surface-alt text-secondary border-line hover:border-accent']"
+                    :class="['p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2.5 select-none', selectedAulaIds.length === 0 ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs' : 'bg-surface-alt border-line text-secondary hover:border-line/80']"
                   >
-                    <span class="material-icons text-xs">{{ selectedAulaIds.length === 0 ? 'check_circle' : 'radio_button_unchecked' }}</span>
-                    Nenhuma (Atividade Geral)
-                  </button>
-                  <button
+                    <input type="radio" :checked="selectedAulaIds.length === 0" class="sr-only" />
+                    <span class="material-icons text-base">{{ selectedAulaIds.length === 0 ? 'check_circle' : 'radio_button_unchecked' }}</span>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-xs font-bold leading-tight">Nenhuma (Atividade Geral)</p>
+                      <p class="text-[11px] opacity-75 leading-none mt-0.5">Visível para toda a disciplina</p>
+                    </div>
+                  </label>
+
+                  <!-- Opções de Aulas -->
+                  <label
                     v-for="aula in props.aulas"
                     :key="aula.id"
-                    type="button"
                     @click="toggleAulaSelection(aula.id)"
-                    :class="['px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border flex items-center gap-1.5', isAulaSelected(aula.id) ? 'bg-accent/15 text-accent border-accent font-semibold' : 'bg-surface-alt text-primary border-line hover:border-accent']"
+                    :class="['p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2.5 select-none', isAulaSelected(aula.id) ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs' : 'bg-surface-alt border-line text-primary hover:border-accent/40']"
                   >
-                    <span class="material-icons text-xs text-accent">{{ isAulaSelected(aula.id) ? 'check_box' : 'check_box_outline_blank' }}</span>
-                    {{ aula.titulo }}
-                  </button>
+                    <input type="checkbox" :checked="isAulaSelected(aula.id)" class="sr-only" />
+                    <span class="material-icons text-base text-accent">{{ isAulaSelected(aula.id) ? 'check_box' : 'check_box_outline_blank' }}</span>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-xs font-medium leading-tight truncate">{{ aula.titulo }}</p>
+                      <p class="text-[11px] text-secondary leading-none mt-0.5">Aula {{ aula.ordem != null ? `#${aula.ordem}` : '' }}</p>
+                    </div>
+                  </label>
                 </div>
               </div>
               <div class="md:col-span-2">
