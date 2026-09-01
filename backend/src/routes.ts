@@ -205,6 +205,11 @@ function renderEmailHtmlContent(text: string): string {
 function readCursoSenha(c: any): string | null {
   const header = c.req.header('x-curso-senha')?.trim() || c.req.header('x-materia-senha')?.trim();
   if (header) return header;
+  const cookieHeader = c.req.header('cookie');
+  if (cookieHeader) {
+    const match = cookieHeader.match(/curso_senha=([^;]+)/);
+    if (match && match[1]) return decodeURIComponent(match[1]);
+  }
   const q = c.req.query('senha');
   return q && q.length > 0 ? q : null;
 }
@@ -2246,6 +2251,10 @@ async function serveStaticDisciplinaContent(c: any) {
   const abs = path.join(resolveFrontendDir(), 'materias', safe);
   const served = serveFileWithCsp(abs);
   if (!served) return c.text('Not found', 404);
+  const senha = readCursoSenha(c);
+  if (senha) {
+    c.header('Set-Cookie', `curso_senha=${encodeURIComponent(senha)}; Path=/; Max-Age=14400; SameSite=Lax`);
+  }
   return served;
 }
 
