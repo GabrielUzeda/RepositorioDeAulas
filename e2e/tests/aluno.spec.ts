@@ -1,4 +1,5 @@
-import { test, expect, Page, APIRequestContext } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import type { Page, APIRequestContext } from '@playwright/test';
 import {
   createCurso,
   createMateria,
@@ -117,7 +118,7 @@ test.describe('Aluno — fluxo completo (curso → materia → senha → aulas/a
     const popupPromise = context.waitForEvent('page');
     await page.locator('h3', { hasText: aulaTitulo }).click();
     const aulaPage = await popupPromise;
-    await aulaPage.waitForLoadState('domcontentloaded');
+    await aulaPage.waitForURL(/\/materias\//, { timeout: 15000 });
     expect(aulaPage.url()).toContain('/materias/');
     await aulaPage.close();
 

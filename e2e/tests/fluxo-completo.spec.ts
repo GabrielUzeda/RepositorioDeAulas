@@ -1,4 +1,5 @@
-import { test, expect, Page, APIRequestContext, BrowserContext } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import type { Page, APIRequestContext, BrowserContext } from '@playwright/test';
 import {
   createCurso,
   createMateria,

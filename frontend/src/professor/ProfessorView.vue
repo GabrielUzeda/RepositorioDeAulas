@@ -1125,6 +1125,8 @@ function handleOpenRespostas(atividade: Atividade) {
       :descricao="editingAula?.descricao"
       :markdown="editingAula?.conteudo_md"
       :loading="isSavingAula"
+      :aulas="cursoStore.aulas"
+      :disciplina-id="selectedDisciplina?.id"
       @close="showMarpModal = false"
       @save="handleSaveMarpAula"
     />
