@@ -43,16 +43,17 @@ const ALLOWED_TAGS = new Set([
 
 function decodeHtmlEntities(str: string): string {
   if (!str) return '';
-  if (!str.includes('&lt;') && !str.includes('&gt;') && !str.includes('&amp;') && !str.includes('&quot;')) {
-    return str;
+  let current = str;
+  let passes = 0;
+  const txt = document.createElement('textarea');
+  while (passes < 3 && (current.includes('&lt;') || current.includes('&gt;') || current.includes('&amp;'))) {
+    txt.innerHTML = current;
+    const decoded = txt.value;
+    if (decoded === current) break;
+    current = decoded;
+    passes++;
   }
-  try {
-    const txt = document.createElement('textarea');
-    txt.innerHTML = str;
-    return txt.value;
-  } catch {
-    return str;
-  }
+  return current;
 }
 
 function sanitizeRichText(html: string): string {
