@@ -33,14 +33,9 @@ const charCount = computed(() => {
 const exec = (command: string, value: string | null = null) => {
   if (!editor.value) return;
   editor.value.focus();
-  try {
-    if (command === 'formatBlock' && value) {
-      document.execCommand('formatBlock', false, `<${value}>`);
-    } else {
-      document.execCommand(command, false, value || undefined);
-    }
-  } catch (_e) {
-    // Fallback if browser requires command without brackets
+  if (command === 'formatBlock' && value) {
+    document.execCommand('formatBlock', false, value.toUpperCase());
+  } else {
     document.execCommand(command, false, value || undefined);
   }
   updateValue();
