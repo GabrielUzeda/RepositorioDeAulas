@@ -167,9 +167,11 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     }
   }
 
+  const isDiscursive = tipo === 'normal' || tipo === 'prova';
+
   const tipoInstrucao: Record<string, string> = {
-    normal: 'Atividade padrão: Crie questões de múltipla escolha com 4 alternativas (A, B, C, D), marcando a correta e fornecendo feedback explicativo pedagógico conciso para cada alternativa.',
-    prova: 'Avaliação formal/Prova: Questões objetivas rigorosas de múltipla escolha com 4 alternativas, marcando exatamente 1 como correta e fornecendo feedback explicativo conciso.',
+    normal: 'Atividade Discursiva (Normal): Crie questões abertas e dissertativas. NÃO gere alternativas. Cada questão deve ter apenas um enunciado claro que o aluno responderá com texto livre.',
+    prova: 'Prova Discursiva: Crie questões dissertativas formais e rigorosas, sem alternativas. Cada questão deve exigir uma resposta elaborada e contextualizada do aluno.',
     minigame: 'Minigame de Naves: Questões com enunciado direto e objetivo, com 4 alternativas curtas. NÃO inclua feedbacks nas alternativas (apenas text e correct).',
     roleta: 'Roleta do Conhecimento: Perguntas instigantes e dinâmicas de múltipla escolha com 4 alternativas e feedback explicativo.',
     reforco: 'Reforço Pedagógico: Questões formativas com 4 alternativas, onde cada alternativa incorreta explica claramente o equívoco no feedback pedagógico para auxiliar a fixação.'
@@ -177,19 +179,31 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
 
   const selectedTipoInstrucao = tipoInstrucao[tipo] || tipoInstrucao.normal;
 
-  const systemPrompt = `Você é um assistente pedagógico de elite para professores do ensino técnico e superior.
-Sua missão é gerar atividades avaliativas interativas de alta qualidade com base no conteúdo das aulas ministradas pelo professor.
-
-DIRETRIZES FUNDAMENTAIS:
-1. Mantenha todas as questões estritamente alinhadas ao conteúdo, conceitos, nomenclaturas e exemplos fornecidos no contexto das aulas.
-2. Não invente conceitos fora do escopo do material didático fornecido.
-3. Se observações específicas do professor forem passadas, siga-as com prioridade.
-4. Tipo de Atividade solicitada: "${tipo}" (${selectedTipoInstrucao}).
-5. Crie exatamente ${quantidade} questões.
-6. A resposta DEVE ser estritamente um objeto JSON válido no formato especificado, sem blocos de código Markdown ao redor, sem texto antes ou depois.
-
-FORMATO JSON OBRIGATÓRIO:
-{
+  const formatoJson = isDiscursive
+    ? `{
+  "questions": [
+    {
+      "title": "Questão 1",
+      "content": "Enunciado claro e detalhado da questão dissertativa aqui..."
+    }
+  ]
+}`
+    : tipo === 'minigame'
+    ? `{
+  "questions": [
+    {
+      "title": "Questão 1",
+      "content": "Enunciado direto e objetivo da questão aqui...",
+      "options": [
+        { "text": "Alternativa A", "correct": true },
+        { "text": "Alternativa B", "correct": false },
+        { "text": "Alternativa C", "correct": false },
+        { "text": "Alternativa D", "correct": false }
+      ]
+    }
+  ]
+}`
+    : `{
   "questions": [
     {
       "title": "Questão 1",
@@ -203,6 +217,21 @@ FORMATO JSON OBRIGATÓRIO:
     }
   ]
 }`;
+
+  const systemPrompt = `Você é um assistente pedagógico de elite para professores do ensino técnico e superior.
+Sua missão é gerar atividades avaliativas interativas de alta qualidade com base no conteúdo das aulas ministradas pelo professor.
+
+DIRETRIZES FUNDAMENTAIS:
+1. Mantenha todas as questões estritamente alinhadas ao conteúdo, conceitos, nomenclaturas e exemplos fornecidos no contexto das aulas.
+2. Não invente conceitos fora do escopo do material didático fornecido.
+3. Se observações específicas do professor forem passadas, siga-as com prioridade.
+4. Tipo de Atividade solicitada: "${tipo}" (${selectedTipoInstrucao}).
+5. Crie exatamente ${quantidade} questões.
+6. A resposta DEVE ser estritamente um objeto JSON válido no formato especificado, sem blocos de código Markdown ao redor, sem texto antes ou depois.
+${isDiscursive ? '7. IMPORTANTE: questões discursivas NÃO possuem alternativas. Gere apenas "title" e "content" por questão.' : ''}
+
+FORMATO JSON OBRIGATÓRIO:
+${formatoJson}`;
 
   let userPrompt = `TEMA PRINCIPAL: ${tema || titulo || 'Conteúdo das aulas fornecidas'}\n`;
   if (titulo) userPrompt += `TÍTULO DA ATIVIDADE: ${titulo}\n`;
@@ -361,23 +390,30 @@ FORMATO JSON OBRIGATÓRIO:
   }
 
   const normalizedQuestions = successfulResponse.questions.map((q: any, index: number) => {
-    const rawOptions = Array.isArray(q.options) ? q.options : (Array.isArray(q.alternativas) ? q.alternativas : []);
-    const options = rawOptions.map((opt: any) => ({
-      text: String(opt.text || opt.label || opt.opcao || '').trim(),
-      correct: Boolean(opt.correct || opt.isCorrect || opt.correta),
-      feedback: tipo === 'minigame' ? '' : String(opt.feedback || opt.justificativa || '').trim()
-    }));
-
-    const hasCorrect = options.some((o: any) => o.correct);
-    if (!hasCorrect && options.length > 0) {
-      options[0].correct = true;
-    }
-
-    return {
+    const result: any = {
       title: String(q.title || `Questão ${index + 1}`),
       content: String(q.content || q.enunciado || q.pergunta || '').trim(),
-      options: options.length > 0 ? options : undefined
     };
+
+    if (!isDiscursive) {
+      const rawOptions = Array.isArray(q.options) ? q.options : (Array.isArray(q.alternativas) ? q.alternativas : []);
+      const options = rawOptions.map((opt: any) => ({
+        text: String(opt.text || opt.label || opt.opcao || '').trim(),
+        correct: Boolean(opt.correct || opt.isCorrect || opt.correta),
+        feedback: tipo === 'minigame' ? '' : String(opt.feedback || opt.justificativa || '').trim()
+      }));
+
+      const hasCorrect = options.some((o: any) => o.correct);
+      if (!hasCorrect && options.length > 0) {
+        options[0].correct = true;
+      }
+
+      if (options.length > 0) {
+        result.options = options;
+      }
+    }
+
+    return result;
   });
 
   return c.json({

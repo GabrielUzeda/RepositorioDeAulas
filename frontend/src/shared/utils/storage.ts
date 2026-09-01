@@ -1,4 +1,5 @@
-const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 1 mês
+const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 1 mês (default)
+const FOUR_HOURS_MS = 4 * 60 * 60 * 1000; // 4 horas (senhas de aluno)
 const KEY_STORAGE_PREFIX = 'enc_key_v1';
 const PREFIX = 'enc:';
 
@@ -68,17 +69,20 @@ interface StoredValue {
   exp: number;
 }
 
-export async function secureSet(key: string, value: string): Promise<void> {
+export async function secureSet(key: string, value: string, customExpiryMs?: number): Promise<void> {
+  const effectiveExpiryMs = customExpiryMs ?? (
+    key.startsWith('curso_senha_') || key.startsWith('curso_access_') ? FOUR_HOURS_MS : EXPIRY_MS
+  );
   const cryptoKey = await getCryptoKey();
   if (!cryptoKey) {
     console.warn('[secure-storage] Contexto não seguro (HTTP); armazenando sem criptografia');
-    const plain = JSON.stringify({ v: value, exp: Date.now() + EXPIRY_MS } satisfies StoredValue);
+    const plain = JSON.stringify({ v: value, exp: Date.now() + effectiveExpiryMs } satisfies StoredValue);
     localStorage.setItem(key, JSON.stringify({ p: 'plain', data: plain }));
     return;
   }
 
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const plain = JSON.stringify({ v: value, exp: Date.now() + EXPIRY_MS } satisfies StoredValue);
+  const plain = JSON.stringify({ v: value, exp: Date.now() + effectiveExpiryMs } satisfies StoredValue);
   const cipher = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     cryptoKey,

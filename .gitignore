@@ -30,6 +30,7 @@ backend/database/data/
 backend/data/
 backend/frontend_static/
 frontend/src/turmas/
+frontend/src/materias/
 
 # Database Backups
 backups/*.sql

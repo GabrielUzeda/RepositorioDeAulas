@@ -36,6 +36,64 @@ const editingNotaStr = computed<string>({
   set: (v: string) => { editingNota.value = v === '' ? null : Number(v); }
 });
 
+const ALLOWED_TAGS = new Set([
+  'P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'H2', 'H3', 'H4',
+  'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'SPAN', 'A', 'DIV'
+]);
+
+function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
+  let current = str;
+  let passes = 0;
+  const txt = document.createElement('textarea');
+  while (passes < 3 && (current.includes('&lt;') || current.includes('&gt;') || current.includes('&amp;'))) {
+    txt.innerHTML = current;
+    const decoded = txt.value;
+    if (decoded === current) break;
+    current = decoded;
+    passes++;
+  }
+  return current;
+}
+
+function sanitizeRichText(html: string): string {
+  if (!html) return '<span class="text-secondary opacity-60">(Sem resposta)</span>';
+  let decoded = decodeHtmlEntities(html);
+  if (!/<[a-z][\s\S]*>/i.test(decoded)) {
+    return decoded.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+  }
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(decoded, 'text/html');
+    const sanitizeNode = (node: Node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (!ALLOWED_TAGS.has(el.tagName.toUpperCase())) {
+          const parent = el.parentNode;
+          while (el.firstChild) parent?.insertBefore(el.firstChild, el);
+          parent?.removeChild(el);
+          return;
+        }
+        const attrs = Array.from(el.attributes);
+        for (const attr of attrs) {
+          const attrName = attr.name.toLowerCase();
+          const attrVal = attr.value.trim().toLowerCase();
+          if (attrName.startsWith('on') || attrVal.startsWith('javascript:') || attrVal.startsWith('data:')) {
+            el.removeAttribute(attr.name);
+          }
+        }
+      }
+      for (const child of Array.from(node.childNodes)) {
+        sanitizeNode(child);
+      }
+    };
+    sanitizeNode(doc.body);
+    return doc.body.innerHTML || decoded;
+  } catch (_e) {
+    return decoded;
+  }
+}
+
 const parsedQuestionsMap = computed<Question[]>(() => {
   if (!props.atividade?.json_data) return [];
   try {
@@ -332,9 +390,10 @@ function scoreColor(nota: number | null | undefined) {
                   <span class="px-2 py-0.5 bg-accent/15 text-accent rounded-md text-xs font-bold shrink-0">Q{{ idx + 1 }}</span>
                   <span class="text-xs font-medium text-primary leading-snug">{{ item.label }}</span>
                 </div>
-                <div class="px-4 py-3 bg-surface text-sm text-primary font-mono whitespace-pre-wrap leading-relaxed">
-                  {{ item.value || '(Sem resposta)' }}
-                </div>
+                <div
+                  class="px-4 py-3 bg-surface text-sm text-primary leading-relaxed border-t border-line/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-accent [&_blockquote]:pl-3 [&_blockquote]:italic [&_pre]:bg-surface-alt [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:font-mono [&_pre]:text-xs [&_pre]:border [&_pre]:border-line [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs max-w-none"
+                  v-html="sanitizeRichText(item.value)"
+                ></div>
               </div>
             </div>
           </div>

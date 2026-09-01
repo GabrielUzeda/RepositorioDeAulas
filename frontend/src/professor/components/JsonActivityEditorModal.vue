@@ -44,7 +44,7 @@ const { success, error, info } = useToast();
 const titulo = ref('');
 const descricao = ref('');
 const tipo = ref<'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco'>('normal');
-const aulaId = ref<string | number>('');
+const selectedAulaIds = ref<number[]>([]);
 const allowPassword = ref(false);
 const senha = ref('');
 const questions = ref<Question[]>([]);
@@ -52,31 +52,19 @@ const isSaving = ref(false);
 const activeQIndex = ref(0);
 const showBasicInfo = ref(true);
 
-const aulaOptions = computed(() => [
-  { label: 'Nenhuma (Atividade Geral)', value: '' },
-  ...props.aulas.map((a) => ({ label: a.titulo, value: String(a.id) })),
-]);
+const isAulaSelected = (id: number) => selectedAulaIds.value.includes(id);
+const toggleAulaSelection = (id: number) => {
+  if (isAulaSelected(id)) {
+    selectedAulaIds.value = selectedAulaIds.value.filter((aId) => aId !== id);
+  } else {
+    selectedAulaIds.value.push(id);
+  }
+};
 
 const effectiveLinkedAulas = computed<Aula[]>(() => {
-  if (aulaId.value) {
-    const selectedId = Number(aulaId.value);
-    const found = props.aulas.find((a) => a.id === selectedId);
-    return found ? [found] : [];
-  }
-  const atvAulaIds = props.atividade?.aula_ids;
-  if (atvAulaIds && atvAulaIds.length > 0) {
-    const ids = new Set(atvAulaIds);
+  if (selectedAulaIds.value.length > 0) {
+    const ids = new Set(selectedAulaIds.value);
     return props.aulas.filter((a) => ids.has(a.id));
-  }
-  const atvAulaId = props.atividade?.aula_id;
-  if (atvAulaId) {
-    const found = props.aulas.find((a) => a.id === atvAulaId);
-    return found ? [found] : [];
-  }
-  if (props.defaultAulaId) {
-    const defId = props.defaultAulaId;
-    const found = props.aulas.find((a) => a.id === defId);
-    return found ? [found] : [];
   }
   return [];
 });
@@ -135,7 +123,7 @@ function scheduleAutoSave() {
       titulo: titulo.value,
       descricao: descricao.value,
       tipo: tipo.value,
-      aulaId: aulaId.value,
+      selectedAulaIds: selectedAulaIds.value,
       allowPassword: allowPassword.value,
       senha: senha.value,
       questions: questions.value,
@@ -149,7 +137,7 @@ function scheduleAutoSave() {
 }
 
 watch(
-  [titulo, descricao, tipo, aulaId, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
+  [titulo, descricao, tipo, selectedAulaIds, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
   () => {
     scheduleAutoSave();
   },
@@ -169,7 +157,13 @@ watch(
         titulo.value = props.atividade.titulo || '';
         descricao.value = props.atividade.descricao || '';
         tipo.value = (props.atividade.tipo as any) || 'normal';
-        aulaId.value = props.atividade.aula_id ? String(props.atividade.aula_id) : (props.atividade.aula_ids && props.atividade.aula_ids.length > 0 ? String(props.atividade.aula_ids[0]) : '');
+        if (props.atividade.aula_ids && Array.isArray(props.atividade.aula_ids) && props.atividade.aula_ids.length > 0) {
+          selectedAulaIds.value = [...props.atividade.aula_ids];
+        } else if (props.atividade.aula_id) {
+          selectedAulaIds.value = [props.atividade.aula_id];
+        } else {
+          selectedAulaIds.value = [];
+        }
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
         aiTema.value = '';
@@ -195,7 +189,13 @@ watch(
             titulo.value = parsed.titulo || '';
             descricao.value = parsed.descricao || '';
             tipo.value = parsed.tipo || 'normal';
-            aulaId.value = parsed.aulaId !== undefined ? String(parsed.aulaId) : (props.defaultAulaId ? String(props.defaultAulaId) : '');
+            if (Array.isArray(parsed.selectedAulaIds)) {
+              selectedAulaIds.value = parsed.selectedAulaIds;
+            } else if (parsed.aulaId) {
+              selectedAulaIds.value = [Number(parsed.aulaId)];
+            } else {
+              selectedAulaIds.value = props.defaultAulaId ? [props.defaultAulaId] : [];
+            }
             allowPassword.value = !!parsed.allowPassword;
             senha.value = parsed.senha || '';
             aiTema.value = parsed.aiTema || '';
@@ -269,7 +269,7 @@ function resetToEmpty() {
   titulo.value = '';
   descricao.value = '';
   tipo.value = 'normal';
-  aulaId.value = props.defaultAulaId ? String(props.defaultAulaId) : '';
+  selectedAulaIds.value = props.defaultAulaId ? [props.defaultAulaId] : [];
   allowPassword.value = false;
   senha.value = '';
   questions.value = [];
@@ -337,11 +337,14 @@ async function handleSave() {
   if (isSaving.value || props.loading) return;
   isSaving.value = true;
   await secureRemove(draftStorageKey.value);
+  const targetAulaIds = selectedAulaIds.value;
+  const primaryAulaId = targetAulaIds.length > 0 ? targetAulaIds[0] : null;
   emit('save', {
     titulo: titulo.value,
     descricao: descricao.value,
     tipo: tipo.value,
-    aula_id: aulaId.value ? Number(aulaId.value) : null,
+    aula_id: primaryAulaId,
+    aula_ids: targetAulaIds,
     allow_password: allowPassword.value,
     senha: allowPassword.value ? senha.value : null,
     caminho: titulo.value.toLowerCase().replace(/\s+/g, '_'),
@@ -549,8 +552,56 @@ async function handleDeleteDraft(draftId: number) {
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <BaseInput v-model="titulo" type="text" label="Título da Atividade *" placeholder="Ex: Avaliação de Algoritmos" class="md:col-span-2" />
-              <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" />
-              <BaseSelect v-model="aulaId" :options="aulaOptions" label="Vincular a uma Aula (Opcional)" />
+              <BaseSelect v-model="tipo" :options="tipoOptions" label="Tipo de Atividade" @change="handleTypeChange" class="md:col-span-2" />
+              <div class="md:col-span-2 space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="block text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+                    <span class="material-icons text-sm text-accent">link</span>
+                    <span>Vincular Aulas</span>
+                  </label>
+                  <span class="text-xs font-medium text-accent bg-accent/10 px-2 py-0.5 rounded-full">
+                    {{ selectedAulaIds.length === 0 ? 'Atividade Geral (0 aulas)' : `${selectedAulaIds.length} aula(s) selecionada(s)` }}
+                  </span>
+                </div>
+                
+                <p class="text-xs text-secondary">
+                  Você pode selecionar <strong>múltiplas aulas</strong> simultaneamente ou deixar <strong>nenhuma aula</strong> selecionada para tornar a atividade geral da disciplina.
+                </p>
+
+                <div v-if="props.aulas.length === 0" class="p-3 bg-surface-alt border border-line rounded-xl text-xs text-secondary italic">
+                  Nenhuma aula cadastrada nesta disciplina. A atividade será criada como Atividade Geral.
+                </div>
+
+                <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-surface border border-line rounded-xl max-h-48 overflow-y-auto">
+                  <!-- Opção 0: Atividade Geral -->
+                  <button
+                    type="button"
+                    @click.prevent="selectedAulaIds = []"
+                    :class="['p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2.5 select-none text-left w-full', selectedAulaIds.length === 0 ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs' : 'bg-surface-alt border-line text-secondary hover:border-line/80']"
+                  >
+                    <span class="material-icons text-base">{{ selectedAulaIds.length === 0 ? 'check_circle' : 'radio_button_unchecked' }}</span>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-xs font-bold leading-tight">Nenhuma (Atividade Geral)</p>
+                      <p class="text-[11px] opacity-75 leading-none mt-0.5">Visível para toda a disciplina</p>
+                    </div>
+                  </button>
+
+                  <!-- Opções de Aulas -->
+                  <button
+                    v-for="aula in props.aulas"
+                    :key="aula.id"
+                    type="button"
+                    @click.prevent="toggleAulaSelection(aula.id)"
+                    :class="['p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2.5 select-none text-left w-full', isAulaSelected(aula.id) ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs' : 'bg-surface-alt border-line text-primary hover:border-accent/40']"
+                  >
+                    <span class="material-icons text-base text-accent">{{ isAulaSelected(aula.id) ? 'check_box' : 'check_box_outline_blank' }}</span>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-xs font-medium leading-tight truncate">{{ aula.titulo }}</p>
+                      <p class="text-[11px] text-secondary leading-none mt-0.5">Aula {{ aula.ordem != null ? `#${aula.ordem}` : '' }}</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
               <div class="md:col-span-2">
                 <BaseTextarea v-model="descricao" :rows="3" label="Descrição / Orientações para Alunos" placeholder="Breve resumo ou instruções da atividade para os alunos..." />
               </div>
