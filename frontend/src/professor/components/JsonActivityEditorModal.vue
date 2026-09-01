@@ -574,32 +574,32 @@ async function handleDeleteDraft(draftId: number) {
 
                 <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-surface border border-line rounded-xl max-h-48 overflow-y-auto">
                   <!-- Opção 0: Atividade Geral -->
-                  <label
-                    @click="selectedAulaIds = []"
-                    :class="['p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2.5 select-none', selectedAulaIds.length === 0 ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs' : 'bg-surface-alt border-line text-secondary hover:border-line/80']"
+                  <button
+                    type="button"
+                    @click.prevent="selectedAulaIds = []"
+                    :class="['p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2.5 select-none text-left w-full', selectedAulaIds.length === 0 ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs' : 'bg-surface-alt border-line text-secondary hover:border-line/80']"
                   >
-                    <input type="radio" :checked="selectedAulaIds.length === 0" class="sr-only" />
                     <span class="material-icons text-base">{{ selectedAulaIds.length === 0 ? 'check_circle' : 'radio_button_unchecked' }}</span>
                     <div class="min-w-0 flex-1">
                       <p class="text-xs font-bold leading-tight">Nenhuma (Atividade Geral)</p>
                       <p class="text-[11px] opacity-75 leading-none mt-0.5">Visível para toda a disciplina</p>
                     </div>
-                  </label>
+                  </button>
 
                   <!-- Opções de Aulas -->
-                  <label
+                  <button
                     v-for="aula in props.aulas"
                     :key="aula.id"
-                    @click="toggleAulaSelection(aula.id)"
-                    :class="['p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2.5 select-none', isAulaSelected(aula.id) ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs' : 'bg-surface-alt border-line text-primary hover:border-accent/40']"
+                    type="button"
+                    @click.prevent="toggleAulaSelection(aula.id)"
+                    :class="['p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2.5 select-none text-left w-full', isAulaSelected(aula.id) ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs' : 'bg-surface-alt border-line text-primary hover:border-accent/40']"
                   >
-                    <input type="checkbox" :checked="isAulaSelected(aula.id)" class="sr-only" />
                     <span class="material-icons text-base text-accent">{{ isAulaSelected(aula.id) ? 'check_box' : 'check_box_outline_blank' }}</span>
                     <div class="min-w-0 flex-1">
                       <p class="text-xs font-medium leading-tight truncate">{{ aula.titulo }}</p>
                       <p class="text-[11px] text-secondary leading-none mt-0.5">Aula {{ aula.ordem != null ? `#${aula.ordem}` : '' }}</p>
                     </div>
-                  </label>
+                  </button>
                 </div>
               </div>
               <div class="md:col-span-2">
