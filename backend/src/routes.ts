@@ -188,6 +188,19 @@ function escapeHtml(value: any): string {
     .replace(/'/g, '&#039;');
 }
 
+function renderEmailHtmlContent(text: string): string {
+  if (!text) return '';
+  if (/<[a-z][\s\S]*>/i.test(text)) {
+    return text
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+      .replace(/\son\w+="[^"]*"/gi, '')
+      .replace(/\son\w+='[^']*'/gi, '')
+      .replace(/javascript:/gi, '');
+  }
+  return escapeHtml(text).replace(/\n/g, '<br/>');
+}
+
 // [2.6] Leitura única e coesa da "senha" de acesso do aluno ao curso.
 function readCursoSenha(c: any): string | null {
   const header = c.req.header('x-curso-senha')?.trim() || c.req.header('x-materia-senha')?.trim();
@@ -1122,7 +1135,7 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
             const tituloQuestao = escapeHtml(q.title || q.titulo || q.statement || q.content || `Questão ${idx + 1}`);
             return `<div style="margin-bottom: 12px; padding: 10px; background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
               <strong style="color: #1e293b;">Questão ${idx + 1}: ${tituloQuestao}</strong><br/>
-              <span style="color: #475569;">Sua resposta: </span><span style="color: #0284c7; font-weight: bold;">${escapeHtml(respText)}</span>
+              <div style="color: #0284c7; margin-top: 4px;">${renderEmailHtmlContent(respText)}</div>
             </div>`;
           }).join('');
         } catch (_e) {
@@ -1864,7 +1877,7 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
       <div style="margin-bottom: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #f8fafc;">
         <strong style="color: #1e293b; font-size: 14px;">${escapeHtml(r.atividade_titulo)}</strong>
         ${r.nota !== null && r.nota !== undefined ? `<span style="float: right; font-weight: bold; color: #4f46e5;">Nota: ${escapeHtml(r.nota)}/100</span>` : ''}
-        ${r.feedback ? `<p style="margin: 6px 0 0 0; color: #475569; font-size: 13px;"><em>Feedback: ${escapeHtml(r.feedback)}</em></p>` : '<p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 12px;">Sem comentários específicos.</p>'}
+        ${r.feedback ? `<div style="margin: 6px 0 0 0; color: #475569; font-size: 13px;"><em>Feedback: ${renderEmailHtmlContent(r.feedback)}</em></div>` : '<p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 12px;">Sem comentários específicos.</p>'}
       </div>
     `).join('');
 
@@ -1877,14 +1890,14 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
         ${feedbackTurma ? `
           <div style="margin-bottom: 16px; padding: 14px; background: #e0e7ff; border-left: 4px solid #4f46e5; border-radius: 4px;">
             <strong style="color: #3730a3;">Recado Geral para a Turma:</strong>
-            <p style="margin: 6px 0 0 0; color: #312e81; font-size: 13px;">${escapeHtml(feedbackTurma)}</p>
+            <div style="margin: 6px 0 0 0; color: #312e81; font-size: 13px;">${renderEmailHtmlContent(feedbackTurma)}</div>
           </div>
         ` : ''}
 
         ${feedbackAluno ? `
           <div style="margin-bottom: 16px; padding: 14px; background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px;">
             <strong style="color: #166534;">Feedback do Professor para Você:</strong>
-            <p style="margin: 6px 0 0 0; color: #14532d; font-size: 13px;">${escapeHtml(feedbackAluno)}</p>
+            <div style="margin: 6px 0 0 0; color: #14532d; font-size: 13px;">${renderEmailHtmlContent(feedbackAluno)}</div>
           </div>
         ` : ''}
 

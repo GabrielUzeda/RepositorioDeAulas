@@ -36,6 +36,48 @@ const editingNotaStr = computed<string>({
   set: (v: string) => { editingNota.value = v === '' ? null : Number(v); }
 });
 
+const ALLOWED_TAGS = new Set([
+  'P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'H2', 'H3', 'H4',
+  'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'SPAN', 'A', 'DIV'
+]);
+
+function sanitizeRichText(html: string): string {
+  if (!html) return '<span class="text-secondary opacity-60">(Sem resposta)</span>';
+  if (!/<[a-z][\s\S]*>/i.test(html)) {
+    return html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+  }
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const sanitizeNode = (node: Node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (!ALLOWED_TAGS.has(el.tagName.toUpperCase())) {
+          const parent = el.parentNode;
+          while (el.firstChild) parent?.insertBefore(el.firstChild, el);
+          parent?.removeChild(el);
+          return;
+        }
+        const attrs = Array.from(el.attributes);
+        for (const attr of attrs) {
+          const attrName = attr.name.toLowerCase();
+          const attrVal = attr.value.trim().toLowerCase();
+          if (attrName.startsWith('on') || attrVal.startsWith('javascript:') || attrVal.startsWith('data:')) {
+            el.removeAttribute(attr.name);
+          }
+        }
+      }
+      for (const child of Array.from(node.childNodes)) {
+        sanitizeNode(child);
+      }
+    };
+    sanitizeNode(doc.body);
+    return doc.body.innerHTML || html;
+  } catch (_e) {
+    return html;
+  }
+}
+
 const parsedQuestionsMap = computed<Question[]>(() => {
   if (!props.atividade?.json_data) return [];
   try {
@@ -332,9 +374,10 @@ function scoreColor(nota: number | null | undefined) {
                   <span class="px-2 py-0.5 bg-accent/15 text-accent rounded-md text-xs font-bold shrink-0">Q{{ idx + 1 }}</span>
                   <span class="text-xs font-medium text-primary leading-snug">{{ item.label }}</span>
                 </div>
-                <div class="px-4 py-3 bg-surface text-sm text-primary font-mono whitespace-pre-wrap leading-relaxed">
-                  {{ item.value || '(Sem resposta)' }}
-                </div>
+                <div
+                  class="px-4 py-3 bg-surface text-sm text-primary leading-relaxed border-t border-line/40 prose dark:prose-invert max-w-none"
+                  v-html="sanitizeRichText(item.value)"
+                ></div>
               </div>
             </div>
           </div>
