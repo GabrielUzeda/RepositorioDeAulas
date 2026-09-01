@@ -173,18 +173,18 @@ const toggleFullscreen = () => {
 
     <div :class="['border rounded-md overflow-hidden bg-surface-alt transition-all', error ? 'border-danger' : 'border-line focus-within:ring-2 ring-accent']">
       <!-- Toolbar -->
-      <div class="flex flex-wrap gap-1 p-2 border-b border-line bg-surface select-none">
-        <button type="button" @mousedown.prevent="exec('bold')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Negrito"><i class="material-icons text-sm">format_bold</i></button>
-        <button type="button" @mousedown.prevent="exec('italic')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Itálico"><i class="material-icons text-sm">format_italic</i></button>
-        <button type="button" @mousedown.prevent="exec('formatBlock', 'h2')" class="p-1.5 hover:bg-surface-alt rounded text-primary font-bold text-xs" title="Título">H2</button>
-        <button type="button" @mousedown.prevent="exec('insertUnorderedList')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Lista"><i class="material-icons text-sm">format_list_bulleted</i></button>
-        <button type="button" @mousedown.prevent="exec('insertOrderedList')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Lista Num."><i class="material-icons text-sm">format_list_numbered</i></button>
-        <button type="button" @mousedown.prevent="exec('formatBlock', 'blockquote')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Citação"><i class="material-icons text-sm">format_quote</i></button>
-        <button type="button" @mousedown.prevent="insertCodeBlock" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Bloco de Código"><i class="material-icons text-sm">code</i></button>
-        <button type="button" @mousedown.prevent="exec('removeFormat')" class="p-1.5 hover:bg-surface-alt rounded text-primary" title="Limpar"><i class="material-icons text-sm">format_clear</i></button>
-        <div class="ml-auto">
-          <button type="button" @mousedown.prevent="toggleFullscreen" class="p-1.5 hover:bg-surface-alt rounded text-primary" :title="isFullscreen ? 'Sair' : 'Expandir'">
-            <i class="material-icons text-sm">{{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</i>
+      <div class="flex flex-wrap items-center gap-1 p-2 border-b border-line bg-surface select-none">
+        <button type="button" @mousedown.prevent="exec('bold')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Negrito"><i class="material-icons text-base leading-none">format_bold</i></button>
+        <button type="button" @mousedown.prevent="exec('italic')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Itálico"><i class="material-icons text-base leading-none">format_italic</i></button>
+        <button type="button" @mousedown.prevent="exec('formatBlock', 'h2')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary font-bold text-xs transition-colors" title="Título">H2</button>
+        <button type="button" @mousedown.prevent="exec('insertUnorderedList')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Lista"><i class="material-icons text-base leading-none">format_list_bulleted</i></button>
+        <button type="button" @mousedown.prevent="exec('insertOrderedList')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Lista Num."><i class="material-icons text-base leading-none">format_list_numbered</i></button>
+        <button type="button" @mousedown.prevent="exec('formatBlock', 'blockquote')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Citação"><i class="material-icons text-base leading-none">format_quote</i></button>
+        <button type="button" @mousedown.prevent="insertCodeBlock" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Bloco de Código"><i class="material-icons text-base leading-none">code</i></button>
+        <button type="button" @mousedown.prevent="exec('removeFormat')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Limpar"><i class="material-icons text-base leading-none">format_clear</i></button>
+        <div class="ml-auto flex items-center">
+          <button type="button" @mousedown.prevent="toggleFullscreen" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" :title="isFullscreen ? 'Sair' : 'Expandir'">
+            <i class="material-icons text-base leading-none">{{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</i>
           </button>
         </div>
       </div>
