@@ -2088,24 +2088,26 @@ onBeforeUnmount(() => {
 /* SLIDES STYLING (card 960x540 = layout do preview; cores do slide vêm de marpTheme.css via --slide-bg) */
 :deep(.slide) {
   width: var(--slide-w); max-width:100%; min-height: var(--slide-h);
-  padding: 48px 56px; background: var(--slide-bg); border-radius: var(--radius);
+  padding: clamp(1.5rem, 4vw, 3.5rem) clamp(2rem, 5vw, 4rem); background: var(--slide-bg); border-radius: var(--radius);
   scroll-snap-align: center; position:relative; overflow:visible;
   box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 0 1px var(--c-line); flex-shrink: 0;
+  font-size: calc(1rem * var(--font-scale, 1));
 }
 :deep(.slide.active) { box-shadow: 0 8px 48px rgba(129,140,248,0.12), 0 0 0 2px var(--c-accent); }
-:deep(.slide-number) { position:absolute; top:16px; right:20px; font-size:11px; color:var(--c-muted); font-weight:600; }
+:deep(.slide-number) { position:absolute; top:1rem; right:1.25rem; font-size:0.75rem; color:var(--c-muted); font-weight:600; font-family:var(--font-mono); }
 :deep(.slide-content) { width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; gap:1.2rem; }
-:deep(.slide-content h1) { font-size: calc(2.8rem * var(--font-scale, 1)); font-weight:900; letter-spacing:-1px; line-height:1.1; }
-:deep(.slide-content h2) { font-size: calc(2rem * var(--font-scale, 1)); font-weight:700; letter-spacing:-0.5px; }
-:deep(.slide-content h3) { font-size: calc(1.4rem * var(--font-scale, 1)); font-weight:600; }
-:deep(.slide-content p)  { font-size: calc(1.15rem * var(--font-scale, 1)); line-height:1.75; color:var(--c-text); }
-:deep(.slide-content ul), :deep(.slide-content ol) { font-size: calc(1.1rem * var(--font-scale, 1)); line-height:1.8; padding-left:1.6rem; margin-bottom:0.8em; color:var(--c-text); list-style-position: outside; }
-:deep(.slide-content ul ul), :deep(.slide-content ul ol), :deep(.slide-content ol ul), :deep(.slide-content ol ol) { font-size:0.95em; line-height:1.6; margin-top:0.3em; margin-bottom:0.3em; padding-left:1.4rem; }
+:deep(.slide-content h1) { font-size: calc(2.8rem * var(--font-scale, 1)); font-weight:900; letter-spacing:-0.05em; line-height:1.15; margin-bottom: 0.4em; }
+:deep(.slide-content h2) { font-size: calc(2rem * var(--font-scale, 1)); font-weight:700; letter-spacing:-0.03em; line-height: 1.2; margin-bottom: 0.4em; }
+:deep(.slide-content h3) { font-size: calc(1.4rem * var(--font-scale, 1)); font-weight:600; line-height: 1.3; margin-bottom: 0.4em; }
+:deep(.slide-content p)  { font-size: calc(1.15rem * var(--font-scale, 1)); line-height:1.75; color:var(--c-text); margin-bottom: 0.6em; }
+:deep(.slide-content ul), :deep(.slide-content ol) { font-size: calc(1.1rem * var(--font-scale, 1)); line-height:1.8; padding-left:1.6em; margin-bottom:0.8em; color:var(--c-text); list-style-position: outside; }
+:deep(.slide-content ul ul), :deep(.slide-content ul ol), :deep(.slide-content ol ul), :deep(.slide-content ol ol) { font-size:0.95em; line-height:1.6; margin-top:0.3em; margin-bottom:0.3em; padding-left:1.4em; }
 :deep(.slide-content ul) { list-style-type: disc; }
 :deep(.slide-content ul ul) { list-style-type: circle; }
 :deep(.slide-content ul ul ul) { list-style-type: square; }
 :deep(.slide-content ol) { list-style-type: decimal; }
-:deep(.table-wrap) { margin: 1.2em 0; border: 1px solid var(--c-line); border-radius: 8px; overflow: hidden; }
+:deep(.slide-content li) { margin-bottom: 0.3em; }
+:deep(.table-wrap) { margin: 1.2em 0; border: 1px solid var(--c-line); border-radius: 0.5rem; overflow: hidden; }
 :deep(.slide-content table) { width:100%; border-collapse:collapse; font-size: calc(0.95rem * var(--font-scale, 1)); margin:0; }
 :deep(.slide.centered .slide-content) { align-items:center; text-align:center; }
 
@@ -2201,12 +2203,13 @@ onBeforeUnmount(() => {
   border-radius: 0 !important;
   box-shadow: none !important;
   border: none !important;
-  padding: 60px 80px !important;
+  padding: clamp(1rem, 4vw, 3.75rem) clamp(1.25rem, 5vw, 5rem) !important;
   margin: 0 !important;
   opacity: 0 !important;
   pointer-events: none !important;
   transform: scale(1) !important;
   transition: opacity 0.4s ease !important;
+  font-size: calc(1rem * var(--font-scale, 1));
 }
 .present-mode :deep(.slide.active) {
   opacity: 1 !important;
@@ -2216,7 +2219,13 @@ onBeforeUnmount(() => {
 
 @media (max-width: 768px) {
   .present-mode :deep(.slide) {
-    padding: 24px 28px !important;
+    padding: clamp(0.5rem, 2.5vw, 1.5rem) clamp(0.75rem, 3vw, 1.75rem) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .present-mode :deep(.slide) {
+    padding: clamp(0.35rem, 1.5vw, 0.75rem) clamp(0.5rem, 2vw, 1rem) !important;
   }
 }
 </style>
