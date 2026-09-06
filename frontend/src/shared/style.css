@@ -99,8 +99,8 @@
   /* Cores de MATIZ (mantidas intactas conforme solicitado) */
   --c-accent:       #1d4ed8;
   --c-accent-hover: #1e40af;
-  --c-accent-light: #dbeafe;
-  --c-accent-text:  #1d4ed8;
+  --c-accent-light: rgba(59, 130, 246, 0.15);
+  --c-accent-text:  #93c5fd;
   --c-on-accent:    #ffffff;
 
   --c-danger:       #dc2626;

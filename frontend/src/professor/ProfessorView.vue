@@ -825,7 +825,7 @@ function handleOpenRespostas(atividade: Atividade) {
                         size="xs"
                         @click="handleOpenVincularModal(aula)"
                         title="Vincular atividades existentes a esta aula"
-                        class="mr-1 text-secondary hover:text-primary"
+                        class="mr-1"
                       >
                         <span class="material-icons text-xs">link</span>
                         <span>Vincular</span>
@@ -962,7 +962,7 @@ function handleOpenRespostas(atividade: Atividade) {
                       variant="ghost"
                       size="xs"
                       @click="handleOpenVincularModal(aula)"
-                      class="text-secondary hover:text-primary font-semibold"
+                      class="font-semibold"
                       title="Vincular atividades já criadas"
                     >
                       <span class="material-icons text-xs">link</span>
