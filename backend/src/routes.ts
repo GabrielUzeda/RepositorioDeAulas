@@ -9,6 +9,7 @@ import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verify
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent, resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
 import { aiRouter } from './ai';
+import { extractTextFromBuffer } from './documentParser';
 
 const app = new Hono();
 
@@ -717,6 +718,93 @@ app.patch('/atividades/:id/status', professorAuth, async (c) => {
   if (!['ativo', 'oculto', 'arquivado'].includes(status)) return c.text('Status inválido', 400);
   dbq('UPDATE atividades SET status = ?, atualizado_em = ? WHERE id = ?').run(status, new Date().toISOString(), id);
   return c.json({ ok: true, status });
+});
+
+// ---------- Documentos Orientadores (RAG) ----------
+
+app.get('/disciplinas/:id/documentos', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  if (!(await canManageDisciplina(c, id))) return c.text('Access denied', 403);
+
+  const rows = dbq(`
+    SELECT id, curso_id, disciplina_id, titulo, nome_arquivo, tipo, tamanho_bytes,
+           substr(conteudo_texto, 1, 300) AS preview_texto, criado_em
+    FROM documentos_orientadores
+    WHERE disciplina_id = ?
+    ORDER BY criado_em DESC
+  `).all(id);
+
+  return c.json(rows);
+});
+
+app.post('/disciplinas/:id/documentos', professorAuth, async (c) => {
+  const disciplinaId = parseId(c.req.param('id'));
+  if (disciplinaId === null) return c.text('', 400);
+  if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
+
+  const disciplina = dbq('SELECT id, curso_id FROM disciplinas WHERE id = ?').get(disciplinaId) as any;
+  if (!disciplina) return c.text('Disciplina not found', 404);
+
+  const contentType = c.req.header('content-type') || '';
+
+  let titulo = '';
+  let tipo = 'outro';
+  let nomeArquivo = '';
+  let conteudoTexto = '';
+  let tamanhoBytes = 0;
+
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await c.req.parseBody();
+    const file = formData.file as File | undefined;
+    titulo = String(formData.titulo || file?.name || 'Documento Orientador').trim();
+    tipo = String(formData.tipo || 'outro').trim();
+
+    if (file && typeof file === 'object' && 'arrayBuffer' in file) {
+      nomeArquivo = file.name || 'documento.txt';
+      const arrayBuf = await file.arrayBuffer();
+      const u8 = new Uint8Array(arrayBuf);
+      tamanhoBytes = u8.byteLength;
+      conteudoTexto = extractTextFromBuffer(u8, nomeArquivo);
+    } else {
+      return c.json({ error: 'Arquivo inválido ou não fornecido' }, 400);
+    }
+  } else {
+    const body = await parseBody(c);
+    if (!body) return c.text('Dados inválidos', 400);
+    titulo = String(body.titulo || 'Documento Orientador').trim();
+    tipo = String(body.tipo || 'outro').trim();
+    nomeArquivo = String(body.nome_arquivo || 'documento.txt').trim();
+    conteudoTexto = String(body.conteudo_texto || '').trim();
+    tamanhoBytes = Buffer.byteLength(conteudoTexto, 'utf-8');
+  }
+
+  if (!conteudoTexto) {
+    return c.json({ error: 'Não foi possível extrair texto do documento ou conteúdo vazio.' }, 400);
+  }
+
+  const r = db
+    .query(`
+      INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING id, curso_id, disciplina_id, titulo, nome_arquivo, tipo, tamanho_bytes, criado_em
+    `)
+    .get(disciplina.curso_id, disciplinaId, titulo, nomeArquivo, tipo, conteudoTexto, tamanhoBytes) as any;
+
+  return c.json(r, 201);
+});
+
+app.delete('/disciplinas/:id/documentos/:docId', professorAuth, async (c) => {
+  const disciplinaId = parseId(c.req.param('id'));
+  const docId = parseId(c.req.param('docId'));
+  if (disciplinaId === null || docId === null) return c.text('', 400);
+  if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
+
+  const doc = dbq('SELECT id FROM documentos_orientadores WHERE id = ? AND disciplina_id = ?').get(docId, disciplinaId);
+  if (!doc) return c.text('Documento não encontrado', 404);
+
+  dbq('DELETE FROM documentos_orientadores WHERE id = ?').run(docId);
+  return c.body(null, 204);
 });
 
 // ---------- Public routes ----------

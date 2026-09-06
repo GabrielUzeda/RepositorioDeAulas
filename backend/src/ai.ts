@@ -168,6 +168,28 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     }
   }
 
+  let docsContexto = '';
+  let targetDisciplinaId = disciplina_id ? Number(disciplina_id) : null;
+  if (!targetDisciplinaId && targetAulasIds.length > 0) {
+    const row = db.query('SELECT disciplina_id FROM aulas WHERE id = ?').get(targetAulasIds[0]) as any;
+    if (row?.disciplina_id) targetDisciplinaId = row.disciplina_id;
+  }
+
+  if (targetDisciplinaId) {
+    const docs = db.query(`
+      SELECT titulo, tipo, conteudo_texto 
+      FROM documentos_orientadores 
+      WHERE disciplina_id = ?
+      ORDER BY id ASC
+    `).all(targetDisciplinaId) as { titulo: string; tipo: string; conteudo_texto: string }[];
+
+    if (docs.length > 0) {
+      docsContexto = docs
+        .map((d, idx) => `--- DOCUMENTO ORIENTADOR ${idx + 1} (${d.tipo.toUpperCase()}): ${d.titulo} ---\n${(d.conteudo_texto || '').slice(0, 5000)}`)
+        .join('\n\n');
+    }
+  }
+
   const isDiscursive = tipo === 'normal' || tipo === 'prova';
 
   const tipoInstrucao: Record<string, string> = {
@@ -244,6 +266,10 @@ ${formatoJson}`;
     userPrompt += `\nCONTEÚDO DAS AULAS VINCULADAS:\n${aulasContexto}\n`;
   } else {
     userPrompt += `\n(Gere as questões com base no tema informado, mantendo rigor técnico e pedagógico.)\n`;
+  }
+
+  if (docsContexto) {
+    userPrompt += `\nDOCUMENTOS ORIENTADORES DA DISCIPLINA (EMENTA / PLANO DE ENSINO / DIRETRIZES):\n${docsContexto}\n`;
   }
 
   if (Array.isArray(questoes_existentes) && questoes_existentes.length > 0) {
