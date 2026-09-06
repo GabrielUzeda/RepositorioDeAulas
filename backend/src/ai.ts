@@ -124,6 +124,7 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     disciplina_id,
     aulas_ids = [],
     aula_id,
+    questoes_existentes = [],
   } = body;
 
   const targetAulasIds: number[] = Array.isArray(aulas_ids) ? [...aulas_ids.map(Number)] : [];
@@ -183,7 +184,7 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     ? `{
   "questions": [
     {
-      "title": "Questão 1",
+      "title": "Conceito Central / Tópico Abordado",
       "content": "Enunciado claro e detalhado da questão dissertativa aqui..."
     }
   ]
@@ -192,7 +193,7 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     ? `{
   "questions": [
     {
-      "title": "Questão 1",
+      "title": "Conceito Central / Tópico Abordado",
       "content": "Enunciado direto e objetivo da questão aqui...",
       "options": [
         { "text": "Alternativa A", "correct": true },
@@ -206,7 +207,7 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     : `{
   "questions": [
     {
-      "title": "Questão 1",
+      "title": "Conceito Central / Tópico Abordado",
       "content": "Enunciado claro e detalhado da questão aqui...",
       "options": [
         { "text": "Texto da alternativa A", "correct": true, "feedback": "Justificativa pedagógica" },
@@ -228,7 +229,8 @@ DIRETRIZES FUNDAMENTAIS:
 4. Tipo de Atividade solicitada: "${tipo}" (${selectedTipoInstrucao}).
 5. Crie exatamente ${quantidade} questões.
 6. A resposta DEVE ser estritamente um objeto JSON válido no formato especificado, sem blocos de código Markdown ao redor, sem texto antes ou depois.
-${isDiscursive ? '7. IMPORTANTE: questões discursivas NÃO possuem alternativas. Gere apenas "title" e "content" por questão.' : ''}
+7. DIRETRIZ OBRIGATÓRIA DE NOMENCLATURA: O campo "title" de cada questão DEVE conter o TEMA ou CONCEITO ESPECÍFICO avaliado (ex: "Declaração de Variáveis e Tipagem", "Recursão e Pilha de Chamadas", "Tratamento de Exceções em Python"). NUNCA use "Questão 1", "Questão 2", "Pergunta 1" ou títulos genéricos vazios.
+${isDiscursive ? '8. IMPORTANTE: questões discursivas NÃO possuem alternativas. Gere apenas "title" e "content" por questão.' : ''}
 
 FORMATO JSON OBRIGATÓRIO:
 ${formatoJson}`;
@@ -242,6 +244,14 @@ ${formatoJson}`;
     userPrompt += `\nCONTEÚDO DAS AULAS VINCULADAS:\n${aulasContexto}\n`;
   } else {
     userPrompt += `\n(Gere as questões com base no tema informado, mantendo rigor técnico e pedagógico.)\n`;
+  }
+
+  if (Array.isArray(questoes_existentes) && questoes_existentes.length > 0) {
+    userPrompt += `\nQUESTÕES JÁ EXISTENTES NESTA ATIVIDADE (É EXPRESSAMENTE PROIBIDO REPETIR ESTES ENUNCIADOS OU CONCEITOS):\n`;
+    questoes_existentes.forEach((q: { title?: string; content?: string }, i: number) => {
+      userPrompt += `${i + 1}. [${q.title || ''}] ${q.content || ''}\n`;
+    });
+    userPrompt += `\nGere ${quantidade} novas questões INÉDITAS, que complementem o aprendizado sem sobrepor o que já foi perguntado acima.\n`;
   }
 
   userPrompt += `\nGere as ${quantidade} questões no formato JSON especificado.`;

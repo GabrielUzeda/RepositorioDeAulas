@@ -239,6 +239,10 @@ async function handleGenerateAiQuestions() {
       disciplina_id: props.disciplinaId,
       aula_id: targetAulasIds.length > 0 ? targetAulasIds[0] : null,
       aulas_ids: targetAulasIds,
+      questoes_existentes: questions.value.map((q) => ({
+        title: q.title,
+        content: (q.content || '').slice(0, 300),
+      })),
     };
 
     const res = await apiClient.post<{
