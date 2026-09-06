@@ -484,8 +484,8 @@ async function createAtividade(c: any) {
   const caminho = sanitizePathOrUrl((body.caminho ?? '') || (body.slug ?? ''));
   const r = db
     .query(
-      `INSERT INTO atividades (disciplina_id, aula_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO atividades (disciplina_id, aula_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem, data_limite)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`
     )
     .get(
@@ -500,7 +500,8 @@ async function createAtividade(c: any) {
       body.tipo ?? null,
       body.senha ?? null,
       body.allow_password == null ? null : body.allow_password ? 1 : 0,
-      body.ordem ?? 0
+      body.ordem ?? 0,
+      body.data_limite ?? null
     ) as any;
 
   if (r && r.id && aulaIds.length > 0) {
@@ -543,7 +544,7 @@ async function updateAtividade(c: any) {
     .query(
       `UPDATE atividades
        SET disciplina_id = ?, aula_id = ?, external_id = ?, titulo = ?, descricao = ?, caminho = ?, icone = ?,
-           json_data = ?, tipo = ?, senha = ?, allow_password = ?, ordem = ?,
+           json_data = ?, tipo = ?, senha = ?, allow_password = ?, ordem = ?, data_limite = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
        WHERE id = ?
        RETURNING *`
@@ -561,6 +562,7 @@ async function updateAtividade(c: any) {
       body.senha ?? null,
       body.allow_password == null ? null : body.allow_password ? 1 : 0,
       body.ordem ?? 0,
+      body.data_limite !== undefined ? body.data_limite : ((dbq('SELECT data_limite FROM atividades WHERE id = ?').get(id) as any)?.data_limite ?? null),
       id
     ) as any;
   if (!r) return c.text('Atividade not found', 404);
@@ -1114,7 +1116,7 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
     return c.text('Informe nome, e-mail válido e respostas.', 400);
   }
   const atv = dbq(`
-    SELECT a.id, a.titulo, a.descricao, a.json_data, a.allow_password, a.senha, a.disciplina_id,
+    SELECT a.id, a.titulo, a.descricao, a.json_data, a.allow_password, a.senha, a.disciplina_id, a.data_limite,
            d.nome as disciplina_nome, c.nome as curso_nome
     FROM atividades a
     LEFT JOIN disciplinas d ON d.id = a.disciplina_id
@@ -1125,6 +1127,14 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
 
   const errSenha = validarSenhasSubmissao(body, atv);
   if (errSenha) return c.json({ erro: errSenha }, 403);
+
+  let entregueComAtraso = 0;
+  if (atv.data_limite) {
+    const limiteMs = new Date(atv.data_limite).getTime();
+    if (!isNaN(limiteMs) && Date.now() > limiteMs) {
+      entregueComAtraso = 1;
+    }
+  }
 
   const email = String(body.aluno_email).trim();
   const nome = String(body.aluno_nome).trim();
@@ -1152,16 +1162,16 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
     let r: any;
     if (existente) {
       dbq(
-        'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ?, consulta_token_hash = ? WHERE id = ?'
-      ).run(encNome, encEmail, encRespostas, tokenHash, existente.id);
+        'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ?, consulta_token_hash = ?, entregue_com_atraso = ? WHERE id = ?'
+      ).run(encNome, encEmail, encRespostas, tokenHash, entregueComAtraso, existente.id);
       r = { id: existente.id, atividade_id: atividadeId, criado_em: existente.criado_em };
     } else {
       r = db
         .query(
-          `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash)
-           VALUES (?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
+          `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash, entregue_com_atraso)
+           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
         )
-        .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash) as any;
+        .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash, entregueComAtraso) as any;
     }
 
     await logAudit(c, 'submeter_resposta', `atividade:${atividadeId}`, { email_hash: emailHash });

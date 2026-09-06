@@ -47,6 +47,7 @@ const tipo = ref<'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco'>('normal
 const selectedAulaIds = ref<number[]>([]);
 const allowPassword = ref(false);
 const senha = ref('');
+const dataLimite = ref('');
 const questions = ref<Question[]>([]);
 const isSaving = ref(false);
 const activeQIndex = ref(0);
@@ -126,7 +127,7 @@ function scheduleAutoSave() {
       selectedAulaIds: selectedAulaIds.value,
       allowPassword: allowPassword.value,
       senha: senha.value,
-      questions: questions.value,
+      dataLimite: dataLimite.value,
       aiTema: aiTema.value,
       aiObservacoes: aiObservacoes.value,
       aiQuantidadeStr: aiQuantidadeStr.value,
@@ -137,7 +138,7 @@ function scheduleAutoSave() {
 }
 
 watch(
-  [titulo, descricao, tipo, selectedAulaIds, allowPassword, senha, questions, aiTema, aiObservacoes, aiQuantidadeStr],
+  [titulo, descricao, tipo, selectedAulaIds, allowPassword, senha, dataLimite, questions, aiTema, aiObservacoes, aiQuantidadeStr],
   () => {
     scheduleAutoSave();
   },
@@ -166,6 +167,7 @@ watch(
         }
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
+        dataLimite.value = props.atividade.data_limite ? props.atividade.data_limite.slice(0, 16) : '';
         aiTema.value = '';
         aiObservacoes.value = '';
         aiQuantidadeStr.value = '5';
@@ -198,6 +200,7 @@ watch(
             }
             allowPassword.value = !!parsed.allowPassword;
             senha.value = parsed.senha || '';
+            dataLimite.value = parsed.dataLimite || '';
             aiTema.value = parsed.aiTema || '';
             aiObservacoes.value = parsed.aiObservacoes || '';
             aiQuantidadeStr.value = parsed.aiQuantidadeStr || '5';
@@ -276,6 +279,7 @@ function resetToEmpty() {
   selectedAulaIds.value = props.defaultAulaId ? [props.defaultAulaId] : [];
   allowPassword.value = false;
   senha.value = '';
+  dataLimite.value = '';
   questions.value = [];
   aiTema.value = '';
   aiObservacoes.value = '';
@@ -351,6 +355,7 @@ async function handleSave() {
     aula_ids: targetAulaIds,
     allow_password: allowPassword.value,
     senha: allowPassword.value ? senha.value : null,
+    data_limite: dataLimite.value ? dataLimite.value : null,
     caminho: titulo.value.toLowerCase().replace(/\s+/g, '_'),
     json_data: JSON.stringify({ questions: questions.value })
   });
@@ -365,6 +370,7 @@ async function handleSaveDraft() {
       titulo: titulo.value || 'Sem título',
       descricao: descricao.value,
       tipo: tipo.value,
+      dataLimite: dataLimite.value,
       json_data: { questions: questions.value }
     };
     const res = await apiClient.post<{ id: number; expira_em: string; success: boolean }>('/professor/rascunhos-editor', payload);
@@ -615,6 +621,10 @@ async function handleDeleteDraft(draftId: number) {
               </div>
               <div v-if="allowPassword" class="md:col-span-2">
                 <BaseInput v-model="senha" type="password" label="Senha da Atividade *" placeholder="Digite a senha exclusiva" />
+              </div>
+              <div class="md:col-span-2">
+                <BaseInput v-model="dataLimite" type="datetime-local" label="Data e Hora Limite de Entrega (Opcional)" placeholder="Definir prazo" />
+                <p class="text-xs text-secondary mt-1">Submissões após este prazo serão registradas com status de atraso.</p>
               </div>
             </div>
           </div>

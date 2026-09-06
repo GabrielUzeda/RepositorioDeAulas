@@ -38,6 +38,17 @@ const { success } = useToast();
 const totalSteps = computed(() => questionsList.value.length + 2); // 0 (ID), 1..N (Perguntas), N+1 (Revisão)
 const progress = computed(() => ((currentStep.value) / (totalSteps.value - 1)) * 100);
 
+const deadlineInfo = computed(() => {
+  if (!props.atividade?.data_limite) return null;
+  const deadlineDate = new Date(props.atividade.data_limite);
+  if (isNaN(deadlineDate.getTime())) return null;
+  const isPast = Date.now() > deadlineDate.getTime();
+  return {
+    formatted: deadlineDate.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }),
+    isPast,
+  };
+});
+
 watch(
   () => [props.show, props.atividade],
   ([showVal, atvVal]) => {
@@ -318,6 +329,15 @@ async function handleSubmit() {
 
     <div v-if="props.atividade" class="space-y-6">
       <div v-if="currentStep === 0" class="space-y-4">
+        <!-- Prazo de Entrega -->
+        <div v-if="deadlineInfo" :class="['p-3.5 rounded-xl border flex items-center gap-2.5 text-xs font-medium', deadlineInfo.isPast ? 'bg-danger/10 border-danger/30 text-danger-text' : 'bg-accent/10 border-accent/30 text-primary']">
+          <span class="material-icons text-base">{{ deadlineInfo.isPast ? 'timer_off' : 'schedule' }}</span>
+          <span>
+            <strong>{{ deadlineInfo.isPast ? 'Prazo expirado:' : 'Prazo de entrega:' }}</strong> {{ deadlineInfo.formatted }}
+            <span v-if="deadlineInfo.isPast" class="font-normal opacity-90"> (esta submissão será registrada com atraso)</span>
+          </span>
+        </div>
+
         <!-- Descrição da Atividade -->
         <div v-if="props.atividade.descricao" class="p-4 bg-surface-alt border border-line rounded-xl space-y-1.5">
           <div class="flex items-center gap-2 text-primary font-medium text-xs">

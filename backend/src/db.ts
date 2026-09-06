@@ -171,6 +171,8 @@ try {
 try { db.run("ALTER TABLE cursos ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
 try { db.run("ALTER TABLE disciplinas ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
 try { db.run("ALTER TABLE atividades ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
+try { db.run("ALTER TABLE atividades ADD COLUMN data_limite TEXT"); } catch {}
+try { db.run("ALTER TABLE respostas_alunos ADD COLUMN entregue_com_atraso INTEGER DEFAULT 0"); } catch {}
 
 try {
   db.run(`

@@ -295,7 +295,10 @@ function scoreColor(nota: number | null | undefined) {
           </div>
 
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold text-primary truncate">{{ resp.aluno_nome }}</p>
+            <div class="flex items-center gap-1.5">
+              <p class="text-sm font-semibold text-primary truncate">{{ resp.aluno_nome }}</p>
+              <span v-if="resp.entregue_com_atraso" class="material-icons text-danger text-xs shrink-0" title="Entregue com atraso">schedule</span>
+            </div>
             <p class="text-xs text-secondary truncate">{{ resp.aluno_email }}</p>
           </div>
 
@@ -323,7 +326,10 @@ function scoreColor(nota: number | null | undefined) {
                 {{ selectedResposta.aluno_nome.charAt(0).toUpperCase() }}
               </div>
               <div class="min-w-0">
-                <h4 class="font-bold text-primary text-sm leading-tight truncate">{{ selectedResposta.aluno_nome }}</h4>
+                <div class="flex items-center gap-2">
+                  <h4 class="font-bold text-primary text-sm leading-tight truncate">{{ selectedResposta.aluno_nome }}</h4>
+                  <span v-if="selectedResposta.entregue_com_atraso" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-danger/10 text-danger-text border border-danger/30 shrink-0">Atraso</span>
+                </div>
                 <p class="text-secondary text-xs truncate">{{ selectedResposta.aluno_email }} · {{ formatDate(selectedResposta.criado_em) }}</p>
               </div>
             </div>
