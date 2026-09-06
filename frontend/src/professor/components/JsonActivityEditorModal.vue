@@ -482,7 +482,10 @@ async function handleDeleteDraft(draftId: number) {
     <div class="flex h-full min-h-[60vh] flex-1 rounded-b-2xl overflow-hidden">
 
       <!-- Sidebar: informações + lista de perguntas -->
-      <aside class="w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto rounded-bl-2xl">
+      <aside
+        class="w-full md:w-64 shrink-0 flex flex-col border-r border-line bg-surface overflow-y-auto rounded-bl-2xl"
+        :class="!showBasicInfo && activeQIndex >= 0 ? 'hidden md:flex' : 'flex'"
+      >
         <!-- Info básica collapsible (Renomeada para Geral) -->
         <button
           class="flex items-center justify-between px-4 py-3 text-xs font-bold uppercase tracking-wider text-secondary hover:bg-surface-alt transition-colors border-b border-line"
@@ -535,8 +538,11 @@ async function handleDeleteDraft(draftId: number) {
       </aside>
 
       <!-- Painel direito com scroll independente -->
-      <div class="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface rounded-br-2xl">
-        <main class="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5">
+      <div
+        class="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface rounded-br-2xl"
+        :class="!showBasicInfo && activeQIndex < 0 ? 'hidden md:flex' : 'flex'"
+      >
+        <main class="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-5">
 
         <!-- Painel: Geral (Configuração da Atividade + Gerador de IA Integrado) -->
         <div v-if="showBasicInfo" class="space-y-6">
@@ -711,7 +717,15 @@ async function handleDeleteDraft(draftId: number) {
         <!-- Painel: pergunta ativa -->
         <template v-else-if="activeQuestion !== null">
           <div class="flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2.5 flex-1 min-w-0">
+            <div class="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
+              <button
+                type="button"
+                class="md:hidden p-1.5 -ml-1 text-secondary hover:text-primary rounded-lg hover:bg-surface-alt transition"
+                title="Voltar à lista de perguntas"
+                @click="activeQIndex = -1; showBasicInfo = true"
+              >
+                <span class="material-icons text-lg">arrow_back</span>
+              </button>
               <span class="w-7 h-7 rounded-md bg-accent text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-xs">{{ activeQIndex + 1 }}</span>
               <span v-if="tipo === 'minigame'" class="font-semibold text-primary text-sm">Pergunta {{ activeQIndex + 1 }}</span>
               <input

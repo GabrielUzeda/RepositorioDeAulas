@@ -23,6 +23,7 @@ const respostas = ref<RespostaAluno[]>([]);
 const isLoading = ref(false);
 const errorMessage = ref('');
 const selectedResposta = ref<RespostaAluno | null>(null);
+const showMobileDetail = ref(false);
 
 const editingNota = ref<number | null>(null);
 const editingFeedback = ref('');
@@ -165,6 +166,7 @@ function handleSelectResposta(resp: RespostaAluno) {
   selectedResposta.value = resp;
   editingNota.value = resp.nota ?? null;
   editingFeedback.value = resp.feedback ?? '';
+  showMobileDetail.value = true;
 }
 
 async function handleSaveAvaliacao() {
@@ -269,10 +271,13 @@ function scoreColor(nota: number | null | undefined) {
     <EmptyState v-else-if="respostas.length === 0" icon="inbox" message="Nenhuma resposta registrada para esta atividade até o momento." class="py-20" />
 
     <!-- Layout split: lista esq + detalhe dir -->
-    <div v-else class="flex h-full min-h-[60vh] flex-1">
+    <div v-else class="flex h-full min-h-[60vh] flex-1 overflow-hidden">
 
       <!-- Lista de alunos (sidebar esquerda) -->
-      <aside class="w-72 shrink-0 flex flex-col border-r border-line overflow-y-auto bg-surface">
+      <aside
+        class="w-full lg:w-72 shrink-0 flex flex-col border-r border-line overflow-y-auto bg-surface"
+        :class="showMobileDetail ? 'hidden lg:flex' : 'flex'"
+      >
         <div class="px-3 pt-3 pb-2 border-b border-line">
           <p class="text-xs font-bold uppercase tracking-wider text-secondary">
             Total de Envios: {{ respostas.length }}
@@ -310,16 +315,27 @@ function scoreColor(nota: number | null | undefined) {
       </aside>
 
       <!-- Painel de detalhe (direita) -->
-      <main class="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <main
+        class="flex-1 min-w-0 flex flex-col overflow-hidden"
+        :class="!showMobileDetail ? 'hidden lg:flex' : 'flex'"
+      >
 
         <!-- Nenhum selecionado -->
         <EmptyState v-if="!selectedResposta" icon="person_search" message="Selecione um aluno à esquerda para ver e avaliar as respostas." class="my-auto" />
 
         <template v-else>
           <!-- Header do aluno selecionado (fixo) -->
-          <div class="shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-b border-line bg-surface-alt">
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="w-9 h-9 rounded-md bg-accent flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs">
+          <div class="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-line bg-surface-alt">
+            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+              <button
+                type="button"
+                class="lg:hidden p-1.5 -ml-1 text-secondary hover:text-primary rounded-lg hover:bg-surface transition"
+                title="Voltar à lista de alunos"
+                @click="showMobileDetail = false"
+              >
+                <span class="material-icons text-lg">arrow_back</span>
+              </button>
+              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-md bg-accent flex items-center justify-center text-white font-bold text-xs sm:text-sm shrink-0 shadow-xs">
                 {{ selectedResposta.aluno_nome.charAt(0).toUpperCase() }}
               </div>
               <div class="min-w-0">

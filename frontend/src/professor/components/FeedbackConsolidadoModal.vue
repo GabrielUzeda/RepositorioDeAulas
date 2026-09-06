@@ -260,6 +260,7 @@ function formatDate(isoStr: string) {
                 <BaseButton
                   variant="primary"
                   size="sm"
+                  class="w-full sm:w-auto"
                   :loading="sendingEmailFor === aluno.aluno_email"
                   @click="handleSendEmailIndividual(aluno)"
                 >

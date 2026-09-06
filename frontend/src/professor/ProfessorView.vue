@@ -543,16 +543,16 @@ function handleOpenRespostas(atividade: Atividade) {
 <template>
   <div class="min-h-screen bg-surface text-primary flex flex-col">
     <!-- Header -->
-    <header class="border-b border-line bg-header-bg/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <span class="material-icons text-accent text-2xl">school</span>
-        <h1 class="text-xl font-bold text-primary tracking-tight">Painel do Professor</h1>
+    <header class="border-b border-line bg-header-bg/80 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+        <span class="material-icons text-accent text-2xl shrink-0">school</span>
+        <h1 class="text-lg sm:text-xl font-bold text-primary tracking-tight truncate">Painel do Professor</h1>
       </div>
 
-      <div class="flex items-center space-x-4">
-        <span class="text-xs text-secondary">Olá, <strong class="text-primary">{{ authStore.professor?.nome }}</strong></span>
+      <div class="flex items-center space-x-2 sm:space-x-4 shrink-0">
+        <span class="text-xs text-secondary hidden sm:inline">Olá, <strong class="text-primary">{{ authStore.professor?.nome }}</strong></span>
         <ThemeToggle />
-        <button @click="logout" class="p-2 text-secondary hover:text-danger hover:bg-surface rounded-xl transition">
+        <button @click="logout" class="p-2 text-secondary hover:text-danger hover:bg-surface rounded-xl transition" title="Sair da conta">
           <span class="material-icons text-sm">logout</span>
         </button>
       </div>
@@ -691,23 +691,23 @@ function handleOpenRespostas(atividade: Atividade) {
 
         <!-- Content View (Aulas e Atividades Integradas) -->
         <section v-else key="detalhes" class="space-y-6">
-          <div class="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-line pb-4 gap-4">
+          <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between border-b border-line pb-4 gap-4">
             <div class="flex items-center gap-3 min-w-0">
               <BackButton @click="goBack" />
               <div class="min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <h2 class="text-2xl font-bold text-primary truncate">{{ selectedDisciplina?.nome }}</h2>
+                  <h2 class="text-xl sm:text-2xl font-bold text-primary truncate">{{ selectedDisciplina?.nome }}</h2>
                   <BaseBadge variant="accent" size="sm">{{ selectedCurso?.nome }}</BaseBadge>
                 </div>
                 <p v-if="selectedDisciplina?.descricao" class="text-secondary text-xs mt-0.5 line-clamp-1">{{ selectedDisciplina?.descricao }}</p>
               </div>
             </div>
 
-            <div class="flex items-center flex-wrap gap-2 shrink-0">
+            <div class="grid grid-cols-2 sm:flex sm:items-center sm:flex-wrap gap-2 shrink-0">
               <BaseButton
                 variant="secondary"
                 size="sm"
-                class="inline-flex items-center gap-1.5"
+                class="inline-flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
                 @click="showFeedbackConsolidadoModal = true"
               >
                 <span class="material-icons text-sm">mark_email_read</span>
@@ -719,6 +719,7 @@ function handleOpenRespostas(atividade: Atividade) {
                 :variant="isReordering ? 'primary' : 'secondary'"
                 size="sm"
                 :disabled="isSavingOrders"
+                class="inline-flex items-center justify-center gap-1.5"
                 @click="toggleReorder"
               >
                 <span class="material-icons text-sm">{{ isReordering ? 'save' : 'swap_vert' }}</span>
@@ -728,6 +729,7 @@ function handleOpenRespostas(atividade: Atividade) {
               <BaseButton
                 variant="secondary"
                 size="sm"
+                class="inline-flex items-center justify-center gap-1.5"
                 @click="handleOpenActivityEditor()"
               >
                 <span class="material-icons text-sm">assignment_add</span>
@@ -737,6 +739,7 @@ function handleOpenRespostas(atividade: Atividade) {
               <BaseButton
                 variant="primary"
                 size="sm"
+                class="inline-flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
                 @click="handleOpenMarpModal()"
               >
                 <span class="material-icons text-sm">add</span>
