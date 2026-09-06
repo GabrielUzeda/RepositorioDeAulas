@@ -768,5 +768,171 @@ animation-duration: 0.5s
   });
 });
 
+aiRouter.post('/evaluate-response', professorAuth, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { questao_enunciado, resposta_aluno, gabarito, criterios, modelo } = body;
+
+  if (!questao_enunciado || !resposta_aluno) {
+    return c.json({ success: false, error: 'Enunciado da questão e resposta do aluno são obrigatórios.' }, 400);
+  }
+
+  const systemPrompt = `Você é um avaliador pedagógico sênior. Avalie a resposta do aluno com base no enunciado da questão, nos critérios ou gabarito (se houver).
+Retorne ESTRITAMENTE um objeto JSON no formato:
+{
+  "nota_sugerida": 85,
+  "feedback": "Comentário pedagógico detalhado e construtivo diretamente para o aluno...",
+  "justificativa": "Breve justificativa técnica da pontuação para o professor..."
+}
+Regras:
+1. "nota_sugerida" deve ser um número inteiro entre 0 e 100.
+2. O "feedback" deve ser empático, apontar os acertos, explicar eventuais equívocos e orientar a melhoria.
+3. Responda apenas com o JSON puro, sem blocos markdown.`;
+
+  let userPrompt = `ENUNCIADO DA QUESTÃO:\n${questao_enunciado}\n\n`;
+  if (gabarito) userPrompt += `GABARITO / EXPECTATIVA DE RESPOSTA:\n${gabarito}\n\n`;
+  if (criterios) userPrompt += `CRITÉRIOS DE CORREÇÃO:\n${criterios}\n\n`;
+  userPrompt += `RESPOSTA SUBMETIDA PELO ALUNO:\n${resposta_aluno}`;
+
+  const candidateModels = [
+    'ag/gemini-3.7-flash-low',
+    'qwenproxy/qwen3.8-max-thinking',
+    'ocg/deepseek-v4-flash',
+    'deepseek-v4-flash',
+    'qwenproxy/qwen3.7-plus',
+  ];
+
+  const modelsToTry = modelo && !candidateModels.includes(modelo)
+    ? [modelo, ...candidateModels]
+    : candidateModels;
+
+  let evaluationResult: any = null;
+  let lastError = '';
+
+  for (const currentModel of modelsToTry) {
+    try {
+      const aiResponse = await fetchFrom9Router('/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({
+          model: currentModel,
+          stream: false,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.2
+        }),
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if (!aiResponse.ok) continue;
+
+      const aiData: any = await aiResponse.json();
+      let content = aiData?.choices?.[0]?.message?.content || '';
+      content = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+
+      const parsed = JSON.parse(content);
+      if (typeof parsed.nota_sugerida === 'number' && parsed.feedback) {
+        evaluationResult = {
+          nota_sugerida: Math.min(100, Math.max(0, Math.round(parsed.nota_sugerida))),
+          feedback: String(parsed.feedback).trim(),
+          justificativa: String(parsed.justificativa || '').trim(),
+          modelo_utilizado: currentModel
+        };
+        break;
+      }
+    } catch (e: any) {
+      lastError = e.message;
+    }
+  }
+
+  if (!evaluationResult) {
+    return c.json({ success: false, error: `Falha na avaliação por IA: ${lastError || 'Não foi possível obter resposta válida'}` }, 502);
+  }
+
+  return c.json({ success: true, ...evaluationResult });
+});
+
+aiRouter.post('/synthesize-class-feedback', professorAuth, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { disciplina_nome, total_envios, respostas_resumo, modelo } = body;
+
+  const systemPrompt = `Você é um coordenador pedagógico especializado em síntese avaliativa. Analise o conjunto de desempenhos e respostas dos alunos e gere um parecer consolidado para a turma.
+Retorne ESTRITAMENTE um objeto JSON no formato:
+{
+  "feedback_geral": "Texto fluido e encorajador para ser compartilhado com toda a turma...",
+  "pontos_fortes": ["Ponto forte 1", "Ponto forte 2"],
+  "pontos_atencao": ["Tópico onde muitos alunos apresentaram dúvidas..."]
+}
+Regras:
+1. O texto deve ser motivador, claro e pedagógico.
+2. Responda apenas com o JSON puro sem formatação markdown.`;
+
+  let userPrompt = `DISCIPLINA: ${disciplina_nome || 'Geral'}\nTOTAL DE ENVIOS ANALISADOS: ${total_envios || 0}\n\n`;
+  if (Array.isArray(respostas_resumo) && respostas_resumo.length > 0) {
+    userPrompt += `RESUMO DOS ENVIOS DOS ALUNOS:\n`;
+    respostas_resumo.slice(0, 30).forEach((item: any, idx: number) => {
+      userPrompt += `${idx + 1}. Aluno: ${item.aluno || 'Anônimo'} | Nota: ${item.nota ?? 'Pendente'} | Feedback anterior: ${item.feedback || item.respostas_principais || 'Sem comentários'}\n`;
+    });
+  }
+
+  const candidateModels = [
+    'ag/gemini-3.7-flash-low',
+    'qwenproxy/qwen3.8-max-thinking',
+    'ocg/deepseek-v4-flash',
+    'deepseek-v4-flash',
+    'qwenproxy/qwen3.7-plus',
+  ];
+
+  const modelsToTry = modelo && !candidateModels.includes(modelo)
+    ? [modelo, ...candidateModels]
+    : candidateModels;
+
+  let synthesisResult: any = null;
+  let lastError = '';
+
+  for (const currentModel of modelsToTry) {
+    try {
+      const aiResponse = await fetchFrom9Router('/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({
+          model: currentModel,
+          stream: false,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.3
+        }),
+        signal: AbortSignal.timeout(45000)
+      });
+
+      if (!aiResponse.ok) continue;
+
+      const aiData: any = await aiResponse.json();
+      let content = aiData?.choices?.[0]?.message?.content || '';
+      content = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+
+      const parsed = JSON.parse(content);
+      if (parsed.feedback_geral) {
+        synthesisResult = {
+          feedback_geral: String(parsed.feedback_geral).trim(),
+          pontos_fortes: Array.isArray(parsed.pontos_fortes) ? parsed.pontos_fortes : [],
+          pontos_atencao: Array.isArray(parsed.pontos_atencao) ? parsed.pontos_atencao : [],
+          modelo_utilizado: currentModel
+        };
+        break;
+      }
+    } catch (e: any) {
+      lastError = e.message;
+    }
+  }
+
+  if (!synthesisResult) {
+    return c.json({ success: false, error: `Falha na síntese por IA: ${lastError || 'Não foi possível obter resposta'}` }, 502);
+  }
+
+  return c.json({ success: true, ...synthesisResult });
+});
+
 export { aiRouter };
 
