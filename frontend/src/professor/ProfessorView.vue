@@ -919,7 +919,7 @@ function handleOpenRespostas(atividade: Atividade) {
                         <template v-else>
                           <BaseButton variant="secondary" size="xs" @click="handleOpenRespostas(atv)">
                             <span class="material-icons text-xs">analytics</span>
-                            <span>Ver Respostas dos Alunos</span>
+                            <span>Respostas</span>
                           </BaseButton>
                           <button
                             @click="handleDesvincularAtividade(atv, aula.id)"
@@ -1074,7 +1074,7 @@ function handleOpenRespostas(atividade: Atividade) {
                       <template v-else>
                         <BaseButton variant="secondary" size="xs" @click="handleOpenRespostas(atv)">
                           <span class="material-icons text-xs">analytics</span>
-                          <span>Ver Respostas dos Alunos</span>
+                          <span>Respostas</span>
                         </BaseButton>
                         <button
                           v-if="localAulas.length > 0"

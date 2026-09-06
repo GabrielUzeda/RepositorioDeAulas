@@ -177,7 +177,7 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     await expect(page.getByRole('heading', { name: materiaNome })).toBeVisible();
 
     // Abre respostas da atividade (primeiro aluno auto-selecionado)
-    await page.getByRole('button', { name: 'Ver Respostas dos Alunos' }).click();
+    await page.getByRole('button', { name: /Respostas/i }).click();
     await expect(page.getByText(`Total de Envios: 1`)).toBeVisible({ timeout: 10000 });
 
     // Avalia
