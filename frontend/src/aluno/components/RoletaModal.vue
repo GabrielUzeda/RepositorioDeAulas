@@ -231,7 +231,7 @@ function handleNextQuestion() {
             </h4>
           </div>
 
-          <div class="text-base font-semibold text-primary leading-relaxed">
+          <div class="text-base font-semibold text-primary leading-relaxed whitespace-pre-wrap">
             {{ currentQuestion.content }}
           </div>
 

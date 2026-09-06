@@ -324,7 +324,7 @@ async function handleSubmit() {
             <span class="material-icons text-accent text-base">description</span>
             <span>Instruções da Atividade</span>
           </div>
-          <p class="text-xs text-secondary whitespace-pre-line leading-relaxed">{{ props.atividade.descricao }}</p>
+          <p class="text-xs text-secondary whitespace-pre-wrap leading-relaxed">{{ props.atividade.descricao }}</p>
         </div>
 
         <!-- Painel LGPD e Re-envio -->
@@ -364,10 +364,10 @@ async function handleSubmit() {
           <div v-if="currentStep === idx + 1" class="space-y-4">
             <div class="space-y-1.5">
               <h3 class="font-bold text-base text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</h3>
-              <p v-if="q.content && q.content !== q.title" class="text-sm text-secondary whitespace-pre-line leading-relaxed bg-surface-alt/50 p-3 rounded-lg border border-line">
+              <p v-if="q.content && q.content !== q.title" class="text-sm text-secondary whitespace-pre-wrap leading-relaxed bg-surface-alt/50 p-3 rounded-lg border border-line">
                 {{ q.content }}
               </p>
-              <p v-else-if="q.content && !q.title" class="text-sm text-secondary whitespace-pre-line leading-relaxed">
+              <p v-else-if="q.content && !q.title" class="text-sm text-secondary whitespace-pre-wrap leading-relaxed">
                 {{ q.content }}
               </p>
             </div>
@@ -400,7 +400,7 @@ async function handleSubmit() {
             <div class="flex justify-between items-start mb-1">
               <div class="space-y-0.5">
                 <p class="text-sm font-semibold text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</p>
-                <p v-if="q.content" class="text-xs text-secondary whitespace-pre-line">
+                <p v-if="q.content" class="text-xs text-secondary whitespace-pre-wrap">
                   {{ q.content }}
                 </p>
               </div>

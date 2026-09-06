@@ -163,6 +163,46 @@ watch(() => props.modelValue, (newVal) => {
 const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value;
 };
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const textNode = document.createTextNode('  ');
+    range.deleteContents();
+    range.insertNode(textNode);
+    range.setStartAfter(textNode);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    updateValue();
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    let node: Node | null = sel.getRangeAt(0).startContainer;
+    while (node && node !== editor.value) {
+      if (node.nodeName === 'PRE' || node.nodeName === 'CODE') {
+        e.preventDefault();
+        const range = sel.getRangeAt(0);
+        const textNode = document.createTextNode('\n');
+        range.deleteContents();
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        updateValue();
+        return;
+      }
+      node = node.parentNode;
+    }
+  }
+};
 </script>
 
 <template>
@@ -195,6 +235,7 @@ const toggleFullscreen = () => {
         :id="editorId"
         contenteditable="true"
         @input="updateValue"
+        @keydown="handleKeydown"
         @focus="handleFocus"
         @blur="handleBlur"
         :style="{ minHeight: isFullscreen ? '90vh' : minHeight }"

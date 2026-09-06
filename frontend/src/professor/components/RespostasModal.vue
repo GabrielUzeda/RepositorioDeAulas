@@ -391,7 +391,7 @@ function scoreColor(nota: number | null | undefined) {
                   <span class="text-xs font-medium text-primary leading-snug">{{ item.label }}</span>
                 </div>
                 <div
-                  class="px-4 py-3 bg-surface text-sm text-primary leading-relaxed border-t border-line/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-accent [&_blockquote]:pl-3 [&_blockquote]:italic [&_pre]:bg-surface-alt [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:font-mono [&_pre]:text-xs [&_pre]:border [&_pre]:border-line [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs max-w-none"
+                   class="px-4 py-3 bg-surface text-sm text-primary leading-relaxed border-t border-line/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-accent [&_blockquote]:pl-3 [&_blockquote]:italic [&_pre]:bg-surface-alt [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:font-mono [&_pre]:text-xs [&_pre]:border [&_pre]:border-line [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_p]:mb-2.5 [&_p:last-child]:mb-0 max-w-none"
                   v-html="sanitizeRichText(item.value)"
                 ></div>
               </div>
