@@ -79,6 +79,7 @@ export interface Atividade {
   senha?: string | null;
   allow_password?: number | boolean;
   ordem?: number;
+  data_limite?: string | null;
   status?: 'ativo' | 'oculto' | 'arquivado';
   criado_em?: string;
   atualizado_em?: string;
@@ -103,6 +104,7 @@ export interface RespostaAluno {
   respostas: string | RespostasAlunoMap;
   nota?: number | null;
   feedback?: string | null;
+  entregue_com_atraso?: number;
   enviado_em?: string | null;
   criado_em: string;
 }
