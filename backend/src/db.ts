@@ -168,6 +168,10 @@ try {
   db.run('ALTER TABLE atividades ADD COLUMN aula_id INTEGER REFERENCES aulas(id) ON DELETE SET NULL');
 } catch {}
 
+try { db.run("ALTER TABLE cursos ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
+try { db.run("ALTER TABLE disciplinas ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
+try { db.run("ALTER TABLE atividades ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
+
 try {
   db.run(`
     CREATE TABLE IF NOT EXISTS aula_atividades (

@@ -119,6 +119,17 @@ async function onConfirmDelDisc() {
 
 function onCancelDelDisc() {}
 
+async function handleToggleDisciplinaStatus(disciplina: Disciplina, status: 'ativo' | 'oculto' | 'arquivado') {
+  const res = await executeWithFeedback(
+    () => apiClient.patch(`/disciplinas/${disciplina.id}/status`, { status }),
+    {
+      successMessage: `Disciplina ${status === 'ativo' ? 'reativada' : status === 'arquivado' ? 'arquivada' : 'ocultada'} com sucesso!`,
+      errorMessage: 'Falha ao alterar status da disciplina.'
+    }
+  );
+  if (res.success) await showDisciplinas();
+}
+
 async function handleOpenDisciplinaDetails(disciplina: Disciplina) {
   selectedDisciplina.value = disciplina;
   await cursoStore.loadDisciplinaContent(disciplina.id);
@@ -263,6 +274,19 @@ async function onConfirmDelAtiv() {
 }
 
 function onCancelDelAtiv() {}
+
+async function handleToggleAtividadeStatus(atividade: Atividade, status: 'ativo' | 'oculto' | 'arquivado') {
+  const res = await executeWithFeedback(
+    () => apiClient.patch(`/atividades/${atividade.id}/status`, { status }),
+    {
+      successMessage: `Atividade ${status === 'ativo' ? 'reativada' : status === 'oculto' ? 'ocultada' : 'arquivada'} com sucesso!`,
+      errorMessage: 'Falha ao alterar status da atividade.'
+    }
+  );
+  if (res.success && selectedDisciplina.value) {
+    await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+  }
+}
 
 // Modo de Reordenação
 const isReordering = ref(false);
@@ -635,6 +659,24 @@ function handleOpenRespostas(atividade: Atividade) {
             >
               <template #header-actions>
                 <div class="flex items-center space-x-1" @click.stop>
+                  <span v-if="disciplina.status === 'arquivado'" class="text-xs text-muted px-1.5 py-0.5 rounded bg-surface-alt border border-line">arquivado</span>
+                  <span v-else-if="disciplina.status === 'oculto'" class="text-xs text-muted px-1.5 py-0.5 rounded bg-surface-alt border border-line">oculto</span>
+                  <button
+                    v-if="!disciplina.status || disciplina.status === 'ativo'"
+                    @click="handleToggleDisciplinaStatus(disciplina, 'oculto')"
+                    title="Ocultar Disciplina para Alunos"
+                    class="p-1.5 text-secondary hover:text-primary rounded-lg"
+                  >
+                    <span class="material-icons text-sm">visibility_off</span>
+                  </button>
+                  <button
+                    v-else
+                    @click="handleToggleDisciplinaStatus(disciplina, 'ativo')"
+                    title="Tornar Disciplina Visível"
+                    class="p-1.5 text-secondary hover:text-accent rounded-lg"
+                  >
+                    <span class="material-icons text-sm">visibility</span>
+                  </button>
                   <button @click="handleOpenDisciplinaModal(disciplina)" title="Editar Disciplina" class="p-1.5 text-secondary hover:text-primary rounded-lg">
                     <span class="material-icons text-sm">edit</span>
                   </button>
@@ -919,8 +961,24 @@ function handleOpenRespostas(atividade: Atividade) {
                         <template v-else>
                           <BaseButton variant="secondary" size="xs" @click="handleOpenRespostas(atv)">
                             <span class="material-icons text-xs">analytics</span>
-                            <span>Ver Respostas dos Alunos</span>
+                            <span>Respostas</span>
                           </BaseButton>
+                          <button
+                            v-if="!atv.status || atv.status === 'ativo'"
+                            @click="handleToggleAtividadeStatus(atv, 'oculto')"
+                            title="Ocultar Atividade para Alunos"
+                            class="w-8 h-8 flex items-center justify-center text-secondary hover:text-primary rounded-md hover:bg-surface transition-colors"
+                          >
+                            <span class="material-icons text-sm">visibility_off</span>
+                          </button>
+                          <button
+                            v-else
+                            @click="handleToggleAtividadeStatus(atv, 'ativo')"
+                            title="Tornar Atividade Visível"
+                            class="w-8 h-8 flex items-center justify-center text-secondary hover:text-accent rounded-md hover:bg-surface transition-colors"
+                          >
+                            <span class="material-icons text-sm">visibility</span>
+                          </button>
                           <button
                             @click="handleDesvincularAtividade(atv, aula.id)"
                             title="Desvincular desta aula (tornar atividade geral)"
@@ -1074,8 +1132,24 @@ function handleOpenRespostas(atividade: Atividade) {
                       <template v-else>
                         <BaseButton variant="secondary" size="xs" @click="handleOpenRespostas(atv)">
                           <span class="material-icons text-xs">analytics</span>
-                          <span>Ver Respostas dos Alunos</span>
+                          <span>Respostas</span>
                         </BaseButton>
+                        <button
+                          v-if="!atv.status || atv.status === 'ativo'"
+                          @click="handleToggleAtividadeStatus(atv, 'oculto')"
+                          title="Ocultar Atividade para Alunos"
+                          class="w-8 h-8 flex items-center justify-center text-secondary hover:text-primary rounded-md hover:bg-surface transition-colors"
+                        >
+                          <span class="material-icons text-sm">visibility_off</span>
+                        </button>
+                        <button
+                          v-else
+                          @click="handleToggleAtividadeStatus(atv, 'ativo')"
+                          title="Tornar Atividade Visível"
+                          class="w-8 h-8 flex items-center justify-center text-secondary hover:text-accent rounded-md hover:bg-surface transition-colors"
+                        >
+                          <span class="material-icons text-sm">visibility</span>
+                        </button>
                         <button
                           v-if="localAulas.length > 0"
                           @click="handleOpenVincularAtividadeEspecifica(atv)"

@@ -211,6 +211,17 @@ async function onConfirmCurso() {
 
 function onCancelCurso() {}
 
+async function handleToggleCursoStatus(curso: Curso, status: 'ativo' | 'oculto' | 'arquivado') {
+  await executeWithFeedback(
+    () => apiClient.patch(`/cursos/${curso.id}/status`, { status }),
+    {
+      successMessage: `Curso ${status === 'ativo' ? 'reativado' : status === 'arquivado' ? 'arquivado' : 'ocultado'} com sucesso!`,
+      errorMessage: 'Falha ao alterar status do curso.'
+    }
+  );
+  await fetchCursos();
+}
+
 function logout() {
   authStore.logout();
   router.push('/login');
@@ -430,7 +441,25 @@ function logout() {
             action-text=""
           >
             <template #header-actions>
-              <div class="flex gap-1" @click.stop>
+              <div class="flex gap-1 items-center" @click.stop>
+                <BaseBadge v-if="curso.status === 'arquivado'" variant="neutral">arquivado</BaseBadge>
+                <BaseBadge v-else-if="curso.status === 'oculto'" variant="secondary">oculto</BaseBadge>
+                <button
+                  v-if="curso.status === 'ativo' || !curso.status"
+                  @click="handleToggleCursoStatus(curso, 'arquivado')"
+                  class="p-1.5 rounded text-muted hover:text-secondary hover:bg-surface transition-colors"
+                  title="Arquivar curso"
+                >
+                  <span class="material-icons text-[16px]">archive</span>
+                </button>
+                <button
+                  v-else
+                  @click="handleToggleCursoStatus(curso, 'ativo')"
+                  class="p-1.5 rounded text-muted hover:text-accent hover:bg-surface transition-colors"
+                  title="Reativar curso"
+                >
+                  <span class="material-icons text-[16px]">unarchive</span>
+                </button>
                 <button
                   @click="openEditCurso(curso)"
                   class="p-1.5 rounded text-muted hover:text-primary hover:bg-surface transition-colors"

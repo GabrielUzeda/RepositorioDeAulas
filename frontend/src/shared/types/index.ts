@@ -15,6 +15,7 @@ export interface Curso {
   senha?: string;
   possui_senha?: boolean;
   descricao?: string;
+  status?: 'ativo' | 'oculto' | 'arquivado';
   criado_em?: string;
   atualizado_em?: string;
   total_disciplinas?: number;
@@ -29,6 +30,7 @@ export interface Disciplina {
   cor?: string;
   icone?: string;
   descricao?: string;
+  status?: 'ativo' | 'oculto' | 'arquivado';
   criado_em?: string;
   atualizado_em?: string;
 }
@@ -77,6 +79,7 @@ export interface Atividade {
   senha?: string | null;
   allow_password?: number | boolean;
   ordem?: number;
+  status?: 'ativo' | 'oculto' | 'arquivado';
   criado_em?: string;
   atualizado_em?: string;
 }
