@@ -27,6 +27,8 @@ const selectedResposta = ref<RespostaAluno | null>(null);
 const editingNota = ref<number | null>(null);
 const editingFeedback = ref('');
 const isSavingAvaliacao = ref(false);
+const isEvaluatingAi = ref(false);
+const aiJustificativa = ref('');
 
 const showConfirmDelete = ref(false);
 const deleteTargetId = ref<number | null>(null);
@@ -165,6 +167,49 @@ function handleSelectResposta(resp: RespostaAluno) {
   selectedResposta.value = resp;
   editingNota.value = resp.nota ?? null;
   editingFeedback.value = resp.feedback ?? '';
+  aiJustificativa.value = '';
+}
+
+async function handleSuggestAiAvaliacao() {
+  if (!selectedResposta.value || isEvaluatingAi.value) return;
+  const parsedItems = parseRespostas(selectedResposta.value.respostas);
+  if (parsedItems.length === 0) {
+    useToast().error('Nenhuma resposta encontrada para avaliar.');
+    return;
+  }
+
+  isEvaluatingAi.value = true;
+  aiJustificativa.value = '';
+
+  try {
+    const questoesTexto = parsedItems.map((item, i) => `Questão ${i + 1}: ${item.label}`).join('\n\n');
+    const respostasTexto = parsedItems.map((item, i) => `Resposta ${i + 1}: ${item.value}`).join('\n\n');
+
+    const res = await apiClient.post<any>('/ai/evaluate-response', {
+      questao_enunciado: questoesTexto,
+      resposta_aluno: respostasTexto,
+      criterios: props.atividade?.descricao || undefined
+    });
+
+    if (res.success && res.data) {
+      if (typeof res.data.nota_sugerida === 'number') {
+        editingNota.value = res.data.nota_sugerida;
+      }
+      if (res.data.feedback) {
+        editingFeedback.value = res.data.feedback;
+      }
+      if (res.data.justificativa) {
+        aiJustificativa.value = res.data.justificativa;
+      }
+      useToast().success('Avaliação sugerida pela IA! Revise e salve.');
+    } else {
+      useToast().error(res.error || 'Não foi possível gerar sugestão por IA.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao comunicar com o serviço de IA.');
+  } finally {
+    isEvaluatingAi.value = false;
+  }
 }
 
 async function handleSaveAvaliacao() {
@@ -345,13 +390,33 @@ function scoreColor(nota: number | null | undefined) {
             <!-- Formulário de avaliação (Feedback à esquerda, Nota + Salvar à direita) -->
             <div class="sticky top-0 z-10 bg-surface-alt border-b border-line px-5 py-4 shadow-xs">
               <div class="flex flex-col sm:flex-row items-stretch sm:items-start gap-4">
-                <div class="flex-1 min-w-0">
+                <div class="flex-1 min-w-0 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold text-primary">Comentário Pedagógico / Feedback</label>
+                    <BaseButton
+                      variant="ghost"
+                      size="sm"
+                      :disabled="isEvaluatingAi"
+                      class="text-xs text-accent font-semibold flex items-center gap-1 hover:bg-accent/10 px-2 py-1 rounded"
+                      @click="handleSuggestAiAvaliacao"
+                    >
+                      <span class="material-icons text-sm" :class="{ 'animate-spin': isEvaluatingAi }">
+                        {{ isEvaluatingAi ? 'sync' : 'auto_awesome' }}
+                      </span>
+                      <span>{{ isEvaluatingAi ? 'Avaliando com IA...' : 'Sugerir com IA' }}</span>
+                    </BaseButton>
+                  </div>
                   <BaseTextarea
                     v-model="editingFeedback"
                     :rows="3"
-                    label="Comentário Pedagógico / Feedback"
                     placeholder="Escreva um comentário pedagógico para este aluno..."
                   />
+                  <div v-if="aiJustificativa" class="p-2 rounded bg-accent/5 border border-accent/20 text-xs text-secondary flex items-start gap-2">
+                    <span class="material-icons text-sm text-accent shrink-0 mt-0.5">info</span>
+                    <div>
+                      <strong class="text-primary">Justificativa da IA:</strong> {{ aiJustificativa }}
+                    </div>
+                  </div>
                 </div>
                 <div class="w-full sm:w-44 shrink-0 flex flex-col justify-between self-stretch gap-2">
                   <BaseInput
