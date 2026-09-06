@@ -709,9 +709,6 @@ function handleOpenRespostas(atividade: Atividade) {
               <BaseButton
                 variant="secondary"
                 size="sm"
-              <BaseButton
-                variant="secondary"
-                size="sm"
                 class="inline-flex items-center justify-center gap-1.5"
                 title="Ementas e PDFs para IA (RAG)"
                 @click="showDocumentosModal = true"

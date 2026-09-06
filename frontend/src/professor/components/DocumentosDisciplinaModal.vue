@@ -111,7 +111,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { api } from '@/shared/api/client';
+import { apiClient } from '@/shared/api/client';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import type { DocumentoOrientador } from '@/shared/types';
@@ -136,7 +136,7 @@ async function loadDocumentos() {
   if (!props.disciplinaId) return;
   loading.value = true;
   try {
-    const res = await api.get<DocumentoOrientador[]>(`/disciplinas/${props.disciplinaId}/documentos`);
+    const res = await apiClient.get<DocumentoOrientador[]>(`/disciplinas/${props.disciplinaId}/documentos`);
     if (res.success && res.data) {
       documentos.value = res.data;
     }
@@ -189,7 +189,7 @@ async function handleFileUpload(e: Event) {
 async function handleDelete(docId: number) {
   if (!confirm('Deseja remover este documento orientador?')) return;
   try {
-    const res = await api.delete(`/disciplinas/${props.disciplinaId}/documentos/${docId}`);
+    const res = await apiClient.delete(`/disciplinas/${props.disciplinaId}/documentos/${docId}`);
     if (res.success) {
       documentos.value = documentos.value.filter(d => d.id !== docId);
     }
