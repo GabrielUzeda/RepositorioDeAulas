@@ -85,6 +85,8 @@ const currentDraftId = ref<number | null>(null);
 
 const showConfirmClear = ref(false);
 const isInitializing = ref(true);
+const editorMode = ref<'edit' | 'split' | 'preview'>('edit');
+const expandedEnunciado = ref(false);
 
 const usesOptions = computed(() => tipo.value !== 'normal' && tipo.value !== 'prova');
 const activeQuestion = computed(() => questions.value[activeQIndex.value] ?? null);
@@ -710,88 +712,213 @@ async function handleDeleteDraft(draftId: number) {
 
         <!-- Painel: pergunta ativa -->
         <template v-else-if="activeQuestion !== null">
-          <div class="flex items-center justify-between gap-3">
+          <!-- Cabeçalho da Pergunta e Controles de Visualização -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-line">
             <div class="flex items-center gap-2.5 flex-1 min-w-0">
               <span class="w-7 h-7 rounded-md bg-accent text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-xs">{{ activeQIndex + 1 }}</span>
               <span v-if="tipo === 'minigame'" class="font-semibold text-primary text-sm">Pergunta {{ activeQIndex + 1 }}</span>
               <input
                 v-else
                 v-model="activeQuestion.title"
-                placeholder="Título/Tema da Questão (Ex: Questão 1)"
-                class="w-full bg-surface-alt px-3.5 py-2 rounded-md border border-line font-semibold text-primary text-sm outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                placeholder="Título/Tema da Questão (Ex: Conceito Central)"
+                class="w-full bg-surface-alt px-3.5 py-1.5 rounded-md border border-line font-semibold text-primary text-sm outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
               />
             </div>
-            <div class="flex items-center gap-1 shrink-0">
-              <BaseButton variant="ghost" size="sm" :disabled="activeQIndex === 0" title="Mover para cima" @click="moveQuestion(activeQIndex, 'up')">
-                <span class="material-icons text-sm">arrow_upward</span>
-              </BaseButton>
-              <BaseButton variant="ghost" size="sm" :disabled="activeQIndex === questions.length - 1" title="Mover para baixo" @click="moveQuestion(activeQIndex, 'down')">
-                <span class="material-icons text-sm">arrow_downward</span>
-              </BaseButton>
-              <BaseButton variant="danger" size="sm" title="Excluir questão" @click="removeQuestion(activeQIndex)">
-                <span class="material-icons text-sm">delete</span>
-              </BaseButton>
-            </div>
-          </div>
 
-          <div class="flex flex-col gap-1.5">
-            <label class="block text-xs font-semibold uppercase tracking-wider text-secondary">Enunciado da Pergunta *</label>
-            <BaseTextarea
-              v-model="activeQuestion.content"
-              :rows="6"
-              class="w-full"
-              placeholder="Digite o enunciado completo da questão para o aluno..."
-            />
-          </div>
-
-          <!-- Alternativas -->
-          <div v-if="usesOptions" class="space-y-3">
-            <div class="flex justify-between items-center">
-              <label class="text-xs font-semibold uppercase tracking-wider text-secondary">Alternativas de Resposta</label>
-              <BaseButton variant="ghost" size="sm" @click="addOption(activeQIndex)">
-                <span class="material-icons text-xs mr-1">add</span> + Adicionar Opção
-              </BaseButton>
-            </div>
-
-            <div class="space-y-2">
-              <div
-                v-for="(opt, oIndex) in activeQuestion.options"
-                :key="oIndex"
-                class="flex items-start gap-3 p-3 rounded-lg border transition-colors"
-                :class="opt.correct ? 'border-success/50 bg-success/5' : 'border-line bg-surface'"
-              >
-                <div class="flex items-center gap-2 pt-1 shrink-0">
-                  <input
-                    type="radio"
-                    :name="`correct_${activeQIndex}`"
-                    :checked="opt.correct"
-                    @change="setCorrectOption(activeQIndex, oIndex)"
-                    title="Marcar como alternativa correta"
-                    class="w-4 h-4 text-success bg-surface border-line cursor-pointer"
-                  />
-                  <span class="text-xs font-bold" :class="opt.correct ? 'text-success' : 'text-secondary'">{{ String.fromCharCode(65 + oIndex) }}</span>
-                </div>
-                <div class="flex-1 min-w-0 space-y-2">
-                  <input
-                    v-model="opt.text"
-                    placeholder="Texto da alternativa..."
-                    class="w-full bg-surface-alt px-3.5 py-2 rounded-md border border-line text-primary text-sm outline-none focus:ring-2 focus:ring-accent focus:border-accent"
-                  />
-                  <input
-                    v-if="tipo !== 'minigame'"
-                    v-model="opt.feedback"
-                    placeholder="Feedback pedagógico (opcional)..."
-                    class="w-full bg-surface-alt px-3 py-1.5 rounded-md text-xs text-secondary border border-line outline-none focus:border-accent"
-                  />
-                </div>
+            <!-- Alternador de Modo de Visualização (Editar / Lado a Lado / Visualizar) e Ações de Ordenação -->
+            <div class="flex items-center gap-2 justify-between sm:justify-end shrink-0">
+              <div class="flex items-center bg-surface-alt border border-line rounded-lg p-0.5 text-xs font-medium">
                 <button
                   type="button"
-                  class="p-1 text-secondary hover:text-danger rounded hover:bg-surface-alt transition-colors shrink-0 mt-1"
-                  title="Remover opção"
-                  @click="removeOption(activeQIndex, oIndex)"
+                  @click="editorMode = 'edit'"
+                  class="px-2.5 py-1 rounded-md transition-all flex items-center gap-1"
+                  :class="editorMode === 'edit' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-secondary hover:text-primary'"
+                  title="Apenas formulário de edição"
                 >
-                  <span class="material-icons text-sm">close</span>
+                  <span class="material-icons text-xs">edit</span>
+                  <span class="hidden md:inline">Editar</span>
                 </button>
+                <button
+                  type="button"
+                  @click="editorMode = 'split'"
+                  class="px-2.5 py-1 rounded-md transition-all hidden lg:flex items-center gap-1"
+                  :class="editorMode === 'split' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-secondary hover:text-primary'"
+                  title="Editor e preview lado a lado"
+                >
+                  <span class="material-icons text-xs">vertical_split</span>
+                  <span>Lado a Lado</span>
+                </button>
+                <button
+                  type="button"
+                  @click="editorMode = 'preview'"
+                  class="px-2.5 py-1 rounded-md transition-all flex items-center gap-1"
+                  :class="editorMode === 'preview' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-secondary hover:text-primary'"
+                  title="Visualizar exatamente como o aluno verá"
+                >
+                  <span class="material-icons text-xs">visibility</span>
+                  <span><span class="hidden md:inline">Preview </span>Aluno</span>
+                </button>
+              </div>
+
+              <div class="flex items-center gap-1 border-l border-line pl-2">
+                <BaseButton variant="ghost" size="sm" :disabled="activeQIndex === 0" title="Mover para cima" @click="moveQuestion(activeQIndex, 'up')">
+                  <span class="material-icons text-sm">arrow_upward</span>
+                </BaseButton>
+                <BaseButton variant="ghost" size="sm" :disabled="activeQIndex === questions.length - 1" title="Mover para baixo" @click="moveQuestion(activeQIndex, 'down')">
+                  <span class="material-icons text-sm">arrow_downward</span>
+                </BaseButton>
+                <BaseButton variant="danger" size="sm" title="Excluir questão" @click="removeQuestion(activeQIndex)">
+                  <span class="material-icons text-sm">delete</span>
+                </BaseButton>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grade Principal: Edição e/ou Preview conforme editorMode -->
+          <div :class="editorMode === 'split' ? 'grid grid-cols-1 lg:grid-cols-2 gap-6 items-start' : 'space-y-4'">
+            <!-- Coluna de Edição -->
+            <div v-show="editorMode !== 'preview'" class="space-y-4">
+              <div class="flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-secondary">Enunciado da Pergunta *</label>
+                  <button
+                    type="button"
+                    @click="expandedEnunciado = !expandedEnunciado"
+                    class="text-xs text-accent hover:underline flex items-center gap-1 font-medium"
+                  >
+                    <span class="material-icons text-xs">{{ expandedEnunciado ? 'unfold_less' : 'unfold_more' }}</span>
+                    <span>{{ expandedEnunciado ? 'Reduzir altura' : 'Expandir área de texto' }}</span>
+                  </button>
+                </div>
+                <BaseTextarea
+                  v-model="activeQuestion.content"
+                  :rows="expandedEnunciado ? 14 : 6"
+                  class="w-full font-mono text-sm leading-relaxed"
+                  placeholder="Digite o enunciado completo da questão para o aluno..."
+                />
+              </div>
+
+              <!-- Alternativas -->
+              <div v-if="usesOptions" class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <label class="text-xs font-semibold uppercase tracking-wider text-secondary">Alternativas de Resposta</label>
+                  <BaseButton variant="ghost" size="sm" @click="addOption(activeQIndex)">
+                    <span class="material-icons text-xs mr-1">add</span> + Adicionar Opção
+                  </BaseButton>
+                </div>
+
+                <div class="space-y-2">
+                  <div
+                    v-for="(opt, oIndex) in activeQuestion.options"
+                    :key="oIndex"
+                    class="flex items-start gap-3 p-3 rounded-lg border transition-colors"
+                    :class="opt.correct ? 'border-success/50 bg-success/5' : 'border-line bg-surface'"
+                  >
+                    <div class="flex items-center gap-2 pt-1 shrink-0">
+                      <input
+                        type="radio"
+                        :name="`correct_${activeQIndex}`"
+                        :checked="opt.correct"
+                        @change="setCorrectOption(activeQIndex, oIndex)"
+                        title="Marcar como alternativa correta"
+                        class="w-4 h-4 text-success bg-surface border-line cursor-pointer"
+                      />
+                      <span class="text-xs font-bold" :class="opt.correct ? 'text-success' : 'text-secondary'">{{ String.fromCharCode(65 + oIndex) }}</span>
+                    </div>
+                    <div class="flex-1 min-w-0 space-y-2">
+                      <input
+                        v-model="opt.text"
+                        placeholder="Texto da alternativa..."
+                        class="w-full bg-surface-alt px-3.5 py-2 rounded-md border border-line text-primary text-sm outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                      />
+                      <input
+                        v-if="tipo !== 'minigame'"
+                        v-model="opt.feedback"
+                        placeholder="Feedback pedagógico (opcional)..."
+                        class="w-full bg-surface-alt px-3 py-1.5 rounded-md text-xs text-secondary border border-line outline-none focus:border-accent"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      class="p-1 text-secondary hover:text-danger rounded hover:bg-surface-alt transition-colors shrink-0 mt-1"
+                      title="Remover opção"
+                      @click="removeOption(activeQIndex, oIndex)"
+                    >
+                      <span class="material-icons text-sm">close</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Coluna de Preview em Tempo Real -->
+            <div v-show="editorMode !== 'edit'" class="p-5 bg-surface-alt/60 rounded-xl border border-line space-y-5">
+              <div class="flex items-center justify-between border-b border-line pb-2.5">
+                <div class="flex items-center gap-2">
+                  <span class="material-icons text-accent text-base">visibility</span>
+                  <span class="text-xs font-bold uppercase tracking-wider text-primary">Prévia do Aluno</span>
+                </div>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="usesOptions ? 'bg-accent/10 text-accent' : 'bg-primary/10 text-primary'">
+                  {{ usesOptions ? 'Múltipla Escolha' : 'Discursiva' }}
+                </span>
+              </div>
+
+              <!-- Enunciado da questão no Preview -->
+              <div class="space-y-2">
+                <h4 v-if="activeQuestion.title" class="font-bold text-primary text-sm">
+                  {{ activeQuestion.title }}
+                </h4>
+                <div
+                  v-if="activeQuestion.content"
+                  class="text-primary text-sm leading-relaxed whitespace-pre-wrap font-sans p-3 bg-surface rounded-lg border border-line/60 shadow-xs"
+                >
+                  {{ activeQuestion.content }}
+                </div>
+                <div v-else class="text-xs text-secondary italic p-3 bg-surface rounded-lg border border-dashed border-line">
+                  Nenhum enunciado digitado ainda. Digite no editor ao lado para visualizar a prévia em tempo real.
+                </div>
+              </div>
+
+              <!-- Opções / Campo Discursivo no Preview -->
+              <div v-if="usesOptions" class="space-y-2.5">
+                <label class="block text-xs font-semibold text-secondary uppercase tracking-wider">Alternativas simuladas:</label>
+                <div v-if="!activeQuestion.options || activeQuestion.options.length === 0" class="text-xs text-secondary italic">
+                  Nenhuma alternativa adicionada.
+                </div>
+                <div
+                  v-for="(opt, oIndex) in activeQuestion.options"
+                  :key="oIndex"
+                  class="p-3 rounded-lg border transition-all flex items-start gap-3 bg-surface"
+                  :class="opt.correct ? 'border-success ring-1 ring-success/30 bg-success/5' : 'border-line'"
+                >
+                  <span
+                    class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5"
+                    :class="opt.correct ? 'bg-success text-on-success' : 'bg-surface-alt text-secondary border border-line'"
+                  >
+                    {{ String.fromCharCode(65 + oIndex) }}
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-primary">{{ opt.text || '(Opção sem texto)' }}</p>
+                    <p v-if="opt.feedback" class="text-xs text-secondary mt-1 flex items-center gap-1">
+                      <span class="material-icons text-xs text-accent">info</span>
+                      <span>{{ opt.feedback }}</span>
+                    </p>
+                  </div>
+                  <span v-if="opt.correct" class="text-xs font-semibold text-success bg-success/10 px-2 py-0.5 rounded shrink-0">
+                    Gabarito
+                  </span>
+                </div>
+              </div>
+
+              <!-- Preview Discursivo -->
+              <div v-else class="space-y-2">
+                <label class="block text-xs font-semibold text-secondary uppercase tracking-wider">Campo de Resposta do Aluno (Simulação):</label>
+                <textarea
+                  disabled
+                  rows="4"
+                  class="w-full bg-surface/50 border border-dashed border-line rounded-lg p-3 text-xs text-secondary cursor-not-allowed resize-none"
+                  placeholder="Área de digitação da resposta discursiva do aluno com suporte a quebra de linha..."
+                ></textarea>
               </div>
             </div>
           </div>
