@@ -685,6 +685,40 @@ app.delete('/atividades/:id', professorAuth, async (c) => {
   return c.body(null, 204);
 });
 
+app.patch('/cursos/:id/status', adminAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const body = await parseBody(c);
+  const status = body?.status;
+  if (!['ativo', 'oculto', 'arquivado'].includes(status)) return c.text('Status inválido', 400);
+  dbq('UPDATE cursos SET status = ?, atualizado_em = ? WHERE id = ?').run(status, new Date().toISOString(), id);
+  return c.json({ ok: true, status });
+});
+
+app.patch('/disciplinas/:id/status', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  if (!(await canManageDisciplina(c, id))) return c.text('Access denied', 403);
+  const body = await parseBody(c);
+  const status = body?.status;
+  if (!['ativo', 'oculto', 'arquivado'].includes(status)) return c.text('Status inválido', 400);
+  dbq('UPDATE disciplinas SET status = ?, atualizado_em = ? WHERE id = ?').run(status, new Date().toISOString(), id);
+  return c.json({ ok: true, status });
+});
+
+app.patch('/atividades/:id/status', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const atv = dbq('SELECT disciplina_id FROM atividades WHERE id = ?').get(id) as any;
+  if (!atv) return c.text('Atividade not found', 404);
+  if (!(await canManageDisciplina(c, atv.disciplina_id))) return c.text('Access denied', 403);
+  const body = await parseBody(c);
+  const status = body?.status;
+  if (!['ativo', 'oculto', 'arquivado'].includes(status)) return c.text('Status inválido', 400);
+  dbq('UPDATE atividades SET status = ?, atualizado_em = ? WHERE id = ?').run(status, new Date().toISOString(), id);
+  return c.json({ ok: true, status });
+});
+
 // ---------- Public routes ----------
 
 app.get('/cursos', async (c) => {
@@ -718,7 +752,7 @@ app.get('/cursos', async (c) => {
        CASE WHEN c.senha IS NOT NULL AND c.senha <> '' THEN 1 ELSE 0 END AS possui_senha,
        (SELECT COUNT(*) FROM disciplinas d WHERE d.curso_id = c.id) AS total_disciplinas,
        (SELECT COUNT(*) FROM curso_professores cp WHERE cp.curso_id = c.id) AS total_professores
-     FROM cursos c ORDER BY c.nome`
+     FROM cursos c WHERE COALESCE(c.status, 'ativo') = 'ativo' ORDER BY c.nome`
   ).all();
   return c.json(rows);
 });
@@ -774,7 +808,7 @@ app.get('/cursos/:id/disciplinas', async (c) => {
       }
     }
   }
-  const rows = dbq('SELECT id, curso_id, slug, nome, cor, icone, descricao FROM disciplinas WHERE curso_id = ? ORDER BY nome').all(id);
+  const rows = dbq('SELECT id, curso_id, slug, nome, cor, icone, descricao FROM disciplinas WHERE curso_id = ? AND COALESCE(status, \'ativo\') = \'ativo\' ORDER BY nome').all(id);
   return c.json(rows);
 });
 
@@ -855,6 +889,13 @@ app.get('/atividades', async (c) => {
     WHERE a.disciplina_id = ?
     ORDER BY a.ordem, a.titulo
   `;
+  const selectQueryAnon = `
+    SELECT a.*,
+      (SELECT json_group_array(aa.aula_id) FROM aula_atividades aa WHERE aa.atividade_id = a.id) AS aula_ids_json
+    FROM atividades a
+    WHERE a.disciplina_id = ? AND COALESCE(a.status, 'ativo') = 'ativo'
+    ORDER BY a.ordem, a.titulo
+  `;
 
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
@@ -873,7 +914,7 @@ app.get('/atividades', async (c) => {
     const senha = readCursoSenha(c);
     if ((curso.senha ?? null) !== senha) return c.text('Senha do curso incorreta', 401);
   }
-  const rows = dbq(selectQuery).all(disciplinaId);
+  const rows = dbq(selectQueryAnon).all(disciplinaId);
   return c.json(rows.map(mapAtividade).map(stripGabarito));
 });
 

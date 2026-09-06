@@ -192,7 +192,7 @@ O repositório opera em 4 grandes papéis/fluxos encadeados, do gerenciamento ad
    - **Disciplinas**: Seleciona o curso e faz CRUD das disciplinas/matérias.
    - **Aulas & Marp**: Abre a disciplina e cria/edita aulas usando o **Marp Markdown Editor** (com suporte a slides, KaTeX, Mermaid e preview em tempo real).
    - **Atividades & Reordenação**: Cria/edita atividades interativas e utiliza os botões ou recurso **Drag & Drop** (`Reordenar`) para definir a sequência pedagógica de aulas e atividades.
-   - **Avaliação**: Acessa `Ver Respostas dos Alunos` em cada atividade, atribui notas numéricas e feedbacks individuais.
+   - **Avaliação**: Acessa `Respostas` em cada atividade, atribui notas numéricas e feedbacks individuais.
    - **Relatórios**: Clica em `Gerar Feedback da Disciplina` para redigir a devolutiva geral da turma, ajustar os comentários individuais e disparar notificações por e-mail via `POST /disciplinas/:id/enviar-emails-feedback`.
 
 3. **Aluno (Área Pública - `/`)**:
@@ -269,7 +269,7 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 - **Login**: placeholders `professor@local` e `••••••••`; botão `Entrar`.
 - **Aluno**: heading `Área do Aluno`; card curso/disciplina = `h3` (nome); tabs `Aulas (N)`/`Atividades (N)`; aula abre em popup com URL contendo `/materias/`; PasswordModal: `Acesso Restrito` + placeholder `Digite a senha`.
 - **ActivityModal (aluno)**: duas `getByLabel('Seu Nome *'/'Seu E-mail *')`; opções objetivas são **botões** (nome = texto da opção, ex. `Brasília`); success `h3 'Resposta Enviada com Sucesso!'` + `Correção do servidor: X / Y acertos`.
-- **Professor**: heading `Painel do Professor`; curso card `h3`; disciplina `h3` + botão `Gerenciar Aulas & Atividades`; botão `Ver Respostas dos Alunos`; `Gerar Feedback da Disciplina`.
+- **Professor**: heading `Painel do Professor`; curso card `h3`; disciplina `h3` + botão `Gerenciar Aulas & Atividades`; botão `Respostas` (seletor: `getByRole('button', { name: /Respostas/i })`); `Gerar Feedback da Disciplina`.
 - **RespostasModal**: `Total de Envios: {n}`; botão `Avaliar / Ver`; inputs `placeholder='Ex: 85'` (nota) e `placeholder='Escreva um comentário pedagógico para este aluno...'` (feedback); sucesso `Avaliação Salva!`; botão `Fechar`.
 - **FeedbackConsolidadoModal**: heading `Relatório de Feedback da Disciplina`; textarea da turma (placeholder `Digite um comunicado ou feedback geral para toda a turma...`); botão `Salvar Feedback da Turma` → `Feedback Geral da Turma salvo com sucesso!`; input individual (placeholder `Escreva observações pedagógicas gerais para este aluno...`); botão `Salvar Feedback` → `Feedback para {nome} salvo!`; badges `E-mail Enviado`/`E-mail Pendente`.
 
