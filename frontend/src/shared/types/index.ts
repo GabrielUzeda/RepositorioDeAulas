@@ -99,6 +99,7 @@ export interface RespostaAluno {
   atividade_id: number;
   aluno_nome: string;
   aluno_email: string;
+  aluno_email_hash?: string;
   respostas: string | RespostasAlunoMap;
   nota?: number | null;
   feedback?: string | null;
