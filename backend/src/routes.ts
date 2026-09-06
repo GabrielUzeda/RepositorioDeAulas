@@ -1704,6 +1704,35 @@ app.put('/respostas/:id/avaliacao', professorAuth, async (c) => {
   return c.json({ success: true, message: 'Avaliação salva com sucesso' });
 });
 
+app.patch('/respostas/:id/email', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('ID inválido', 400);
+
+  const resp = dbq('SELECT r.id, a.disciplina_id FROM respostas_alunos r JOIN atividades a ON a.id = r.atividade_id WHERE r.id = ?').get(id) as { id: number; disciplina_id: number } | undefined;
+  if (!resp) return c.text('Resposta não encontrada', 404);
+
+  if (!(await canManageDisciplina(c, resp.disciplina_id))) {
+    return c.text('Access denied', 403);
+  }
+
+  const body = await parseBody(c);
+  if (!body || !body.novo_email) return c.json({ success: false, error: 'Novo e-mail é obrigatório' }, 400);
+
+  const rawEmail = String(body.novo_email).trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(rawEmail)) {
+    return c.json({ success: false, error: 'Formato de e-mail inválido' }, 400);
+  }
+
+  const encryptedEmail = await encryptData(rawEmail);
+  const emailHash = hashEmail(rawEmail);
+
+  dbq('UPDATE respostas_alunos SET aluno_email = ?, aluno_email_hash = ? WHERE id = ?').run(encryptedEmail, emailHash, id);
+  await logAudit(c, 'atualizar_email_resposta', 'respostas_alunos', { resposta_id: id });
+
+  return c.json({ success: true, message: 'E-mail do aluno atualizado com sucesso', aluno_email: rawEmail, aluno_email_hash: emailHash });
+});
+
 app.get('/disciplinas/:id/relatorio-feedback', professorAuth, async (c) => {
   const disciplinaId = parseId(c.req.param('id'));
   if (disciplinaId === null) return c.text('ID inválido', 400);

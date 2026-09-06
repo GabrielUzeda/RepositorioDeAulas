@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
 import { useToast } from '@/shared/composables/useToast';
+import { validateEmailWithTypo } from '@/shared/utils/emailValidator';
 import type { Atividade, Question } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
@@ -132,8 +133,16 @@ async function handleRestoreDraft() {
   }
 }
 
+const emailValidation = computed(() => validateEmailWithTypo(alunoEmail.value));
+
 function isValidEmailFormat(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+(?:\.[^\s@]+)?$/.test(email);
+  return validateEmailWithTypo(email).isValid;
+}
+
+function applySuggestedEmail() {
+  if (emailValidation.value.suggestion) {
+    alunoEmail.value = emailValidation.value.suggestion;
+  }
 }
 
 const showDraftModal = ref(false);
@@ -336,7 +345,25 @@ async function handleSubmit() {
         </div>
 
         <BaseInput v-model="alunoNome" label="Seu Nome *" placeholder="Nome Completo" />
-        <BaseInput v-model="alunoEmail" type="email" label="Seu E-mail *" placeholder="seu@email.com" />
+        <div class="space-y-1">
+          <BaseInput v-model="alunoEmail" type="email" label="Seu E-mail *" placeholder="seu@email.com" />
+          <div
+            v-if="emailValidation.suggestion"
+            class="p-2.5 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2 text-xs text-primary"
+          >
+            <div class="flex items-center gap-1.5">
+              <span class="material-icons text-accent text-sm">help_outline</span>
+              <span>Você quis dizer <strong>{{ emailValidation.suggestion }}</strong>?</span>
+            </div>
+            <button
+              type="button"
+              @click="applySuggestedEmail"
+              class="px-2 py-0.5 bg-accent text-white font-semibold rounded text-xs hover:bg-accent/90 shrink-0"
+            >
+              Corrigir
+            </button>
+          </div>
+        </div>
         
         <div class="flex items-center gap-2 pt-1">
           <input

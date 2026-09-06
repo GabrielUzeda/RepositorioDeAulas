@@ -61,7 +61,9 @@ const sanitizeHTML = (html: string): string => {
 
   // 1. Remover completamente tags perigosas ou atípicas (scripts, iframes, svgs, math, templates, etc.)
   const dangerousTags = doc.querySelectorAll('script, iframe, object, embed, form, input, button, select, textarea, svg, math, template, noscript, style, link, meta, base, applet, audio, video');
-  dangerousTags.forEach(el => el.remove());
+  for (const el of Array.from(dangerousTags)) {
+    el.remove();
+  }
 
   // 2. Processar recursivamente todos os elementos aplicando allowlist estrita
   const sanitizeNode = (node: Node) => {

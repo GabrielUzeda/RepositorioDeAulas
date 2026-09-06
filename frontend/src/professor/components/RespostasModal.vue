@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
+import { validateEmailWithTypo } from '@/shared/utils/emailValidator';
 import { apiClient } from '@/shared/api/client';
 import type { Atividade, RespostaAluno, Question } from '@/shared/types';
 import BaseModal from '../../shared/components/BaseModal.vue';
@@ -30,6 +31,49 @@ const isSavingAvaliacao = ref(false);
 
 const showConfirmDelete = ref(false);
 const deleteTargetId = ref<number | null>(null);
+const showEditEmailModal = ref(false);
+const editingEmail = ref('');
+const isSavingEmail = ref(false);
+
+function openEditEmailModal() {
+  if (selectedResposta.value) {
+    editingEmail.value = selectedResposta.value.aluno_email;
+    showEditEmailModal.value = true;
+  }
+}
+
+async function handleUpdateEmail() {
+  if (!selectedResposta.value || isSavingEmail.value) return;
+  const validation = validateEmailWithTypo(editingEmail.value);
+  if (!validation.isValid) {
+    useToast().error(validation.error || 'Formato de e-mail inválido.');
+    return;
+  }
+
+  isSavingEmail.value = true;
+  try {
+    const res: any = await apiClient.patch(`/respostas/${selectedResposta.value.id}/email`, {
+      novo_email: editingEmail.value.trim().toLowerCase()
+    });
+    if (res.success) {
+      selectedResposta.value.aluno_email = res.aluno_email || editingEmail.value.trim().toLowerCase();
+      selectedResposta.value.aluno_email_hash = res.aluno_email_hash;
+      const target = respostas.value.find(r => r.id === selectedResposta.value?.id);
+      if (target) {
+        target.aluno_email = selectedResposta.value.aluno_email;
+        target.aluno_email_hash = res.aluno_email_hash;
+      }
+      useToast().success('E-mail do aluno corrigido com sucesso!');
+      showEditEmailModal.value = false;
+    } else {
+      useToast().error(res.error || 'Erro ao atualizar e-mail.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao atualizar e-mail.');
+  } finally {
+    isSavingEmail.value = false;
+  }
+}
 
 const editingNotaStr = computed<string>({
   get: () => (editingNota.value === null ? '' : String(editingNota.value)),
@@ -324,7 +368,19 @@ function scoreColor(nota: number | null | undefined) {
               </div>
               <div class="min-w-0">
                 <h4 class="font-bold text-primary text-sm leading-tight truncate">{{ selectedResposta.aluno_nome }}</h4>
-                <p class="text-secondary text-xs truncate">{{ selectedResposta.aluno_email }} · {{ formatDate(selectedResposta.criado_em) }}</p>
+                <div class="flex items-center gap-1.5 text-secondary text-xs truncate">
+                  <span class="truncate">{{ selectedResposta.aluno_email }}</span>
+                  <button
+                    type="button"
+                    class="text-accent hover:text-primary transition-colors p-0.5 rounded"
+                    title="Corrigir e-mail do aluno"
+                    @click="openEditEmailModal"
+                  >
+                    <span class="material-icons text-xs">edit</span>
+                  </button>
+                  <span>·</span>
+                  <span>{{ formatDate(selectedResposta.criado_em) }}</span>
+                </div>
               </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -407,6 +463,33 @@ function scoreColor(nota: number | null | undefined) {
         <BaseButton variant="secondary" @click="emit('close')">Fechar</BaseButton>
       </div>
     </template>
+  </BaseModal>
+
+  <!-- Modal de Edição de E-mail do Aluno -->
+  <BaseModal
+    v-model="showEditEmailModal"
+    title="Corrigir E-mail do Aluno"
+    max-width="max-w-md"
+    @close="showEditEmailModal = false"
+  >
+    <div class="space-y-4">
+      <p class="text-xs text-secondary">
+        Atualize o endereço de e-mail cadastrado nesta resposta para que o aluno receba o comprovante e os feedbacks pedagógicos corretamente.
+      </p>
+      <BaseInput
+        v-model="editingEmail"
+        type="email"
+        label="Novo Endereço de E-mail"
+        placeholder="aluno@escola.com"
+      />
+      <div class="flex justify-end gap-2 pt-2 border-t border-line">
+        <BaseButton variant="ghost" size="sm" @click="showEditEmailModal = false">Cancelar</BaseButton>
+        <BaseButton variant="primary" size="sm" :loading="isSavingEmail" @click="handleUpdateEmail">
+          <span class="material-icons text-xs mr-1">save</span>
+          <span>Salvar Alteração</span>
+        </BaseButton>
+      </div>
+    </div>
   </BaseModal>
 
   <ConfirmDialog
