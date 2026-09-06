@@ -170,6 +170,18 @@ export interface AiModel {
   maxOutput?: number;
 }
 
+export interface DocumentoOrientador {
+  id: number;
+  curso_id?: number | null;
+  disciplina_id: number;
+  titulo: string;
+  nome_arquivo: string;
+  tipo: string;
+  conteudo_texto?: string;
+  tamanho_bytes?: number;
+  criado_em?: string;
+}
+
 export interface GenerateActivityPayload {
   modelo: string;
   tipo: string;

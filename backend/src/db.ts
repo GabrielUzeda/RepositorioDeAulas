@@ -191,8 +191,26 @@ try {
   `);
 } catch {}
 
+try {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS documentos_orientadores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      curso_id INTEGER REFERENCES cursos(id) ON DELETE CASCADE,
+      disciplina_id INTEGER REFERENCES disciplinas(id) ON DELETE CASCADE,
+      titulo TEXT NOT NULL,
+      nome_arquivo TEXT NOT NULL,
+      tipo TEXT CHECK(tipo IN ('ementa', 'plano_ensino', 'apostila', 'outro')) DEFAULT 'outro',
+      conteudo_texto TEXT NOT NULL,
+      tamanho_bytes INTEGER NOT NULL,
+      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    )
+  `);
+} catch {}
+
 // [2] Índices para alta performance
 db.run(`
+CREATE INDEX IF NOT EXISTS idx_documentos_orientadores_disc ON documentos_orientadores(disciplina_id);
+CREATE INDEX IF NOT EXISTS idx_documentos_orientadores_curso ON documentos_orientadores(curso_id);
 CREATE INDEX IF NOT EXISTS idx_ranking_atividade_pontuacao ON ranking(atividade_id, pontuacao DESC);
 CREATE INDEX IF NOT EXISTS idx_respostas_atividade ON respostas_alunos(atividade_id);
 CREATE INDEX IF NOT EXISTS idx_respostas_aluno_email_hash ON respostas_alunos(aluno_email_hash);

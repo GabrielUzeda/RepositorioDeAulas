@@ -9,6 +9,7 @@ import MarpEditorModal from '@/professor/components/MarpEditorModal.vue';
 import JsonActivityEditorModal from '@/professor/components/JsonActivityEditorModal.vue';
 import RespostasModal from '@/professor/components/RespostasModal.vue';
 import FeedbackConsolidadoModal from '@/professor/components/FeedbackConsolidadoModal.vue';
+import DocumentosDisciplinaModal from '@/professor/components/DocumentosDisciplinaModal.vue';
 import CursoCard from '@/aluno/components/CursoCard.vue';
 import DisciplinaCard from '@/aluno/components/DisciplinaCard.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
@@ -43,6 +44,7 @@ const showRespostasModal = ref(false);
 const selectedRespostasAtividade = ref<Atividade | null>(null);
 
 const showFeedbackConsolidadoModal = ref(false);
+const showDocumentosModal = ref(false);
 
 onMounted(async () => {
   await cursoStore.fetchCursos();
@@ -707,6 +709,20 @@ function handleOpenRespostas(atividade: Atividade) {
               <BaseButton
                 variant="secondary"
                 size="sm"
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                class="inline-flex items-center justify-center gap-1.5"
+                title="Ementas e PDFs para IA (RAG)"
+                @click="showDocumentosModal = true"
+              >
+                <span class="material-icons text-sm">auto_stories</span>
+                <span>Documentos RAG</span>
+              </BaseButton>
+
+              <BaseButton
+                variant="secondary"
+                size="sm"
                 class="inline-flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
                 @click="showFeedbackConsolidadoModal = true"
               >
@@ -1231,6 +1247,13 @@ function handleOpenRespostas(atividade: Atividade) {
       :disciplina-id="selectedDisciplina?.id || null"
       :disciplina-nome="selectedDisciplina?.nome"
       @close="showFeedbackConsolidadoModal = false"
+    />
+
+    <DocumentosDisciplinaModal
+      v-if="selectedDisciplina"
+      v-model="showDocumentosModal"
+      :disciplina-id="selectedDisciplina.id"
+      @close="showDocumentosModal = false"
     />
 
     <ConfirmDialog
