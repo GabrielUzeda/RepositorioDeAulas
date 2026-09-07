@@ -1,4 +1,6 @@
-export function extractTextFromBuffer(buffer: Uint8Array, filename: string): string {
+import { extractText } from 'unpdf';
+
+export async function extractTextFromBuffer(buffer: Uint8Array, filename: string): Promise<string> {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
 
   if (['txt', 'md', 'markdown', 'json', 'csv', 'yaml', 'yml'].includes(ext)) {
@@ -14,7 +16,16 @@ export function extractTextFromBuffer(buffer: Uint8Array, filename: string): str
   return decoded.replace(/[^\x20-\x7E\n\r\t\u00A0-\u00FF\u0100-\u017F]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-export function extractTextFromPdf(buffer: Uint8Array): string {
+export async function extractTextFromPdf(buffer: Uint8Array): Promise<string> {
+  try {
+    const { text } = await extractText(buffer, { mergePages: true });
+    if (text && text.trim()) {
+      return text.replace(/\s+/g, ' ').trim();
+    }
+  } catch (err) {
+    console.error('Erro ao extrair texto do PDF via unpdf:', err);
+  }
+
   const raw = new TextDecoder('latin1').decode(buffer);
   const textChunks: string[] = [];
 

@@ -83,4 +83,65 @@ describe('AI Module & 9router Integration', () => {
     });
     expect(resEmpty.status).toBe(400);
   });
+
+  test('POST /ai/evaluate-response validates payload and auth', async () => {
+    const resNoAuth = await app.request('/ai/evaluate-response', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ questao_enunciado: 'Q1', resposta_aluno: 'R1' })
+    });
+    expect(resNoAuth.status).toBe(401);
+
+    const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
+    const resNoPayload = await app.request('/ai/evaluate-response', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({})
+    });
+    expect(resNoPayload.status).toBe(400);
+  });
+
+  test('POST /ai/synthesize-class-feedback validates auth and structure', async () => {
+    const resNoAuth = await app.request('/ai/synthesize-class-feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ disciplina_nome: 'Algoritmos' })
+    });
+    expect(resNoAuth.status).toBe(401);
+
+    const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
+    const resAuth = await app.request('/ai/synthesize-class-feedback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        disciplina_nome: 'Algoritmos',
+        total_envios: 1,
+        alunos_detalhes: [
+          {
+            aluno_nome: 'Aluno Teste',
+            aluno_email: 'aluno@teste.com',
+            media: 90,
+            atividades: [
+              { atividade_titulo: 'Atv 1', nota: 90, feedback: 'Bom trabalho com laços' }
+            ]
+          }
+        ]
+      })
+    });
+    expect([200, 502, 503]).toContain(resAuth.status);
+    if (resAuth.status === 200) {
+      const data = await resAuth.json() as any;
+      expect(data.success).toBe(true);
+      expect(data).toHaveProperty('feedback_geral');
+      expect(Array.isArray(data.pontos_fortes)).toBe(true);
+      expect(Array.isArray(data.pontos_atencao)).toBe(true);
+      expect(Array.isArray(data.alunos_sintese)).toBe(true);
+    }
+  });
 });

@@ -798,4 +798,57 @@ describe('Auth Module & Multi-Professor System', () => {
     const relRows = db.query('SELECT * FROM aula_atividades WHERE atividade_id = ?').all(atv.id);
     expect(relRows.length).toBe(0);
   });
+
+  test('PATCH /respostas/:id/email atualiza e-mail com hash HMAC SHA-256 e sem corrupção [object Promise]', async () => {
+    const adminLogin = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@escola.com', password: ADMIN_SEED_PASSWORD }),
+    });
+    const { token } = await adminLogin.json();
+
+    const disc = db.query(`SELECT id FROM disciplinas LIMIT 1`).get() as any;
+    const atvRes = await app.request('/atividades', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        disciplina_id: disc.id,
+        titulo: 'Atividade Teste Patch Email',
+        tipo: 'normal',
+        json_data: JSON.stringify([{ id: 'q1', type: 'open', title: 'Q1' }]),
+      }),
+    });
+    const atv = await atvRes.json();
+
+    const subRes = await app.request(`/atividades/${atv.id}/respostas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        aluno_nome: 'Aluno Teste',
+        aluno_email: 'antigo@escola.com',
+        respostas: { q1: 'minha resposta' },
+        senha_curso: 'asdf1234',
+      }),
+    });
+    expect([200, 201]).toContain(subRes.status);
+    const sub = await subRes.json();
+
+    // Atualiza o e-mail via PATCH
+    const patchRes = await app.request(`/respostas/${sub.id}/email`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ novo_email: 'novo.aluno@gmail.com' }),
+    });
+    expect(patchRes.status).toBe(200);
+    const patchData = await patchRes.json();
+    expect(patchData.success).toBe(true);
+    expect(typeof patchData.aluno_email_hash).toBe('string');
+    expect(patchData.aluno_email_hash).not.toBe('[object Promise]');
+    expect(patchData.aluno_email_hash.length).toBeGreaterThan(10);
+
+    // Consulta no banco SQLite
+    const row = db.query('SELECT aluno_email_hash FROM respostas_alunos WHERE id = ?').get(sub.id) as any;
+    expect(row.aluno_email_hash).toBe(patchData.aluno_email_hash);
+    expect(row.aluno_email_hash).not.toBe('[object Promise]');
+  });
 });

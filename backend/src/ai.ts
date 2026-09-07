@@ -854,24 +854,56 @@ Regras:
 
 aiRouter.post('/synthesize-class-feedback', professorAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const { disciplina_nome, total_envios, respostas_resumo, modelo } = body;
+  const { disciplina_nome, total_envios, respostas_resumo, alunos_detalhes, modelo } = body;
 
-  const systemPrompt = `Você é um coordenador pedagógico especializado em síntese avaliativa. Analise o conjunto de desempenhos e respostas dos alunos e gere um parecer consolidado para a turma.
+  const systemPrompt = `Você é um coordenador pedagógico sênior especializado em síntese avaliativa e devolutiva formativa.
+Sua missão é analisar o conjunto de desempenhos, notas e todos os N feedbacks individuais que cada aluno recebeu nas atividades ao longo da disciplina e produzir:
+1. Um parecer consolidado para a turma ("feedback_geral", "pontos_fortes", "pontos_atencao").
+2. Uma síntese individual e longitudinal para CADA aluno informado ("alunos_sintese"), consolidando os N feedbacks que ele recebeu nas atividades da disciplina para orientar sua evolução pedagógica.
+
 Retorne ESTRITAMENTE um objeto JSON no formato:
 {
   "feedback_geral": "Texto fluido e encorajador para ser compartilhado com toda a turma...",
   "pontos_fortes": ["Ponto forte 1", "Ponto forte 2"],
-  "pontos_atencao": ["Tópico onde muitos alunos apresentaram dúvidas..."]
+  "pontos_atencao": ["Tópico onde a turma apresentou dúvidas..."],
+  "alunos_sintese": [
+    {
+      "aluno_email": "email@do.aluno",
+      "feedback_individual": "Síntese individual personalizada para o aluno, destacando sua progressão através das atividades e sugestões de aprimoramento..."
+    }
+  ]
 }
-Regras:
-1. O texto deve ser motivador, claro e pedagógico.
-2. Responda apenas com o JSON puro sem formatação markdown.`;
 
-  let userPrompt = `DISCIPLINA: ${disciplina_nome || 'Geral'}\nTOTAL DE ENVIOS ANALISADOS: ${total_envios || 0}\n\n`;
-  if (Array.isArray(respostas_resumo) && respostas_resumo.length > 0) {
-    userPrompt += `RESUMO DOS ENVIOS DOS ALUNOS:\n`;
-    respostas_resumo.slice(0, 30).forEach((item: any, idx: number) => {
-      userPrompt += `${idx + 1}. Aluno: ${item.aluno || 'Anônimo'} | Nota: ${item.nota ?? 'Pendente'} | Feedback anterior: ${item.feedback || item.respostas_principais || 'Sem comentários'}\n`;
+Regras:
+1. O texto geral e os individuais devem ser motivadores, claros e pedagógicos.
+2. Na lista "alunos_sintese", gere uma entrada para cada aluno informado com seu respectivo email e feedback_individual sintetizado a partir de seus desempenhos nas atividades.
+3. Responda apenas com o JSON puro sem formatação markdown.`;
+
+  let userPrompt = `DISCIPLINA: ${disciplina_nome || 'Geral'}\nTOTAL DE ALUNOS/ENVIOS: ${total_envios || 0}\n\n`;
+
+  const alunosLista = Array.isArray(alunos_detalhes) && alunos_detalhes.length > 0
+    ? alunos_detalhes
+    : Array.isArray(respostas_resumo) ? respostas_resumo : [];
+
+  if (alunosLista.length > 0) {
+    userPrompt += `HISTÓRICO DE ATIVIDADES E FEEDBACKS POR ALUNO:\n`;
+    alunosLista.slice(0, 30).forEach((item: any, idx: number) => {
+      const nome = item.aluno_nome || item.aluno || 'Anônimo';
+      const email = item.aluno_email || '';
+      const emailInfo = email ? ` (${email})` : '';
+      const media = item.media !== undefined && item.media !== null ? ` | Média: ${item.media}/100` : (item.nota !== undefined ? ` | Média: ${item.nota}` : '');
+      userPrompt += `\n[ALUNO ${idx + 1}] ${nome}${emailInfo}${media}:\n`;
+      if (Array.isArray(item.atividades) && item.atividades.length > 0) {
+        item.atividades.forEach((atv: any, atvIdx: number) => {
+          const notaStr = atv.nota !== null && atv.nota !== undefined ? `Nota: ${atv.nota}/100` : 'Sem nota';
+          const feedStr = atv.feedback ? `Feedback: "${atv.feedback}"` : 'Sem comentários';
+          userPrompt += `  - Atividade "${atv.atividade_titulo || `Atividade ${atvIdx + 1}`}": ${notaStr} | ${feedStr}\n`;
+        });
+      } else if (item.feedback || item.respostas_principais) {
+        userPrompt += `  - Feedbacks anteriores: ${item.feedback || item.respostas_principais}\n`;
+      } else {
+        userPrompt += `  - Atividades enviadas sem feedbacks preliminares.\n`;
+      }
     });
   }
 
@@ -903,7 +935,7 @@ Regras:
           ],
           temperature: 0.3
         }),
-        signal: AbortSignal.timeout(45000)
+        signal: AbortSignal.timeout(60000)
       });
 
       if (!aiResponse.ok) continue;
@@ -918,6 +950,10 @@ Regras:
           feedback_geral: String(parsed.feedback_geral).trim(),
           pontos_fortes: Array.isArray(parsed.pontos_fortes) ? parsed.pontos_fortes : [],
           pontos_atencao: Array.isArray(parsed.pontos_atencao) ? parsed.pontos_atencao : [],
+          alunos_sintese: Array.isArray(parsed.alunos_sintese) ? parsed.alunos_sintese.map((s: any) => ({
+            aluno_email: String(s.aluno_email || '').trim().toLowerCase(),
+            feedback_individual: String(s.feedback_individual || '').trim()
+          })) : [],
           modelo_utilizado: currentModel
         };
         break;
