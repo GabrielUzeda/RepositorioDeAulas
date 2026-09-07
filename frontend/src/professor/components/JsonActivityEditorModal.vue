@@ -130,6 +130,7 @@ function scheduleAutoSave() {
       allowPassword: allowPassword.value,
       senha: senha.value,
       dataLimite: dataLimite.value,
+      questions: questions.value,
       aiTema: aiTema.value,
       aiObservacoes: aiObservacoes.value,
       aiQuantidadeStr: aiQuantidadeStr.value,
@@ -744,7 +745,7 @@ async function handleDeleteDraft(draftId: number) {
               <input
                 v-else
                 v-model="activeQuestion.title"
-                placeholder="Título/Tema da Questão (Ex: Conceito Central)"
+                placeholder="Título/Tema da Questão (Ex: Questão 1)"
                 class="w-full bg-surface-alt px-3.5 py-1.5 rounded-md border border-line font-semibold text-primary text-sm outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
               />
             </div>

@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import type { Atividade } from '@/shared/types';
 import BaseContentCard from '@/shared/components/BaseContentCard.vue';
+import BaseBadge from '@/shared/components/BaseBadge.vue';
 
 const props = defineProps<{
   atividade: Atividade;
@@ -9,6 +10,42 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<(e: 'click', atividade: Atividade) => void>();
+
+const deadlineInfo = computed(() => {
+  if (!props.atividade.data_limite) return null;
+  const deadlineDate = new Date(props.atividade.data_limite);
+  const now = new Date();
+  const diffMs = deadlineDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const isExpired = diffMs < 0;
+
+  const formattedDate = deadlineDate.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  if (isExpired) {
+    return {
+      text: `Prazo encerrado (${formattedDate})`,
+      variant: 'danger' as const,
+      icon: 'event_busy'
+    };
+  }
+  if (diffDays <= 2) {
+    return {
+      text: `Entrega próxima: ${formattedDate}`,
+      variant: 'warning' as const,
+      icon: 'schedule'
+    };
+  }
+  return {
+    text: `Prazo: ${formattedDate}`,
+    variant: 'secondary' as const,
+    icon: 'event'
+  };
+});
 
 const typeConfig = computed(() => {
   switch (props.atividade.tipo) {
@@ -63,5 +100,14 @@ const typeConfig = computed(() => {
     action-icon="arrow_forward"
     :is-locked="props.isLocked"
     @click="emit('click', props.atividade)"
-  />
+  >
+    <template v-if="deadlineInfo" #meta>
+      <div class="mt-2 flex items-center">
+        <BaseBadge :variant="deadlineInfo.variant" class="text-[11px] gap-1">
+          <span class="material-icons text-[13px]">{{ deadlineInfo.icon }}</span>
+          {{ deadlineInfo.text }}
+        </BaseBadge>
+      </div>
+    </template>
+  </BaseContentCard>
 </template>
