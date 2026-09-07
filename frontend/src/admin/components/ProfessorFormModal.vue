@@ -6,6 +6,7 @@ import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseSelect from '@/shared/components/BaseSelect.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -26,6 +27,7 @@ const selectedCursoIds = ref<number[]>([]);
 const searchQuery = ref('');
 const error = ref('');
 const isSubmitting = ref(false);
+const isLoadingCursos = ref(false);
 
 watch(
   () => props.show,
@@ -38,17 +40,24 @@ watch(
       role.value = props.professor?.role === 'admin' ? 'admin' : 'professor';
       searchQuery.value = '';
       error.value = '';
+      selectedCursoIds.value = [];
 
-      const resCursos = await apiClient.get<Curso[]>('/cursos');
-      if (resCursos.success && resCursos.data) {
-        cursos.value = resCursos.data;
-      }
-
-      if (props.professor) {
-        const res = await apiClient.get<Curso[]>(`/professores/${props.professor.id}/cursos`);
-        selectedCursoIds.value = res.success && res.data ? res.data.map((c: Curso) => c.id) : [];
-      } else {
-        selectedCursoIds.value = [];
+      isLoadingCursos.value = true;
+      try {
+        const [resCursos, resProfCursos] = await Promise.all([
+          apiClient.get<Curso[]>('/cursos'),
+          props.professor ? apiClient.get<Curso[]>(`/professores/${props.professor.id}/cursos`) : Promise.resolve(null)
+        ]);
+        if (resCursos.success && resCursos.data) {
+          cursos.value = resCursos.data;
+        }
+        if (resProfCursos && resProfCursos.success && resProfCursos.data) {
+          selectedCursoIds.value = resProfCursos.data.map((c: Curso) => c.id);
+        } else if (!props.professor) {
+          selectedCursoIds.value = [];
+        }
+      } finally {
+        isLoadingCursos.value = false;
       }
     }
   }
@@ -222,7 +231,11 @@ async function handleSubmit() {
           </div>
 
           <!-- Scalable Toggle Chips Grid -->
-          <div v-if="cursos.length === 0" class="text-xs text-secondary text-center py-5">
+          <div v-if="isLoadingCursos" class="flex items-center justify-center py-6 gap-2 text-xs text-secondary" aria-busy="true">
+            <BaseSpinner size="sm" />
+            <span>Carregando cursos...</span>
+          </div>
+          <div v-else-if="cursos.length === 0" class="text-xs text-secondary text-center py-5">
             Nenhum curso cadastrado no sistema.
           </div>
           <div v-else-if="filteredCursos.length === 0" class="text-xs text-secondary text-center py-5">

@@ -1216,55 +1216,67 @@ function downloadFile(content: string, fileName: string, contentType: string) {
   }, 100);
 }
 
+const isExporting = ref(false);
+
 async function exportHtml() {
   showExportMenu.value = false;
-  const res = await apiClient.post('/marp/render', {
-    titulo: titleInput.value || 'Aula Sem Título',
-    markdown: markdownInput.value,
-  });
-  const html = res.data?.html;
-  if (!res.success || res.status === 0 || !html) {
-    useToast().error(res.error || 'backend indisponível');
-    return;
+  isExporting.value = true;
+  try {
+    const res = await apiClient.post('/marp/render', {
+      titulo: titleInput.value || 'Aula Sem Título',
+      markdown: markdownInput.value,
+    });
+    const html = res.data?.html;
+    if (!res.success || res.status === 0 || !html) {
+      useToast().error(res.error || 'backend indisponível');
+      return;
+    }
+    downloadFile(html, 'apresentacao-marp-next.html', 'text/html;charset=utf-8;');
+  } finally {
+    isExporting.value = false;
   }
-  downloadFile(html, 'apresentacao-marp-next.html', 'text/html;charset=utf-8;');
 }
 
 async function exportPdf() {
   showExportMenu.value = false;
-  // Gera o HTML standalone em memória e imprime via iframe oculto — NUNCA a página do app.
-  const res = await apiClient.post('/marp/render', {
-    titulo: titleInput.value || 'Aula Sem Título',
-    markdown: markdownInput.value,
-  });
-  const htmlContent = res.data?.html;
-  if (!res.success || res.status === 0 || !htmlContent) {
-    useToast().error(res.error || 'backend indisponível');
-    return;
-  }
-  const iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(iframe);
-
-  const removeIframe = () => {
-    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    window.removeEventListener('afterprint', removeIframe);
-  };
-  window.addEventListener('afterprint', removeIframe);
-  setTimeout(removeIframe, 60000);
-
+  isExporting.value = true;
   try {
-    const doc = iframe.contentDocument;
-    if (!doc || !iframe.contentWindow) { removeIframe(); return; }
-    doc.open();
-    doc.write(htmlContent);
-    doc.close();
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-  } catch (e) {
-    removeIframe();
-    useToast().error('Não foi possível gerar o PDF.');
+    // Gera o HTML standalone em memória e imprime via iframe oculto — NUNCA a página do app.
+    const res = await apiClient.post('/marp/render', {
+      titulo: titleInput.value || 'Aula Sem Título',
+      markdown: markdownInput.value,
+    });
+    const htmlContent = res.data?.html;
+    if (!res.success || res.status === 0 || !htmlContent) {
+      useToast().error(res.error || 'backend indisponível');
+      return;
+    }
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(iframe);
+
+    const removeIframe = () => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      window.removeEventListener('afterprint', removeIframe);
+    };
+    window.addEventListener('afterprint', removeIframe);
+    setTimeout(removeIframe, 60000);
+
+    try {
+      const doc = iframe.contentDocument;
+      if (!doc || !iframe.contentWindow) { removeIframe(); return; }
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (e) {
+      removeIframe();
+      useToast().error('Não foi possível gerar o PDF.');
+    }
+  } finally {
+    isExporting.value = false;
   }
 }
 
@@ -1643,7 +1655,7 @@ onBeforeUnmount(() => {
 
       <!-- Dropdown de Exportar -->
       <div class="export-dropdown relative">
-        <BaseButton variant="secondary" size="sm" @click.stop="showExportMenu = !showExportMenu" title="Exportar Apresentação">Exportar</BaseButton>
+        <BaseButton variant="secondary" size="sm" :loading="isExporting" :disabled="isExporting" @click.stop="showExportMenu = !showExportMenu" title="Exportar Apresentação">Exportar</BaseButton>
         <div v-if="showExportMenu" class="export-menu">
           <button class="export-item" @click="exportHtml(); showExportMenu = false">HTML Autossuficiente (.html)</button>
           <button class="export-item" @click="exportPdf(); showExportMenu = false">Documento PDF (.pdf)</button>

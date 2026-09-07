@@ -124,8 +124,12 @@ function handleSaveDraft() {
   }
 }
 
+const isRestoringDraft = ref(false);
+const isSavingDraft = ref(false);
+
 async function handleRestoreDraft() {
-  if (!rascunhoCodigo.value) return;
+  if (!rascunhoCodigo.value || isRestoringDraft.value) return;
+  isRestoringDraft.value = true;
   try {
     const res: any = await apiClient.get(`/rascunhos/${rascunhoCodigo.value}`);
     const data = res.data?.data || res.data || res;
@@ -141,6 +145,8 @@ async function handleRestoreDraft() {
     }
   } catch (err: any) {
     errorMessage.value = err.message || 'Erro ao restaurar rascunho.';
+  } finally {
+    isRestoringDraft.value = false;
   }
 }
 
@@ -164,12 +170,13 @@ const isSendingDraftEmail = ref(false);
 const draftEmailStatus = ref('');
 
 async function handleSaveDraftToServer() {
-  if (!props.atividade) return;
+  if (!props.atividade || isSavingDraft.value) return;
   if (!alunoEmail.value || !isValidEmailFormat(alunoEmail.value)) {
     errorMessage.value = 'Preencha um e-mail válido no primeiro passo para salvar o rascunho no servidor.';
     return;
   }
   errorMessage.value = '';
+  isSavingDraft.value = true;
   try {
     const res: any = await apiClient.post(`/atividades/${props.atividade.id}/rascunhos`, {
       nome: alunoNome.value,
@@ -188,6 +195,8 @@ async function handleSaveDraftToServer() {
     }
   } catch (err: any) {
     errorMessage.value = err.message || 'Erro ao salvar rascunho.';
+  } finally {
+    isSavingDraft.value = false;
   }
 }
 
@@ -365,8 +374,15 @@ async function handleSubmit() {
         </div>
 
         <BaseInput v-model="alunoNome" label="Seu Nome *" placeholder="Nome Completo" />
-        <div class="space-y-1">
-          <BaseInput v-model="alunoEmail" type="email" label="Seu E-mail *" placeholder="seu@email.com" />
+        <div class="space-y-1.5">
+          <BaseInput
+            v-model="alunoEmail"
+            type="email"
+            label="Seu E-mail *"
+            placeholder="seu@email.com"
+            :error="alunoEmail.trim() && !emailValidation.isValid ? emailValidation.error : undefined"
+          />
+          <!-- Sugestão de correção para erros de digitação comuns -->
           <div
             v-if="emailValidation.suggestion"
             class="p-2.5 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2 text-xs text-primary"
@@ -382,6 +398,14 @@ async function handleSubmit() {
             >
               Corrigir
             </button>
+          </div>
+          <!-- Aviso pedagógico quando domínio não é um provedor comum conhecido -->
+          <div
+            v-else-if="alunoEmail.trim() && emailValidation.isValid && emailValidation.warning"
+            class="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2 text-xs text-primary"
+          >
+            <span class="material-icons text-amber-500 text-sm mt-0.5 shrink-0">info</span>
+            <span>{{ emailValidation.warning }}</span>
           </div>
         </div>
         
@@ -401,7 +425,7 @@ async function handleSubmit() {
             <p class="text-sm font-medium text-primary">Restaurar Rascunho</p>
             <div class="flex gap-2">
                 <BaseInput v-model="rascunhoCodigo" class="flex-1" placeholder="Código (ex: R8K9X2)" />
-                <BaseButton variant="secondary" @click="handleRestoreDraft">Restaurar</BaseButton>
+                <BaseButton variant="secondary" :loading="isRestoringDraft" :disabled="isRestoringDraft || !rascunhoCodigo.trim()" @click="handleRestoreDraft">Restaurar</BaseButton>
             </div>
         </div>
       </div>
@@ -491,7 +515,7 @@ async function handleSubmit() {
       <div class="flex justify-between pt-4 border-t border-line">
         <BaseButton variant="secondary" :disabled="currentStep === 0" @click="prevStep">Anterior</BaseButton>
         <div class="flex gap-2">
-            <BaseButton v-if="currentStep > 0" variant="ghost" @click="handleSaveDraftToServer">Salvar Rascunho</BaseButton>
+            <BaseButton v-if="currentStep > 0" variant="ghost" :loading="isSavingDraft" :disabled="isSavingDraft" @click="handleSaveDraftToServer">Salvar Rascunho</BaseButton>
             <BaseButton v-if="currentStep < totalSteps - 1" variant="primary" @click="nextStep">Próximo</BaseButton>
             <BaseButton v-else variant="primary" :loading="isSubmitting" @click="handleSubmit">Enviar Resposta</BaseButton>
         </div>

@@ -62,8 +62,8 @@ function handleOpenCurso(curso: Curso) {
 
 async function showDisciplinas() {
   if (!selectedCurso.value) return;
-  await cursoStore.fetchDisciplinas(selectedCurso.value.id);
   activeView.value = 'disciplinas';
+  await cursoStore.fetchDisciplinas(selectedCurso.value.id);
 }
 
 import { executeWithFeedback } from '@/shared/api/requestHelper';
@@ -99,6 +99,7 @@ async function handleSaveDisciplina(data: Partial<Disciplina>) {
 
 const showDelDisc = ref(false);
 const delDiscId = ref<number | null>(null);
+const isDeletingDisc = ref(false);
 
 function handleDeleteDisciplina(disciplinaId: number) {
   delDiscId.value = disciplinaId;
@@ -110,11 +111,13 @@ async function onConfirmDelDisc() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/disciplinas/${delDiscId.value}`),
     {
+      loadingRef: isDeletingDisc,
       successMessage: 'Disciplina excluída com sucesso!',
       errorMessage: 'Falha ao excluir disciplina.'
     }
   );
   if (res.success) {
+    showDelDisc.value = false;
     await showDisciplinas();
   }
 }
@@ -134,8 +137,8 @@ async function handleToggleDisciplinaStatus(disciplina: Disciplina, status: 'ati
 
 async function handleOpenDisciplinaDetails(disciplina: Disciplina) {
   selectedDisciplina.value = disciplina;
-  await cursoStore.loadDisciplinaContent(disciplina.id);
   activeView.value = 'detalhes';
+  await cursoStore.loadDisciplinaContent(disciplina.id);
 }
 
 function goBack() {
@@ -190,6 +193,7 @@ async function handleSaveMarpAula(payload: { titulo: string; descricao: string; 
 
 const showDelAula = ref(false);
 const delAulaId = ref<number | null>(null);
+const isDeletingAula = ref(false);
 
 function handleDeleteAula(aulaId: number) {
   delAulaId.value = aulaId;
@@ -201,11 +205,13 @@ async function onConfirmDelAula() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/aulas/${delAulaId.value}`),
     {
+      loadingRef: isDeletingAula,
       successMessage: 'Aula excluída com sucesso!',
       errorMessage: 'Falha ao excluir aula.'
     }
   );
   if (res.success && selectedDisciplina.value) {
+    showDelAula.value = false;
     await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
   }
 }
@@ -255,6 +261,7 @@ async function handleSaveActivity(payload: any) {
 
 const showDelAtiv = ref(false);
 const delAtivId = ref<number | null>(null);
+const isDeletingAtiv = ref(false);
 
 function handleDeleteActivity(atividadeId: number) {
   delAtivId.value = atividadeId;
@@ -266,11 +273,13 @@ async function onConfirmDelAtiv() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/atividades/${delAtivId.value}`),
     {
+      loadingRef: isDeletingAtiv,
       successMessage: 'Atividade excluída com sucesso!',
       errorMessage: 'Falha ao excluir atividade.'
     }
   );
   if (res.success && selectedDisciplina.value) {
+    showDelAtiv.value = false;
     await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
   }
 }
@@ -1257,6 +1266,7 @@ function handleOpenRespostas(atividade: Atividade) {
       v-model="showDelDisc"
       message="Tem certeza que deseja excluir esta disciplina?"
       :danger="true"
+      :loading="isDeletingDisc"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmDelDisc"
@@ -1267,6 +1277,7 @@ function handleOpenRespostas(atividade: Atividade) {
       v-model="showDelAula"
       message="Tem certeza que deseja excluir esta aula?"
       :danger="true"
+      :loading="isDeletingAula"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmDelAula"
@@ -1277,6 +1288,7 @@ function handleOpenRespostas(atividade: Atividade) {
       v-model="showDelAtiv"
       message="Tem certeza que deseja excluir esta atividade?"
       :danger="true"
+      :loading="isDeletingAtiv"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmDelAtiv"

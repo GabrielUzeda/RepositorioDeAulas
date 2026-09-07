@@ -117,6 +117,7 @@ async function handleSaveProfessor(payload: { nome: string; email: string; passw
 
 const showConfirmProf = ref(false);
 const deleteTargetProf = ref<Professor | null>(null);
+const isDeletingProf = ref(false);
 
 function onDeleteProfessorClick(prof: Professor) {
   deleteTargetProf.value = prof;
@@ -129,11 +130,13 @@ async function onConfirmProf() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/professores/${prof.id}`),
     {
+      loadingRef: isDeletingProf,
       successMessage: 'Professor excluído com sucesso!',
       errorMessage: 'Falha ao excluir professor.'
     }
   );
   if (res.success) {
+    showConfirmProf.value = false;
     await fetchProfessores();
   }
 }
@@ -188,6 +191,7 @@ async function handleSaveCurso(payload: { nome: string; descricao: string; cor: 
 
 const showConfirmCurso = ref(false);
 const deleteTargetCurso = ref<Curso | null>(null);
+const isDeletingCurso = ref(false);
 
 function onDeleteCursoClick(curso: Curso) {
   deleteTargetCurso.value = curso;
@@ -200,11 +204,13 @@ async function onConfirmCurso() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/cursos/${curso.id}`),
     {
+      loadingRef: isDeletingCurso,
       successMessage: 'Curso excluído com sucesso!',
       errorMessage: 'Falha ao excluir curso.'
     }
   );
   if (res.success) {
+    showConfirmCurso.value = false;
     await fetchCursos();
   }
 }
@@ -490,6 +496,7 @@ function logout() {
       title="Excluir Professor"
       :message="`Tem certeza que deseja excluir &quot;${deleteTargetProf?.nome}&quot;? As disciplinas associadas também serão removidas.`"
       :danger="true"
+      :loading="isDeletingProf"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmProf"
@@ -501,6 +508,7 @@ function logout() {
       title="Excluir Curso"
       :message="`Tem certeza que deseja excluir o curso &quot;${deleteTargetCurso?.nome}&quot;? As disciplinas dele também serão removidas.`"
       :danger="true"
+      :loading="isDeletingCurso"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmCurso"

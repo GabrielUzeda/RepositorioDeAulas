@@ -2,12 +2,13 @@
   <BaseModal
     :model-value="modelValue"
     title="Documentos Orientadores (RAG)"
-    subtitle="Ementas, planos de aula e PDFs vinculados para contextualizar a IA"
-    size="xl"
+    max-width="max-w-4xl"
     @update:model-value="emit('update:modelValue', $event)"
     @close="emit('close')"
   >
     <div class="space-y-6">
+      <p class="text-xs text-secondary -mt-2">Ementas, planos de aula e PDFs vinculados para contextualizar a IA</p>
+
       <!-- Upload area -->
       <div class="p-4 rounded-card border-2 border-dashed border-line bg-surface-alt/50">
         <div class="flex flex-col sm:flex-row items-center gap-4">
@@ -51,15 +52,15 @@
         </div>
 
         <div v-if="loading" class="py-8 text-center text-secondary">
-          <span class="material-icons animate-spin text-2xl">sync</span>
-          <p class="text-xs mt-1">Carregando documentos...</p>
+          <BaseSpinner size="md" text="Carregando documentos..." />
         </div>
 
-        <div v-else-if="documentos.length === 0" class="py-8 text-center bg-surface-alt/30 rounded-card border border-line">
-          <span class="material-icons text-3xl text-secondary opacity-40">description</span>
-          <p class="text-sm font-medium text-secondary mt-1">Nenhum documento orientador adicionado</p>
-          <p class="text-xs text-secondary opacity-80 mt-0.5">Envie a ementa ou PDF do curso para gerar atividades contextualizadas</p>
-        </div>
+        <EmptyState
+          v-else-if="documentos.length === 0"
+          icon="description"
+          title="Nenhum documento orientador adicionado"
+          description="Envie a ementa ou PDF do curso para gerar atividades contextualizadas"
+        />
 
         <div v-else class="space-y-2 max-h-72 overflow-y-auto pr-1">
           <div
@@ -89,7 +90,7 @@
                 type="button"
                 class="p-1.5 text-secondary hover:text-danger rounded-control hover:bg-surface transition-colors"
                 title="Excluir documento"
-                @click="handleDelete(doc.id)"
+                @click="confirmDelete(doc.id)"
               >
                 <span class="material-icons text-base">delete</span>
               </button>
@@ -107,6 +108,16 @@
       </div>
     </template>
   </BaseModal>
+
+  <ConfirmDialog
+    v-model="showConfirmDelete"
+    title="Excluir Documento Orientador"
+    message="Deseja realmente remover este documento orientador? A IA deixará de utilizá-lo como referência."
+    confirm-text="Excluir"
+    variant="danger"
+    :loading="isDeletingDoc"
+    @confirm="executeDelete"
+  />
 </template>
 
 <script setup lang="ts">
@@ -114,6 +125,10 @@ import { ref, watch } from 'vue';
 import { apiClient } from '@/shared/api/client';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
+import EmptyState from '@/shared/components/EmptyState.vue';
+import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
+import { useToast } from '@/shared/composables/useToast';
 import type { DocumentoOrientador } from '@/shared/types';
 
 const props = defineProps<{
@@ -126,11 +141,16 @@ const emit = defineEmits<{
   (e: 'close'): void;
 }>();
 
+const toast = useToast();
 const documentos = ref<DocumentoOrientador[]>([]);
 const loading = ref(false);
 const uploading = ref(false);
 const uploadError = ref('');
 const fileInput = ref<HTMLInputElement | null>(null);
+
+const showConfirmDelete = ref(false);
+const docIdToDelete = ref<number | null>(null);
+const isDeletingDoc = ref(false);
 
 async function loadDocumentos() {
   if (!props.disciplinaId) return;
@@ -160,7 +180,6 @@ async function handleFileUpload(e: Event) {
     formData.append('arquivo', file);
     formData.append('titulo', file.name.replace(/\.[^/.]+$/, ''));
 
-    // Bun/Hono multipart
     const token = sessionStorage.getItem('professor_auth');
     const authData = token ? JSON.parse(token) : null;
 
@@ -174,27 +193,41 @@ async function handleFileUpload(e: Event) {
 
     const res = await response.json();
     if (res.success) {
+      toast.success('Documento orientador anexado com sucesso!');
       await loadDocumentos();
     } else {
       uploadError.value = res.error || 'Erro ao processar arquivo';
+      toast.error(uploadError.value);
     }
   } catch (err: any) {
     uploadError.value = err.message || 'Falha no upload';
+    toast.error(uploadError.value);
   } finally {
     uploading.value = false;
     if (fileInput.value) fileInput.value.value = '';
   }
 }
 
-async function handleDelete(docId: number) {
-  if (!confirm('Deseja remover este documento orientador?')) return;
+function confirmDelete(docId: number) {
+  docIdToDelete.value = docId;
+  showConfirmDelete.value = true;
+}
+
+async function executeDelete() {
+  if (!docIdToDelete.value) return;
+  isDeletingDoc.value = true;
   try {
-    const res = await apiClient.delete(`/disciplinas/${props.disciplinaId}/documentos/${docId}`);
+    const res = await apiClient.delete(`/disciplinas/${props.disciplinaId}/documentos/${docIdToDelete.value}`);
     if (res.success) {
-      documentos.value = documentos.value.filter(d => d.id !== docId);
+      documentos.value = documentos.value.filter(d => d.id !== docIdToDelete.value);
+      toast.success('Documento orientador removido com sucesso!');
+      showConfirmDelete.value = false;
     }
   } catch (e: any) {
-    alert(e.message || 'Erro ao excluir');
+    toast.error(e.message || 'Erro ao excluir');
+  } finally {
+    isDeletingDoc.value = false;
+    docIdToDelete.value = null;
   }
 }
 

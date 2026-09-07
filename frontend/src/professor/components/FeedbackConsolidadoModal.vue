@@ -67,21 +67,25 @@ async function handleGenerateAiSynthesis() {
   isSynthesizingAi.value = true;
 
   try {
-    const respostasResumo = alunos.value.map(a => {
+    const alunosDetalhes = alunos.value.map(a => {
       const notas = a.atividades.map(atv => atv.nota).filter((n): n is number => n !== null);
-      const media = notas.length > 0 ? Math.round(notas.reduce((acc, v) => acc + v, 0) / notas.length) : undefined;
-      const feedbacks = a.atividades.map(atv => atv.feedback).filter(Boolean).join('; ');
+      const media = notas.length > 0 ? Math.round(notas.reduce((acc, v) => acc + v, 0) / notas.length) : null;
       return {
-        aluno: a.aluno_nome,
-        nota: media,
-        feedback: feedbacks || a.feedback_geral || undefined
+        aluno_nome: a.aluno_nome,
+        aluno_email: a.aluno_email,
+        media,
+        atividades: a.atividades.map(atv => ({
+          atividade_titulo: atv.atividade_titulo,
+          nota: atv.nota,
+          feedback: atv.feedback || null
+        }))
       };
     });
 
     const res = await apiClient.post<any>('/ai/synthesize-class-feedback', {
       disciplina_nome: props.disciplinaNome || 'Disciplina',
       total_envios: alunos.value.length,
-      respostas_resumo: respostasResumo
+      alunos_detalhes: alunosDetalhes
     });
 
     if (res.success && res.data) {
@@ -90,7 +94,23 @@ async function handleGenerateAiSynthesis() {
       }
       aiPontosFortes.value = res.data.pontos_fortes || [];
       aiPontosAtencao.value = res.data.pontos_atencao || [];
-      useToast().success('Síntese pedagógica gerada pela IA! Revise e clique em Salvar.');
+
+      if (Array.isArray(res.data.alunos_sintese)) {
+        const sinteseMap = new Map<string, string>();
+        for (const item of res.data.alunos_sintese) {
+          if (item.aluno_email && item.feedback_individual) {
+            sinteseMap.set(String(item.aluno_email).trim().toLowerCase(), String(item.feedback_individual).trim());
+          }
+        }
+        for (const aluno of alunos.value) {
+          const individual = sinteseMap.get(aluno.aluno_email.trim().toLowerCase());
+          if (individual) {
+            aluno.feedback_geral = individual;
+          }
+        }
+      }
+
+      useToast().success('Síntese pedagógica da turma e feedbacks individuais sintetizados com sucesso!');
     } else {
       useToast().error(res.error || 'Erro ao gerar síntese da turma com IA.');
     }
@@ -117,6 +137,32 @@ async function handleSaveFeedbackTurma() {
     }
   } catch (err: any) {
     useToast().error(err.message || 'Erro ao salvar feedback da turma.');
+  } finally {
+    isSavingTurma.value = false;
+  }
+}
+
+async function handleSaveAllFeedbacks() {
+  if (!props.disciplinaId || isSavingTurma.value) return;
+  isSavingTurma.value = true;
+  try {
+    const payload = [
+      { aluno_email: null, feedback_geral: feedbackTurma.value },
+      ...alunos.value.map(a => ({
+        aluno_email: a.aluno_email,
+        feedback_geral: a.feedback_geral || ''
+      }))
+    ];
+    const res = await apiClient.post(`/disciplinas/${props.disciplinaId}/salvar-feedback-geral`, {
+      feedbacks: payload
+    });
+    if (res.success) {
+      useToast().success('Todos os feedbacks (turma e individuais) salvos com sucesso!');
+    } else {
+      useToast().error(res.error || 'Erro ao salvar feedbacks.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao salvar feedbacks.');
   } finally {
     isSavingTurma.value = false;
   }
@@ -195,8 +241,8 @@ async function doSendEmailTodos(forcarReenvio: boolean) {
 async function handleSendEmailTodos() {
   if (!props.disciplinaId || isSendingAll.value) return;
   
-  // Salva feedback da turma antes de disparar
-  await handleSaveFeedbackTurma();
+  // Salva feedback da turma e todos os feedbacks individuais dos alunos antes de disparar
+  await handleSaveAllFeedbacks();
 
   const pendentes = alunos.value.filter(a => !a.ja_enviado);
   if (pendentes.length === 0) {
@@ -209,6 +255,7 @@ async function handleSendEmailTodos() {
 
 async function confirmReenvio() {
   await doSendEmailTodos(true);
+  confirmReenvioOpen.value = false;
 }
 
 function formatDate(isoStr: string) {
@@ -253,13 +300,17 @@ function formatDate(isoStr: string) {
                 size="sm"
                 :disabled="isSynthesizingAi || alunos.length === 0"
                 class="text-xs text-accent font-semibold flex items-center gap-1 hover:bg-accent/10 px-2.5 py-1.5 rounded"
-                title="Sintetizar desempenho da turma com IA"
+                title="Sintetizar desempenho da turma e feedbacks individuais dos alunos com IA"
                 @click="handleGenerateAiSynthesis"
               >
                 <span class="material-icons text-sm" :class="{ 'animate-spin': isSynthesizingAi }">
                   {{ isSynthesizingAi ? 'sync' : 'auto_awesome' }}
                 </span>
                 <span>{{ isSynthesizingAi ? 'Gerando Síntese...' : 'Sintetizar com IA' }}</span>
+              </BaseButton>
+              <BaseButton variant="secondary" size="sm" :loading="isSavingTurma" @click="handleSaveAllFeedbacks" title="Salvar feedback da turma e individuais de todos os alunos">
+                <span class="material-icons text-xs">done_all</span>
+                <span>Salvar Todos</span>
               </BaseButton>
               <BaseButton variant="primary" size="sm" :loading="isSavingTurma" @click="handleSaveFeedbackTurma">
                 <span class="material-icons text-xs">save</span>
@@ -423,6 +474,7 @@ function formatDate(isoStr: string) {
   <ConfirmDialog
     v-model="confirmReenvioOpen"
     :danger="true"
+    :loading="isSendingAll"
     message="Todos os alunos já receberam o e-mail de feedback. Deseja reenviar para todos novamente?"
     confirm-text="Reenviar"
     @confirm="confirmReenvio"

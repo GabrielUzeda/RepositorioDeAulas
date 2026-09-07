@@ -8,6 +8,7 @@ import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -28,6 +29,7 @@ const senha = ref('');
 const selectedProfessorIds = ref<number[]>([]);
 const searchQuery = ref('');
 const isSubmitting = ref(false);
+const isLoadingProfessores = ref(false);
 
 watch(
   () => props.show,
@@ -41,6 +43,7 @@ watch(
         icone.value = props.curso.icone || 'school';
         senha.value = props.curso.senha || '';
         selectedProfessorIds.value = [];
+        isLoadingProfessores.value = true;
         apiClient
           .get<{ id: number }[]>(`/cursos/${props.curso.id}/professores`)
           .then((res) => {
@@ -50,6 +53,9 @@ watch(
           })
           .catch(() => {
             selectedProfessorIds.value = [];
+          })
+          .finally(() => {
+            isLoadingProfessores.value = false;
           });
       } else {
         nome.value = '';
@@ -58,6 +64,7 @@ watch(
         icone.value = 'school';
         senha.value = '';
         selectedProfessorIds.value = [];
+        isLoadingProfessores.value = false;
       }
       searchQuery.value = '';
     }
@@ -195,7 +202,11 @@ async function handleSubmit() {
           />
         </div>
 
-        <div v-if="professores.length === 0" class="text-xs text-secondary text-center py-5">
+        <div v-if="isLoadingProfessores" class="flex items-center justify-center py-6 gap-2 text-xs text-secondary" aria-busy="true">
+          <BaseSpinner size="sm" />
+          <span>Carregando vinculações...</span>
+        </div>
+        <div v-else-if="professores.length === 0" class="text-xs text-secondary text-center py-5">
           Nenhum professor cadastrado no sistema.
         </div>
         <div v-else-if="filteredProfessores.length === 0" class="text-xs text-secondary text-center py-5">

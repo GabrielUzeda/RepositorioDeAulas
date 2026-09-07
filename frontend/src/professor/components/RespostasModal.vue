@@ -290,7 +290,10 @@ function requestDeleteResposta(id: number) {
   showConfirmDelete.value = true;
 }
 
+const isDeletingResposta = ref(false);
+
 async function handleDeleteResposta(id: number) {
+  isDeletingResposta.value = true;
   try {
     const res = await apiClient.delete(`/respostas/${id}`);
     if (res.success) {
@@ -302,11 +305,15 @@ async function handleDeleteResposta(id: number) {
           editingFeedback.value = selectedResposta.value.feedback ?? '';
         }
       }
+      showConfirmDelete.value = false;
+      useToast().success('Resposta excluída com sucesso.');
     } else {
       useToast().error('Erro ao excluir resposta.');
     }
   } catch (err: any) {
     useToast().error(err.message || 'Erro ao excluir resposta.');
+  } finally {
+    isDeletingResposta.value = false;
   }
 }
 
@@ -582,6 +589,7 @@ function scoreColor(nota: number | null | undefined) {
   <ConfirmDialog
     v-model="showConfirmDelete"
     :danger="true"
+    :loading="isDeletingResposta"
     message="Deseja realmente excluir esta resposta do aluno? Esta ação cumpre o direito à eliminação dos dados (Art. 18 LGPD)."
     confirm-text="Excluir"
     @confirm="onConfirmDelete"
