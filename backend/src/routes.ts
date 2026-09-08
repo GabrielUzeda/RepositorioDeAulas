@@ -137,12 +137,14 @@ function mapAtividade(row: any) {
 }
 
 function stripGabarito(row: any): any {
-  if (row == null || row.json_data == null) return row;
+  if (row == null) return row;
   const out = { ...row };
+  delete out.senha;
+  if (out.json_data == null) return out;
   try {
     const parsed = typeof out.json_data === 'string' ? JSON.parse(out.json_data) : out.json_data;
     const type = row.tipo || parsed?.meta?.type || parsed?.type;
-    if (type === 'reforco' || type === 'roleta' || type === 'minigame') return row;
+    if (type === 'reforco' || type === 'roleta' || type === 'minigame') return out;
     if (parsed && Array.isArray(parsed.questions)) {
       for (const q of parsed.questions) {
         if (q && Array.isArray(q.options)) {
@@ -786,7 +788,7 @@ app.post('/disciplinas/:id/documentos', professorAuth, async (c) => {
 
   if (contentType.includes('multipart/form-data')) {
     const formData = await c.req.parseBody();
-    const file = formData.file as File | undefined;
+    const file = (formData.file || formData.arquivo) as File | undefined;
     titulo = String(formData.titulo || file?.name || 'Documento Orientador').trim();
     tipo = String(formData.tipo || 'outro').trim();
 
@@ -824,7 +826,7 @@ app.post('/disciplinas/:id/documentos', professorAuth, async (c) => {
     `)
     .get(disciplina.curso_id, disciplinaId, titulo, nomeArquivo, tipo, conteudoTexto, tamanhoBytes) as any;
 
-  return c.json(r, 201);
+  return c.json({ success: true, ...r }, 201);
 });
 
 app.delete('/disciplinas/:id/documentos/:docId', professorAuth, async (c) => {
@@ -2000,12 +2002,16 @@ app.post('/disciplinas/:id/salvar-feedback-geral', professorAuth, async (c) => {
   const body = await parseBody(c);
   if (!body) return c.json({ success: false, error: 'JSON inválido' }, 400);
 
-  if (Array.isArray(body.feedbacks)) {
-    for (const item of body.feedbacks) {
-      const rawEmail = item.aluno_email ? String(item.aluno_email).trim().toLowerCase() : null;
-      const emailHash = rawEmail ? await hashEmail(rawEmail) : null;
-      const feedbackGeral = item.feedback_geral ? String(item.feedback_geral).trim() : '';
-
+  const upsertFeedback = (emailHash: string | null, feedbackGeral: string) => {
+    if (emailHash === null) {
+      dbq(
+        `INSERT INTO disciplina_feedbacks (disciplina_id, aluno_email_hash, feedback_geral)
+         VALUES (?, NULL, ?)
+         ON CONFLICT(disciplina_id) WHERE aluno_email_hash IS NULL DO UPDATE SET
+           feedback_geral = excluded.feedback_geral,
+           atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`
+      ).run(disciplinaId, feedbackGeral);
+    } else {
       dbq(
         `INSERT INTO disciplina_feedbacks (disciplina_id, aluno_email_hash, feedback_geral)
          VALUES (?, ?, ?)
@@ -2014,20 +2020,22 @@ app.post('/disciplinas/:id/salvar-feedback-geral', professorAuth, async (c) => {
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`
       ).run(disciplinaId, emailHash, feedbackGeral);
     }
+  };
+
+  if (Array.isArray(body.feedbacks)) {
+    for (const item of body.feedbacks) {
+      const rawEmail = item.aluno_email ? String(item.aluno_email).trim().toLowerCase() : null;
+      const emailHash = rawEmail ? await hashEmail(rawEmail) : null;
+      const feedbackGeral = item.feedback_geral ? String(item.feedback_geral).trim() : '';
+      upsertFeedback(emailHash, feedbackGeral);
+    }
     return c.json({ success: true, message: `${body.feedbacks.length} feedbacks salvos com sucesso` });
   }
 
   const rawEmail = body.aluno_email ? String(body.aluno_email).trim().toLowerCase() : null;
   const emailHash = rawEmail ? await hashEmail(rawEmail) : null;
   const feedbackGeral = body.feedback_geral ? String(body.feedback_geral).trim() : '';
-
-  dbq(
-    `INSERT INTO disciplina_feedbacks (disciplina_id, aluno_email_hash, feedback_geral)
-     VALUES (?, ?, ?)
-     ON CONFLICT(disciplina_id, aluno_email_hash) DO UPDATE SET
-       feedback_geral = excluded.feedback_geral,
-       atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`
-  ).run(disciplinaId, emailHash, feedbackGeral);
+  upsertFeedback(emailHash, feedbackGeral);
 
   return c.json({ success: true, message: 'Feedback geral salvo com sucesso' });
 });

@@ -68,6 +68,12 @@ async function handleSelectDisciplina(disciplina: Disciplina) {
   }
   cursoSenha.value = cursoPwd;
 
+  if (selectedCurso.value?.possui_senha && !cursoPwd) {
+    pendingCurso.value = selectedCurso.value;
+    showPasswordModal.value = true;
+    return;
+  }
+
   activeView.value = 'content';
   const success = await cursoStore.loadDisciplinaContent(disciplina.id, cursoPwd);
   if (!success) {

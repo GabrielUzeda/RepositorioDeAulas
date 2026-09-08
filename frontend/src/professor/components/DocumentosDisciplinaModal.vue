@@ -114,7 +114,7 @@
     title="Excluir Documento Orientador"
     message="Deseja realmente remover este documento orientador? A IA deixará de utilizá-lo como referência."
     confirm-text="Excluir"
-    variant="danger"
+    :danger="true"
     :loading="isDeletingDoc"
     @confirm="executeDelete"
   />
@@ -177,22 +177,22 @@ async function handleFileUpload(e: Event) {
 
   try {
     const formData = new FormData();
+    formData.append('file', file);
     formData.append('arquivo', file);
     formData.append('titulo', file.name.replace(/\.[^/.]+$/, ''));
 
-    const token = sessionStorage.getItem('professor_auth');
-    const authData = token ? JSON.parse(token) : null;
+    const token = apiClient.getProfessorToken();
 
     const response = await fetch(`/api/disciplinas/${props.disciplinaId}/documentos`, {
       method: 'POST',
       headers: {
-        ...(authData?.token ? { Authorization: `Bearer ${authData.token}` } : {})
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
       body: formData
     });
 
     const res = await response.json();
-    if (res.success) {
+    if (res.success || res.id) {
       toast.success('Documento orientador anexado com sucesso!');
       await loadDocumentos();
     } else {

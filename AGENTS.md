@@ -283,7 +283,7 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 ## 10. Armadilhas validadas (leia antes de editar != código)
 
 1. **Senha é exclusiva do curso**: `disciplinas` não possui mais coluna `senha`. O acesso anônimo a aulas/atividades checa apenas `cursos.senha`. Para fluxo anônimo sem modal de senha, crie o curso sem senha.
-2. **`GET /cursos/:id` devolve `senha` inclusive para anônimos**; `GET /cursos/:id/disciplinas` anon omite campos.
+2. **`GET /cursos/:id` não expõe a senha nem seu hash** — devolve `possui_senha: 0 | 1` (booleano); `GET /cursos/:id/disciplinas` anônimo omite campos restritos. Validação de senha é feita via `POST /cursos/:id/verificar-senha`.
 3. **Tailwind JIT** só com classes literais.
 4. **Marp** grava em `resolveFrontendDir()` → no container `/app/frontend_static` (bind de `./frontend/dist/`). Se `frontend/dist/` não existir no host, o mount cria pasta vazia e aulas dão 404 → **rode `npm run build` no frontend antes de E2E**.
 5. **E-mail**: sem SMTP, `enviar-emails-feedback` roda com `enviados=0` (não lança). Para testar entrega real, adicionar um SMTP fake (ex.: Mailhog) ao compose.

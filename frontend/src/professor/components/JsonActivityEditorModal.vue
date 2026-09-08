@@ -92,6 +92,21 @@ const expandedEnunciado = ref(false);
 const usesOptions = computed(() => tipo.value !== 'normal' && tipo.value !== 'prova');
 const activeQuestion = computed(() => questions.value[activeQIndex.value] ?? null);
 
+function formatToLocalDateTimeInput(isoOrDateStr?: string | null): string {
+  if (!isoOrDateStr) return '';
+  const d = new Date(isoOrDateStr);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function parseLocalDateTimeToIso(localDateTimeStr?: string | null): string | null {
+  if (!localDateTimeStr) return null;
+  const d = new Date(localDateTimeStr);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
 const draftStorageKey = computed(() => {
   if (props.atividade?.id && props.atividade.id > 0) {
     return `prof_editor_draft_atv_${props.atividade.id}`;
@@ -170,7 +185,7 @@ watch(
         }
         allowPassword.value = !!props.atividade.allow_password;
         senha.value = props.atividade.senha || '';
-        dataLimite.value = props.atividade.data_limite ? props.atividade.data_limite.slice(0, 16) : '';
+        dataLimite.value = formatToLocalDateTimeInput(props.atividade.data_limite);
         aiTema.value = '';
         aiObservacoes.value = '';
         aiQuantidadeStr.value = '5';
@@ -203,7 +218,7 @@ watch(
             }
             allowPassword.value = !!parsed.allowPassword;
             senha.value = parsed.senha || '';
-            dataLimite.value = parsed.dataLimite || '';
+            dataLimite.value = formatToLocalDateTimeInput(parsed.dataLimite);
             aiTema.value = parsed.aiTema || '';
             aiObservacoes.value = parsed.aiObservacoes || '';
             aiQuantidadeStr.value = parsed.aiQuantidadeStr || '5';
@@ -358,7 +373,7 @@ async function handleSave() {
     aula_ids: targetAulaIds,
     allow_password: allowPassword.value,
     senha: allowPassword.value ? senha.value : null,
-    data_limite: dataLimite.value ? dataLimite.value : null,
+    data_limite: parseLocalDateTimeToIso(dataLimite.value),
     caminho: titulo.value.toLowerCase().replace(/\s+/g, '_'),
     json_data: JSON.stringify({ questions: questions.value })
   });
@@ -373,7 +388,7 @@ async function handleSaveDraft() {
       titulo: titulo.value || 'Sem título',
       descricao: descricao.value,
       tipo: tipo.value,
-      dataLimite: dataLimite.value,
+      dataLimite: parseLocalDateTimeToIso(dataLimite.value),
       json_data: { questions: questions.value }
     };
     const res = await apiClient.post<{ id: number; expira_em: string; success: boolean }>('/professor/rascunhos-editor', payload);
