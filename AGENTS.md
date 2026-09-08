@@ -45,7 +45,7 @@ RepositorioDeAulas_new/
 bun install          # instalar deps
 bun run dev          # bun run --watch src/index.ts (porta 8080)
 bun run start        # produção
-bun test             # testes (pequeno conjunto, ex: auth.test.ts)
+bun test             # testes (suítes: auth, emailValidator, marp, ai, features)
 ```
 
 ### Frontend (workdir `frontend/`)
@@ -219,7 +219,7 @@ O sistema suporta 4 tipos principais de atividades interativas (armazenadas na c
 ## 8. Testes E2E (Playwright via Docker — caminho oficial)
 
 ### Escopo
-Há 12 specs em `e2e/tests/`. Status verificados (todos 100% passando — 26/26 testes):
+Há 15 specs em `e2e/tests/`. Status verificados (todos 100% passando):
 
 | Spec | Status | Cobre |
 |---|---|---|
@@ -234,6 +234,7 @@ Há 12 specs em `e2e/tests/`. Status verificados (todos 100% passando — 26/26 
 | `atividade-fluxo.spec.ts` | ✅ atual | Fluxo de rascunhos do professor no editor e resolução do aluno |
 | `atividade-ia.spec.ts` | ✅ **atualizado** | Painel do gerador de atividades por IA integrado na aba Geral |
 | `atividade-rascunhos.spec.ts` | ✅ atual | Salvamento e restauração de rascunhos de atividades (30 dias) |
+| `aula-ia.spec.ts` | ✅ atual | Geração e pré-visualização de aulas assistidas por IA |
 | `email-feedback.spec.ts` | ✅ atual | Entrega real de e-mails de feedback pedagógico via Mailhog |
 | `fluxo-completo.spec.ts` | ✅ atual | Jornada completa de ponta a ponta (Professor → Aluno → Avaliação → Feedback) |
 | `relacao-aula-atividade.spec.ts` | ✅ **novo** | Matriz completa: aula sem atividade, aula com atividade vinculada e atividade geral, com visão do professor e resolução do aluno |
