@@ -219,7 +219,7 @@ O sistema suporta 4 tipos principais de atividades interativas (armazenadas na c
 ## 8. Testes E2E (Playwright via Docker — caminho oficial)
 
 ### Escopo
-Há 15 specs em `e2e/tests/`. Status verificados (todos 100% passando):
+Há 16 specs em `e2e/tests/`. Status verificados (todos 100% passando):
 
 | Spec | Status | Cobre |
 |---|---|---|
@@ -238,6 +238,7 @@ Há 15 specs em `e2e/tests/`. Status verificados (todos 100% passando):
 | `email-feedback.spec.ts` | ✅ atual | Entrega real de e-mails de feedback pedagógico via Mailhog |
 | `fluxo-completo.spec.ts` | ✅ atual | Jornada completa de ponta a ponta (Professor → Aluno → Avaliação → Feedback) |
 | `relacao-aula-atividade.spec.ts` | ✅ **novo** | Matriz completa: aula sem atividade, aula com atividade vinculada e atividade geral, com visão do professor e resolução do aluno |
+| `melhorias-recentes.spec.ts` | ✅ **novo** | Modal RAG de documentos, prazos/deadlines no editor, prévia em tempo real, validação com correção de typo de e-mail e ciclo de vida |
 
 ### Como executar
 ```bash
