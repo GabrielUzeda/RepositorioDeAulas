@@ -190,14 +190,31 @@ async function main() {
   } finally {
     // Limpeza (Cleanup) em Produção
     console.log('\n🧹 [Cleanup] Iniciando limpeza dos dados de teste criados em produção...');
+    if (!adminToken) {
+      try {
+        const loginRes = await fetch(`${BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD })
+        });
+        if (loginRes.ok) {
+          const data = await loginRes.json();
+          adminToken = data.token;
+        }
+      } catch (e) {
+        console.warn('   ⚠️ Não foi possível obter token admin para cleanup:', e.message);
+      }
+    }
+
     if (adminToken) {
       if (respostaId) {
         try {
-          await fetch(`${BASE}/respostas/${respostaId}`, {
+          const res = await fetch(`${BASE}/respostas/${respostaId}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${adminToken}` }
           });
-          console.log(`   🗑️  Resposta ID ${respostaId} excluída.`);
+          if (res.ok) console.log(`   🗑️  Resposta ID ${respostaId} excluída.`);
+          else console.warn(`   ⚠️ Falha ao excluir resposta ${respostaId}: status ${res.status}`);
         } catch (e) {
           console.warn('   ⚠️ Erro ao excluir resposta:', e.message);
         }
@@ -205,11 +222,12 @@ async function main() {
 
       if (cursoId) {
         try {
-          await fetch(`${BASE}/cursos/${cursoId}`, {
+          const res = await fetch(`${BASE}/cursos/${cursoId}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${adminToken}` }
           });
-          console.log(`   🗑️  Curso ID ${cursoId} (e disciplinas/aulas/atividades vinculadas) excluído.`);
+          if (res.ok) console.log(`   🗑️  Curso ID ${cursoId} (e disciplinas/aulas/atividades vinculadas) excluído.`);
+          else console.warn(`   ⚠️ Falha ao excluir curso ${cursoId}: status ${res.status}`);
         } catch (e) {
           console.warn('   ⚠️ Erro ao excluir curso:', e.message);
         }
@@ -217,14 +235,52 @@ async function main() {
 
       if (profId) {
         try {
-          await fetch(`${BASE}/professores/${profId}`, {
+          const res = await fetch(`${BASE}/professores/${profId}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${adminToken}` }
           });
-          console.log(`   🗑️  Professor ID ${profId} excluído.`);
+          if (res.ok) console.log(`   🗑️  Professor ID ${profId} excluído.`);
+          else console.warn(`   ⚠️ Falha ao excluir professor ${profId}: status ${res.status}`);
         } catch (e) {
           console.warn('   ⚠️ Erro ao excluir professor:', e.message);
         }
+      }
+
+      // Cleanup defensivo de eventuais sobras antigas de smoke test
+      try {
+        const cursosRes = await fetch(`${BASE}/cursos`, {
+          headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        if (cursosRes.ok) {
+          const cursos = await cursosRes.json();
+          for (const c of cursos) {
+            if (c.nome && (c.nome.startsWith('Curso Smoke Test') || c.nome === 'Curso do Professor 2')) {
+              await fetch(`${BASE}/cursos/${c.id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${adminToken}` }
+              });
+              console.log(`   🗑️  Curso residual ${c.nome} (ID ${c.id}) removido.`);
+            }
+          }
+        }
+
+        const profsRes = await fetch(`${BASE}/professores`, {
+          headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        if (profsRes.ok) {
+          const profs = await profsRes.json();
+          for (const p of profs) {
+            if (p.email && (p.email.startsWith('smoke_prof_') || p.email.startsWith('prof_'))) {
+              await fetch(`${BASE}/professores/${p.id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${adminToken}` }
+              });
+              console.log(`   🗑️  Professor residual ${p.nome} (ID ${p.id}) removido.`);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('   ⚠️ Erro na varredura de resíduos:', e.message);
       }
     }
     console.log('✨ [Cleanup] Ambiente de produção limpo com sucesso!\n');

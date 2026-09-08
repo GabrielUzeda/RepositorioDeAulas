@@ -478,6 +478,10 @@ function getActivityTypeBadge(tipo?: string) {
   }
 }
 
+function hasRespostas(tipo?: string): boolean {
+  return tipo === 'normal' || tipo === 'prova' || !tipo;
+}
+
 function toggleReorder() {
   if (isReordering.value) {
     saveOrders();
@@ -628,10 +632,23 @@ function handleOpenRespostas(atividade: Atividade) {
               </div>
             </div>
 
-            <BaseButton variant="primary" size="sm" @click="handleOpenDisciplinaModal()">
-              <span class="material-icons text-sm">add</span>
-              <span>Nova Disciplina</span>
-            </BaseButton>
+            <div class="flex items-center gap-2">
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                class="inline-flex items-center justify-center gap-1.5"
+                title="Documentos RAG gerais deste curso"
+                @click="showDocumentosModal = true"
+              >
+                <span class="material-icons text-sm">auto_stories</span>
+                <span>Documentos RAG</span>
+              </BaseButton>
+
+              <BaseButton variant="primary" size="sm" @click="handleOpenDisciplinaModal()">
+                <span class="material-icons text-sm">add</span>
+                <span>Nova Disciplina</span>
+              </BaseButton>
+            </div>
           </div>
 
           <div v-if="cursoStore.loadingDisciplinas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label="Carregando disciplinas">
@@ -702,19 +719,23 @@ function handleOpenRespostas(atividade: Atividade) {
 
         <!-- Content View (Aulas e Atividades Integradas) -->
         <section v-else key="detalhes" class="space-y-6">
-          <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between border-b border-line pb-4 gap-4">
-            <div class="flex items-center gap-3 min-w-0">
-              <BackButton @click="goBack" />
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
+          <div class="border-b border-line pb-4 space-y-3">
+            <!-- Linha 1: Título, Curso e Descrição com espaço livre -->
+            <div class="flex items-start gap-3 min-w-0">
+              <BackButton @click="goBack" class="mt-0.5" />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2.5 flex-wrap">
                   <h2 class="text-xl sm:text-2xl font-bold text-primary truncate">{{ selectedDisciplina?.nome }}</h2>
                   <BaseBadge variant="accent" size="sm">{{ selectedCurso?.nome }}</BaseBadge>
                 </div>
-                <p v-if="selectedDisciplina?.descricao" class="text-secondary text-xs mt-0.5 line-clamp-1">{{ selectedDisciplina?.descricao }}</p>
+                <p v-if="selectedDisciplina?.descricao" class="text-secondary text-xs mt-1 leading-relaxed">
+                  {{ selectedDisciplina?.descricao }}
+                </p>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:flex sm:items-center sm:flex-wrap gap-2 shrink-0">
+            <!-- Linha 2: Barra de Ações com scroll horizontal suave quando necessário -->
+            <div class="flex items-center flex-wrap gap-2 pt-1">
               <BaseButton
                 variant="secondary"
                 size="sm"
@@ -729,7 +750,7 @@ function handleOpenRespostas(atividade: Atividade) {
               <BaseButton
                 variant="secondary"
                 size="sm"
-                class="inline-flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
+                class="inline-flex items-center justify-center gap-1.5"
                 @click="showFeedbackConsolidadoModal = true"
               >
                 <span class="material-icons text-sm">mark_email_read</span>
@@ -761,7 +782,7 @@ function handleOpenRespostas(atividade: Atividade) {
               <BaseButton
                 variant="primary"
                 size="sm"
-                class="inline-flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
+                class="inline-flex items-center justify-center gap-1.5"
                 @click="handleOpenMarpModal()"
               >
                 <span class="material-icons text-sm">add</span>
@@ -939,25 +960,23 @@ function handleOpenRespostas(atividade: Atividade) {
                       :key="atv.id"
                       class="bg-surface-alt border border-line rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs hover:border-line-strong hover:shadow-xs transition-all"
                     >
-                      <div class="flex items-center gap-3 min-w-0">
+                      <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <!-- Ícone + Tipo Compacto e Elegante -->
                         <div
-                          class="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
+                          class="inline-flex items-center gap-1 px-1.5 py-1 rounded-md shrink-0 self-start sm:self-center"
                           :class="getActivityTypeBadge(atv.tipo).badgeClass"
+                          :title="getActivityTypeBadge(atv.tipo).label"
                         >
-                          <span class="material-icons text-base">
+                          <span class="material-icons text-[15px] leading-none">
                             {{ atv.icone || getActivityTypeBadge(atv.tipo).icon }}
                           </span>
+                          <span class="text-[10px] font-bold tracking-tight">
+                            {{ getActivityTypeBadge(atv.tipo).label }}
+                          </span>
                         </div>
-                        <div class="min-w-0">
-                          <div class="flex items-center gap-2">
-                            <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ atv.titulo }}</h4>
-                            <span
-                              class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
-                              :class="getActivityTypeBadge(atv.tipo).badgeClass"
-                            >
-                              {{ getActivityTypeBadge(atv.tipo).label }}
-                            </span>
-                          </div>
+
+                        <div class="min-w-0 flex-1">
+                          <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ atv.titulo }}</h4>
                           <p v-if="atv.descricao" class="text-xs text-secondary leading-relaxed truncate mt-0.5">
                             {{ atv.descricao }}
                           </p>
@@ -984,7 +1003,12 @@ function handleOpenRespostas(atividade: Atividade) {
                           </button>
                         </template>
                         <template v-else>
-                          <BaseButton variant="secondary" size="xs" @click="handleOpenRespostas(atv)">
+                          <BaseButton
+                            v-if="hasRespostas(atv.tipo)"
+                            variant="secondary"
+                            size="xs"
+                            @click="handleOpenRespostas(atv)"
+                          >
                             <span class="material-icons text-xs">analytics</span>
                             <span>Respostas</span>
                           </BaseButton>
@@ -1110,25 +1134,23 @@ function handleOpenRespostas(atividade: Atividade) {
                     :key="atv.id"
                     class="bg-surface-alt border border-line rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs hover:border-line-strong transition-all"
                   >
-                    <div class="flex items-center gap-3 min-w-0">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      <!-- Ícone + Tipo Compacto e Elegante -->
                       <div
-                        class="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
+                        class="inline-flex items-center gap-1 px-1.5 py-1 rounded-md shrink-0 self-start sm:self-center"
                         :class="getActivityTypeBadge(atv.tipo).badgeClass"
+                        :title="getActivityTypeBadge(atv.tipo).label"
                       >
-                        <span class="material-icons text-base">
+                        <span class="material-icons text-[15px] leading-none">
                           {{ atv.icone || getActivityTypeBadge(atv.tipo).icon }}
                         </span>
+                        <span class="text-[10px] font-bold tracking-tight">
+                          {{ getActivityTypeBadge(atv.tipo).label }}
+                        </span>
                       </div>
-                      <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                          <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ atv.titulo }}</h4>
-                          <span
-                            class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
-                            :class="getActivityTypeBadge(atv.tipo).badgeClass"
-                          >
-                            {{ getActivityTypeBadge(atv.tipo).label }}
-                          </span>
-                        </div>
+
+                      <div class="min-w-0 flex-1">
+                        <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ atv.titulo }}</h4>
                         <p v-if="atv.descricao" class="text-xs text-secondary leading-relaxed truncate mt-0.5">
                           {{ atv.descricao }}
                         </p>
@@ -1155,7 +1177,12 @@ function handleOpenRespostas(atividade: Atividade) {
                         </button>
                       </template>
                       <template v-else>
-                        <BaseButton variant="secondary" size="xs" @click="handleOpenRespostas(atv)">
+                        <BaseButton
+                          v-if="hasRespostas(atv.tipo)"
+                          variant="secondary"
+                          size="xs"
+                          @click="handleOpenRespostas(atv)"
+                        >
                           <span class="material-icons text-xs">analytics</span>
                           <span>Respostas</span>
                         </BaseButton>
@@ -1256,9 +1283,10 @@ function handleOpenRespostas(atividade: Atividade) {
     />
 
     <DocumentosDisciplinaModal
-      v-if="selectedDisciplina"
+      v-if="selectedCurso || selectedDisciplina"
       v-model="showDocumentosModal"
-      :disciplina-id="selectedDisciplina.id"
+      :curso-id="selectedCurso?.id || null"
+      :disciplina-id="selectedDisciplina?.id || null"
       @close="showDocumentosModal = false"
     />
 

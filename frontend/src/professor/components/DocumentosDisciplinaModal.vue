@@ -7,7 +7,33 @@
     @close="emit('close')"
   >
     <div class="space-y-6">
-      <p class="text-xs text-secondary -mt-2">Ementas, planos de aula e PDFs vinculados para contextualizar a IA</p>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 -mt-2">
+        <p class="text-xs text-secondary">Ementas, planos de ensino e PDFs para contextualizar a inteligência artificial</p>
+        
+        <!-- Seletor de Escopo: Disciplina vs Curso Inteiro -->
+        <div v-if="cursoId" class="flex items-center p-1 bg-surface-alt rounded-xl border border-line shrink-0">
+          <button
+            type="button"
+            :disabled="uploading"
+            class="px-3 py-1 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="escopoAtivo === 'disciplina' ? 'bg-accent text-white shadow-xs' : 'text-secondary hover:text-primary'"
+            @click="mudarEscopo('disciplina')"
+          >
+            <span class="material-icons text-xs">folder</span>
+            <span>Esta Disciplina</span>
+          </button>
+          <button
+            type="button"
+            :disabled="uploading"
+            class="px-3 py-1 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="escopoAtivo === 'curso' ? 'bg-accent text-white shadow-xs' : 'text-secondary hover:text-primary'"
+            @click="mudarEscopo('curso')"
+          >
+            <span class="material-icons text-xs">school</span>
+            <span>Curso Inteiro</span>
+          </button>
+        </div>
+      </div>
 
       <!-- Upload area -->
       <div class="p-4 rounded-card border-2 border-dashed border-line bg-surface-alt/50">
@@ -16,8 +42,12 @@
             <span class="material-icons text-2xl">upload_file</span>
           </div>
           <div class="flex-1 text-center sm:text-left">
-            <p class="text-sm font-semibold text-primary">Anexar Documento Pedagógico</p>
-            <p class="text-xs text-secondary mt-0.5">Suporta PDF, Markdown (.md), TXT e CSV (até 5MB)</p>
+            <p class="text-sm font-semibold text-primary">
+              {{ escopoAtivo === 'curso' ? 'Anexar Documento Geral do Curso' : 'Anexar Documento da Disciplina' }}
+            </p>
+            <p class="text-xs text-secondary mt-0.5">
+              {{ escopoAtivo === 'curso' ? 'Documentos do curso ficam disponíveis para todas as disciplinas associadas' : 'Disponível especificamente para as atividades e aulas desta disciplina' }} (PDF, MD, TXT, CSV até 10MB)
+            </p>
           </div>
           <div class="flex items-center gap-2 w-full sm:w-auto">
             <input
@@ -45,8 +75,12 @@
       <div>
         <div class="flex items-center justify-between mb-3">
           <h4 class="text-sm font-bold text-primary flex items-center gap-1.5">
-            <span class="material-icons text-base text-accent">folder</span>
-            Documentos da Disciplina ({{ documentos.length }})
+            <span class="material-icons text-base text-accent">
+              {{ escopoAtivo === 'curso' ? 'school' : 'folder' }}
+            </span>
+            <span>
+              {{ escopoAtivo === 'curso' ? 'Documentos do Curso' : 'Documentos da Disciplina' }} ({{ documentos.length }})
+            </span>
           </h4>
           <span class="text-xs text-secondary">A IA usará estes documentos para criar questões precisas</span>
         </div>
@@ -58,8 +92,8 @@
         <EmptyState
           v-else-if="documentos.length === 0"
           icon="description"
-          title="Nenhum documento orientador adicionado"
-          description="Envie a ementa ou PDF do curso para gerar atividades contextualizadas"
+          :title="escopoAtivo === 'curso' ? 'Nenhum documento geral do curso adicionado' : 'Nenhum documento da disciplina adicionado'"
+          :description="escopoAtivo === 'curso' ? 'Envie diretrizes ou matrizes que se aplicam a todo o curso' : 'Envie a ementa ou plano de ensino para gerar atividades contextualizadas'"
         />
 
         <div v-else class="space-y-2 max-h-72 overflow-y-auto pr-1">
@@ -74,9 +108,12 @@
               </span>
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-primary truncate">{{ doc.titulo }}</p>
-                <div class="flex items-center gap-2 text-xs text-secondary mt-0.5">
+                <div class="flex items-center gap-2 text-xs text-secondary mt-0.5 flex-wrap">
                   <span class="uppercase font-mono text-[10px] px-1.5 py-0.5 rounded bg-surface border border-line">
                     {{ doc.tipo }}
+                  </span>
+                  <span v-if="doc.disciplina_id === null || doc.disciplina_id === undefined" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-secondary/15 text-secondary">
+                    Geral do Curso
                   </span>
                   <span>{{ formatBytes(doc.tamanho_bytes || 0) }}</span>
                   <span>•</span>
@@ -133,7 +170,8 @@ import type { DocumentoOrientador } from '@/shared/types';
 
 const props = defineProps<{
   modelValue: boolean;
-  disciplinaId: number;
+  disciplinaId?: number | null;
+  cursoId?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -142,6 +180,7 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const escopoAtivo = ref<'disciplina' | 'curso'>('disciplina');
 const documentos = ref<DocumentoOrientador[]>([]);
 const loading = ref(false);
 const uploading = ref(false);
@@ -152,11 +191,24 @@ const showConfirmDelete = ref(false);
 const docIdToDelete = ref<number | null>(null);
 const isDeletingDoc = ref(false);
 
+function mudarEscopo(novoEscopo: 'disciplina' | 'curso') {
+  if (escopoAtivo.value === novoEscopo) return;
+  escopoAtivo.value = novoEscopo;
+  loadDocumentos();
+}
+
 async function loadDocumentos() {
-  if (!props.disciplinaId) return;
+  const isCurso = escopoAtivo.value === 'curso' || !props.disciplinaId;
+  const targetId = isCurso ? props.cursoId : props.disciplinaId;
+  if (!targetId) return;
+
   loading.value = true;
   try {
-    const res = await apiClient.get<DocumentoOrientador[]>(`/disciplinas/${props.disciplinaId}/documentos`);
+    const endpoint = isCurso
+      ? `/cursos/${targetId}/documentos`
+      : `/disciplinas/${targetId}/documentos`;
+
+    const res = await apiClient.get<DocumentoOrientador[]>(endpoint);
     if (res.success && res.data) {
       documentos.value = res.data;
     }
@@ -172,6 +224,10 @@ async function handleFileUpload(e: Event) {
   const file = target.files?.[0];
   if (!file) return;
 
+  const isCurso = escopoAtivo.value === 'curso' || !props.disciplinaId;
+  const targetId = isCurso ? props.cursoId : props.disciplinaId;
+  if (!targetId) return;
+
   uploadError.value = '';
   uploading.value = true;
 
@@ -182,8 +238,11 @@ async function handleFileUpload(e: Event) {
     formData.append('titulo', file.name.replace(/\.[^/.]+$/, ''));
 
     const token = apiClient.getProfessorToken();
+    const endpoint = isCurso
+      ? `/api/cursos/${targetId}/documentos`
+      : `/api/disciplinas/${targetId}/documentos`;
 
-    const response = await fetch(`/api/disciplinas/${props.disciplinaId}/documentos`, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -193,7 +252,7 @@ async function handleFileUpload(e: Event) {
 
     const res = await response.json();
     if (res.success || res.id) {
-      toast.success('Documento orientador anexado com sucesso!');
+      toast.success(isCurso ? 'Documento geral do curso anexado com sucesso!' : 'Documento orientador anexado com sucesso!');
       await loadDocumentos();
     } else {
       uploadError.value = res.error || 'Erro ao processar arquivo';
@@ -215,9 +274,18 @@ function confirmDelete(docId: number) {
 
 async function executeDelete() {
   if (!docIdToDelete.value) return;
+
+  const isCurso = escopoAtivo.value === 'curso' || !props.disciplinaId;
+  const targetId = isCurso ? props.cursoId : props.disciplinaId;
+  if (!targetId) return;
+
   isDeletingDoc.value = true;
   try {
-    const res = await apiClient.delete(`/disciplinas/${props.disciplinaId}/documentos/${docIdToDelete.value}`);
+    const endpoint = isCurso
+      ? `/cursos/${targetId}/documentos/${docIdToDelete.value}`
+      : `/disciplinas/${targetId}/documentos/${docIdToDelete.value}`;
+
+    const res = await apiClient.delete(endpoint);
     if (res.success) {
       documentos.value = documentos.value.filter(d => d.id !== docIdToDelete.value);
       toast.success('Documento orientador removido com sucesso!');
@@ -247,7 +315,12 @@ function formatDate(dateStr?: string): string {
 watch(
   () => props.modelValue,
   (open) => {
-    if (open) loadDocumentos();
+    if (open) {
+      if (!props.disciplinaId && props.cursoId) {
+        escopoAtivo.value = 'curso';
+      }
+      loadDocumentos();
+    }
   },
   { immediate: true }
 );

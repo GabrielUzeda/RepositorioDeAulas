@@ -82,6 +82,52 @@ describe('Novos Fluxos de Negócio (RAG, Deadlines, Ciclo de Vida e Feedbacks)',
       const checkDoc = db.query('SELECT id FROM documentos_orientadores WHERE id = ?').get(created.id);
       expect(checkDoc).toBeNull();
     });
+
+    test('CRUD de documentos orientadores de CURSO (RAG Geral do Curso)', async () => {
+      const curso = db.query('SELECT id FROM cursos LIMIT 1').get() as any;
+      expect(curso).toBeDefined();
+
+      // 1. Inserir documento geral do curso
+      const createRes = await app.request(`/cursos/${curso.id}/documentos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          titulo: 'Diretrizes Gerais do Curso 2026',
+          tipo: 'outro',
+          nome_arquivo: 'diretrizes.txt',
+          conteudo_texto: 'Regras de avaliacao institucional e criterios pedagogicos gerais.'
+        })
+      });
+      expect(createRes.status).toBe(201);
+      const created = await createRes.json();
+      expect(created.id).toBeDefined();
+      expect(created.curso_id).toBe(curso.id);
+      expect(created.disciplina_id).toBeNull();
+
+      // 2. Listar documentos do curso
+      const listRes = await app.request(`/cursos/${curso.id}/documentos`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(listRes.status).toBe(200);
+      const docs = await listRes.json();
+      const found = docs.find((d: any) => d.id === created.id);
+      expect(found).toBeDefined();
+      expect(found.titulo).toBe('Diretrizes Gerais do Curso 2026');
+
+      // 3. Excluir documento do curso
+      const delRes = await app.request(`/cursos/${curso.id}/documentos/${created.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(delRes.status).toBe(204);
+
+      const checkDoc = db.query('SELECT id FROM documentos_orientadores WHERE id = ?').get(created.id);
+      expect(checkDoc).toBeNull();
+    });
   });
 
   // ---------- 2. Prazos de Entrega e Detecção de Atraso (MEL-06) ----------
@@ -285,6 +331,78 @@ describe('Novos Fluxos de Negócio (RAG, Deadlines, Ciclo de Vida e Feedbacks)',
         'SELECT feedback_geral FROM disciplina_feedbacks WHERE disciplina_id = ? AND aluno_email_hash IS NULL'
       ).get(disc.id) as any;
       expect(turmaFbAtualizado.feedback_geral).toContain('Nova data de prova!');
+    });
+  });
+
+  // ---------- 5. Salvamento em Lote de Avaliações ----------
+  describe('Salvamento em Lote de Avaliações (POST /atividades/:id/salvar-avaliacoes)', () => {
+    test('salva notas e feedbacks de múltiplos alunos em lote', async () => {
+      const disc = db.query('SELECT id FROM disciplinas LIMIT 1').get() as any;
+
+      const atvRes = await app.request('/atividades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({
+          disciplina_id: disc.id,
+          titulo: 'Atividade Teste Lote',
+          tipo: 'normal',
+          status: 'ativo'
+        })
+      });
+      const atv = await atvRes.json();
+
+      // Cria 2 respostas de alunos
+      const r1 = await app.request(`/atividades/${atv.id}/respostas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aluno_nome: 'Aluno Um',
+          aluno_email: 'aluno1@escola.com',
+          respostas: { q1: 'resposta 1' },
+          senha_curso: 'asdf1234'
+        })
+      });
+      expect([200, 201]).toContain(r1.status);
+      const r1Data = await r1.json();
+
+      const r2 = await app.request(`/atividades/${atv.id}/respostas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aluno_nome: 'Aluno Dois',
+          aluno_email: 'aluno2@escola.com',
+          respostas: { q1: 'resposta 2' },
+          senha_curso: 'asdf1234'
+        })
+      });
+      expect([200, 201]).toContain(r2.status);
+      const r2Data = await r2.json();
+
+      // Salva em lote
+      const batchRes = await app.request(`/atividades/${atv.id}/salvar-avaliacoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({
+          avaliacoes: [
+            { id: r1Data.id, nota: 95, feedback: 'Excelente raciocínio!' },
+            { id: r2Data.id, nota: 70, feedback: 'Bom esforço, revisar conceito X.' }
+          ]
+        })
+      });
+
+      expect(batchRes.status).toBe(200);
+      const batchData = await batchRes.json();
+      expect(batchData.success).toBe(true);
+      expect(batchData.total).toBe(2);
+
+      // Valida no banco
+      const saved1 = db.query('SELECT nota, feedback FROM respostas_alunos WHERE id = ?').get(r1Data.id) as any;
+      expect(saved1.nota).toBe(95);
+      expect(saved1.feedback).toBe('Excelente raciocínio!');
+
+      const saved2 = db.query('SELECT nota, feedback FROM respostas_alunos WHERE id = ?').get(r2Data.id) as any;
+      expect(saved2.nota).toBe(70);
+      expect(saved2.feedback).toBe('Bom esforço, revisar conceito X.');
     });
   });
 });

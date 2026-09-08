@@ -180,11 +180,17 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     await page.getByRole('button', { name: /Respostas/i }).click();
     await expect(page.getByText(`Total de Envios: 1`)).toBeVisible({ timeout: 10000 });
 
+    // Garante que os botões de IA e Salvar Todas estão no modal (habilitados) e não dentro do feedback
+    await expect(page.getByRole('button', { name: 'Corrigir Todas com IA' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Critérios IA' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Salvar Todas' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Sugerir com IA' })).not.toBeVisible();
+
     // Avalia
     await page.getByPlaceholder('Ex: 85').fill(String(notaEsperada));
     await page.getByPlaceholder('Escreva um comentário pedagógico para este aluno...').fill(feedbackAtividade);
-    await page.getByRole('button', { name: 'Salvar Avaliação' }).click();
-    await expect(page.getByText('Avaliação Salva!')).toBeVisible();
+    await page.getByRole('button', { name: 'Salvar Todas' }).click();
+    await expect(page.getByText(/Avaliações salvas com sucesso!/i)).toBeVisible();
     await page.getByRole('dialog').getByRole('button', { name: 'Fechar' }).last().click();
   });
 

@@ -1,6 +1,7 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { professorAuth } from './auth';
 import { db } from './db';
+import { decryptData } from './utils';
 
 const aiRouter = new Hono();
 
@@ -176,12 +177,15 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
   }
 
   if (targetDisciplinaId) {
+    const discRow = db.query('SELECT curso_id FROM disciplinas WHERE id = ?').get(targetDisciplinaId) as any;
+    const targetCursoId = discRow?.curso_id ? Number(discRow.curso_id) : null;
+
     const docs = db.query(`
       SELECT titulo, tipo, conteudo_texto 
       FROM documentos_orientadores 
-      WHERE disciplina_id = ?
+      WHERE disciplina_id = ? OR (curso_id = ? AND disciplina_id IS NULL)
       ORDER BY id ASC
-    `).all(targetDisciplinaId) as { titulo: string; tipo: string; conteudo_texto: string }[];
+    `).all(targetDisciplinaId, targetCursoId) as { titulo: string; tipo: string; conteudo_texto: string }[];
 
     if (docs.length > 0) {
       docsContexto = docs
@@ -768,15 +772,57 @@ animation-duration: 0.5s
   });
 });
 
-aiRouter.post('/evaluate-response', professorAuth, async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const { questao_enunciado, resposta_aluno, gabarito, criterios, modelo } = body;
+export const EVAL_CANDIDATE_MODELS: readonly string[] = [
+  'ocg/deepseek-v4-flash',
+  'qwenproxy/qwen3.8-max',
+  'qwenproxy/qwen3.7-plus',
+  'ag/gemini-3-flash-agent',
+  'ag/gemini-3.7-flash-low',
+  'qwenproxy/qwen3.8-max-thinking',
+  'deepseek-v4-flash',
+];
 
-  if (!questao_enunciado || !resposta_aluno) {
-    return c.json({ success: false, error: 'Enunciado da questão e resposta do aluno são obrigatórios.' }, 400);
+export async function evaluateStudentResponse({
+  questao_enunciado,
+  resposta_aluno,
+  gabarito,
+  criterios,
+  modelo,
+  observacoes,
+  severidade = 'moderado',
+}: {
+  questao_enunciado: string;
+  resposta_aluno: string;
+  gabarito?: string;
+  criterios?: string;
+  modelo?: string;
+  observacoes?: string;
+  severidade?: 'brando' | 'moderado' | 'rigoroso' | 'sistematico' | string;
+}): Promise<{
+  nota_sugerida: number;
+  feedback: string;
+  justificativa?: string;
+  modelo_utilizado?: string;
+}> {
+  let severidadeInstrucao = '';
+  switch (severidade) {
+    case 'brando':
+      severidadeInstrucao = 'Nível de severidade: BRANDO. Seja encorajador e flexível. Valorize a intenção, raciocínio e conceitos parciais, relevando pequenos desvios de sintaxe, formatação ou pontuação.';
+      break;
+    case 'rigoroso':
+      severidadeInstrucao = 'Nível de severidade: RIGOROSO. Exija precisão conceitual, clareza técnica e rigor na demonstração dos pontos solicitados. Penalize omissões conceituais ou imprecisões.';
+      break;
+    case 'sistematico':
+      severidadeInstrucao = 'Nível de severidade: SISTEMÁTICO. Avalie item a item com método estrito e analítico, pontuando cada aspecto de forma pragmática e fundamentada.';
+      break;
+    case 'moderado':
+    default:
+      severidadeInstrucao = 'Nível de severidade: MODERADO. Mantenha um equilíbrio justo entre rigor técnico e acolhimento pedagógico construtivo.';
+      break;
   }
 
   const systemPrompt = `Você é um avaliador pedagógico sênior. Avalie a resposta do aluno com base no enunciado da questão, nos critérios ou gabarito (se houver).
+${severidadeInstrucao}
 Retorne ESTRITAMENTE um objeto JSON no formato:
 {
   "nota_sugerida": 85,
@@ -791,18 +837,13 @@ Regras:
   let userPrompt = `ENUNCIADO DA QUESTÃO:\n${questao_enunciado}\n\n`;
   if (gabarito) userPrompt += `GABARITO / EXPECTATIVA DE RESPOSTA:\n${gabarito}\n\n`;
   if (criterios) userPrompt += `CRITÉRIOS DE CORREÇÃO:\n${criterios}\n\n`;
+  if (observacoes && observacoes.trim()) userPrompt += `OBSERVAÇÕES DO PROFESSOR:\n${observacoes.trim()}\n\n`;
   userPrompt += `RESPOSTA SUBMETIDA PELO ALUNO:\n${resposta_aluno}`;
 
-  const candidateModels = [
-    'ag/gemini-3.7-flash-low',
-    'qwenproxy/qwen3.8-max-thinking',
-    'ocg/deepseek-v4-flash',
-    'deepseek-v4-flash',
-    'qwenproxy/qwen3.7-plus',
-  ];
+  const candidateModels = [...EVAL_CANDIDATE_MODELS];
 
-  const modelsToTry = modelo && !candidateModels.includes(modelo)
-    ? [modelo, ...candidateModels]
+  const modelsToTry = modelo && candidateModels.includes(modelo)
+    ? [modelo, ...candidateModels.filter((m) => m !== modelo)]
     : candidateModels;
 
   let evaluationResult: any = null;
@@ -846,10 +887,165 @@ Regras:
   }
 
   if (!evaluationResult) {
-    return c.json({ success: false, error: `Falha na avaliação por IA: ${lastError || 'Não foi possível obter resposta válida'}` }, 502);
+    throw new Error(`Falha na avaliação por IA: ${lastError || 'Não foi possível obter resposta válida'}`);
   }
 
-  return c.json({ success: true, ...evaluationResult });
+  return evaluationResult;
+}
+
+aiRouter.post('/evaluate-response', professorAuth, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { questao_enunciado, resposta_aluno, gabarito, criterios, modelo, observacoes, severidade } = body;
+
+  if (!questao_enunciado || !resposta_aluno) {
+    return c.json({ success: false, error: 'questao_enunciado e resposta_aluno são obrigatórios.' }, 400);
+  }
+
+  try {
+    const result = await evaluateStudentResponse({ questao_enunciado, resposta_aluno, gabarito, criterios, modelo, observacoes, severidade });
+    return c.json({ success: true, ...result });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 502);
+  }
+});
+
+export async function handleEvaluateActivityResponses(c: Context, forcedAtividadeId?: number) {
+  const body = await c.req.json().catch(() => ({}));
+  const atividade_id = forcedAtividadeId !== undefined
+    ? Number(forcedAtividadeId)
+    : Number(body.atividade_id || body.atividadeId);
+
+  if (!atividade_id || isNaN(atividade_id)) {
+    return c.json({ success: false, error: 'atividade_id é obrigatório.' }, 400);
+  }
+
+  const atv = db.query('SELECT id, disciplina_id, titulo, descricao, json_data FROM atividades WHERE id = ?').get(atividade_id) as any;
+  if (!atv) {
+    return c.json({ success: false, error: 'Atividade não encontrada.' }, 404);
+  }
+
+  const profId = c.get('professorId');
+  const profRole = c.get('professorRole');
+  if (profRole !== 'admin') {
+    const d = db.query('SELECT curso_id FROM disciplinas WHERE id = ?').get(atv.disciplina_id) as any;
+    if (!d) return c.text('Access denied', 403);
+    const hasPerm = db.query('SELECT 1 FROM curso_professores WHERE curso_id = ? AND professor_id = ?').get(d.curso_id, Number(profId));
+    if (!hasPerm) return c.text('Access denied', 403);
+  }
+
+  const rows = db.query('SELECT id, respostas, nota, feedback FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em ASC').all(atividade_id) as any[];
+
+  if (rows.length === 0) {
+    return c.json({
+      success: true,
+      total: 0,
+      avaliados: 0,
+      falhas_count: 0,
+      sucessos: [],
+      falhas: [],
+      avaliacoes: []
+    });
+  }
+
+  let questions: any[] = [];
+  if (atv.json_data) {
+    try {
+      const data = typeof atv.json_data === 'string' ? JSON.parse(atv.json_data) : atv.json_data;
+      questions = data.questions || [];
+    } catch {}
+  }
+
+  const modeloSafe = typeof body.modelo === 'string' && EVAL_CANDIDATE_MODELS.includes(body.modelo)
+    ? body.modelo
+    : undefined;
+
+  const observacoes = typeof body.observacoes === 'string' ? body.observacoes.trim() : undefined;
+  const severidade = typeof body.severidade === 'string' ? body.severidade.trim() : 'moderado';
+
+  const sucessos: any[] = [];
+  const falhas: any[] = [];
+
+  const CONCURRENCY = 3;
+  for (let i = 0; i < rows.length; i += CONCURRENCY) {
+    const chunk = rows.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      chunk.map(async (row) => {
+        try {
+          const decryptedRespostas = await decryptData(row.respostas);
+
+          let mapObj: Record<string, any> | null = null;
+          if (typeof decryptedRespostas === 'string') {
+            try {
+              const parsed = JSON.parse(decryptedRespostas);
+              if (typeof parsed === 'object' && parsed !== null) mapObj = parsed;
+            } catch {}
+          } else if (typeof decryptedRespostas === 'object' && decryptedRespostas !== null) {
+            mapObj = decryptedRespostas;
+          }
+
+          let questoesTexto = '';
+          let respostasTexto = '';
+
+          if (mapObj) {
+            const entries = Object.entries(mapObj);
+            questoesTexto = entries.map(([key]) => {
+              const qIdx = Number(key);
+              const q = !isNaN(qIdx) ? questions[qIdx] : null;
+              return `Questão ${isNaN(qIdx) ? key : qIdx + 1}: ${q?.content || q?.title || `Questão ${isNaN(qIdx) ? key : qIdx + 1}`}`;
+            }).join('\n\n');
+            respostasTexto = entries.map(([key, val], idx) => `Resposta ${idx + 1}: ${String(val)}`).join('\n\n');
+          } else {
+            questoesTexto = atv.titulo + (atv.descricao ? `\n${atv.descricao}` : '');
+            respostasTexto = String(decryptedRespostas || '');
+          }
+
+          const evalRes = await evaluateStudentResponse({
+            questao_enunciado: questoesTexto || atv.titulo || 'Atividade',
+            resposta_aluno: respostasTexto || '(Sem resposta)',
+            criterios: atv.descricao || undefined,
+            modelo: modeloSafe,
+            observacoes,
+            severidade
+          });
+
+          db.query('UPDATE respostas_alunos SET nota = ?, feedback = ? WHERE id = ?').run(
+            evalRes.nota_sugerida,
+            evalRes.feedback,
+            row.id
+          );
+
+          sucessos.push({
+            id: row.id,
+            nota: evalRes.nota_sugerida,
+            feedback: evalRes.feedback,
+            justificativa: evalRes.justificativa
+          });
+        } catch (err: any) {
+          falhas.push({
+            id: row.id,
+            erro: err.message || 'Erro ao avaliar resposta'
+          });
+        }
+      })
+    );
+  }
+
+  // LGPD: Minimização de dados. Retorna apenas IDs, notas e feedbacks atualizados (sem payload bruto de respostas)
+  const updatedRows = db.query('SELECT id, nota, feedback FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em DESC').all(atividade_id) as any[];
+
+  return c.json({
+    success: true,
+    total: rows.length,
+    avaliados: sucessos.length,
+    falhas_count: falhas.length,
+    sucessos,
+    falhas,
+    avaliacoes: updatedRows
+  });
+}
+
+aiRouter.post('/evaluate-activity-responses', professorAuth, async (c) => {
+  return handleEvaluateActivityResponses(c);
 });
 
 aiRouter.post('/synthesize-class-feedback', professorAuth, async (c) => {

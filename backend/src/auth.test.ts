@@ -261,6 +261,16 @@ describe('Auth Module & Multi-Professor System', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(listAtividadesRes.status).toBe(200);
+
+    // Limpeza dos dados criados neste teste
+    await app.request(`/cursos/${cData.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    await app.request(`/professores/${profId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
   });
 
   test('Security Headers present on responses', async () => {

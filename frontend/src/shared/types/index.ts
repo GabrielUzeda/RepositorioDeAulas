@@ -173,7 +173,7 @@ export interface AiModel {
 export interface DocumentoOrientador {
   id: number;
   curso_id?: number | null;
-  disciplina_id: number;
+  disciplina_id?: number | null;
   titulo: string;
   nome_arquivo: string;
   tipo: string;

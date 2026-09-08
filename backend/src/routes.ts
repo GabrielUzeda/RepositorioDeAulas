@@ -8,7 +8,7 @@ import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail, h
 import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter, extractClientIp } from './auth';
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent, resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
-import { aiRouter } from './ai';
+import { aiRouter, handleEvaluateActivityResponses } from './ai';
 import { extractTextFromBuffer } from './documentParser';
 import { validateEmailWithTypo } from './emailValidator';
 
@@ -836,6 +836,108 @@ app.delete('/disciplinas/:id/documentos/:docId', professorAuth, async (c) => {
   if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
 
   const doc = dbq('SELECT id FROM documentos_orientadores WHERE id = ? AND disciplina_id = ?').get(docId, disciplinaId);
+  if (!doc) return c.text('Documento não encontrado', 404);
+
+  dbq('DELETE FROM documentos_orientadores WHERE id = ?').run(docId);
+  return c.body(null, 204);
+});
+
+// ---------- Documentos Orientadores de Curso (RAG Geral) ----------
+
+app.get('/cursos/:id/documentos', professorAuth, async (c) => {
+  const cursoId = parseId(c.req.param('id'));
+  if (cursoId === null) return c.text('', 400);
+
+  const prof = getProfessor(c);
+  if (!prof || !canManageCurso(prof, cursoId)) return c.text('Access denied', 403);
+
+  const rows = dbq(`
+    SELECT id, curso_id, disciplina_id, titulo, nome_arquivo, tipo, tamanho_bytes,
+           substr(conteudo_texto, 1, 300) AS preview_texto, criado_em
+    FROM documentos_orientadores
+    WHERE curso_id = ? AND disciplina_id IS NULL
+    ORDER BY criado_em DESC
+  `).all(cursoId);
+
+  return c.json(rows);
+});
+
+app.post('/cursos/:id/documentos', professorAuth, async (c) => {
+  const cursoId = parseId(c.req.param('id'));
+  if (cursoId === null) return c.text('', 400);
+
+  const prof = getProfessor(c);
+  if (!prof || !canManageCurso(prof, cursoId)) return c.text('Access denied', 403);
+
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+  const contentLength = Number(c.req.header('content-length') || '0');
+  if (contentLength > MAX_UPLOAD_BYTES) {
+    return c.json({ error: 'Arquivo muito grande. Limite: 10 MB.' }, 413);
+  }
+
+  const curso = dbq('SELECT id FROM cursos WHERE id = ?').get(cursoId) as any;
+  if (!curso) return c.text('Curso not found', 404);
+
+  const contentType = c.req.header('content-type') || '';
+
+  let titulo = '';
+  let tipo = 'outro';
+  let nomeArquivo = '';
+  let conteudoTexto = '';
+  let tamanhoBytes = 0;
+
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await c.req.parseBody();
+    const file = (formData.file || formData.arquivo) as File | undefined;
+    titulo = String(formData.titulo || file?.name || 'Documento Orientador do Curso').trim();
+    tipo = String(formData.tipo || 'outro').trim();
+
+    if (file && typeof file === 'object' && 'arrayBuffer' in file) {
+      nomeArquivo = file.name || 'documento.txt';
+      const arrayBuf = await file.arrayBuffer();
+      const u8 = new Uint8Array(arrayBuf);
+      if (u8.byteLength > MAX_UPLOAD_BYTES) {
+        return c.json({ error: 'Arquivo muito grande. Limite: 10 MB.' }, 413);
+      }
+      tamanhoBytes = u8.byteLength;
+      conteudoTexto = await extractTextFromBuffer(u8, nomeArquivo);
+    } else {
+      return c.json({ error: 'Arquivo inválido ou não fornecido' }, 400);
+    }
+  } else {
+    const body = await parseBody(c);
+    if (!body) return c.text('Dados inválidos', 400);
+    titulo = String(body.titulo || 'Documento Orientador do Curso').trim();
+    tipo = String(body.tipo || 'outro').trim();
+    nomeArquivo = String(body.nome_arquivo || 'documento.txt').trim();
+    conteudoTexto = String(body.conteudo_texto || '').trim();
+    tamanhoBytes = Buffer.byteLength(conteudoTexto, 'utf-8');
+  }
+
+  if (!conteudoTexto) {
+    return c.json({ error: 'Não foi possível extrair texto do documento ou conteúdo vazio.' }, 400);
+  }
+
+  const r = db
+    .query(`
+      INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes)
+      VALUES (?, NULL, ?, ?, ?, ?, ?)
+      RETURNING id, curso_id, disciplina_id, titulo, nome_arquivo, tipo, tamanho_bytes, criado_em
+    `)
+    .get(cursoId, titulo, nomeArquivo, tipo, conteudoTexto, tamanhoBytes) as any;
+
+  return c.json({ success: true, ...r }, 201);
+});
+
+app.delete('/cursos/:id/documentos/:docId', professorAuth, async (c) => {
+  const cursoId = parseId(c.req.param('id'));
+  const docId = parseId(c.req.param('docId'));
+  if (cursoId === null || docId === null) return c.text('', 400);
+
+  const prof = getProfessor(c);
+  if (!prof || !canManageCurso(prof, cursoId)) return c.text('Access denied', 403);
+
+  const doc = dbq('SELECT id FROM documentos_orientadores WHERE id = ? AND curso_id = ? AND disciplina_id IS NULL').get(docId, cursoId);
   if (!doc) return c.text('Documento não encontrado', 404);
 
   dbq('DELETE FROM documentos_orientadores WHERE id = ?').run(docId);
@@ -1856,6 +1958,44 @@ app.put('/respostas/:id/avaliacao', professorAuth, async (c) => {
   await logAudit(c, 'avaliar_resposta', 'respostas_alunos', { resposta_id: id, nota });
 
   return c.json({ success: true, message: 'Avaliação salva com sucesso' });
+});
+
+app.post('/atividades/:id/salvar-avaliacoes', professorAuth, async (c) => {
+  const atividadeId = parseId(c.req.param('id'));
+  if (atividadeId === null) return c.text('ID inválido', 400);
+
+  const atv = dbq('SELECT id, disciplina_id FROM atividades WHERE id = ?').get(atividadeId) as { id: number; disciplina_id: number } | undefined;
+  if (!atv) return c.text('Atividade não encontrada', 404);
+
+  if (!(await canManageDisciplina(c, atv.disciplina_id))) {
+    return c.text('Access denied', 403);
+  }
+
+  const body = await parseBody(c);
+  if (!body || !Array.isArray(body.avaliacoes)) {
+    return c.json({ success: false, error: 'Lista de avaliações inválida' }, 400);
+  }
+
+  let salvasCount = 0;
+  for (const item of body.avaliacoes) {
+    const respId = parseId(item.id);
+    if (respId === null) continue;
+
+    const nota = item.nota !== undefined && item.nota !== null && item.nota !== '' ? Number(item.nota) : null;
+    const feedback = item.feedback !== undefined && item.feedback !== null ? String(item.feedback).trim() : null;
+
+    dbq('UPDATE respostas_alunos SET nota = ?, feedback = ? WHERE id = ? AND atividade_id = ?').run(nota, feedback, respId, atividadeId);
+    salvasCount++;
+  }
+
+  await logAudit(c, 'salvar_avaliacoes_lote', 'respostas_alunos', { atividade_id: atividadeId, total: salvasCount });
+  return c.json({ success: true, message: 'Avaliações salvas com sucesso', total: salvasCount });
+});
+
+app.post('/atividades/:id/avaliar-respostas-ia', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('ID inválido', 400);
+  return handleEvaluateActivityResponses(c, id);
 });
 
 app.patch('/respostas/:id/email', professorAuth, async (c) => {

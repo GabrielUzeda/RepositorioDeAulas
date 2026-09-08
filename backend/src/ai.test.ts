@@ -144,4 +144,96 @@ describe('AI Module & 9router Integration', () => {
       expect(Array.isArray(data.alunos_sintese)).toBe(true);
     }
   });
+
+  test('POST /ai/evaluate-activity-responses validates auth and payload', async () => {
+    const resNoAuth = await app.request('/ai/evaluate-activity-responses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ atividade_id: 1 })
+    });
+    expect(resNoAuth.status).toBe(401);
+
+    const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
+    const resNoPayload = await app.request('/ai/evaluate-activity-responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({})
+    });
+    expect(resNoPayload.status).toBe(400);
+
+    const resNotFound = await app.request('/ai/evaluate-activity-responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ atividade_id: 999999 })
+    });
+    expect(resNotFound.status).toBe(404);
+  });
+
+  test('POST /ai/evaluate-activity-responses handles empty submissions gracefully', async () => {
+    const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
+    const res = await app.request('/ai/evaluate-activity-responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ atividade_id: 2 })
+    });
+    expect([200, 502]).toContain(res.status);
+    if (res.status === 200) {
+      const data = await res.json() as any;
+      expect(data.success).toBe(true);
+      expect(data.total).toBe(0);
+      expect(data.avaliados).toBe(0);
+      expect(Array.isArray(data.sucessos)).toBe(true);
+      expect(Array.isArray(data.falhas)).toBe(true);
+      expect(Array.isArray(data.avaliacoes)).toBe(true);
+    }
+  });
+
+  test('POST /atividades/:id/avaliar-respostas-ia delegates to evaluate-activity-responses', async () => {
+    const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
+    const res = await app.request('/atividades/2/avaliar-respostas-ia', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({})
+    });
+    expect([200, 502]).toContain(res.status);
+    if (res.status === 200) {
+      const data = await res.json() as any;
+      expect(data.success).toBe(true);
+      expect(data.total).toBe(0);
+    }
+  });
+
+  test('POST /ai/evaluate-activity-responses accepts severidade and observacoes payload', async () => {
+    const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
+    const res = await app.request('/ai/evaluate-activity-responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        atividade_id: 2,
+        severidade: 'rigoroso',
+        observacoes: 'Penalizar falta de unidades de medida.'
+      })
+    });
+    expect([200, 502]).toContain(res.status);
+    if (res.status === 200) {
+      const data = await res.json() as any;
+      expect(data.success).toBe(true);
+      expect(data.total).toBe(0);
+    }
+  });
 });
