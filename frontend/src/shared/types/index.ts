@@ -15,6 +15,7 @@ export interface Curso {
   senha?: string;
   possui_senha?: boolean;
   descricao?: string;
+  status?: 'ativo' | 'oculto' | 'arquivado';
   criado_em?: string;
   atualizado_em?: string;
   total_disciplinas?: number;
@@ -29,6 +30,7 @@ export interface Disciplina {
   cor?: string;
   icone?: string;
   descricao?: string;
+  status?: 'ativo' | 'oculto' | 'arquivado';
   criado_em?: string;
   atualizado_em?: string;
 }
@@ -77,6 +79,8 @@ export interface Atividade {
   senha?: string | null;
   allow_password?: number | boolean;
   ordem?: number;
+  data_limite?: string | null;
+  status?: 'ativo' | 'oculto' | 'arquivado';
   criado_em?: string;
   atualizado_em?: string;
 }
@@ -96,9 +100,11 @@ export interface RespostaAluno {
   atividade_id: number;
   aluno_nome: string;
   aluno_email: string;
+  aluno_email_hash?: string;
   respostas: string | RespostasAlunoMap;
   nota?: number | null;
   feedback?: string | null;
+  entregue_com_atraso?: number;
   enviado_em?: string | null;
   criado_em: string;
 }
@@ -162,6 +168,18 @@ export interface AiModel {
   vision: boolean;
   contextWindow?: number;
   maxOutput?: number;
+}
+
+export interface DocumentoOrientador {
+  id: number;
+  curso_id?: number | null;
+  disciplina_id?: number | null;
+  titulo: string;
+  nome_arquivo: string;
+  tipo: string;
+  conteudo_texto?: string;
+  tamanho_bytes?: number;
+  criado_em?: string;
 }
 
 export interface GenerateActivityPayload {

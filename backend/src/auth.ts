@@ -81,8 +81,13 @@ function getJwtSecret(): string {
 
 // Validado na inicialização do servidor (index.ts) para falhar cedo em produção.
 export function assertRequiredSecrets(): void {
-  if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-    throw new Error('FATAL: JWT_SECRET ausente em ambiente de produção. Encerrando boot.');
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('FATAL: JWT_SECRET ausente em ambiente de produção. Encerrando boot.');
+    }
+    if (!process.env.ENCRYPTION_KEY_256) {
+      throw new Error('FATAL: ENCRYPTION_KEY_256 ausente em ambiente de produção. Encerrando boot.');
+    }
   }
 }
 

@@ -9,6 +9,7 @@ import MarpEditorModal from '@/professor/components/MarpEditorModal.vue';
 import JsonActivityEditorModal from '@/professor/components/JsonActivityEditorModal.vue';
 import RespostasModal from '@/professor/components/RespostasModal.vue';
 import FeedbackConsolidadoModal from '@/professor/components/FeedbackConsolidadoModal.vue';
+import DocumentosDisciplinaModal from '@/professor/components/DocumentosDisciplinaModal.vue';
 import CursoCard from '@/aluno/components/CursoCard.vue';
 import DisciplinaCard from '@/aluno/components/DisciplinaCard.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
@@ -43,6 +44,7 @@ const showRespostasModal = ref(false);
 const selectedRespostasAtividade = ref<Atividade | null>(null);
 
 const showFeedbackConsolidadoModal = ref(false);
+const showDocumentosModal = ref(false);
 
 onMounted(async () => {
   await cursoStore.fetchCursos();
@@ -60,8 +62,8 @@ function handleOpenCurso(curso: Curso) {
 
 async function showDisciplinas() {
   if (!selectedCurso.value) return;
-  await cursoStore.fetchDisciplinas(selectedCurso.value.id);
   activeView.value = 'disciplinas';
+  await cursoStore.fetchDisciplinas(selectedCurso.value.id);
 }
 
 import { executeWithFeedback } from '@/shared/api/requestHelper';
@@ -97,6 +99,7 @@ async function handleSaveDisciplina(data: Partial<Disciplina>) {
 
 const showDelDisc = ref(false);
 const delDiscId = ref<number | null>(null);
+const isDeletingDisc = ref(false);
 
 function handleDeleteDisciplina(disciplinaId: number) {
   delDiscId.value = disciplinaId;
@@ -108,21 +111,34 @@ async function onConfirmDelDisc() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/disciplinas/${delDiscId.value}`),
     {
+      loadingRef: isDeletingDisc,
       successMessage: 'Disciplina excluída com sucesso!',
       errorMessage: 'Falha ao excluir disciplina.'
     }
   );
   if (res.success) {
+    showDelDisc.value = false;
     await showDisciplinas();
   }
 }
 
 function onCancelDelDisc() {}
 
+async function handleToggleDisciplinaStatus(disciplina: Disciplina, status: 'ativo' | 'oculto' | 'arquivado') {
+  const res = await executeWithFeedback(
+    () => apiClient.patch(`/disciplinas/${disciplina.id}/status`, { status }),
+    {
+      successMessage: `Disciplina ${status === 'ativo' ? 'reativada' : status === 'arquivado' ? 'arquivada' : 'ocultada'} com sucesso!`,
+      errorMessage: 'Falha ao alterar status da disciplina.'
+    }
+  );
+  if (res.success) await showDisciplinas();
+}
+
 async function handleOpenDisciplinaDetails(disciplina: Disciplina) {
   selectedDisciplina.value = disciplina;
-  await cursoStore.loadDisciplinaContent(disciplina.id);
   activeView.value = 'detalhes';
+  await cursoStore.loadDisciplinaContent(disciplina.id);
 }
 
 function goBack() {
@@ -177,6 +193,7 @@ async function handleSaveMarpAula(payload: { titulo: string; descricao: string; 
 
 const showDelAula = ref(false);
 const delAulaId = ref<number | null>(null);
+const isDeletingAula = ref(false);
 
 function handleDeleteAula(aulaId: number) {
   delAulaId.value = aulaId;
@@ -188,11 +205,13 @@ async function onConfirmDelAula() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/aulas/${delAulaId.value}`),
     {
+      loadingRef: isDeletingAula,
       successMessage: 'Aula excluída com sucesso!',
       errorMessage: 'Falha ao excluir aula.'
     }
   );
   if (res.success && selectedDisciplina.value) {
+    showDelAula.value = false;
     await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
   }
 }
@@ -242,6 +261,7 @@ async function handleSaveActivity(payload: any) {
 
 const showDelAtiv = ref(false);
 const delAtivId = ref<number | null>(null);
+const isDeletingAtiv = ref(false);
 
 function handleDeleteActivity(atividadeId: number) {
   delAtivId.value = atividadeId;
@@ -253,16 +273,31 @@ async function onConfirmDelAtiv() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/atividades/${delAtivId.value}`),
     {
+      loadingRef: isDeletingAtiv,
       successMessage: 'Atividade excluída com sucesso!',
       errorMessage: 'Falha ao excluir atividade.'
+    }
+  );
+  if (res.success && selectedDisciplina.value) {
+    showDelAtiv.value = false;
+    await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
+  }
+}
+
+function onCancelDelAtiv() {}
+
+async function handleToggleAtividadeStatus(atividade: Atividade, status: 'ativo' | 'oculto' | 'arquivado') {
+  const res = await executeWithFeedback(
+    () => apiClient.patch(`/atividades/${atividade.id}/status`, { status }),
+    {
+      successMessage: `Atividade ${status === 'ativo' ? 'reativada' : status === 'oculto' ? 'ocultada' : 'arquivada'} com sucesso!`,
+      errorMessage: 'Falha ao alterar status da atividade.'
     }
   );
   if (res.success && selectedDisciplina.value) {
     await cursoStore.loadDisciplinaContent(selectedDisciplina.value.id);
   }
 }
-
-function onCancelDelAtiv() {}
 
 // Modo de Reordenação
 const isReordering = ref(false);
@@ -443,6 +478,10 @@ function getActivityTypeBadge(tipo?: string) {
   }
 }
 
+function hasRespostas(tipo?: string): boolean {
+  return tipo === 'normal' || tipo === 'prova' || !tipo;
+}
+
 function toggleReorder() {
   if (isReordering.value) {
     saveOrders();
@@ -519,16 +558,16 @@ function handleOpenRespostas(atividade: Atividade) {
 <template>
   <div class="min-h-screen bg-surface text-primary flex flex-col">
     <!-- Header -->
-    <header class="border-b border-line bg-header-bg/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <span class="material-icons text-accent text-2xl">school</span>
-        <h1 class="text-xl font-bold text-primary tracking-tight">Painel do Professor</h1>
+    <header class="border-b border-line bg-header-bg/80 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+        <span class="material-icons text-accent text-2xl shrink-0">school</span>
+        <h1 class="text-lg sm:text-xl font-bold text-primary tracking-tight truncate">Painel do Professor</h1>
       </div>
 
-      <div class="flex items-center space-x-4">
-        <span class="text-xs text-secondary">Olá, <strong class="text-primary">{{ authStore.professor?.nome }}</strong></span>
+      <div class="flex items-center space-x-2 sm:space-x-4 shrink-0">
+        <span class="text-xs text-secondary hidden sm:inline">Olá, <strong class="text-primary">{{ authStore.professor?.nome }}</strong></span>
         <ThemeToggle />
-        <button @click="logout" class="p-2 text-secondary hover:text-danger hover:bg-surface rounded-xl transition">
+        <button @click="logout" class="p-2 text-secondary hover:text-danger hover:bg-surface rounded-xl transition" title="Sair da conta">
           <span class="material-icons text-sm">logout</span>
         </button>
       </div>
@@ -593,10 +632,23 @@ function handleOpenRespostas(atividade: Atividade) {
               </div>
             </div>
 
-            <BaseButton variant="primary" size="sm" @click="handleOpenDisciplinaModal()">
-              <span class="material-icons text-sm">add</span>
-              <span>Nova Disciplina</span>
-            </BaseButton>
+            <div class="flex items-center gap-2">
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                class="inline-flex items-center justify-center gap-1.5"
+                title="Documentos RAG gerais deste curso"
+                @click="showDocumentosModal = true"
+              >
+                <span class="material-icons text-sm">auto_stories</span>
+                <span>Documentos RAG</span>
+              </BaseButton>
+
+              <BaseButton variant="primary" size="sm" @click="handleOpenDisciplinaModal()">
+                <span class="material-icons text-sm">add</span>
+                <span>Nova Disciplina</span>
+              </BaseButton>
+            </div>
           </div>
 
           <div v-if="cursoStore.loadingDisciplinas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label="Carregando disciplinas">
@@ -635,6 +687,24 @@ function handleOpenRespostas(atividade: Atividade) {
             >
               <template #header-actions>
                 <div class="flex items-center space-x-1" @click.stop>
+                  <span v-if="disciplina.status === 'arquivado'" class="text-xs text-muted px-1.5 py-0.5 rounded bg-surface-alt border border-line">arquivado</span>
+                  <span v-else-if="disciplina.status === 'oculto'" class="text-xs text-muted px-1.5 py-0.5 rounded bg-surface-alt border border-line">oculto</span>
+                  <button
+                    v-if="!disciplina.status || disciplina.status === 'ativo'"
+                    @click="handleToggleDisciplinaStatus(disciplina, 'oculto')"
+                    title="Ocultar Disciplina para Alunos"
+                    class="p-1.5 text-secondary hover:text-primary rounded-lg"
+                  >
+                    <span class="material-icons text-sm">visibility_off</span>
+                  </button>
+                  <button
+                    v-else
+                    @click="handleToggleDisciplinaStatus(disciplina, 'ativo')"
+                    title="Tornar Disciplina Visível"
+                    class="p-1.5 text-secondary hover:text-accent rounded-lg"
+                  >
+                    <span class="material-icons text-sm">visibility</span>
+                  </button>
                   <button @click="handleOpenDisciplinaModal(disciplina)" title="Editar Disciplina" class="p-1.5 text-secondary hover:text-primary rounded-lg">
                     <span class="material-icons text-sm">edit</span>
                   </button>
@@ -649,23 +719,38 @@ function handleOpenRespostas(atividade: Atividade) {
 
         <!-- Content View (Aulas e Atividades Integradas) -->
         <section v-else key="detalhes" class="space-y-6">
-          <div class="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-line pb-4 gap-4">
-            <div class="flex items-center gap-3 min-w-0">
-              <BackButton @click="goBack" />
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <h2 class="text-2xl font-bold text-primary truncate">{{ selectedDisciplina?.nome }}</h2>
+          <div class="border-b border-line pb-4 space-y-3">
+            <!-- Linha 1: Título, Curso e Descrição com espaço livre -->
+            <div class="flex items-start gap-3 min-w-0">
+              <BackButton @click="goBack" class="mt-0.5" />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                  <h2 class="text-xl sm:text-2xl font-bold text-primary truncate">{{ selectedDisciplina?.nome }}</h2>
                   <BaseBadge variant="accent" size="sm">{{ selectedCurso?.nome }}</BaseBadge>
                 </div>
-                <p v-if="selectedDisciplina?.descricao" class="text-secondary text-xs mt-0.5 line-clamp-1">{{ selectedDisciplina?.descricao }}</p>
+                <p v-if="selectedDisciplina?.descricao" class="text-secondary text-xs mt-1 leading-relaxed">
+                  {{ selectedDisciplina?.descricao }}
+                </p>
               </div>
             </div>
 
-            <div class="flex items-center flex-wrap gap-2 shrink-0">
+            <!-- Linha 2: Barra de Ações com scroll horizontal suave quando necessário -->
+            <div class="flex items-center flex-wrap gap-2 pt-1">
               <BaseButton
                 variant="secondary"
                 size="sm"
-                class="inline-flex items-center gap-1.5"
+                class="inline-flex items-center justify-center gap-1.5"
+                title="Ementas e PDFs para IA (RAG)"
+                @click="showDocumentosModal = true"
+              >
+                <span class="material-icons text-sm">auto_stories</span>
+                <span>Documentos RAG</span>
+              </BaseButton>
+
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                class="inline-flex items-center justify-center gap-1.5"
                 @click="showFeedbackConsolidadoModal = true"
               >
                 <span class="material-icons text-sm">mark_email_read</span>
@@ -677,6 +762,7 @@ function handleOpenRespostas(atividade: Atividade) {
                 :variant="isReordering ? 'primary' : 'secondary'"
                 size="sm"
                 :disabled="isSavingOrders"
+                class="inline-flex items-center justify-center gap-1.5"
                 @click="toggleReorder"
               >
                 <span class="material-icons text-sm">{{ isReordering ? 'save' : 'swap_vert' }}</span>
@@ -686,6 +772,7 @@ function handleOpenRespostas(atividade: Atividade) {
               <BaseButton
                 variant="secondary"
                 size="sm"
+                class="inline-flex items-center justify-center gap-1.5"
                 @click="handleOpenActivityEditor()"
               >
                 <span class="material-icons text-sm">assignment_add</span>
@@ -695,6 +782,7 @@ function handleOpenRespostas(atividade: Atividade) {
               <BaseButton
                 variant="primary"
                 size="sm"
+                class="inline-flex items-center justify-center gap-1.5"
                 @click="handleOpenMarpModal()"
               >
                 <span class="material-icons text-sm">add</span>
@@ -825,7 +913,7 @@ function handleOpenRespostas(atividade: Atividade) {
                         size="xs"
                         @click="handleOpenVincularModal(aula)"
                         title="Vincular atividades existentes a esta aula"
-                        class="mr-1 text-secondary hover:text-primary"
+                        class="mr-1"
                       >
                         <span class="material-icons text-xs">link</span>
                         <span>Vincular</span>
@@ -872,25 +960,23 @@ function handleOpenRespostas(atividade: Atividade) {
                       :key="atv.id"
                       class="bg-surface-alt border border-line rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs hover:border-line-strong hover:shadow-xs transition-all"
                     >
-                      <div class="flex items-center gap-3 min-w-0">
+                      <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <!-- Ícone + Tipo Compacto e Elegante -->
                         <div
-                          class="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
+                          class="inline-flex items-center gap-1 px-1.5 py-1 rounded-md shrink-0 self-start sm:self-center"
                           :class="getActivityTypeBadge(atv.tipo).badgeClass"
+                          :title="getActivityTypeBadge(atv.tipo).label"
                         >
-                          <span class="material-icons text-base">
+                          <span class="material-icons text-[15px] leading-none">
                             {{ atv.icone || getActivityTypeBadge(atv.tipo).icon }}
                           </span>
+                          <span class="text-[10px] font-bold tracking-tight">
+                            {{ getActivityTypeBadge(atv.tipo).label }}
+                          </span>
                         </div>
-                        <div class="min-w-0">
-                          <div class="flex items-center gap-2">
-                            <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ atv.titulo }}</h4>
-                            <span
-                              class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
-                              :class="getActivityTypeBadge(atv.tipo).badgeClass"
-                            >
-                              {{ getActivityTypeBadge(atv.tipo).label }}
-                            </span>
-                          </div>
+
+                        <div class="min-w-0 flex-1">
+                          <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ atv.titulo }}</h4>
                           <p v-if="atv.descricao" class="text-xs text-secondary leading-relaxed truncate mt-0.5">
                             {{ atv.descricao }}
                           </p>
@@ -917,10 +1003,31 @@ function handleOpenRespostas(atividade: Atividade) {
                           </button>
                         </template>
                         <template v-else>
-                          <BaseButton variant="secondary" size="xs" @click="handleOpenRespostas(atv)">
+                          <BaseButton
+                            v-if="hasRespostas(atv.tipo)"
+                            variant="secondary"
+                            size="xs"
+                            @click="handleOpenRespostas(atv)"
+                          >
                             <span class="material-icons text-xs">analytics</span>
-                            <span>Ver Respostas dos Alunos</span>
+                            <span>Respostas</span>
                           </BaseButton>
+                          <button
+                            v-if="!atv.status || atv.status === 'ativo'"
+                            @click="handleToggleAtividadeStatus(atv, 'oculto')"
+                            title="Ocultar Atividade para Alunos"
+                            class="w-8 h-8 flex items-center justify-center text-secondary hover:text-primary rounded-md hover:bg-surface transition-colors"
+                          >
+                            <span class="material-icons text-sm">visibility_off</span>
+                          </button>
+                          <button
+                            v-else
+                            @click="handleToggleAtividadeStatus(atv, 'ativo')"
+                            title="Tornar Atividade Visível"
+                            class="w-8 h-8 flex items-center justify-center text-secondary hover:text-accent rounded-md hover:bg-surface transition-colors"
+                          >
+                            <span class="material-icons text-sm">visibility</span>
+                          </button>
                           <button
                             @click="handleDesvincularAtividade(atv, aula.id)"
                             title="Desvincular desta aula (tornar atividade geral)"
@@ -962,7 +1069,7 @@ function handleOpenRespostas(atividade: Atividade) {
                       variant="ghost"
                       size="xs"
                       @click="handleOpenVincularModal(aula)"
-                      class="text-secondary hover:text-primary font-semibold"
+                      class="font-semibold"
                       title="Vincular atividades já criadas"
                     >
                       <span class="material-icons text-xs">link</span>
@@ -1027,25 +1134,23 @@ function handleOpenRespostas(atividade: Atividade) {
                     :key="atv.id"
                     class="bg-surface-alt border border-line rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs hover:border-line-strong transition-all"
                   >
-                    <div class="flex items-center gap-3 min-w-0">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      <!-- Ícone + Tipo Compacto e Elegante -->
                       <div
-                        class="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
+                        class="inline-flex items-center gap-1 px-1.5 py-1 rounded-md shrink-0 self-start sm:self-center"
                         :class="getActivityTypeBadge(atv.tipo).badgeClass"
+                        :title="getActivityTypeBadge(atv.tipo).label"
                       >
-                        <span class="material-icons text-base">
+                        <span class="material-icons text-[15px] leading-none">
                           {{ atv.icone || getActivityTypeBadge(atv.tipo).icon }}
                         </span>
+                        <span class="text-[10px] font-bold tracking-tight">
+                          {{ getActivityTypeBadge(atv.tipo).label }}
+                        </span>
                       </div>
-                      <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                          <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ atv.titulo }}</h4>
-                          <span
-                            class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
-                            :class="getActivityTypeBadge(atv.tipo).badgeClass"
-                          >
-                            {{ getActivityTypeBadge(atv.tipo).label }}
-                          </span>
-                        </div>
+
+                      <div class="min-w-0 flex-1">
+                        <h4 class="text-sm font-semibold text-primary leading-snug truncate">{{ atv.titulo }}</h4>
                         <p v-if="atv.descricao" class="text-xs text-secondary leading-relaxed truncate mt-0.5">
                           {{ atv.descricao }}
                         </p>
@@ -1072,10 +1177,31 @@ function handleOpenRespostas(atividade: Atividade) {
                         </button>
                       </template>
                       <template v-else>
-                        <BaseButton variant="secondary" size="xs" @click="handleOpenRespostas(atv)">
+                        <BaseButton
+                          v-if="hasRespostas(atv.tipo)"
+                          variant="secondary"
+                          size="xs"
+                          @click="handleOpenRespostas(atv)"
+                        >
                           <span class="material-icons text-xs">analytics</span>
-                          <span>Ver Respostas dos Alunos</span>
+                          <span>Respostas</span>
                         </BaseButton>
+                        <button
+                          v-if="!atv.status || atv.status === 'ativo'"
+                          @click="handleToggleAtividadeStatus(atv, 'oculto')"
+                          title="Ocultar Atividade para Alunos"
+                          class="w-8 h-8 flex items-center justify-center text-secondary hover:text-primary rounded-md hover:bg-surface transition-colors"
+                        >
+                          <span class="material-icons text-sm">visibility_off</span>
+                        </button>
+                        <button
+                          v-else
+                          @click="handleToggleAtividadeStatus(atv, 'ativo')"
+                          title="Tornar Atividade Visível"
+                          class="w-8 h-8 flex items-center justify-center text-secondary hover:text-accent rounded-md hover:bg-surface transition-colors"
+                        >
+                          <span class="material-icons text-sm">visibility</span>
+                        </button>
                         <button
                           v-if="localAulas.length > 0"
                           @click="handleOpenVincularAtividadeEspecifica(atv)"
@@ -1156,10 +1282,19 @@ function handleOpenRespostas(atividade: Atividade) {
       @close="showFeedbackConsolidadoModal = false"
     />
 
+    <DocumentosDisciplinaModal
+      v-if="selectedCurso || selectedDisciplina"
+      v-model="showDocumentosModal"
+      :curso-id="selectedCurso?.id || null"
+      :disciplina-id="selectedDisciplina?.id || null"
+      @close="showDocumentosModal = false"
+    />
+
     <ConfirmDialog
       v-model="showDelDisc"
       message="Tem certeza que deseja excluir esta disciplina?"
       :danger="true"
+      :loading="isDeletingDisc"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmDelDisc"
@@ -1170,6 +1305,7 @@ function handleOpenRespostas(atividade: Atividade) {
       v-model="showDelAula"
       message="Tem certeza que deseja excluir esta aula?"
       :danger="true"
+      :loading="isDeletingAula"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmDelAula"
@@ -1180,6 +1316,7 @@ function handleOpenRespostas(atividade: Atividade) {
       v-model="showDelAtiv"
       message="Tem certeza que deseja excluir esta atividade?"
       :danger="true"
+      :loading="isDeletingAtiv"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmDelAtiv"

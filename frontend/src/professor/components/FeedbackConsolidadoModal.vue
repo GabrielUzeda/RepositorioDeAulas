@@ -27,6 +27,9 @@ const alunos = ref<AlunoFeedbackConsolidado[]>([]);
 const isSendingAll = ref(false);
 const sendingEmailFor = ref<string | null>(null);
 const confirmReenvioOpen = ref(false);
+const isSynthesizingAi = ref(false);
+const aiPontosFortes = ref<string[]>([]);
+const aiPontosAtencao = ref<string[]>([]);
 
 watch(
   () => props.show,
@@ -59,6 +62,65 @@ async function fetchRelatorio() {
   }
 }
 
+async function handleGenerateAiSynthesis() {
+  if (!props.disciplinaId || isSynthesizingAi.value || alunos.value.length === 0) return;
+  isSynthesizingAi.value = true;
+
+  try {
+    const alunosDetalhes = alunos.value.map(a => {
+      const notas = a.atividades.map(atv => atv.nota).filter((n): n is number => n !== null);
+      const media = notas.length > 0 ? Math.round(notas.reduce((acc, v) => acc + v, 0) / notas.length) : null;
+      return {
+        aluno_nome: a.aluno_nome,
+        aluno_email: a.aluno_email,
+        media,
+        atividades: a.atividades.map(atv => ({
+          atividade_titulo: atv.atividade_titulo,
+          nota: atv.nota,
+          feedback: atv.feedback || null
+        }))
+      };
+    });
+
+    const res = await apiClient.post<any>('/ai/synthesize-class-feedback', {
+      disciplina_nome: props.disciplinaNome || 'Disciplina',
+      total_envios: alunos.value.length,
+      alunos_detalhes: alunosDetalhes
+    });
+
+    if (res.success && res.data) {
+      if (res.data.feedback_geral) {
+        feedbackTurma.value = res.data.feedback_geral;
+      }
+      aiPontosFortes.value = res.data.pontos_fortes || [];
+      aiPontosAtencao.value = res.data.pontos_atencao || [];
+
+      if (Array.isArray(res.data.alunos_sintese)) {
+        const sinteseMap = new Map<string, string>();
+        for (const item of res.data.alunos_sintese) {
+          if (item.aluno_email && item.feedback_individual) {
+            sinteseMap.set(String(item.aluno_email).trim().toLowerCase(), String(item.feedback_individual).trim());
+          }
+        }
+        for (const aluno of alunos.value) {
+          const individual = sinteseMap.get(aluno.aluno_email.trim().toLowerCase());
+          if (individual) {
+            aluno.feedback_geral = individual;
+          }
+        }
+      }
+
+      useToast().success('Síntese pedagógica da turma e feedbacks individuais sintetizados com sucesso!');
+    } else {
+      useToast().error(res.error || 'Erro ao gerar síntese da turma com IA.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro de comunicação com o serviço de IA.');
+  } finally {
+    isSynthesizingAi.value = false;
+  }
+}
+
 async function handleSaveFeedbackTurma() {
   if (!props.disciplinaId || isSavingTurma.value) return;
   isSavingTurma.value = true;
@@ -75,6 +137,32 @@ async function handleSaveFeedbackTurma() {
     }
   } catch (err: any) {
     useToast().error(err.message || 'Erro ao salvar feedback da turma.');
+  } finally {
+    isSavingTurma.value = false;
+  }
+}
+
+async function handleSaveAllFeedbacks() {
+  if (!props.disciplinaId || isSavingTurma.value) return;
+  isSavingTurma.value = true;
+  try {
+    const payload = [
+      { aluno_email: null, feedback_geral: feedbackTurma.value },
+      ...alunos.value.map(a => ({
+        aluno_email: a.aluno_email,
+        feedback_geral: a.feedback_geral || ''
+      }))
+    ];
+    const res = await apiClient.post(`/disciplinas/${props.disciplinaId}/salvar-feedback-geral`, {
+      feedbacks: payload
+    });
+    if (res.success) {
+      useToast().success('Todos os feedbacks (turma e individuais) salvos com sucesso!');
+    } else {
+      useToast().error(res.error || 'Erro ao salvar feedbacks.');
+    }
+  } catch (err: any) {
+    useToast().error(err.message || 'Erro ao salvar feedbacks.');
   } finally {
     isSavingTurma.value = false;
   }
@@ -153,8 +241,8 @@ async function doSendEmailTodos(forcarReenvio: boolean) {
 async function handleSendEmailTodos() {
   if (!props.disciplinaId || isSendingAll.value) return;
   
-  // Salva feedback da turma antes de disparar
-  await handleSaveFeedbackTurma();
+  // Salva feedback da turma e todos os feedbacks individuais dos alunos antes de disparar
+  await handleSaveAllFeedbacks();
 
   const pendentes = alunos.value.filter(a => !a.ja_enviado);
   if (pendentes.length === 0) {
@@ -167,6 +255,7 @@ async function handleSendEmailTodos() {
 
 async function confirmReenvio() {
   await doSendEmailTodos(true);
+  confirmReenvioOpen.value = false;
 }
 
 function formatDate(isoStr: string) {
@@ -200,21 +289,60 @@ function formatDate(isoStr: string) {
       <div v-else class="space-y-6">
         <!-- 1. Feedback Geral da Turma -->
         <div class="p-5 bg-surface border border-line rounded-2xl space-y-3">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <label class="block text-xs font-bold text-primary uppercase tracking-wider flex items-center space-x-1.5">
               <span class="material-icons text-sm text-accent">campaign</span>
               <span>Feedback Geral da Turma (Recado Coletivo)</span>
             </label>
-            <BaseButton variant="primary" size="sm" :loading="isSavingTurma" @click="handleSaveFeedbackTurma">
-              <span class="material-icons text-xs">save</span>
-              <span>Salvar Feedback da Turma</span>
-            </BaseButton>
+            <div class="flex items-center gap-2">
+              <BaseButton
+                variant="ghost"
+                size="sm"
+                :disabled="isSynthesizingAi || alunos.length === 0"
+                class="text-xs text-accent font-semibold flex items-center gap-1 hover:bg-accent/10 px-2.5 py-1.5 rounded"
+                title="Sintetizar desempenho da turma e feedbacks individuais dos alunos com IA"
+                @click="handleGenerateAiSynthesis"
+              >
+                <span class="material-icons text-sm" :class="{ 'animate-spin': isSynthesizingAi }">
+                  {{ isSynthesizingAi ? 'sync' : 'auto_awesome' }}
+                </span>
+                <span>{{ isSynthesizingAi ? 'Gerando Síntese...' : 'Sintetizar com IA' }}</span>
+              </BaseButton>
+              <BaseButton variant="secondary" size="sm" :loading="isSavingTurma" @click="handleSaveAllFeedbacks" title="Salvar feedback da turma e individuais de todos os alunos">
+                <span class="material-icons text-xs">done_all</span>
+                <span>Salvar Todos</span>
+              </BaseButton>
+              <BaseButton variant="primary" size="sm" :loading="isSavingTurma" @click="handleSaveFeedbackTurma">
+                <span class="material-icons text-xs">save</span>
+                <span>Salvar Feedback da Turma</span>
+              </BaseButton>
+            </div>
           </div>
           <BaseTextarea
             v-model="feedbackTurma"
             :rows="3"
             placeholder="Digite um comunicado ou feedback geral para toda a turma nesta disciplina (será incluído no e-mail de todos os alunos)..."
           />
+
+          <!-- Destaques da IA (pontos fortes e de atenção) -->
+          <div v-if="aiPontosFortes.length > 0 || aiPontosAtencao.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div v-if="aiPontosFortes.length > 0" class="p-3 bg-success/10 border border-success/30 rounded-xl space-y-1">
+              <p class="text-xs font-bold text-success flex items-center gap-1">
+                <span class="material-icons text-xs">thumb_up</span> Pontos Fortes Observados:
+              </p>
+              <ul class="text-xs text-primary space-y-0.5 list-disc pl-4">
+                <li v-for="(ponto, i) in aiPontosFortes" :key="i">{{ ponto }}</li>
+              </ul>
+            </div>
+            <div v-if="aiPontosAtencao.length > 0" class="p-3 bg-accent/10 border border-accent/30 rounded-xl space-y-1">
+              <p class="text-xs font-bold text-accent flex items-center gap-1">
+                <span class="material-icons text-xs">lightbulb</span> Tópicos de Atenção / Revisão:
+              </p>
+              <ul class="text-xs text-primary space-y-0.5 list-disc pl-4">
+                <li v-for="(ponto, i) in aiPontosAtencao" :key="i">{{ ponto }}</li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         <!-- 2. Lista de Alunos e Avaliações Consolidadas -->
@@ -260,6 +388,7 @@ function formatDate(isoStr: string) {
                 <BaseButton
                   variant="primary"
                   size="sm"
+                  class="w-full sm:w-auto"
                   :loading="sendingEmailFor === aluno.aluno_email"
                   @click="handleSendEmailIndividual(aluno)"
                 >
@@ -345,6 +474,7 @@ function formatDate(isoStr: string) {
   <ConfirmDialog
     v-model="confirmReenvioOpen"
     :danger="true"
+    :loading="isSendingAll"
     message="Todos os alunos já receberam o e-mail de feedback. Deseja reenviar para todos novamente?"
     confirm-text="Reenviar"
     @confirm="confirmReenvio"

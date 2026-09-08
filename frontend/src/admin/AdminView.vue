@@ -117,6 +117,7 @@ async function handleSaveProfessor(payload: { nome: string; email: string; passw
 
 const showConfirmProf = ref(false);
 const deleteTargetProf = ref<Professor | null>(null);
+const isDeletingProf = ref(false);
 
 function onDeleteProfessorClick(prof: Professor) {
   deleteTargetProf.value = prof;
@@ -129,11 +130,13 @@ async function onConfirmProf() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/professores/${prof.id}`),
     {
+      loadingRef: isDeletingProf,
       successMessage: 'Professor excluído com sucesso!',
       errorMessage: 'Falha ao excluir professor.'
     }
   );
   if (res.success) {
+    showConfirmProf.value = false;
     await fetchProfessores();
   }
 }
@@ -188,6 +191,7 @@ async function handleSaveCurso(payload: { nome: string; descricao: string; cor: 
 
 const showConfirmCurso = ref(false);
 const deleteTargetCurso = ref<Curso | null>(null);
+const isDeletingCurso = ref(false);
 
 function onDeleteCursoClick(curso: Curso) {
   deleteTargetCurso.value = curso;
@@ -200,16 +204,29 @@ async function onConfirmCurso() {
   const res = await executeWithFeedback(
     () => apiClient.delete(`/cursos/${curso.id}`),
     {
+      loadingRef: isDeletingCurso,
       successMessage: 'Curso excluído com sucesso!',
       errorMessage: 'Falha ao excluir curso.'
     }
   );
   if (res.success) {
+    showConfirmCurso.value = false;
     await fetchCursos();
   }
 }
 
 function onCancelCurso() {}
+
+async function handleToggleCursoStatus(curso: Curso, status: 'ativo' | 'oculto' | 'arquivado') {
+  await executeWithFeedback(
+    () => apiClient.patch(`/cursos/${curso.id}/status`, { status }),
+    {
+      successMessage: `Curso ${status === 'ativo' ? 'reativado' : status === 'arquivado' ? 'arquivado' : 'ocultado'} com sucesso!`,
+      errorMessage: 'Falha ao alterar status do curso.'
+    }
+  );
+  await fetchCursos();
+}
 
 function logout() {
   authStore.logout();
@@ -430,7 +447,25 @@ function logout() {
             action-text=""
           >
             <template #header-actions>
-              <div class="flex gap-1" @click.stop>
+              <div class="flex gap-1 items-center" @click.stop>
+                <BaseBadge v-if="curso.status === 'arquivado'" variant="neutral">arquivado</BaseBadge>
+                <BaseBadge v-else-if="curso.status === 'oculto'" variant="secondary">oculto</BaseBadge>
+                <button
+                  v-if="curso.status === 'ativo' || !curso.status"
+                  @click="handleToggleCursoStatus(curso, 'arquivado')"
+                  class="p-1.5 rounded text-muted hover:text-secondary hover:bg-surface transition-colors"
+                  title="Arquivar curso"
+                >
+                  <span class="material-icons text-[16px]">archive</span>
+                </button>
+                <button
+                  v-else
+                  @click="handleToggleCursoStatus(curso, 'ativo')"
+                  class="p-1.5 rounded text-muted hover:text-accent hover:bg-surface transition-colors"
+                  title="Reativar curso"
+                >
+                  <span class="material-icons text-[16px]">unarchive</span>
+                </button>
                 <button
                   @click="openEditCurso(curso)"
                   class="p-1.5 rounded text-muted hover:text-primary hover:bg-surface transition-colors"
@@ -461,6 +496,7 @@ function logout() {
       title="Excluir Professor"
       :message="`Tem certeza que deseja excluir &quot;${deleteTargetProf?.nome}&quot;? As disciplinas associadas também serão removidas.`"
       :danger="true"
+      :loading="isDeletingProf"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmProf"
@@ -472,6 +508,7 @@ function logout() {
       title="Excluir Curso"
       :message="`Tem certeza que deseja excluir o curso &quot;${deleteTargetCurso?.nome}&quot;? As disciplinas dele também serão removidas.`"
       :danger="true"
+      :loading="isDeletingCurso"
       confirm-text="Excluir"
       cancel-text="Cancelar"
       @confirm="onConfirmCurso"

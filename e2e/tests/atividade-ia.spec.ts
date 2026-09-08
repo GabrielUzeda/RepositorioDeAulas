@@ -71,14 +71,14 @@ test.describe('Professor — Modal de Geração de Atividades por IA (9router)',
     await expect(page.getByText('Observações ou Instruções Pedagógicas para a IA')).toBeVisible();
     await expect(page.getByRole('button', { name: /Gerar e Adicionar Questões na Atividade/i })).toBeVisible();
 
-    // 2. Ao vincular a uma aula pelo select, o campo de tema desaparece e surge o banner de contexto automático
-    await page.getByLabel('Vincular a uma Aula (Opcional)').selectOption({ label: 'Aula de Algoritmos 1' });
+    // 2. Ao vincular a uma aula, o campo de tema desaparece e surge o banner de contexto automático
+    await page.locator('button', { hasText: 'Aula de Algoritmos 1' }).click();
     await expect(page.getByText('Contexto Automático por Aula')).toBeVisible();
     await expect(page.locator('span', { hasText: 'Aula de Algoritmos 1' })).toBeVisible();
     await expect(page.getByText('Tema / Tópico Específico *')).not.toBeVisible();
 
     // 3. Ao desvincular de volta para Atividade Geral, o campo obrigatório de tema reaparece
-    await page.getByLabel('Vincular a uma Aula (Opcional)').selectOption({ label: 'Nenhuma (Atividade Geral)' });
+    await page.locator('button', { hasText: 'Nenhuma (Atividade Geral)' }).click();
     await expect(page.getByText('Tema / Tópico Específico *')).toBeVisible();
     await expect(page.getByText('Contexto Automático por Aula')).not.toBeVisible();
 

@@ -45,7 +45,7 @@ RepositorioDeAulas_new/
 bun install          # instalar deps
 bun run dev          # bun run --watch src/index.ts (porta 8080)
 bun run start        # produção
-bun test             # testes (pequeno conjunto, ex: auth.test.ts)
+bun test             # testes (suítes: auth, emailValidator, marp, ai, features)
 ```
 
 ### Frontend (workdir `frontend/`)
@@ -192,7 +192,7 @@ O repositório opera em 4 grandes papéis/fluxos encadeados, do gerenciamento ad
    - **Disciplinas**: Seleciona o curso e faz CRUD das disciplinas/matérias.
    - **Aulas & Marp**: Abre a disciplina e cria/edita aulas usando o **Marp Markdown Editor** (com suporte a slides, KaTeX, Mermaid e preview em tempo real).
    - **Atividades & Reordenação**: Cria/edita atividades interativas e utiliza os botões ou recurso **Drag & Drop** (`Reordenar`) para definir a sequência pedagógica de aulas e atividades.
-   - **Avaliação**: Acessa `Ver Respostas dos Alunos` em cada atividade, atribui notas numéricas e feedbacks individuais.
+   - **Avaliação**: Acessa `Respostas` em cada atividade, atribui notas numéricas e feedbacks individuais.
    - **Relatórios**: Clica em `Gerar Feedback da Disciplina` para redigir a devolutiva geral da turma, ajustar os comentários individuais e disparar notificações por e-mail via `POST /disciplinas/:id/enviar-emails-feedback`.
 
 3. **Aluno (Área Pública - `/`)**:
@@ -219,7 +219,7 @@ O sistema suporta 4 tipos principais de atividades interativas (armazenadas na c
 ## 8. Testes E2E (Playwright via Docker — caminho oficial)
 
 ### Escopo
-Há 12 specs em `e2e/tests/`. Status verificados (todos 100% passando — 26/26 testes):
+Há 16 specs em `e2e/tests/`. Status verificados (todos 100% passando):
 
 | Spec | Status | Cobre |
 |---|---|---|
@@ -234,9 +234,11 @@ Há 12 specs em `e2e/tests/`. Status verificados (todos 100% passando — 26/26 
 | `atividade-fluxo.spec.ts` | ✅ atual | Fluxo de rascunhos do professor no editor e resolução do aluno |
 | `atividade-ia.spec.ts` | ✅ **atualizado** | Painel do gerador de atividades por IA integrado na aba Geral |
 | `atividade-rascunhos.spec.ts` | ✅ atual | Salvamento e restauração de rascunhos de atividades (30 dias) |
+| `aula-ia.spec.ts` | ✅ atual | Geração e pré-visualização de aulas assistidas por IA |
 | `email-feedback.spec.ts` | ✅ atual | Entrega real de e-mails de feedback pedagógico via Mailhog |
 | `fluxo-completo.spec.ts` | ✅ atual | Jornada completa de ponta a ponta (Professor → Aluno → Avaliação → Feedback) |
 | `relacao-aula-atividade.spec.ts` | ✅ **novo** | Matriz completa: aula sem atividade, aula com atividade vinculada e atividade geral, com visão do professor e resolução do aluno |
+| `melhorias-recentes.spec.ts` | ✅ **novo** | Modal RAG de documentos, prazos/deadlines no editor, prévia em tempo real, validação com correção de typo de e-mail e ciclo de vida |
 
 ### Como executar
 ```bash
@@ -269,7 +271,7 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 - **Login**: placeholders `professor@local` e `••••••••`; botão `Entrar`.
 - **Aluno**: heading `Área do Aluno`; card curso/disciplina = `h3` (nome); tabs `Aulas (N)`/`Atividades (N)`; aula abre em popup com URL contendo `/materias/`; PasswordModal: `Acesso Restrito` + placeholder `Digite a senha`.
 - **ActivityModal (aluno)**: duas `getByLabel('Seu Nome *'/'Seu E-mail *')`; opções objetivas são **botões** (nome = texto da opção, ex. `Brasília`); success `h3 'Resposta Enviada com Sucesso!'` + `Correção do servidor: X / Y acertos`.
-- **Professor**: heading `Painel do Professor`; curso card `h3`; disciplina `h3` + botão `Gerenciar Aulas & Atividades`; botão `Ver Respostas dos Alunos`; `Gerar Feedback da Disciplina`.
+- **Professor**: heading `Painel do Professor`; curso card `h3`; disciplina `h3` + botão `Gerenciar Aulas & Atividades`; botão `Respostas` (seletor: `getByRole('button', { name: /Respostas/i })`); `Gerar Feedback da Disciplina`.
 - **RespostasModal**: `Total de Envios: {n}`; botão `Avaliar / Ver`; inputs `placeholder='Ex: 85'` (nota) e `placeholder='Escreva um comentário pedagógico para este aluno...'` (feedback); sucesso `Avaliação Salva!`; botão `Fechar`.
 - **FeedbackConsolidadoModal**: heading `Relatório de Feedback da Disciplina`; textarea da turma (placeholder `Digite um comunicado ou feedback geral para toda a turma...`); botão `Salvar Feedback da Turma` → `Feedback Geral da Turma salvo com sucesso!`; input individual (placeholder `Escreva observações pedagógicas gerais para este aluno...`); botão `Salvar Feedback` → `Feedback para {nome} salvo!`; badges `E-mail Enviado`/`E-mail Pendente`.
 
@@ -283,7 +285,7 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 ## 10. Armadilhas validadas (leia antes de editar != código)
 
 1. **Senha é exclusiva do curso**: `disciplinas` não possui mais coluna `senha`. O acesso anônimo a aulas/atividades checa apenas `cursos.senha`. Para fluxo anônimo sem modal de senha, crie o curso sem senha.
-2. **`GET /cursos/:id` devolve `senha` inclusive para anônimos**; `GET /cursos/:id/disciplinas` anon omite campos.
+2. **`GET /cursos/:id` não expõe a senha nem seu hash** — devolve `possui_senha: 0 | 1` (booleano); `GET /cursos/:id/disciplinas` anônimo omite campos restritos. Validação de senha é feita via `POST /cursos/:id/verificar-senha`.
 3. **Tailwind JIT** só com classes literais.
 4. **Marp** grava em `resolveFrontendDir()` → no container `/app/frontend_static` (bind de `./frontend/dist/`). Se `frontend/dist/` não existir no host, o mount cria pasta vazia e aulas dão 404 → **rode `npm run build` no frontend antes de E2E**.
 5. **E-mail**: sem SMTP, `enviar-emails-feedback` roda com `enviados=0` (não lança). Para testar entrega real, adicionar um SMTP fake (ex.: Mailhog) ao compose.

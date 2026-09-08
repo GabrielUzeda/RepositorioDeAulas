@@ -166,7 +166,7 @@ function prevQuestion() {
       <!-- Question Body -->
       <div v-if="currentQuestion" class="space-y-4 pt-1">
         <h4 v-if="currentQuestion.title" class="text-base font-semibold text-accent">{{ currentQuestion.title }}</h4>
-        <p class="text-primary text-base font-medium leading-relaxed">{{ currentQuestion.content }}</p>
+        <p class="text-primary text-base font-medium leading-relaxed whitespace-pre-wrap">{{ currentQuestion.content }}</p>
 
         <!-- Option Buttons -->
         <div class="space-y-3 pt-2">

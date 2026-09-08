@@ -1,7 +1,7 @@
 import './env';
 import app from './routes';
 import { initMailer } from './mailer';
-import { runDataRetentionPurge } from './db';
+import { runDataRetentionPurge, purgeOldRanking } from './db';
 import { assertRequiredSecrets } from './auth';
 import { regenerateAllAulasHtml } from './marp';
 
@@ -15,6 +15,10 @@ initMailer();
 // diariamente. `.unref()` evita que o timer impeça o encerramento do processo.
 runDataRetentionPurge();
 setInterval(runDataRetentionPurge, 24 * 60 * 60 * 1000).unref();
+
+// [PERF] Purga de ranking em background (a cada 6h) em vez de inline por request.
+purgeOldRanking(30);
+setInterval(() => purgeOldRanking(30), 6 * 60 * 60 * 1000).unref();
 
 // Sincroniza e regenera o HTML standalone de todas as aulas cadastradas no boot
 const totalRegeneradas = regenerateAllAulasHtml();

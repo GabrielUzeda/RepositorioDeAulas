@@ -55,8 +55,8 @@ async function handleSelectCurso(curso: Curso) {
       return;
     }
   }
-  await cursoStore.fetchDisciplinas(curso.id);
   activeView.value = 'disciplinas';
+  await cursoStore.fetchDisciplinas(curso.id);
 }
 
 async function handleSelectDisciplina(disciplina: Disciplina) {
@@ -68,10 +68,16 @@ async function handleSelectDisciplina(disciplina: Disciplina) {
   }
   cursoSenha.value = cursoPwd;
 
+  if (selectedCurso.value?.possui_senha && !cursoPwd) {
+    pendingCurso.value = selectedCurso.value;
+    showPasswordModal.value = true;
+    return;
+  }
+
+  activeView.value = 'content';
   const success = await cursoStore.loadDisciplinaContent(disciplina.id, cursoPwd);
-  if (success) {
-    activeView.value = 'content';
-  } else {
+  if (!success) {
+    activeView.value = 'disciplinas';
     pendingCurso.value = selectedCurso.value;
     showPasswordModal.value = true;
   }

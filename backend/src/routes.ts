@@ -4,11 +4,13 @@ import { secureHeaders } from 'hono/secure-headers';
 import { existsSync, statSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { db, purgeOldRanking } from './db';
-import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail } from './utils';
+import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail, hashSenhaCurso } from './utils';
 import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter, extractClientIp } from './auth';
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent, resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
-import { aiRouter } from './ai';
+import { aiRouter, handleEvaluateActivityResponses } from './ai';
+import { extractTextFromBuffer } from './documentParser';
+import { validateEmailWithTypo } from './emailValidator';
 
 const app = new Hono();
 
@@ -135,12 +137,14 @@ function mapAtividade(row: any) {
 }
 
 function stripGabarito(row: any): any {
-  if (row == null || row.json_data == null) return row;
+  if (row == null) return row;
   const out = { ...row };
+  delete out.senha;
+  if (out.json_data == null) return out;
   try {
     const parsed = typeof out.json_data === 'string' ? JSON.parse(out.json_data) : out.json_data;
     const type = row.tipo || parsed?.meta?.type || parsed?.type;
-    if (type === 'reforco' || type === 'roleta' || type === 'minigame') return row;
+    if (type === 'reforco' || type === 'roleta' || type === 'minigame') return out;
     if (parsed && Array.isArray(parsed.questions)) {
       for (const q of parsed.questions) {
         if (q && Array.isArray(q.options)) {
@@ -214,17 +218,30 @@ function readCursoSenha(c: any): string | null {
   return q && q.length > 0 ? q : null;
 }
 
+// Compara senha fornecida (plaintext) com o valor armazenado (hash sha256: ou legado plaintext).
+async function matchSenhaCurso(input: string, stored: string): Promise<boolean> {
+  if (stored.startsWith('sha256:')) {
+    const inputHash = await hashSenhaCurso(input);
+    return inputHash === stored;
+  }
+  // Legado: senha plaintext ainda no DB (migração gradual)
+  return input === stored;
+}
+
 // [2.7] Valida senha de curso e de atividade para submissões/ranking do aluno.
 // Só exige senha quando o curso tem senha (curso.senha) ou a atividade é
 // protegida (allow_password). Cursos sem senha seguem liberados.
-function validarSenhasSubmissao(body: any, atv: any): string | null {
+async function validarSenhasSubmissao(body: any, atv: any): Promise<string | null> {
   const disciplina = dbq('SELECT id, curso_id FROM disciplinas WHERE id = ?').get(atv.disciplina_id) as any;
   if (!disciplina) return 'Disciplina não encontrada';
   const curso = dbq('SELECT id, senha FROM cursos WHERE id = ?').get(disciplina.curso_id) as any;
   if (!curso) return 'Curso não encontrado';
 
-  if (curso.senha && body.senha_curso !== curso.senha) {
-    return 'Senha do curso incorreta';
+  if (curso.senha) {
+    const inputSenhaCurso = body.senha_curso ? String(body.senha_curso) : '';
+    if (!inputSenhaCurso || !(await matchSenhaCurso(inputSenhaCurso, curso.senha))) {
+      return 'Senha do curso incorreta';
+    }
   }
   if (atv.allow_password && atv.senha && body.senha_atividade !== atv.senha) {
     return 'Senha da atividade incorreta';
@@ -305,13 +322,16 @@ async function createCurso(c: any) {
   if (!body) return c.text('', 400);
   const slug = sanitizeSlug(body.slug ?? body.nome ?? '');
   if (!slug) return c.text('Informe um nome válido para o curso.', 400);
+  const senhaRaw: string | null = body.senha != null && body.senha !== '' ? String(body.senha) : null;
+  const senhaHash = senhaRaw ? await hashSenhaCurso(senhaRaw) : null;
   const r = db
     .query(
       `INSERT INTO cursos (slug, nome, cor, icone, senha, descricao)
        VALUES (?, ?, ?, ?, ?, ?)
-       RETURNING *`
+       RETURNING id, slug, nome, cor, icone, descricao, status, criado_em, atualizado_em,
+         CASE WHEN senha IS NOT NULL AND senha <> '' THEN 1 ELSE 0 END AS possui_senha`
     )
-    .get(slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, body.senha ?? null, body.descricao ?? null);
+    .get(slug, body.nome ?? '', body.cor ?? null, body.icone ?? null, senhaHash, body.descricao ?? null);
   return c.json(r, 201);
 }
 
@@ -327,7 +347,11 @@ async function updateCurso(c: any) {
 
   let novaSenha = existing.senha;
   if (body.senha !== undefined) {
-    novaSenha = body.senha === '' || body.senha === null ? null : String(body.senha);
+    if (body.senha === '' || body.senha === null) {
+      novaSenha = null;
+    } else {
+      novaSenha = await hashSenhaCurso(String(body.senha));
+    }
   }
 
   const r = db
@@ -336,7 +360,8 @@ async function updateCurso(c: any) {
        SET slug = ?, nome = ?, cor = ?, icone = ?, senha = ?, descricao = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
        WHERE id = ?
-       RETURNING *`
+       RETURNING id, slug, nome, cor, icone, descricao, status, criado_em, atualizado_em,
+         CASE WHEN senha IS NOT NULL AND senha <> '' THEN 1 ELSE 0 END AS possui_senha`
     )
     .get(slug, body.nome ?? existing.nome, body.cor ?? existing.cor, body.icone ?? existing.icone, novaSenha, body.descricao ?? existing.descricao, id);
   return c.json(r, 200);
@@ -484,8 +509,8 @@ async function createAtividade(c: any) {
   const caminho = sanitizePathOrUrl((body.caminho ?? '') || (body.slug ?? ''));
   const r = db
     .query(
-      `INSERT INTO atividades (disciplina_id, aula_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO atividades (disciplina_id, aula_id, external_id, titulo, descricao, caminho, icone, json_data, tipo, senha, allow_password, ordem, data_limite)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`
     )
     .get(
@@ -500,7 +525,8 @@ async function createAtividade(c: any) {
       body.tipo ?? null,
       body.senha ?? null,
       body.allow_password == null ? null : body.allow_password ? 1 : 0,
-      body.ordem ?? 0
+      body.ordem ?? 0,
+      body.data_limite ?? null
     ) as any;
 
   if (r && r.id && aulaIds.length > 0) {
@@ -543,7 +569,7 @@ async function updateAtividade(c: any) {
     .query(
       `UPDATE atividades
        SET disciplina_id = ?, aula_id = ?, external_id = ?, titulo = ?, descricao = ?, caminho = ?, icone = ?,
-           json_data = ?, tipo = ?, senha = ?, allow_password = ?, ordem = ?,
+           json_data = ?, tipo = ?, senha = ?, allow_password = ?, ordem = ?, data_limite = ?,
            atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
        WHERE id = ?
        RETURNING *`
@@ -561,6 +587,7 @@ async function updateAtividade(c: any) {
       body.senha ?? null,
       body.allow_password == null ? null : body.allow_password ? 1 : 0,
       body.ordem ?? 0,
+      body.data_limite !== undefined ? body.data_limite : ((dbq('SELECT data_limite FROM atividades WHERE id = ?').get(id) as any)?.data_limite ?? null),
       id
     ) as any;
   if (!r) return c.text('Atividade not found', 404);
@@ -685,6 +712,238 @@ app.delete('/atividades/:id', professorAuth, async (c) => {
   return c.body(null, 204);
 });
 
+app.patch('/cursos/:id/status', adminAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const body = await parseBody(c);
+  const status = body?.status;
+  if (!['ativo', 'oculto', 'arquivado'].includes(status)) return c.text('Status inválido', 400);
+  dbq('UPDATE cursos SET status = ?, atualizado_em = ? WHERE id = ?').run(status, new Date().toISOString(), id);
+  return c.json({ ok: true, status });
+});
+
+app.patch('/disciplinas/:id/status', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  if (!(await canManageDisciplina(c, id))) return c.text('Access denied', 403);
+  const body = await parseBody(c);
+  const status = body?.status;
+  if (!['ativo', 'oculto', 'arquivado'].includes(status)) return c.text('Status inválido', 400);
+  dbq('UPDATE disciplinas SET status = ?, atualizado_em = ? WHERE id = ?').run(status, new Date().toISOString(), id);
+  return c.json({ ok: true, status });
+});
+
+app.patch('/atividades/:id/status', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  const atv = dbq('SELECT disciplina_id FROM atividades WHERE id = ?').get(id) as any;
+  if (!atv) return c.text('Atividade not found', 404);
+  if (!(await canManageDisciplina(c, atv.disciplina_id))) return c.text('Access denied', 403);
+  const body = await parseBody(c);
+  const status = body?.status;
+  if (!['ativo', 'oculto', 'arquivado'].includes(status)) return c.text('Status inválido', 400);
+  dbq('UPDATE atividades SET status = ?, atualizado_em = ? WHERE id = ?').run(status, new Date().toISOString(), id);
+  return c.json({ ok: true, status });
+});
+
+// ---------- Documentos Orientadores (RAG) ----------
+
+app.get('/disciplinas/:id/documentos', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('', 400);
+  if (!(await canManageDisciplina(c, id))) return c.text('Access denied', 403);
+
+  const rows = dbq(`
+    SELECT id, curso_id, disciplina_id, titulo, nome_arquivo, tipo, tamanho_bytes,
+           substr(conteudo_texto, 1, 300) AS preview_texto, criado_em
+    FROM documentos_orientadores
+    WHERE disciplina_id = ?
+    ORDER BY criado_em DESC
+  `).all(id);
+
+  return c.json(rows);
+});
+
+app.post('/disciplinas/:id/documentos', professorAuth, async (c) => {
+  const disciplinaId = parseId(c.req.param('id'));
+  if (disciplinaId === null) return c.text('', 400);
+  if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
+
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+  const contentLength = Number(c.req.header('content-length') || '0');
+  if (contentLength > MAX_UPLOAD_BYTES) {
+    return c.json({ error: 'Arquivo muito grande. Limite: 10 MB.' }, 413);
+  }
+
+  const disciplina = dbq('SELECT id, curso_id FROM disciplinas WHERE id = ?').get(disciplinaId) as any;
+  if (!disciplina) return c.text('Disciplina not found', 404);
+
+  const contentType = c.req.header('content-type') || '';
+
+  let titulo = '';
+  let tipo = 'outro';
+  let nomeArquivo = '';
+  let conteudoTexto = '';
+  let tamanhoBytes = 0;
+
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await c.req.parseBody();
+    const file = (formData.file || formData.arquivo) as File | undefined;
+    titulo = String(formData.titulo || file?.name || 'Documento Orientador').trim();
+    tipo = String(formData.tipo || 'outro').trim();
+
+    if (file && typeof file === 'object' && 'arrayBuffer' in file) {
+      nomeArquivo = file.name || 'documento.txt';
+      const arrayBuf = await file.arrayBuffer();
+      const u8 = new Uint8Array(arrayBuf);
+      if (u8.byteLength > MAX_UPLOAD_BYTES) {
+        return c.json({ error: 'Arquivo muito grande. Limite: 10 MB.' }, 413);
+      }
+      tamanhoBytes = u8.byteLength;
+      conteudoTexto = await extractTextFromBuffer(u8, nomeArquivo);
+    } else {
+      return c.json({ error: 'Arquivo inválido ou não fornecido' }, 400);
+    }
+  } else {
+    const body = await parseBody(c);
+    if (!body) return c.text('Dados inválidos', 400);
+    titulo = String(body.titulo || 'Documento Orientador').trim();
+    tipo = String(body.tipo || 'outro').trim();
+    nomeArquivo = String(body.nome_arquivo || 'documento.txt').trim();
+    conteudoTexto = String(body.conteudo_texto || '').trim();
+    tamanhoBytes = Buffer.byteLength(conteudoTexto, 'utf-8');
+  }
+
+  if (!conteudoTexto) {
+    return c.json({ error: 'Não foi possível extrair texto do documento ou conteúdo vazio.' }, 400);
+  }
+
+  const r = db
+    .query(`
+      INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING id, curso_id, disciplina_id, titulo, nome_arquivo, tipo, tamanho_bytes, criado_em
+    `)
+    .get(disciplina.curso_id, disciplinaId, titulo, nomeArquivo, tipo, conteudoTexto, tamanhoBytes) as any;
+
+  return c.json({ success: true, ...r }, 201);
+});
+
+app.delete('/disciplinas/:id/documentos/:docId', professorAuth, async (c) => {
+  const disciplinaId = parseId(c.req.param('id'));
+  const docId = parseId(c.req.param('docId'));
+  if (disciplinaId === null || docId === null) return c.text('', 400);
+  if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
+
+  const doc = dbq('SELECT id FROM documentos_orientadores WHERE id = ? AND disciplina_id = ?').get(docId, disciplinaId);
+  if (!doc) return c.text('Documento não encontrado', 404);
+
+  dbq('DELETE FROM documentos_orientadores WHERE id = ?').run(docId);
+  return c.body(null, 204);
+});
+
+// ---------- Documentos Orientadores de Curso (RAG Geral) ----------
+
+app.get('/cursos/:id/documentos', professorAuth, async (c) => {
+  const cursoId = parseId(c.req.param('id'));
+  if (cursoId === null) return c.text('', 400);
+
+  const prof = getProfessor(c);
+  if (!prof || !canManageCurso(prof, cursoId)) return c.text('Access denied', 403);
+
+  const rows = dbq(`
+    SELECT id, curso_id, disciplina_id, titulo, nome_arquivo, tipo, tamanho_bytes,
+           substr(conteudo_texto, 1, 300) AS preview_texto, criado_em
+    FROM documentos_orientadores
+    WHERE curso_id = ? AND disciplina_id IS NULL
+    ORDER BY criado_em DESC
+  `).all(cursoId);
+
+  return c.json(rows);
+});
+
+app.post('/cursos/:id/documentos', professorAuth, async (c) => {
+  const cursoId = parseId(c.req.param('id'));
+  if (cursoId === null) return c.text('', 400);
+
+  const prof = getProfessor(c);
+  if (!prof || !canManageCurso(prof, cursoId)) return c.text('Access denied', 403);
+
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+  const contentLength = Number(c.req.header('content-length') || '0');
+  if (contentLength > MAX_UPLOAD_BYTES) {
+    return c.json({ error: 'Arquivo muito grande. Limite: 10 MB.' }, 413);
+  }
+
+  const curso = dbq('SELECT id FROM cursos WHERE id = ?').get(cursoId) as any;
+  if (!curso) return c.text('Curso not found', 404);
+
+  const contentType = c.req.header('content-type') || '';
+
+  let titulo = '';
+  let tipo = 'outro';
+  let nomeArquivo = '';
+  let conteudoTexto = '';
+  let tamanhoBytes = 0;
+
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await c.req.parseBody();
+    const file = (formData.file || formData.arquivo) as File | undefined;
+    titulo = String(formData.titulo || file?.name || 'Documento Orientador do Curso').trim();
+    tipo = String(formData.tipo || 'outro').trim();
+
+    if (file && typeof file === 'object' && 'arrayBuffer' in file) {
+      nomeArquivo = file.name || 'documento.txt';
+      const arrayBuf = await file.arrayBuffer();
+      const u8 = new Uint8Array(arrayBuf);
+      if (u8.byteLength > MAX_UPLOAD_BYTES) {
+        return c.json({ error: 'Arquivo muito grande. Limite: 10 MB.' }, 413);
+      }
+      tamanhoBytes = u8.byteLength;
+      conteudoTexto = await extractTextFromBuffer(u8, nomeArquivo);
+    } else {
+      return c.json({ error: 'Arquivo inválido ou não fornecido' }, 400);
+    }
+  } else {
+    const body = await parseBody(c);
+    if (!body) return c.text('Dados inválidos', 400);
+    titulo = String(body.titulo || 'Documento Orientador do Curso').trim();
+    tipo = String(body.tipo || 'outro').trim();
+    nomeArquivo = String(body.nome_arquivo || 'documento.txt').trim();
+    conteudoTexto = String(body.conteudo_texto || '').trim();
+    tamanhoBytes = Buffer.byteLength(conteudoTexto, 'utf-8');
+  }
+
+  if (!conteudoTexto) {
+    return c.json({ error: 'Não foi possível extrair texto do documento ou conteúdo vazio.' }, 400);
+  }
+
+  const r = db
+    .query(`
+      INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes)
+      VALUES (?, NULL, ?, ?, ?, ?, ?)
+      RETURNING id, curso_id, disciplina_id, titulo, nome_arquivo, tipo, tamanho_bytes, criado_em
+    `)
+    .get(cursoId, titulo, nomeArquivo, tipo, conteudoTexto, tamanhoBytes) as any;
+
+  return c.json({ success: true, ...r }, 201);
+});
+
+app.delete('/cursos/:id/documentos/:docId', professorAuth, async (c) => {
+  const cursoId = parseId(c.req.param('id'));
+  const docId = parseId(c.req.param('docId'));
+  if (cursoId === null || docId === null) return c.text('', 400);
+
+  const prof = getProfessor(c);
+  if (!prof || !canManageCurso(prof, cursoId)) return c.text('Access denied', 403);
+
+  const doc = dbq('SELECT id FROM documentos_orientadores WHERE id = ? AND curso_id = ? AND disciplina_id IS NULL').get(docId, cursoId);
+  if (!doc) return c.text('Documento não encontrado', 404);
+
+  dbq('DELETE FROM documentos_orientadores WHERE id = ?').run(docId);
+  return c.body(null, 204);
+});
+
 // ---------- Public routes ----------
 
 app.get('/cursos', async (c) => {
@@ -695,7 +954,8 @@ app.get('/cursos', async (c) => {
       const profId = Number(payload.sub);
       if (payload.role === 'admin') {
         const rows = dbq(
-          `SELECT c.*,
+          `SELECT c.id, c.slug, c.nome, c.cor, c.icone, c.descricao, c.status, c.criado_em, c.atualizado_em,
+             CASE WHEN c.senha IS NOT NULL AND c.senha <> '' THEN 1 ELSE 0 END AS possui_senha,
              (SELECT COUNT(*) FROM disciplinas d WHERE d.curso_id = c.id) AS total_disciplinas,
              (SELECT COUNT(*) FROM curso_professores cp WHERE cp.curso_id = c.id) AS total_professores
            FROM cursos c ORDER BY c.nome`
@@ -703,7 +963,8 @@ app.get('/cursos', async (c) => {
         return c.json(rows);
       }
       const rows = dbq(
-        `SELECT c.*,
+        `SELECT c.id, c.slug, c.nome, c.cor, c.icone, c.descricao, c.status, c.criado_em, c.atualizado_em,
+           CASE WHEN c.senha IS NOT NULL AND c.senha <> '' THEN 1 ELSE 0 END AS possui_senha,
            (SELECT COUNT(*) FROM disciplinas d WHERE d.curso_id = c.id) AS total_disciplinas,
            (SELECT COUNT(*) FROM curso_professores cp WHERE cp.curso_id = c.id) AS total_professores
          FROM cursos c
@@ -718,7 +979,7 @@ app.get('/cursos', async (c) => {
        CASE WHEN c.senha IS NOT NULL AND c.senha <> '' THEN 1 ELSE 0 END AS possui_senha,
        (SELECT COUNT(*) FROM disciplinas d WHERE d.curso_id = c.id) AS total_disciplinas,
        (SELECT COUNT(*) FROM curso_professores cp WHERE cp.curso_id = c.id) AS total_professores
-     FROM cursos c ORDER BY c.nome`
+     FROM cursos c WHERE COALESCE(c.status, 'ativo') = 'ativo' ORDER BY c.nome`
   ).all();
   return c.json(rows);
 });
@@ -740,7 +1001,7 @@ async function verifyCursoSenha(c: any, cursoId: number) {
     return c.json({ ok: true, message: 'Curso sem senha', curso: { id: curso.id, slug: curso.slug, nome: curso.nome } });
   }
   if (!input) return c.text('Senha é obrigatória', 400);
-  if (input !== curso.senha) return c.text('Senha incorreta', 401);
+  if (!(await matchSenhaCurso(input, curso.senha))) return c.text('Senha incorreta', 401);
   return c.json({ ok: true, message: 'Senha correta', curso: { id: curso.id, slug: curso.slug, nome: curso.nome } });
 }
 
@@ -774,7 +1035,7 @@ app.get('/cursos/:id/disciplinas', async (c) => {
       }
     }
   }
-  const rows = dbq('SELECT id, curso_id, slug, nome, cor, icone, descricao FROM disciplinas WHERE curso_id = ? ORDER BY nome').all(id);
+  const rows = dbq('SELECT id, curso_id, slug, nome, cor, icone, descricao FROM disciplinas WHERE curso_id = ? AND COALESCE(status, \'ativo\') = \'ativo\' ORDER BY nome').all(id);
   return c.json(rows);
 });
 
@@ -804,10 +1065,18 @@ app.get('/aulas', async (c) => {
     }
   }
 
-  const curso = dbq('SELECT id, senha FROM cursos WHERE id = ?').get(disciplina.curso_id) as any;
-  if (curso && curso.senha) {
+  if (disciplina.status && disciplina.status !== 'ativo') {
+    return c.text('Disciplina não encontrada', 404);
+  }
+
+  const curso = dbq('SELECT id, senha, status FROM cursos WHERE id = ?').get(disciplina.curso_id) as any;
+  if (!curso || (curso.status && curso.status !== 'ativo')) {
+    return c.text('Disciplina não encontrada', 404);
+  }
+
+  if (curso.senha) {
     const senha = readCursoSenha(c);
-    if ((curso.senha ?? null) !== senha) return c.text('Senha do curso incorreta', 401);
+    if (!senha || !(await matchSenhaCurso(senha, curso.senha))) return c.text('Senha do curso incorreta', 401);
   }
   const rows = dbq('SELECT * FROM aulas WHERE disciplina_id = ? ORDER BY ordem, titulo').all(disciplinaId);
   return c.json(rows);
@@ -821,21 +1090,29 @@ app.get('/aulas/:id', async (c) => {
 
   const disciplina = dbq('SELECT * FROM disciplinas WHERE id = ?').get(r.disciplina_id) as any;
   if (disciplina) {
-    const curso = dbq('SELECT id, senha FROM cursos WHERE id = ?').get(disciplina.curso_id) as any;
-    if (curso && curso.senha) {
-      const authHeader = c.req.header('Authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const payload = await verifyJwt(authHeader.slice(7));
-        if (payload?.sub) {
-          const profId = Number(payload.sub);
-          if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, disciplina.curso_id)) {
-            return c.json(r);
-          }
+    const authHeader = c.req.header('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const payload = await verifyJwt(authHeader.slice(7));
+      if (payload?.sub) {
+        const profId = Number(payload.sub);
+        if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, disciplina.curso_id)) {
+          return c.json(r);
         }
       }
+    }
 
+    if (disciplina.status && disciplina.status !== 'ativo') {
+      return c.text('Aula not found', 404);
+    }
+
+    const curso = dbq('SELECT id, senha, status FROM cursos WHERE id = ?').get(disciplina.curso_id) as any;
+    if (!curso || (curso.status && curso.status !== 'ativo')) {
+      return c.text('Aula not found', 404);
+    }
+
+    if (curso.senha) {
       const senha = readCursoSenha(c);
-      if ((curso.senha ?? null) !== senha) return c.text('Senha do curso incorreta', 401);
+      if (!senha || !(await matchSenhaCurso(senha, curso.senha))) return c.text('Senha do curso incorreta', 401);
     }
   }
 
@@ -855,6 +1132,13 @@ app.get('/atividades', async (c) => {
     WHERE a.disciplina_id = ?
     ORDER BY a.ordem, a.titulo
   `;
+  const selectQueryAnon = `
+    SELECT a.*,
+      (SELECT json_group_array(aa.aula_id) FROM aula_atividades aa WHERE aa.atividade_id = a.id) AS aula_ids_json
+    FROM atividades a
+    WHERE a.disciplina_id = ? AND COALESCE(a.status, 'ativo') = 'ativo'
+    ORDER BY a.ordem, a.titulo
+  `;
 
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
@@ -871,9 +1155,9 @@ app.get('/atividades', async (c) => {
   const curso = dbq('SELECT id, senha FROM cursos WHERE id = ?').get(disciplina.curso_id) as any;
   if (curso && curso.senha) {
     const senha = readCursoSenha(c);
-    if ((curso.senha ?? null) !== senha) return c.text('Senha do curso incorreta', 401);
+    if (!senha || !(await matchSenhaCurso(senha, curso.senha))) return c.text('Senha do curso incorreta', 401);
   }
-  const rows = dbq(selectQuery).all(disciplinaId);
+  const rows = dbq(selectQueryAnon).all(disciplinaId);
   return c.json(rows.map(mapAtividade).map(stripGabarito));
 });
 
@@ -901,10 +1185,14 @@ app.get('/atividades/:id', async (c) => {
     }
   }
 
-  const disciplina = dbq('SELECT id, curso_id FROM disciplinas WHERE id = ?').get(atv.disciplina_id) as any;
-  if (!disciplina) return c.text('Disciplina not found for activity', 500);
-  const curso = dbq('SELECT id, senha FROM cursos WHERE id = ?').get(disciplina.curso_id) as any;
-  if (!curso) return c.text('Curso não encontrado', 500);
+  if (atv.status && atv.status !== 'ativo') {
+    return c.text('Atividade not found', 404);
+  }
+
+  const disciplina = dbq('SELECT id, curso_id, status FROM disciplinas WHERE id = ?').get(atv.disciplina_id) as any;
+  if (!disciplina || (disciplina.status && disciplina.status !== 'ativo')) return c.text('Atividade not found', 404);
+  const curso = dbq('SELECT id, senha, status FROM cursos WHERE id = ?').get(disciplina.curso_id) as any;
+  if (!curso || (curso.status && curso.status !== 'ativo')) return c.text('Atividade not found', 404);
   const inputSenha = readCursoSenha(c) ?? '';
   const cursoSenha = curso.senha ?? '';
   const atvSenha = atv.senha ?? '';
@@ -918,7 +1206,7 @@ app.get('/atividades/:id', async (c) => {
   }
 
   if (cursoSenha) {
-    if (inputSenha === cursoSenha) {
+    if (inputSenha && await matchSenhaCurso(inputSenha, cursoSenha)) {
       return c.json(stripGabarito(atv));
     }
     return c.text('Senha do curso incorreta', 401);
@@ -1003,7 +1291,7 @@ app.post('/ranking', submissionLimiter, async (c) => {
   const atv = dbq('SELECT id, allow_password, senha, disciplina_id FROM atividades WHERE id = ?').get(atividadeId) as any;
   if (!atv) return c.text('Atividade não encontrada', 404);
 
-  const errSenha = validarSenhasSubmissao(body, atv);
+  const errSenha = await validarSenhasSubmissao(body, atv);
   if (errSenha) return c.json({ erro: errSenha }, 403);
 
   const rawNome = String(body.nome_jogador || 'Aluno').trim();
@@ -1012,9 +1300,6 @@ app.post('/ranking', submissionLimiter, async (c) => {
   const pontuacaoCap = Math.min(Math.max(pontuacaoInt, 0), MAX_RANKING_PONTUACAO);
 
   try {
-    // Purga automática de registros de ranking com mais de 30 dias
-    purgeOldRanking(30);
-
     const r = db
       .query(
         `INSERT INTO ranking (atividade_id, nome_jogador, pontuacao)
@@ -1031,9 +1316,6 @@ app.get('/ranking/:atividade_id', (c) => {
   const id = parseId(c.req.param('atividade_id'));
   if (id === null) return c.text('', 400);
   try {
-    // Purga automática de registros de ranking com mais de 30 dias
-    purgeOldRanking(30);
-
     const rows = dbq('SELECT id, atividade_id, nome_jogador, pontuacao, data_envio FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(id);
     return c.json(rows);
   } catch (e: any) {
@@ -1073,8 +1355,9 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
     return c.text('Informe nome, e-mail válido e respostas.', 400);
   }
   const atv = dbq(`
-    SELECT a.id, a.titulo, a.descricao, a.json_data, a.allow_password, a.senha, a.disciplina_id,
-           d.nome as disciplina_nome, c.nome as curso_nome
+    SELECT a.id, a.titulo, a.descricao, a.json_data, a.allow_password, a.senha, a.disciplina_id, a.data_limite, a.status,
+           d.nome as disciplina_nome, d.status as disciplina_status,
+           c.nome as curso_nome, c.status as curso_status
     FROM atividades a
     LEFT JOIN disciplinas d ON d.id = a.disciplina_id
     LEFT JOIN cursos c ON c.id = d.curso_id
@@ -1082,8 +1365,22 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
   `).get(atividadeId) as any;
   if (!atv) return c.text('Atividade não encontrada', 404);
 
-  const errSenha = validarSenhasSubmissao(body, atv);
+  if ((atv.status && atv.status !== 'ativo') ||
+      (atv.disciplina_status && atv.disciplina_status !== 'ativo') ||
+      (atv.curso_status && atv.curso_status !== 'ativo')) {
+    return c.text('Esta atividade não está disponível para envio', 403);
+  }
+
+  const errSenha = await validarSenhasSubmissao(body, atv);
   if (errSenha) return c.json({ erro: errSenha }, 403);
+
+  let entregueComAtraso = 0;
+  if (atv.data_limite) {
+    const limiteMs = new Date(atv.data_limite).getTime();
+    if (!isNaN(limiteMs) && Date.now() > limiteMs) {
+      entregueComAtraso = 1;
+    }
+  }
 
   const email = String(body.aluno_email).trim();
   const nome = String(body.aluno_nome).trim();
@@ -1111,16 +1408,16 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
     let r: any;
     if (existente) {
       dbq(
-        'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ?, consulta_token_hash = ? WHERE id = ?'
-      ).run(encNome, encEmail, encRespostas, tokenHash, existente.id);
+        'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ?, consulta_token_hash = ?, entregue_com_atraso = ? WHERE id = ?'
+      ).run(encNome, encEmail, encRespostas, tokenHash, entregueComAtraso, existente.id);
       r = { id: existente.id, atividade_id: atividadeId, criado_em: existente.criado_em };
     } else {
       r = db
         .query(
-          `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash)
-           VALUES (?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
+          `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash, entregue_com_atraso)
+           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
         )
-        .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash) as any;
+        .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash, entregueComAtraso) as any;
     }
 
     await logAudit(c, 'submeter_resposta', `atividade:${atividadeId}`, { email_hash: emailHash });
@@ -1663,6 +1960,73 @@ app.put('/respostas/:id/avaliacao', professorAuth, async (c) => {
   return c.json({ success: true, message: 'Avaliação salva com sucesso' });
 });
 
+app.post('/atividades/:id/salvar-avaliacoes', professorAuth, async (c) => {
+  const atividadeId = parseId(c.req.param('id'));
+  if (atividadeId === null) return c.text('ID inválido', 400);
+
+  const atv = dbq('SELECT id, disciplina_id FROM atividades WHERE id = ?').get(atividadeId) as { id: number; disciplina_id: number } | undefined;
+  if (!atv) return c.text('Atividade não encontrada', 404);
+
+  if (!(await canManageDisciplina(c, atv.disciplina_id))) {
+    return c.text('Access denied', 403);
+  }
+
+  const body = await parseBody(c);
+  if (!body || !Array.isArray(body.avaliacoes)) {
+    return c.json({ success: false, error: 'Lista de avaliações inválida' }, 400);
+  }
+
+  let salvasCount = 0;
+  for (const item of body.avaliacoes) {
+    const respId = parseId(item.id);
+    if (respId === null) continue;
+
+    const nota = item.nota !== undefined && item.nota !== null && item.nota !== '' ? Number(item.nota) : null;
+    const feedback = item.feedback !== undefined && item.feedback !== null ? String(item.feedback).trim() : null;
+
+    dbq('UPDATE respostas_alunos SET nota = ?, feedback = ? WHERE id = ? AND atividade_id = ?').run(nota, feedback, respId, atividadeId);
+    salvasCount++;
+  }
+
+  await logAudit(c, 'salvar_avaliacoes_lote', 'respostas_alunos', { atividade_id: atividadeId, total: salvasCount });
+  return c.json({ success: true, message: 'Avaliações salvas com sucesso', total: salvasCount });
+});
+
+app.post('/atividades/:id/avaliar-respostas-ia', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('ID inválido', 400);
+  return handleEvaluateActivityResponses(c, id);
+});
+
+app.patch('/respostas/:id/email', professorAuth, async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.text('ID inválido', 400);
+
+  const resp = dbq('SELECT r.id, a.disciplina_id FROM respostas_alunos r JOIN atividades a ON a.id = r.atividade_id WHERE r.id = ?').get(id) as { id: number; disciplina_id: number } | undefined;
+  if (!resp) return c.text('Resposta não encontrada', 404);
+
+  if (!(await canManageDisciplina(c, resp.disciplina_id))) {
+    return c.text('Access denied', 403);
+  }
+
+  const body = await parseBody(c);
+  if (!body || !body.novo_email) return c.json({ success: false, error: 'Novo e-mail é obrigatório' }, 400);
+
+  const rawEmail = String(body.novo_email).trim().toLowerCase();
+  const emailValidation = validateEmailWithTypo(rawEmail);
+  if (!emailValidation.isValid) {
+    return c.json({ success: false, error: emailValidation.error || 'Formato de e-mail inválido' }, 400);
+  }
+
+  const encryptedEmail = await encryptData(rawEmail);
+  const emailHash = await hashEmail(rawEmail);
+
+  dbq('UPDATE respostas_alunos SET aluno_email = ?, aluno_email_hash = ? WHERE id = ?').run(encryptedEmail, emailHash, id);
+  await logAudit(c, 'atualizar_email_resposta', 'respostas_alunos', { resposta_id: id });
+
+  return c.json({ success: true, message: 'E-mail do aluno atualizado com sucesso', aluno_email: rawEmail, aluno_email_hash: emailHash });
+});
+
 app.get('/disciplinas/:id/relatorio-feedback', professorAuth, async (c) => {
   const disciplinaId = parseId(c.req.param('id'));
   if (disciplinaId === null) return c.text('ID inválido', 400);
@@ -1778,17 +2142,40 @@ app.post('/disciplinas/:id/salvar-feedback-geral', professorAuth, async (c) => {
   const body = await parseBody(c);
   if (!body) return c.json({ success: false, error: 'JSON inválido' }, 400);
 
+  const upsertFeedback = (emailHash: string | null, feedbackGeral: string) => {
+    if (emailHash === null) {
+      dbq(
+        `INSERT INTO disciplina_feedbacks (disciplina_id, aluno_email_hash, feedback_geral)
+         VALUES (?, NULL, ?)
+         ON CONFLICT(disciplina_id) WHERE aluno_email_hash IS NULL DO UPDATE SET
+           feedback_geral = excluded.feedback_geral,
+           atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`
+      ).run(disciplinaId, feedbackGeral);
+    } else {
+      dbq(
+        `INSERT INTO disciplina_feedbacks (disciplina_id, aluno_email_hash, feedback_geral)
+         VALUES (?, ?, ?)
+         ON CONFLICT(disciplina_id, aluno_email_hash) DO UPDATE SET
+           feedback_geral = excluded.feedback_geral,
+           atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`
+      ).run(disciplinaId, emailHash, feedbackGeral);
+    }
+  };
+
+  if (Array.isArray(body.feedbacks)) {
+    for (const item of body.feedbacks) {
+      const rawEmail = item.aluno_email ? String(item.aluno_email).trim().toLowerCase() : null;
+      const emailHash = rawEmail ? await hashEmail(rawEmail) : null;
+      const feedbackGeral = item.feedback_geral ? String(item.feedback_geral).trim() : '';
+      upsertFeedback(emailHash, feedbackGeral);
+    }
+    return c.json({ success: true, message: `${body.feedbacks.length} feedbacks salvos com sucesso` });
+  }
+
   const rawEmail = body.aluno_email ? String(body.aluno_email).trim().toLowerCase() : null;
   const emailHash = rawEmail ? await hashEmail(rawEmail) : null;
   const feedbackGeral = body.feedback_geral ? String(body.feedback_geral).trim() : '';
-
-  dbq(
-    `INSERT INTO disciplina_feedbacks (disciplina_id, aluno_email_hash, feedback_geral)
-     VALUES (?, ?, ?)
-     ON CONFLICT(disciplina_id, aluno_email_hash) DO UPDATE SET
-       feedback_geral = excluded.feedback_geral,
-       atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`
-  ).run(disciplinaId, emailHash, feedbackGeral);
+  upsertFeedback(emailHash, feedbackGeral);
 
   return c.json({ success: true, message: 'Feedback geral salvo com sucesso' });
 });
@@ -2230,17 +2617,17 @@ async function serveStaticDisciplinaContent(c: any) {
   const disciplina = dbq('SELECT id, curso_id FROM disciplinas WHERE slug = ?').get(firstSeg) as { id: number; curso_id: number } | undefined;
   if (disciplina) {
     const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '').trim() || '';
-    const prof = token ? verifyJwt(token) : null;
+    const prof = token ? await verifyJwt(token) : null;
     const isProfessor = prof && (prof.role === 'admin' || !!dbq('SELECT 1 FROM curso_professores cp WHERE cp.curso_id = ? AND cp.professor_id = ?').get(disciplina.curso_id, Number(prof.sub)));
     if (!isProfessor) {
       const curso = dbq('SELECT senha FROM cursos WHERE id = ?').get(disciplina.curso_id) as { senha: string | null } | undefined;
       if (curso?.senha) {
         const senha = readCursoSenha(c);
-        if (!senha || senha !== curso.senha) {
+        const senhaValida = senha ? await matchSenhaCurso(senha, curso.senha) : false;
+        if (!senhaValida) {
           const isHtmlRequest = safe.endsWith('.html') || (c.req.header('accept') && c.req.header('accept').includes('text/html'));
           if (isHtmlRequest) {
-            const hasSentInvalidPassword = Boolean(senha && senha !== curso.senha);
-            return c.html(renderSlidePasswordPromptHtml(hasSentInvalidPassword), 401);
+            return c.html(renderSlidePasswordPromptHtml(Boolean(senha)), 401);
           }
           return c.text('Unauthorized', 401);
         }
@@ -2253,7 +2640,8 @@ async function serveStaticDisciplinaContent(c: any) {
   if (!served) return c.text('Not found', 404);
   const senha = readCursoSenha(c);
   if (senha) {
-    c.header('Set-Cookie', `curso_senha=${encodeURIComponent(senha)}; Path=/; Max-Age=14400; SameSite=Lax`);
+    const isSecure = process.env.NODE_ENV === 'production';
+    c.header('Set-Cookie', `curso_senha=${encodeURIComponent(senha)}; Path=/; Max-Age=14400; SameSite=Lax; HttpOnly${isSecure ? '; Secure' : ''}`);
   }
   return served;
 }

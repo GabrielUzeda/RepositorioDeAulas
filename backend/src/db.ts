@@ -12,6 +12,9 @@ if (!existsSync(dbDir)) {
 
 export const db = new Database(dbPath);
 
+// WAL mode: reads não bloqueiam writes (melhor concorrência); synchronous=NORMAL seguro para WAL
+db.query('PRAGMA journal_mode = WAL;').run();
+db.query('PRAGMA synchronous = NORMAL;').run();
 // Ativa as Foreign Keys no SQLite
 db.query('PRAGMA foreign_keys = ON;').run();
 
@@ -37,6 +40,7 @@ CREATE TABLE IF NOT EXISTS cursos (
   icone TEXT DEFAULT 'school',
   senha TEXT,
   descricao TEXT,
+  status TEXT DEFAULT 'ativo',
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
@@ -55,6 +59,7 @@ CREATE TABLE IF NOT EXISTS disciplinas (
   cor TEXT DEFAULT 'bg-indigo-600',
   icone TEXT DEFAULT 'school',
   descricao TEXT,
+  status TEXT DEFAULT 'ativo',
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   UNIQUE(slug, curso_id)
@@ -87,6 +92,8 @@ CREATE TABLE IF NOT EXISTS atividades (
   ordem INTEGER DEFAULT 0,
   senha TEXT,
   allow_password INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'ativo',
+  data_limite TEXT,
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
@@ -101,6 +108,7 @@ CREATE TABLE IF NOT EXISTS respostas_alunos (
   consulta_token_hash TEXT,
   nota REAL,
   feedback TEXT,
+  entregue_com_atraso INTEGER DEFAULT 0,
   enviado_em TEXT,
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
@@ -115,6 +123,10 @@ CREATE TABLE IF NOT EXISTS disciplina_feedbacks (
   atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   UNIQUE(disciplina_id, aluno_email_hash)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_disciplina_feedbacks_turma_uniq 
+ON disciplina_feedbacks(disciplina_id) 
+WHERE aluno_email_hash IS NULL;
 
 CREATE TABLE IF NOT EXISTS ranking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,6 +180,12 @@ try {
   db.run('ALTER TABLE atividades ADD COLUMN aula_id INTEGER REFERENCES aulas(id) ON DELETE SET NULL');
 } catch {}
 
+try { db.run("ALTER TABLE cursos ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
+try { db.run("ALTER TABLE disciplinas ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
+try { db.run("ALTER TABLE atividades ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
+try { db.run("ALTER TABLE atividades ADD COLUMN data_limite TEXT"); } catch {}
+try { db.run("ALTER TABLE respostas_alunos ADD COLUMN entregue_com_atraso INTEGER DEFAULT 0"); } catch {}
+
 try {
   db.run(`
     CREATE TABLE IF NOT EXISTS aula_atividades (
@@ -185,8 +203,26 @@ try {
   `);
 } catch {}
 
+try {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS documentos_orientadores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      curso_id INTEGER REFERENCES cursos(id) ON DELETE CASCADE,
+      disciplina_id INTEGER REFERENCES disciplinas(id) ON DELETE CASCADE,
+      titulo TEXT NOT NULL,
+      nome_arquivo TEXT NOT NULL,
+      tipo TEXT CHECK(tipo IN ('ementa', 'plano_ensino', 'apostila', 'outro')) DEFAULT 'outro',
+      conteudo_texto TEXT NOT NULL,
+      tamanho_bytes INTEGER NOT NULL,
+      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    )
+  `);
+} catch {}
+
 // [2] Índices para alta performance
 db.run(`
+CREATE INDEX IF NOT EXISTS idx_documentos_orientadores_disc ON documentos_orientadores(disciplina_id);
+CREATE INDEX IF NOT EXISTS idx_documentos_orientadores_curso ON documentos_orientadores(curso_id);
 CREATE INDEX IF NOT EXISTS idx_ranking_atividade_pontuacao ON ranking(atividade_id, pontuacao DESC);
 CREATE INDEX IF NOT EXISTS idx_respostas_atividade ON respostas_alunos(atividade_id);
 CREATE INDEX IF NOT EXISTS idx_respostas_aluno_email_hash ON respostas_alunos(aluno_email_hash);

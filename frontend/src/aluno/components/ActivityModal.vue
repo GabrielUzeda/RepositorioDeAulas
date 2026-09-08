@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
 import { useToast } from '@/shared/composables/useToast';
+import { validateEmailWithTypo } from '@/shared/utils/emailValidator';
 import type { Atividade, Question } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
@@ -37,6 +38,17 @@ const { success } = useToast();
 
 const totalSteps = computed(() => questionsList.value.length + 2); // 0 (ID), 1..N (Perguntas), N+1 (Revisão)
 const progress = computed(() => ((currentStep.value) / (totalSteps.value - 1)) * 100);
+
+const deadlineInfo = computed(() => {
+  if (!props.atividade?.data_limite) return null;
+  const deadlineDate = new Date(props.atividade.data_limite);
+  if (isNaN(deadlineDate.getTime())) return null;
+  const isPast = Date.now() > deadlineDate.getTime();
+  return {
+    formatted: deadlineDate.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }),
+    isPast,
+  };
+});
 
 watch(
   () => [props.show, props.atividade],
@@ -112,8 +124,12 @@ function handleSaveDraft() {
   }
 }
 
+const isRestoringDraft = ref(false);
+const isSavingDraft = ref(false);
+
 async function handleRestoreDraft() {
-  if (!rascunhoCodigo.value) return;
+  if (!rascunhoCodigo.value || isRestoringDraft.value) return;
+  isRestoringDraft.value = true;
   try {
     const res: any = await apiClient.get(`/rascunhos/${rascunhoCodigo.value}`);
     const data = res.data?.data || res.data || res;
@@ -129,11 +145,21 @@ async function handleRestoreDraft() {
     }
   } catch (err: any) {
     errorMessage.value = err.message || 'Erro ao restaurar rascunho.';
+  } finally {
+    isRestoringDraft.value = false;
   }
 }
 
+const emailValidation = computed(() => validateEmailWithTypo(alunoEmail.value));
+
 function isValidEmailFormat(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+(?:\.[^\s@]+)?$/.test(email);
+  return validateEmailWithTypo(email).isValid;
+}
+
+function applySuggestedEmail() {
+  if (emailValidation.value.suggestion) {
+    alunoEmail.value = emailValidation.value.suggestion;
+  }
 }
 
 const showDraftModal = ref(false);
@@ -144,12 +170,13 @@ const isSendingDraftEmail = ref(false);
 const draftEmailStatus = ref('');
 
 async function handleSaveDraftToServer() {
-  if (!props.atividade) return;
+  if (!props.atividade || isSavingDraft.value) return;
   if (!alunoEmail.value || !isValidEmailFormat(alunoEmail.value)) {
     errorMessage.value = 'Preencha um e-mail válido no primeiro passo para salvar o rascunho no servidor.';
     return;
   }
   errorMessage.value = '';
+  isSavingDraft.value = true;
   try {
     const res: any = await apiClient.post(`/atividades/${props.atividade.id}/rascunhos`, {
       nome: alunoNome.value,
@@ -168,6 +195,8 @@ async function handleSaveDraftToServer() {
     }
   } catch (err: any) {
     errorMessage.value = err.message || 'Erro ao salvar rascunho.';
+  } finally {
+    isSavingDraft.value = false;
   }
 }
 
@@ -318,13 +347,22 @@ async function handleSubmit() {
 
     <div v-if="props.atividade" class="space-y-6">
       <div v-if="currentStep === 0" class="space-y-4">
+        <!-- Prazo de Entrega -->
+        <div v-if="deadlineInfo" :class="['p-3.5 rounded-xl border flex items-center gap-2.5 text-xs font-medium', deadlineInfo.isPast ? 'bg-danger/10 border-danger/30 text-danger-text' : 'bg-accent/10 border-accent/30 text-primary']">
+          <span class="material-icons text-base">{{ deadlineInfo.isPast ? 'timer_off' : 'schedule' }}</span>
+          <span>
+            <strong>{{ deadlineInfo.isPast ? 'Prazo expirado:' : 'Prazo de entrega:' }}</strong> {{ deadlineInfo.formatted }}
+            <span v-if="deadlineInfo.isPast" class="font-normal opacity-90"> (esta submissão será registrada com atraso)</span>
+          </span>
+        </div>
+
         <!-- Descrição da Atividade -->
         <div v-if="props.atividade.descricao" class="p-4 bg-surface-alt border border-line rounded-xl space-y-1.5">
           <div class="flex items-center gap-2 text-primary font-medium text-xs">
             <span class="material-icons text-accent text-base">description</span>
             <span>Instruções da Atividade</span>
           </div>
-          <p class="text-xs text-secondary whitespace-pre-line leading-relaxed">{{ props.atividade.descricao }}</p>
+          <p class="text-xs text-secondary whitespace-pre-wrap leading-relaxed">{{ props.atividade.descricao }}</p>
         </div>
 
         <!-- Painel LGPD e Re-envio -->
@@ -336,7 +374,40 @@ async function handleSubmit() {
         </div>
 
         <BaseInput v-model="alunoNome" label="Seu Nome *" placeholder="Nome Completo" />
-        <BaseInput v-model="alunoEmail" type="email" label="Seu E-mail *" placeholder="seu@email.com" />
+        <div class="space-y-1.5">
+          <BaseInput
+            v-model="alunoEmail"
+            type="email"
+            label="Seu E-mail *"
+            placeholder="seu@email.com"
+            :error="alunoEmail.trim() && !emailValidation.isValid ? emailValidation.error : undefined"
+          />
+          <!-- Sugestão de correção para erros de digitação comuns -->
+          <div
+            v-if="emailValidation.suggestion"
+            class="p-2.5 bg-accent/10 border border-accent/30 rounded-lg flex items-center justify-between gap-2 text-xs text-primary"
+          >
+            <div class="flex items-center gap-1.5">
+              <span class="material-icons text-accent text-sm">help_outline</span>
+              <span>Você quis dizer <strong>{{ emailValidation.suggestion }}</strong>?</span>
+            </div>
+            <button
+              type="button"
+              @click="applySuggestedEmail"
+              class="px-2 py-0.5 bg-accent text-white font-semibold rounded text-xs hover:bg-accent/90 shrink-0"
+            >
+              Corrigir
+            </button>
+          </div>
+          <!-- Aviso pedagógico quando domínio não é um provedor comum conhecido -->
+          <div
+            v-else-if="alunoEmail.trim() && emailValidation.isValid && emailValidation.warning"
+            class="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2 text-xs text-primary"
+          >
+            <span class="material-icons text-amber-500 text-sm mt-0.5 shrink-0">info</span>
+            <span>{{ emailValidation.warning }}</span>
+          </div>
+        </div>
         
         <div class="flex items-center gap-2 pt-1">
           <input
@@ -354,7 +425,7 @@ async function handleSubmit() {
             <p class="text-sm font-medium text-primary">Restaurar Rascunho</p>
             <div class="flex gap-2">
                 <BaseInput v-model="rascunhoCodigo" class="flex-1" placeholder="Código (ex: R8K9X2)" />
-                <BaseButton variant="secondary" @click="handleRestoreDraft">Restaurar</BaseButton>
+                <BaseButton variant="secondary" :loading="isRestoringDraft" :disabled="isRestoringDraft || !rascunhoCodigo.trim()" @click="handleRestoreDraft">Restaurar</BaseButton>
             </div>
         </div>
       </div>
@@ -364,10 +435,10 @@ async function handleSubmit() {
           <div v-if="currentStep === idx + 1" class="space-y-4">
             <div class="space-y-1.5">
               <h3 class="font-bold text-base text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</h3>
-              <p v-if="q.content && q.content !== q.title" class="text-sm text-secondary whitespace-pre-line leading-relaxed bg-surface-alt/50 p-3 rounded-lg border border-line">
+              <p v-if="q.content && q.content !== q.title" class="text-sm text-secondary whitespace-pre-wrap leading-relaxed bg-surface-alt/50 p-3 rounded-lg border border-line">
                 {{ q.content }}
               </p>
-              <p v-else-if="q.content && !q.title" class="text-sm text-secondary whitespace-pre-line leading-relaxed">
+              <p v-else-if="q.content && !q.title" class="text-sm text-secondary whitespace-pre-wrap leading-relaxed">
                 {{ q.content }}
               </p>
             </div>
@@ -400,7 +471,7 @@ async function handleSubmit() {
             <div class="flex justify-between items-start mb-1">
               <div class="space-y-0.5">
                 <p class="text-sm font-semibold text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</p>
-                <p v-if="q.content" class="text-xs text-secondary whitespace-pre-line">
+                <p v-if="q.content" class="text-xs text-secondary whitespace-pre-wrap">
                   {{ q.content }}
                 </p>
               </div>
@@ -444,7 +515,7 @@ async function handleSubmit() {
       <div class="flex justify-between pt-4 border-t border-line">
         <BaseButton variant="secondary" :disabled="currentStep === 0" @click="prevStep">Anterior</BaseButton>
         <div class="flex gap-2">
-            <BaseButton v-if="currentStep > 0" variant="ghost" @click="handleSaveDraftToServer">Salvar Rascunho</BaseButton>
+            <BaseButton v-if="currentStep > 0" variant="ghost" :loading="isSavingDraft" :disabled="isSavingDraft" @click="handleSaveDraftToServer">Salvar Rascunho</BaseButton>
             <BaseButton v-if="currentStep < totalSteps - 1" variant="primary" @click="nextStep">Próximo</BaseButton>
             <BaseButton v-else variant="primary" :loading="isSubmitting" @click="handleSubmit">Enviar Resposta</BaseButton>
         </div>

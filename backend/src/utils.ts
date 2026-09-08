@@ -99,3 +99,9 @@ export async function hashEmail(email: string): Promise<string> {
   return b64url(new Uint8Array(sig));
 }
 
+// Hash de senha de curso (PIN coletivo, não PII). SHA-256 simples com prefixo de versão.
+export async function hashSenhaCurso(senha: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`v1:${senha}`));
+  return 'sha256:' + Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+

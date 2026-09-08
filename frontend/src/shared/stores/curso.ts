@@ -16,6 +16,8 @@ export const useCursoStore = defineStore('curso', () => {
   const loadingDisciplinas = ref(false);
   const loadingContent = ref(false);
   const isLoading = computed(() => loadingCursos.value || loadingDisciplinas.value || loadingContent.value);
+  const loadedCursoId = ref<number | null>(null);
+  const loadedDisciplinaId = ref<number | null>(null);
 
   async function fetchCursos(): Promise<void> {
     loadingCursos.value = true;
@@ -30,6 +32,10 @@ export const useCursoStore = defineStore('curso', () => {
   }
 
   async function fetchDisciplinas(cursoId: number): Promise<void> {
+    if (loadedCursoId.value !== cursoId) {
+      disciplinas.value = [];
+      loadedCursoId.value = cursoId;
+    }
     loadingDisciplinas.value = true;
     try {
       const res = await apiClient.get<Disciplina[]>(`/cursos/${cursoId}/disciplinas`);
@@ -42,6 +48,11 @@ export const useCursoStore = defineStore('curso', () => {
   }
 
   async function loadDisciplinaContent(disciplinaId: number, password?: string): Promise<boolean> {
+    if (loadedDisciplinaId.value !== disciplinaId) {
+      aulas.value = [];
+      atividades.value = [];
+      loadedDisciplinaId.value = disciplinaId;
+    }
     loadingContent.value = true;
     try {
       const pwdParam = password ? `&senha=${encodeURIComponent(password)}` : '';
