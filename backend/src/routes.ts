@@ -2050,6 +2050,14 @@ app.get('/disciplinas/:id/relatorio-feedback', professorAuth, async (c) => {
     }
   }
 
+  const atividadesConsideradas = dbq(
+    `SELECT DISTINCT a.id, a.titulo, a.ordem
+     FROM atividades a
+     JOIN respostas_alunos r ON r.atividade_id = a.id
+     WHERE a.disciplina_id = ?
+     ORDER BY a.ordem ASC, a.id ASC`
+  ).all(disciplinaId) as Array<{ id: number; titulo: string; ordem: number }>;
+
   const rawRespostasRows = dbq(
     `SELECT r.id, r.atividade_id, r.aluno_nome, r.aluno_email, r.aluno_email_hash, r.nota, r.feedback, r.enviado_em, r.criado_em, a.titulo as atividade_titulo
      FROM respostas_alunos r
@@ -2090,6 +2098,8 @@ app.get('/disciplinas/:id/relatorio-feedback', professorAuth, async (c) => {
       criado_em: string;
       enviado_em: string | null;
     }>;
+    atividades_pendentes: Array<{ id: number; atividade_titulo: string }>;
+    media_calculada: number | null;
     ja_enviado: boolean;
   }>();
 
@@ -2102,6 +2112,8 @@ app.get('/disciplinas/:id/relatorio-feedback', professorAuth, async (c) => {
         aluno_email: r.aluno_email,
         feedback_geral: fAluno?.feedback_geral || '',
         atividades: [],
+        atividades_pendentes: [],
+        media_calculada: null,
         ja_enviado: true
       });
     }
@@ -2122,10 +2134,22 @@ app.get('/disciplinas/:id/relatorio-feedback', professorAuth, async (c) => {
     }
   }
 
+  for (const aluno of alunosMap.values()) {
+    const entreguesSet = new Set(aluno.atividades.map((a) => a.atividade_id));
+    aluno.atividades_pendentes = atividadesConsideradas
+      .filter((a) => !entreguesSet.has(a.id))
+      .map((a) => ({ id: a.id, atividade_titulo: a.titulo }));
+
+    const somaNotas = aluno.atividades.reduce((acc, a) => acc + (a.nota !== null ? a.nota : 0), 0);
+    const totalConsideradas = atividadesConsideradas.length;
+    aluno.media_calculada = totalConsideradas > 0 ? Math.round(somaNotas / totalConsideradas) : null;
+  }
+
   return c.json({
     success: true,
     data: {
       feedback_turma: turmaFeedbackRow?.feedback_geral || '',
+      atividades_consideradas: atividadesConsideradas.map((a) => ({ id: a.id, titulo: a.titulo })),
       alunos: Array.from(alunosMap.values())
     }
   });
