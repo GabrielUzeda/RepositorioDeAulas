@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { db } from './db';
 import { sanitizeSlug } from './utils';
-import { THEME_LABELS, NEXT_THEME, normalizeTheme } from './marpTheme';
+import { THEME_LABELS, NEXT_THEME, normalizeTheme, MERMAID_THEME_VARIABLES } from './marpTheme';
 
 const MARP_THEME_CSS = readFileSync(path.join(import.meta.dir, 'marpTheme.css'), 'utf8');
 
@@ -424,21 +424,19 @@ document.querySelectorAll('.slide-content pre').forEach(pre => {
   }
 });
 
+const mermaidThemeVars = ${JSON.stringify(MERMAID_THEME_VARIABLES)};
+
 function initMermaid(themeName) {
   if (window.mermaid) {
     const theme = normalizeTheme(themeName);
+    const activeVars = mermaidThemeVars[theme] || mermaidThemeVars.default;
     mermaid.initialize({
       startOnLoad: false,
-      theme: theme === 'dark' ? 'dark' : 'default',
+      theme: 'base',
+      themeVariables: activeVars,
       securityLevel: 'loose',
       flowchart: { useMaxWidth: true, htmlLabels: true, padding: 20 },
-      sequence: { useMaxWidth: true, wrap: true },
-      themeVariables: {
-        primaryColor: '#6366f1',
-        primaryTextColor: theme === 'dark' ? '#f8fafc' : '#0f172a',
-        lineColor: theme === 'dark' ? '#94a3b8' : '#475569',
-        fontSize: '15px'
-      }
+      sequence: { useMaxWidth: true, wrap: true }
     });
   }
 }
@@ -470,6 +468,12 @@ function activateSlide(idx) {
   document.getElementById('progress-bar').style.width = (((currentSlide + 1) / totalSlides) * 100) + '%';
 }
 
+function decodeHtmlEntities(str) {
+  const txt = document.createElement('textarea');
+  txt.innerHTML = str;
+  return txt.value;
+}
+
 async function renderAllMermaid() {
   if (!window.mermaid) return;
   try {
@@ -477,42 +481,57 @@ async function renderAllMermaid() {
     await document.fonts.load('16px Inter');
   } catch (e) {}
 
+  const currentTheme = normalizeTheme(document.documentElement.dataset.theme || 'default');
+  initMermaid(currentTheme);
+  const activeVars = mermaidThemeVars[currentTheme] || mermaidThemeVars.default;
+  const directive = '%%{init: ' + JSON.stringify({ theme: 'base', themeVariables: activeVars }) + '}%%\\n';
+
   document.querySelectorAll('.slide-content').forEach(container => {
     container.querySelectorAll('pre, .mermaid-block').forEach(el => {
-      const src = el.dataset.rawMermaid || (el.querySelector('code') ? el.querySelector('code').textContent.trim() : null);
-      if (!src) return;
+      const raw = el.dataset.rawMermaid || (el.querySelector('code') ? el.querySelector('code').textContent.trim() : null);
+      if (!raw) return;
 
+      const cleanSrc = decodeHtmlEntities(raw);
       const isMmd = el.dataset.isMermaid === '1' ||
         (el.querySelector('code') && el.querySelector('code').className.includes('mermaid')) ||
-        /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline)/m.test(src);
+        /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline)/m.test(cleanSrc);
       if (!isMmd) return;
 
       const id = 'mmd-p-' + (++mermaidCounter);
       const wrapper = document.createElement('div');
       wrapper.className = 'mermaid-block';
-      wrapper.dataset.rawMermaid = src;
+      wrapper.dataset.rawMermaid = cleanSrc;
       wrapper.dataset.isMermaid = '1';
       el.replaceWith(wrapper);
 
-      mermaid.render(id, src).then(({ svg }) => {
-        wrapper.innerHTML = svg;
-        const svgEl = wrapper.querySelector('svg');
-        if (svgEl) {
-          svgEl.removeAttribute('width');
-          svgEl.removeAttribute('height');
-          svgEl.style.width = '100%';
-          svgEl.style.height = 'auto';
-          const vb = svgEl.getAttribute('viewBox');
-          if (vb) {
-            const [x, y, w, h] = vb.split(' ').map(Number);
-            svgEl.setAttribute('viewBox', (x - 12) + ' ' + (y - 12) + ' ' + (w + 24) + ' ' + (h + 24));
-          }
-          svgEl.style.overflow = 'visible';
-          svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach(node => node.style.overflow = 'visible');
+      const codeToRender = cleanSrc.startsWith('%%{init:') ? cleanSrc : directive + cleanSrc;
+
+      try {
+        const renderPromise = mermaid.render(id, codeToRender);
+        if (renderPromise && typeof renderPromise.then === 'function') {
+          renderPromise.then(({ svg }) => {
+            wrapper.innerHTML = svg;
+            const svgEl = wrapper.querySelector('svg');
+            if (svgEl) {
+              svgEl.removeAttribute('width');
+              svgEl.removeAttribute('height');
+              svgEl.style.width = '100%';
+              svgEl.style.height = 'auto';
+              const vb = svgEl.getAttribute('viewBox');
+              if (vb) {
+                const [x, y, w, h] = vb.split(' ').map(Number);
+                svgEl.setAttribute('viewBox', (x - 12) + ' ' + (y - 12) + ' ' + (w + 24) + ' ' + (h + 24));
+              }
+              svgEl.style.overflow = 'visible';
+              svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach(node => node.style.overflow = 'visible');
+            }
+          }).catch(err => {
+            wrapper.innerHTML = '<div class="mermaid-error error-box">Erro de sintaxe Mermaid: ' + (err?.message || err) + '</div>';
+          });
         }
-      }).catch(err => {
-        wrapper.innerHTML = '<div style="color:#ef4444;font-size:12px;">[Erro] Mermaid: ' + err.message + '</div>';
-      });
+      } catch (err) {
+        wrapper.innerHTML = '<div class="mermaid-error error-box">Erro de sintaxe Mermaid: ' + (err?.message || err) + '</div>';
+      }
     });
   });
 }

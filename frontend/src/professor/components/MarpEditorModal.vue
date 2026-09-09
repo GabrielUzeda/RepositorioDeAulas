@@ -3,7 +3,7 @@ import { ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
 import { apiClient } from '@/shared/api/client';
 import BaseButton from '@/shared/components/BaseButton.vue';
-import { THEME_LABELS, NEXT_THEME, normalizeTheme, type ThemeKey, THEME_KEYS } from '@/shared/marpTheme';
+import { THEME_LABELS, NEXT_THEME, normalizeTheme, MERMAID_THEME_VARIABLES, type ThemeKey, THEME_KEYS } from '@/shared/marpTheme';
 // CSS canônico de tema (marpTheme.css). Injetado no <head> de forma NÃO-scoped
 // (onMounted) porque o preview renderiza o DOM do slide dinamicamente e <style scoped>
 // não alcança conteúdo injetado. Os seletores [data-theme=...] só ativam dentro do
@@ -582,18 +582,14 @@ function initMermaid(themeName: ThemeKey) {
   const w = window as any;
   if (w.mermaid) {
     const theme = normalizeTheme(themeName);
+    const activeVars = MERMAID_THEME_VARIABLES[theme] || MERMAID_THEME_VARIABLES.default;
     w.mermaid.initialize({
       startOnLoad: false,
-      theme: theme === 'dark' ? 'dark' : 'default',
+      theme: 'base',
+      themeVariables: activeVars,
       securityLevel: 'loose',
       flowchart: { useMaxWidth: true, htmlLabels: true, padding: 20 },
-      sequence: { useMaxWidth: true, wrap: true },
-      themeVariables: {
-        primaryColor: '#6366f1',
-        primaryTextColor: theme === 'dark' ? '#f8fafc' : '#0f172a',
-        lineColor: theme === 'dark' ? '#94a3b8' : '#475569',
-        fontSize: '15px',
-      }
+      sequence: { useMaxWidth: true, wrap: true }
     });
   }
 }
@@ -766,6 +762,12 @@ function renderAllCodeHighlight(container: HTMLElement) {
   });
 }
 
+function decodeHtmlEntities(str: string): string {
+  const txt = document.createElement('textarea');
+  txt.innerHTML = str;
+  return txt.value;
+}
+
 async function renderAllMermaid() {
   const w = window as any;
   if (!mermaidReady) await waitForFonts();
@@ -776,42 +778,57 @@ async function renderAllMermaid() {
     await document.fonts.load('16px Inter');
   } catch (e) {}
 
+  const currentTh = normalizeTheme(currentTheme.value);
+  initMermaid(currentTh);
+  const activeVars = MERMAID_THEME_VARIABLES[currentTh] || MERMAID_THEME_VARIABLES.default;
+  const directive = `%%{init: ${JSON.stringify({ theme: 'base', themeVariables: activeVars })}}%%\n`;
+
   previewPaneRef.value.querySelectorAll('.slide-content').forEach(container => {
     container.querySelectorAll('pre, .mermaid-block').forEach(el => {
-      const src = (el as HTMLElement).dataset.rawMermaid || (el.querySelector('code') ? el.querySelector('code')!.textContent?.trim() : null);
-      if (!src) return;
+      const raw = (el as HTMLElement).dataset.rawMermaid || (el.querySelector('code') ? el.querySelector('code')!.textContent?.trim() : null);
+      if (!raw) return;
 
+      const cleanSrc = decodeHtmlEntities(raw);
       const isMmd = (el as HTMLElement).dataset.isMermaid === '1' ||
         (el.querySelector('code') && el.querySelector('code')!.className.includes('mermaid')) ||
-        /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline)/m.test(src);
+        /^(graph|flowchart|sequence|classDiagram|stateDiagram|erDiagram|pie|gantt|journey|mindmap|timeline)/m.test(cleanSrc);
       if (!isMmd) return;
 
       const id = 'mmd-mn-' + (++mermaidCounter);
       const wrapper = document.createElement('div');
       wrapper.className = 'mermaid-block';
-      wrapper.dataset.rawMermaid = src;
+      wrapper.dataset.rawMermaid = cleanSrc;
       wrapper.dataset.isMermaid = '1';
       el.replaceWith(wrapper);
 
-      w.mermaid.render(id, src).then(({ svg }: { svg: string }) => {
-        wrapper.innerHTML = svg;
-        const svgEl = wrapper.querySelector('svg');
-        if (svgEl) {
-          svgEl.removeAttribute('width');
-          svgEl.removeAttribute('height');
-          svgEl.style.width = '100%';
-          svgEl.style.height = 'auto';
-          const vb = svgEl.getAttribute('viewBox');
-          if (vb) {
-            const [x, y, w, h] = vb.split(' ').map(Number);
-            svgEl.setAttribute('viewBox', (x - 12) + ' ' + (y - 12) + ' ' + (w + 24) + ' ' + (h + 24));
-          }
-          svgEl.style.overflow = 'visible';
-          svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach((node: Element) => (node as HTMLElement).style.overflow = 'visible');
+      const codeToRender = cleanSrc.startsWith('%%{init:') ? cleanSrc : directive + cleanSrc;
+
+      try {
+        const renderPromise = w.mermaid.render(id, codeToRender);
+        if (renderPromise && typeof renderPromise.then === 'function') {
+          renderPromise.then(({ svg }: { svg: string }) => {
+            wrapper.innerHTML = svg;
+            const svgEl = wrapper.querySelector('svg');
+            if (svgEl) {
+              svgEl.removeAttribute('width');
+              svgEl.removeAttribute('height');
+              svgEl.style.width = '100%';
+              svgEl.style.height = 'auto';
+              const vb = svgEl.getAttribute('viewBox');
+              if (vb) {
+                const [x, y, w, h] = vb.split(' ').map(Number);
+                svgEl.setAttribute('viewBox', (x - 12) + ' ' + (y - 12) + ' ' + (w + 24) + ' ' + (h + 24));
+              }
+              svgEl.style.overflow = 'visible';
+              svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach((node: Element) => (node as HTMLElement).style.overflow = 'visible');
+            }
+          }).catch((err: any) => {
+            wrapper.innerHTML = '<div class="mermaid-error error-box">Erro de sintaxe Mermaid: ' + (err?.message || err) + '</div>';
+          });
         }
-      }).catch((err: any) => {
-        wrapper.innerHTML = '<div style="color:#ef4444;font-size:12px;">[Erro] Mermaid: ' + err.message + '</div>';
-      });
+      } catch (err: any) {
+        wrapper.innerHTML = '<div class="mermaid-error error-box">Erro de sintaxe Mermaid: ' + (err?.message || err) + '</div>';
+      }
     });
   });
 }
@@ -2124,27 +2141,39 @@ onBeforeUnmount(() => {
 :deep(.slide.centered .slide-content) { align-items:center; text-align:center; }
 
 /* MERMAID STYLING */
-:deep(.mermaid-block) { display: flex; justify-content: center; overflow: visible !important; padding: 16px 0; }
-:deep(.mermaid-block svg) { overflow: visible !important; max-width: 100%; transform: scale(var(--font-scale, 1)); transform-origin: center center; }
-:deep(.mermaid-error) { color: var(--red); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; }
-:deep(.mermaid-block p), :deep(.mermaid-block div), :deep(.mermaid-block span) { margin: 0 !important; padding: 0 !important; line-height: 1.25 !important; }
+:deep(.mermaid-block), :deep(.diagram-wrapper) { display: flex; justify-content: center; align-items: center; overflow-x: auto; overflow-y: visible !important; padding: 16px 0; min-height: 140px; margin: 1em 0; }
+:deep(.mermaid-block svg), :deep(.diagram-wrapper svg) { overflow: visible !important; max-width: 100% !important; height: auto !important; font-family: inherit; transform: scale(var(--font-scale, 1)); transform-origin: center center; }
+:deep(.mermaid-error), :deep(.error-box) { color: #dc2626; background-color: #fee2e2; border: 1px solid #f87171; border-radius: 8px; padding: 0.875rem 1rem; font-size: 0.875rem; font-family: var(--font-mono, monospace); white-space: pre-wrap; width: 100%; box-sizing: border-box; }
+.marpnext-modal-root[data-theme="dark"] :deep(.mermaid-error),
+.marpnext-modal-root[data-theme="dark"] :deep(.error-box) { background-color: #450a0a; color: #fca5a5; border-color: #991b1b; }
+:deep(.mermaid-block p), :deep(.mermaid-block div), :deep(.mermaid-block span), :deep(.diagram-wrapper p), :deep(.diagram-wrapper div), :deep(.diagram-wrapper span) { margin: 0 !important; padding: 0 !important; line-height: 1.25 !important; }
 :deep(.mermaid-block .nodeLabel),
 :deep(.mermaid-block .edgeLabel),
 :deep(.mermaid-block text),
 :deep(.mermaid-block .label),
 :deep(.mermaid-block .cluster-label text),
-:deep(.mermaid-block .actor) {
+:deep(.mermaid-block .actor),
+:deep(.diagram-wrapper .nodeLabel),
+:deep(.diagram-wrapper .edgeLabel),
+:deep(.diagram-wrapper text),
+:deep(.diagram-wrapper .label),
+:deep(.diagram-wrapper .cluster-label text),
+:deep(.diagram-wrapper .actor) {
   white-space: pre-wrap !important;
   overflow: visible !important;
   text-overflow: clip !important;
   line-height: 1.25 !important;
 }
-:deep(.mermaid-block foreignObject) { overflow: visible !important; }
-:deep(.mermaid-block foreignObject div) { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; box-sizing: border-box !important; overflow: visible !important; white-space: nowrap !important; text-align: center !important; line-height: 1.25 !important; }
+:deep(.mermaid-block foreignObject), :deep(.diagram-wrapper foreignObject) { overflow: visible !important; }
+:deep(.mermaid-block foreignObject div), :deep(.diagram-wrapper foreignObject div) { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; box-sizing: border-box !important; overflow: visible !important; white-space: nowrap !important; text-align: center !important; line-height: 1.25 !important; }
 :deep(.mermaid-block .node rect),
 :deep(.mermaid-block .node polygon),
+:deep(.diagram-wrapper .node rect),
+:deep(.diagram-wrapper .node polygon) { rx: 6px; ry: 6px; stroke-width: 1.5px; }
 :deep(.mermaid-block .node circle),
-:deep(.mermaid-block .node ellipse) { stroke-width: 1.5px; }
+:deep(.mermaid-block .node ellipse),
+:deep(.diagram-wrapper .node circle),
+:deep(.diagram-wrapper .node ellipse) { stroke-width: 1.5px; }
 
 /* ANIMATIONS */
 :deep(.slide .slide-content > *) { opacity:1; transition: opacity .3s, transform .3s; }

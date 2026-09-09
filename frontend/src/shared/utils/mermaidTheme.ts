@@ -1,24 +1,4 @@
-export type ThemeKey = 'default' | 'dark' | 'light'
-
-export const THEME_KEYS = ['default', 'dark', 'light'] as const
-
-export const THEME_LABELS: Record<ThemeKey, string> = {
-  default: 'Default',
-  dark: 'Dark',
-  light: 'Light',
-}
-
-export const NEXT_THEME: Record<ThemeKey, ThemeKey> = {
-  default: 'dark',
-  dark: 'light',
-  light: 'default',
-}
-
-export function normalizeTheme(input: string | undefined | null): ThemeKey {
-  if (input === 'high-contrast') return 'default'
-  if (input === 'dark' || input === 'light') return input
-  return 'default'
-}
+export type ThemeKey = 'default' | 'dark' | 'light';
 
 export interface MermaidThemeVariables {
   fontFamily: string;
@@ -236,6 +216,12 @@ export const MERMAID_THEME_VARIABLES: Record<ThemeKey, MermaidThemeVariables> = 
     doneTaskBorderColor: '#64748b',
   },
 };
+
+export function normalizeTheme(input: string | undefined | null): ThemeKey {
+  if (input === 'high-contrast') return 'default';
+  if (input === 'dark' || input === 'light') return input;
+  return 'default';
+}
 
 export function getMermaidThemeVariables(input: string | undefined | null): MermaidThemeVariables {
   const key = normalizeTheme(input);

@@ -325,6 +325,115 @@
   margin: 1rem 0;
 }
 
+/* ===== Mermaid Diagramas ===== */
+.mermaid-block,
+.diagram-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: visible !important;
+  padding: 1rem 0;
+  min-height: 140px;
+  margin: 1em 0;
+}
+
+.mermaid-block svg,
+.diagram-wrapper svg {
+  overflow: visible !important;
+  max-width: 100% !important;
+  height: auto !important;
+  font-family: inherit;
+  transform: scale(var(--font-scale, 1));
+  transform-origin: center center;
+}
+
+.mermaid-block p,
+.mermaid-block div,
+.mermaid-block span,
+.diagram-wrapper p,
+.diagram-wrapper div,
+.diagram-wrapper span {
+  line-height: 1.25 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.mermaid-block .nodeLabel,
+.mermaid-block .edgeLabel,
+.mermaid-block text,
+.mermaid-block .label,
+.mermaid-block .cluster-label text,
+.mermaid-block .actor,
+.diagram-wrapper .nodeLabel,
+.diagram-wrapper .edgeLabel,
+.diagram-wrapper text,
+.diagram-wrapper .label,
+.diagram-wrapper .cluster-label text,
+.diagram-wrapper .actor {
+  white-space: pre-wrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.25 !important;
+}
+
+.mermaid-block foreignObject,
+.diagram-wrapper foreignObject {
+  overflow: visible !important;
+}
+
+.mermaid-block foreignObject div,
+.diagram-wrapper foreignObject div {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  line-height: 1.25 !important;
+}
+
+.mermaid-block .node rect,
+.mermaid-block .node polygon,
+.diagram-wrapper .node rect,
+.diagram-wrapper .node polygon {
+  rx: 6px;
+  ry: 6px;
+  stroke-width: 1.5px;
+}
+
+.mermaid-block .node circle,
+.mermaid-block .node ellipse,
+.diagram-wrapper .node circle,
+.diagram-wrapper .node ellipse {
+  stroke-width: 1.5px;
+}
+
+.mermaid-error,
+.error-box {
+  color: #dc2626;
+  background-color: #fee2e2;
+  border: 1px solid #f87171;
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  font-family: var(--font-mono, monospace);
+  white-space: pre-wrap;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-theme="dark"] .mermaid-error,
+[data-theme="dark"] .error-box {
+  background-color: #450a0a;
+  color: #fca5a5;
+  border-color: #991b1b;
+}
+
 /* ===== Apresentação (valores canônicos standalone) ===== */
 /* ===== Barra de Apresentação ===== */
 #controls-bar {

@@ -51,4 +51,35 @@ animation: fade-up
       expect(() => new Function(match[1])).not.toThrow();
     }
   });
+
+  test('Mermaid Theme: variáveis e suporte de temas para default, light e dark', () => {
+    const mdMermaid = `---
+theme: default
+title: Aula com Diagramas Mermaid
+---
+
+# Slide com Mermaid
+\`\`\`mermaid
+flowchart TD
+    A[Início] --> B{Decisão}
+    B -- Sim --> C[Sucesso]
+    B -- Não --> D[Erro]
+\`\`\`
+`;
+    const htmlDefault = generateMarpNextStandaloneHtml('Aula Mermaid Default', mdMermaid);
+    expect(htmlDefault).toContain('mermaidThemeVars');
+    expect(htmlDefault).toContain('flowchart');
+    expect(htmlDefault).toContain('mermaid-block');
+    expect(htmlDefault).toContain('rx: 6px');
+    expect(htmlDefault).toContain('mermaid-error');
+    expect(htmlDefault).toContain('error-box');
+
+    const htmlLight = generateMarpNextStandaloneHtml('Aula Mermaid Light', mdMermaid.replace('theme: default', 'theme: light'));
+    expect(htmlLight).toContain('data-theme="light"');
+    expect(htmlLight).toContain('mermaidThemeVars');
+
+    const htmlDark = generateMarpNextStandaloneHtml('Aula Mermaid Dark', mdMermaid.replace('theme: default', 'theme: dark'));
+    expect(htmlDark).toContain('data-theme="dark"');
+    expect(htmlDark).toContain('mermaidThemeVars');
+  });
 });
