@@ -145,6 +145,41 @@ describe('AI Module & 9router Integration', () => {
     }
   });
 
+  test('POST /ai/synthesize-class-feedback accepts severidade, observacoes and atividades_pendentes', async () => {
+    const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
+    const res = await app.request('/ai/synthesize-class-feedback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        disciplina_nome: 'Algoritmos',
+        total_envios: 1,
+        severidade: 'rigoroso',
+        observacoes: 'Exigir menção expressa aos tópicos pendentes.',
+        alunos_detalhes: [
+          {
+            aluno_nome: 'Aluno Teste',
+            aluno_email: 'aluno@teste.com',
+            media_calculada: 45,
+            atividades: [
+              { atividade_titulo: 'Atv 1', nota: 90, feedback: 'Bom trabalho com laços' }
+            ],
+            atividades_pendentes: [
+              { id: 2, atividade_titulo: 'Atv 2 Recursão' }
+            ]
+          }
+        ]
+      })
+    });
+    expect([200, 502, 503]).toContain(res.status);
+    if (res.status === 200) {
+      const data = await res.json() as any;
+      expect(data.success).toBe(true);
+    }
+  });
+
   test('POST /ai/evaluate-activity-responses validates auth and payload', async () => {
     const resNoAuth = await app.request('/ai/evaluate-activity-responses', {
       method: 'POST',

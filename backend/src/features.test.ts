@@ -405,4 +405,137 @@ describe('Novos Fluxos de Negócio (RAG, Deadlines, Ciclo de Vida e Feedbacks)',
       expect(saved2.feedback).toBe('Bom esforço, revisar conceito X.');
     });
   });
+
+  // ---------- 6. Relatório Consolidado de Feedback (MT-01) ----------
+  describe('Relatório de Feedback com Atividades Consideradas e Médias (MT-01)', () => {
+    test('retorna atividades_consideradas, atividades_pendentes e media_calculada por aluno', async () => {
+      const curso = db.query('SELECT id FROM cursos LIMIT 1').get() as any;
+
+      // Cria disciplina isolada para o teste
+      const testSlug = `materia-mt01-${Date.now()}`;
+      const discRes = await app.request('/disciplinas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({
+          curso_id: curso.id,
+          nome: 'Matéria MT-01 Teste',
+          slug: testSlug
+        })
+      });
+      const disc = await discRes.json();
+
+      // Atividade 1
+      const atv1Res = await app.request('/atividades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ disciplina_id: disc.id, titulo: 'Atividade 1', ordem: 1 })
+      });
+      const atv1 = await atv1Res.json();
+
+      // Atividade 2
+      const atv2Res = await app.request('/atividades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ disciplina_id: disc.id, titulo: 'Atividade 2', ordem: 2 })
+      });
+      const atv2 = await atv2Res.json();
+
+      // Atividade 3 sem nenhuma resposta (não deve ser considerada)
+      await app.request('/atividades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ disciplina_id: disc.id, titulo: 'Atividade 3 Sem Respostas', ordem: 3 })
+      });
+
+      // Aluno Completo responde Atv 1 e Atv 2
+      const r1 = await app.request(`/atividades/${atv1.id}/respostas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aluno_nome: 'Aluno Completo',
+          aluno_email: 'completo@teste.com',
+          respostas: { q1: 'r1' },
+          senha_curso: 'asdf1234'
+        })
+      });
+      const r1Data = await r1.json();
+
+      const r2 = await app.request(`/atividades/${atv2.id}/respostas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aluno_nome: 'Aluno Completo',
+          aluno_email: 'completo@teste.com',
+          respostas: { q1: 'r2' },
+          senha_curso: 'asdf1234'
+        })
+      });
+      const r2Data = await r2.json();
+
+      // Aluno Parcial responde apenas Atv 1
+      const r3 = await app.request(`/atividades/${atv1.id}/respostas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aluno_nome: 'Aluno Parcial',
+          aluno_email: 'parcial@teste.com',
+          respostas: { q1: 'r3' },
+          senha_curso: 'asdf1234'
+        })
+      });
+      const r3Data = await r3.json();
+
+      // Atribui notas
+      await app.request(`/atividades/${atv1.id}/salvar-avaliacoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({
+          avaliacoes: [
+            { id: r1Data.id, nota: 80, feedback: 'Bom' },
+            { id: r3Data.id, nota: 100, feedback: 'Perfeito' }
+          ]
+        })
+      });
+
+      await app.request(`/atividades/${atv2.id}/salvar-avaliacoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({
+          avaliacoes: [
+            { id: r2Data.id, nota: 60, feedback: 'Regular' }
+          ]
+        })
+      });
+
+      // Consulta relatório
+      const relRes = await app.request(`/disciplinas/${disc.id}/relatorio-feedback`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(relRes.status).toBe(200);
+      const relData = await relRes.json();
+      expect(relData.success).toBe(true);
+
+      // Atividades consideradas: deve conter apenas Atv 1 e Atv 2
+      expect(relData.data.atividades_consideradas).toEqual([
+        { id: atv1.id, titulo: 'Atividade 1' },
+        { id: atv2.id, titulo: 'Atividade 2' }
+      ]);
+
+      const alunoCompleto = relData.data.alunos.find((a: any) => a.aluno_email === 'completo@teste.com');
+      expect(alunoCompleto).toBeDefined();
+      expect(alunoCompleto.atividades).toHaveLength(2);
+      expect(alunoCompleto.atividades_pendentes).toEqual([]);
+      // Média: (80 + 60) / 2 = 70
+      expect(alunoCompleto.media_calculada).toBe(70);
+
+      const alunoParcial = relData.data.alunos.find((a: any) => a.aluno_email === 'parcial@teste.com');
+      expect(alunoParcial).toBeDefined();
+      expect(alunoParcial.atividades).toHaveLength(1);
+      expect(alunoParcial.atividades_pendentes).toEqual([
+        { id: atv2.id, atividade_titulo: 'Atividade 2' }
+      ]);
+      // Média: 100 / 2 = 50 (atividade 2 não entregue vale 0)
+      expect(alunoParcial.media_calculada).toBe(50);
+    });
+  });
 });

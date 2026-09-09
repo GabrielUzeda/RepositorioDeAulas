@@ -7,6 +7,7 @@ import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
+import BaseSelect from '@/shared/components/BaseSelect.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
@@ -24,12 +25,24 @@ const isSavingTurma = ref(false);
 const savingAlunoEmail = ref<string | null>(null);
 const feedbackTurma = ref('');
 const alunos = ref<AlunoFeedbackConsolidado[]>([]);
+const atividadesConsideradas = ref<Array<{ id: number; titulo: string }>>([]);
 const isSendingAll = ref(false);
 const sendingEmailFor = ref<string | null>(null);
 const confirmReenvioOpen = ref(false);
 const isSynthesizingAi = ref(false);
 const aiPontosFortes = ref<string[]>([]);
 const aiPontosAtencao = ref<string[]>([]);
+
+const showAiConfigModal = ref(false);
+const aiSeveridade = ref<'brando' | 'moderado' | 'rigoroso' | 'sistematico'>('moderado');
+const aiObservacoes = ref('');
+
+const severidadeOptions = [
+  { value: 'brando', label: 'Brando (Acolhedor e encorajador)' },
+  { value: 'moderado', label: 'Moderado (Equilibrado e padrão)' },
+  { value: 'rigoroso', label: 'Rigoroso (Exigência e precisão)' },
+  { value: 'sistematico', label: 'Sistemático (Analítico passo a passo)' }
+];
 
 watch(
   () => props.show,
@@ -39,6 +52,7 @@ watch(
     } else {
       feedbackTurma.value = '';
       alunos.value = [];
+      atividadesConsideradas.value = [];
     }
   }
 );
@@ -52,6 +66,7 @@ async function fetchRelatorio() {
       const payload = res.data.data || res.data;
       feedbackTurma.value = payload.feedback_turma || '';
       alunos.value = payload.alunos || [];
+      atividadesConsideradas.value = payload.atividades_consideradas || [];
     } else {
       useToast().error(res.error || 'Erro ao carregar relatório de feedback.');
     }
@@ -68,23 +83,24 @@ async function handleGenerateAiSynthesis() {
 
   try {
     const alunosDetalhes = alunos.value.map(a => {
-      const notas = a.atividades.map(atv => atv.nota).filter((n): n is number => n !== null);
-      const media = notas.length > 0 ? Math.round(notas.reduce((acc, v) => acc + v, 0) / notas.length) : null;
       return {
         aluno_nome: a.aluno_nome,
         aluno_email: a.aluno_email,
-        media,
+        media_calculada: a.media_calculada,
         atividades: a.atividades.map(atv => ({
           atividade_titulo: atv.atividade_titulo,
           nota: atv.nota,
           feedback: atv.feedback || null
-        }))
+        })),
+        atividades_pendentes: a.atividades_pendentes || []
       };
     });
 
     const res = await apiClient.post<any>('/ai/synthesize-class-feedback', {
       disciplina_nome: props.disciplinaNome || 'Disciplina',
       total_envios: alunos.value.length,
+      severidade: aiSeveridade.value,
+      observacoes: aiObservacoes.value.trim() || undefined,
       alunos_detalhes: alunosDetalhes
     });
 
@@ -298,8 +314,19 @@ function formatDate(isoStr: string) {
               <BaseButton
                 variant="ghost"
                 size="sm"
+                class="text-xs text-secondary hover:text-primary px-2.5 py-1.5 rounded-lg border border-line flex items-center gap-1.5"
+                title="Configurar critérios e observações pedagógicas da IA"
+                @click="showAiConfigModal = true"
+              >
+                <span class="material-icons text-sm text-accent">tune</span>
+                <span class="hidden sm:inline">Critérios IA</span>
+              </BaseButton>
+
+              <BaseButton
+                variant="ghost"
+                size="sm"
                 :disabled="isSynthesizingAi || alunos.length === 0"
-                class="text-xs text-accent font-semibold flex items-center gap-1 hover:bg-accent/10 px-2.5 py-1.5 rounded"
+                class="text-xs text-accent font-semibold flex items-center gap-1 hover:bg-accent/10 px-2.5 py-1.5 rounded border border-accent/20"
                 title="Sintetizar desempenho da turma e feedbacks individuais dos alunos com IA"
                 @click="handleGenerateAiSynthesis"
               >
@@ -365,8 +392,16 @@ function formatDate(isoStr: string) {
               <!-- Cabecalho do Aluno -->
               <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-line pb-3">
                 <div>
-                  <h4 class="font-bold text-primary text-base flex items-center space-x-2">
+                  <h4 class="font-bold text-primary text-base flex flex-wrap items-center gap-2">
                     <span>{{ aluno.aluno_nome }}</span>
+                    <span
+                      v-if="aluno.media_calculada !== null && aluno.media_calculada !== undefined"
+                      class="px-2.5 py-0.5 bg-accent/15 text-accent border border-accent/30 text-[11px] font-bold rounded-full flex items-center space-x-1"
+                      title="Média geral da disciplina (atividades não entregues valem nota 0)"
+                    >
+                      <span class="material-icons text-[12px]">analytics</span>
+                      <span>Média da Disciplina: {{ aluno.media_calculada }}/100</span>
+                    </span>
                     <span
                       v-if="aluno.ja_enviado"
                       class="px-2.5 py-0.5 bg-success text-on-success text-[10px] font-bold rounded-full flex items-center space-x-1"
@@ -418,6 +453,24 @@ function formatDate(isoStr: string) {
                     </div>
                     <p v-if="atv.feedback" class="text-secondary text-[11px] italic">"{{ atv.feedback }}"</p>
                     <p v-else class="text-secondary text-[10px]">Sem comentários na atividade.</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Atividades Pendentes (não entregues) -->
+              <div v-if="aluno.atividades_pendentes && aluno.atividades_pendentes.length > 0" class="space-y-2 pt-1">
+                <label class="block text-[11px] font-bold text-danger uppercase tracking-wider flex items-center gap-1">
+                  <span class="material-icons text-xs">warning_amber</span>
+                  <span>Atividades Não Entregues ({{ aluno.atividades_pendentes.length }}) — Contabilizadas como Nota 0 na média:</span>
+                </label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div
+                    v-for="pend in aluno.atividades_pendentes"
+                    :key="pend.id"
+                    class="p-2.5 bg-danger/5 border border-danger/20 rounded-xl flex items-center justify-between text-xs"
+                  >
+                    <span class="text-primary font-medium truncate">{{ pend.atividade_titulo }}</span>
+                    <span class="px-2 py-0.5 bg-danger/10 text-danger font-bold rounded text-[10px] shrink-0">Pendente (0/100)</span>
                   </div>
                 </div>
               </div>
@@ -479,4 +532,41 @@ function formatDate(isoStr: string) {
     confirm-text="Reenviar"
     @confirm="confirmReenvio"
   />
+
+  <!-- Modal de Configuração de Critérios de IA -->
+  <BaseModal
+    v-model="showAiConfigModal"
+    title="Configuração da Síntese com IA"
+    max-width="max-w-md"
+    @close="showAiConfigModal = false"
+  >
+    <div class="space-y-4">
+      <p class="text-xs text-secondary">
+        Personalize o nível de severidade e forneça orientações específicas para a inteligência artificial ao gerar o parecer geral da turma e os feedbacks individuais dos alunos.
+      </p>
+
+      <BaseSelect
+        v-model="aiSeveridade"
+        label="Nível de Severidade da Síntese"
+        :options="severidadeOptions"
+      />
+
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-primary">Orientações e Observações Pedagógicas</label>
+        <BaseTextarea
+          v-model="aiObservacoes"
+          :rows="4"
+          placeholder="Ex: 'Enfatize a importância de entregar as atividades pendentes', 'Destaque o bom domínio dos tópicos teóricos', 'Seja rigoroso na cobrança de prazos', etc."
+        />
+        <p class="text-[11px] text-secondary">Instruções extras que serão injetadas diretamente na síntese coletiva e nas devolutivas individuais dos alunos.</p>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-line">
+        <BaseButton variant="primary" size="sm" @click="showAiConfigModal = false">
+          <span class="material-icons text-xs mr-1">check</span>
+          <span>Aplicar Critérios</span>
+        </BaseButton>
+      </div>
+    </div>
+  </BaseModal>
 </template>

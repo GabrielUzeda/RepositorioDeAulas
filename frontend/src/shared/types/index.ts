@@ -128,16 +128,29 @@ export interface AtividadeFeedbackItem {
   enviado_em: string | null;
 }
 
+export interface AtividadePendenteItem {
+  id: number;
+  atividade_titulo: string;
+}
+
+export interface AtividadeConsideradaItem {
+  id: number;
+  titulo: string;
+}
+
 export interface AlunoFeedbackConsolidado {
   aluno_nome: string;
   aluno_email: string;
   feedback_geral: string;
   atividades: AtividadeFeedbackItem[];
+  atividades_pendentes?: AtividadePendenteItem[];
+  media_calculada?: number | null;
   ja_enviado: boolean;
 }
 
 export interface DisciplinaFeedbackRelatorio {
   feedback_turma: string;
+  atividades_consideradas?: AtividadeConsideradaItem[];
   alunos: AlunoFeedbackConsolidado[];
 }
 

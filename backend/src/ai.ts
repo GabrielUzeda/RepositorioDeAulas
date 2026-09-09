@@ -569,6 +569,7 @@ Responda somente com a aula gerada.
 21. NUNCA use títulos ou callouts chamativos do tipo "Regra de Ouro:", "Dica de Ouro:", "Segredo:", "Atenção:", "Importante:" — eles soam mecânicos e quebram a imersão. Prefira títulos descritivos do conteúdo (ex.: "O problema do trabalho repetitivo" em vez de "Regra de Ouro: automatize tarefas").
 22. Use o cabeçalho '#' (título) SOMENTE para marcar grandes blocos da aula: no slide de título da aula e ao iniciar uma nova seção/tema com troca drástica de conteúdo (marcação de novo bloco). Nos slides regulares do desenvolvimento, demarque o que se está vendo com o subtítulo '##' (ex.: '## Estrutura while em Python'), não com '#' — evite que cada slide vire um título. NUNCA escreva as palavras 'Subtítulo:' ou 'Título:' em texto corrido. Se a aula percorre várias estruturas/fenômenos (ex.: for, while, do-while), cada um recebe seu próprio slide/sequência demarcado com '##' que nomeie exatamente o elemento, para o aluno saber onde está e o que dominar a cada passo.
 23. Use negrito (**texto**) sempre que possível para demarcar as informações mais importantes de cada slide, destacando os pontos-chave que merecem atenção do aluno.
+24. Compatibilidade com Dark Mode em HTML/CSS: Os slides suportam alternância entre modo claro e modo escuro (dark mode), o que altera as cores do slide (fundo, textos e bordas). Ao gerar elementos em HTML/CSS customizados, considere sempre essas alterações de tema: defina pares contrastantes explícitos de fundo e texto ou use as variáveis de tema (como var(--text-primary), var(--text-secondary), var(--slide-bg), var(--border)) para garantir que o HTML interno não fique invisível nem sofra perda de contraste ao alternar para o dark mode.
 </REGRAS>
 
 <PRINCIPIOS_PEDAGOGICOS_REFERENCIA>
@@ -638,7 +639,7 @@ A aula é uma CONSTRUÇÃO PROGRESSIVA. Cada seção prepara o terreno para a pr
   .scanner-4{animation:loopScanner 5s infinite;animation-delay:3.75s}
 </style>
 
-Tome liberdade de adaptar cores, tamanhos e delays ao contexto. Importar bibliotecas externas via CDN também é permitido e recomendável quando derem animações mais sofisticadas — ex.: GSAP (https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js) para animações sincronizadas e Lottie (https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js) para ilustrações animadas em JSON — sempre via <script src>. Mantenha as animações simples, robustas a replay e que não dependam de interação do usuário para provocar o efeito (o slide deve se explicar sozinho em loop).
+Tome liberdade de adaptar cores, tamanhos e delays ao contexto. Importar bibliotecas externas via CDN também é permitido e recomendável quando derem animações mais sofisticadas — ex.: GSAP (https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js) para animações sincronizadas e Lottie (https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js) para ilustrações animadas em JSON — sempre via <script src>. Mantenha as animações simples, robustas a replay e que não dependam de interação do usuário para provocar o efeito (o slide deve se explicar sozinho em loop). IMPORTANTE: Considere sempre as alterações de cores do dark mode nos slides; garanta que elementos HTML internos possuam contraste adequado tanto no tema claro quanto no escuro (definindo pares explícitos de background/color ou utilizando variáveis CSS do slide).
 - Tabelas Markdown
 - Blocos de código com highlight de sintaxe
 - Classes Marp: centered, split, invert
@@ -1050,12 +1051,33 @@ aiRouter.post('/evaluate-activity-responses', professorAuth, async (c) => {
 
 aiRouter.post('/synthesize-class-feedback', professorAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const { disciplina_nome, total_envios, respostas_resumo, alunos_detalhes, modelo } = body;
+  const { disciplina_nome, total_envios, respostas_resumo, alunos_detalhes, modelo, observacoes, severidade } = body;
 
-  const systemPrompt = `Você é um coordenador pedagógico sênior especializado em síntese avaliativa e devolutiva formativa.
+  const observacoesLimpo = typeof observacoes === 'string' ? observacoes.trim().slice(0, 2000) : undefined;
+  const severidadeSafe = typeof severidade === 'string' ? severidade.trim() : 'moderado';
+
+  let severidadeInstrucao = '';
+  switch (severidadeSafe) {
+    case 'brando':
+      severidadeInstrucao = 'Nível de severidade: BRANDO. Seja acolhedor e encorajador, valorizando o esforço e a participação dos alunos.';
+      break;
+    case 'rigoroso':
+      severidadeInstrucao = 'Nível de severidade: RIGOROSO. Seja criterioso e exigente, destacando omissões conceituais, atividades pendentes e necessidade de maior comprometimento.';
+      break;
+    case 'sistematico':
+      severidadeInstrucao = 'Nível de severidade: SISTEMÁTICO. Analise detalhadamente com método pragmático, objetivo e estruturado item a item.';
+      break;
+    default:
+      severidadeInstrucao = 'Nível de severidade: MODERADO. Mantenha equilíbrio justo entre rigor pedagógico e acolhimento construtivo.';
+      break;
+  }
+
+  let systemPrompt = `Você é um coordenador pedagógico sênior especializado em síntese avaliativa e devolutiva formativa.
 Sua missão é analisar o conjunto de desempenhos, notas e todos os N feedbacks individuais que cada aluno recebeu nas atividades ao longo da disciplina e produzir:
 1. Um parecer consolidado para a turma ("feedback_geral", "pontos_fortes", "pontos_atencao").
 2. Uma síntese individual e longitudinal para CADA aluno informado ("alunos_sintese"), consolidando os N feedbacks que ele recebeu nas atividades da disciplina para orientar sua evolução pedagógica.
+
+${severidadeInstrucao}
 
 Retorne ESTRITAMENTE um objeto JSON no formato:
 {
@@ -1073,9 +1095,18 @@ Retorne ESTRITAMENTE um objeto JSON no formato:
 Regras:
 1. O texto geral e os individuais devem ser motivadores, claros e pedagógicos.
 2. Na lista "alunos_sintese", gere uma entrada para cada aluno informado com seu respectivo email e feedback_individual sintetizado a partir de seus desempenhos nas atividades.
-3. Responda apenas com o JSON puro sem formatação markdown.`;
+3. Importante sobre a média e atividades pendentes: a média geral da disciplina considera nota 0 para atividades que a turma realizou mas o aluno NÃO entregou. Se o aluno possuir atividades pendentes/não entregues, mencione isso construtivamente em sua devolutiva individual, incentivando-o a regularizar suas pendências.
+4. Responda apenas com o JSON puro sem formatação markdown.`;
 
-  let userPrompt = `DISCIPLINA: ${disciplina_nome || 'Geral'}\nTOTAL DE ALUNOS/ENVIOS: ${total_envios || 0}\n\n`;
+  if (observacoesLimpo) {
+    systemPrompt += `\n\nOBSERVAÇÕES E DIRETRIZES DO PROFESSOR (DEVEM SER ESTRITAMENTE RESPEITADAS):\n${observacoesLimpo}`;
+  }
+
+  let userPrompt = `DISCIPLINA: ${disciplina_nome || 'Geral'}\nTOTAL DE ALUNOS/ENVIOS: ${total_envios || 0}\n`;
+  if (observacoesLimpo) {
+    userPrompt += `ORIENTAÇÕES DO PROFESSOR: ${observacoesLimpo}\n`;
+  }
+  userPrompt += `\n`;
 
   const alunosLista = Array.isArray(alunos_detalhes) && alunos_detalhes.length > 0
     ? alunos_detalhes
@@ -1087,18 +1118,28 @@ Regras:
       const nome = item.aluno_nome || item.aluno || 'Anônimo';
       const email = item.aluno_email || '';
       const emailInfo = email ? ` (${email})` : '';
-      const media = item.media !== undefined && item.media !== null ? ` | Média: ${item.media}/100` : (item.nota !== undefined ? ` | Média: ${item.nota}` : '');
+      const mediaVal = item.media_calculada !== undefined && item.media_calculada !== null
+        ? item.media_calculada
+        : (item.media !== undefined && item.media !== null ? item.media : (item.nota !== undefined ? item.nota : null));
+      const media = mediaVal !== null ? ` | Média Geral da Disciplina: ${mediaVal}/100` : '';
       userPrompt += `\n[ALUNO ${idx + 1}] ${nome}${emailInfo}${media}:\n`;
       if (Array.isArray(item.atividades) && item.atividades.length > 0) {
         item.atividades.forEach((atv: any, atvIdx: number) => {
           const notaStr = atv.nota !== null && atv.nota !== undefined ? `Nota: ${atv.nota}/100` : 'Sem nota';
           const feedStr = atv.feedback ? `Feedback: "${atv.feedback}"` : 'Sem comentários';
-          userPrompt += `  - Atividade "${atv.atividade_titulo || `Atividade ${atvIdx + 1}`}": ${notaStr} | ${feedStr}\n`;
+          userPrompt += `  - Atividade entregue "${atv.atividade_titulo || `Atividade ${atvIdx + 1}`}": ${notaStr} | ${feedStr}\n`;
         });
       } else if (item.feedback || item.respostas_principais) {
         userPrompt += `  - Feedbacks anteriores: ${item.feedback || item.respostas_principais}\n`;
       } else {
-        userPrompt += `  - Atividades enviadas sem feedbacks preliminares.\n`;
+        userPrompt += `  - Nenhuma atividade entregue com feedbacks preliminares.\n`;
+      }
+
+      if (Array.isArray(item.atividades_pendentes) && item.atividades_pendentes.length > 0) {
+        userPrompt += `  - Atividades NÃO ENTREGUES nesta disciplina (contabilizadas com nota 0 na média geral):\n`;
+        item.atividades_pendentes.forEach((pend: any) => {
+          userPrompt += `    * "${pend.atividade_titulo || pend.titulo || 'Atividade pendente'}" (Pendente/Não entregue)\n`;
+        });
       }
     });
   }

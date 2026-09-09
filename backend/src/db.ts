@@ -3,7 +3,8 @@ import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { hashPassword } from './auth';
 
-const dbPath = process.env.DATABASE_PATH || './data/app.db';
+const isTestEnv = process.env.NODE_ENV === 'test' || (typeof Bun !== 'undefined' && Array.isArray(Bun.argv) && Bun.argv.some(arg => arg.includes('test')));
+const dbPath = process.env.DATABASE_PATH || (isTestEnv ? './data/test.db' : './data/app.db');
 const dbDir = dirname(dbPath);
 
 if (!existsSync(dbDir)) {
