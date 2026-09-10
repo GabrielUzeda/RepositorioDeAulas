@@ -288,11 +288,12 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   justify-content: center;
   align-items: center;
   overflow: visible !important;
-  margin: 1em 0;
+  padding: 0.5rem 0;
 }
 .mermaid-block svg {
   overflow: visible !important;
   max-width: 100%;
+  max-height: 45vh;
   height: auto;
   transform: scale(var(--font-scale, 1));
   transform-origin: center center;
@@ -324,7 +325,6 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
   height: 100% !important;
   box-sizing: border-box !important;
   overflow: visible !important;
-  white-space: nowrap !important;
   text-align: center !important;
   line-height: 1.25 !important;
 }
@@ -515,7 +515,9 @@ async function renderAllMermaid() {
             if (svgEl) {
               svgEl.removeAttribute('width');
               svgEl.removeAttribute('height');
-              svgEl.style.width = '100%';
+              svgEl.style.maxWidth = '100%';
+              svgEl.style.maxHeight = '42vh';
+              svgEl.style.width = 'auto';
               svgEl.style.height = 'auto';
               const vb = svgEl.getAttribute('viewBox');
               if (vb) {
