@@ -812,7 +812,9 @@ async function renderAllMermaid() {
             if (svgEl) {
               svgEl.removeAttribute('width');
               svgEl.removeAttribute('height');
-              svgEl.style.width = '100%';
+              svgEl.style.maxWidth = '100%';
+              svgEl.style.maxHeight = '42vh';
+              svgEl.style.width = 'auto';
               svgEl.style.height = 'auto';
               const vb = svgEl.getAttribute('viewBox');
               if (vb) {
@@ -2141,8 +2143,8 @@ onBeforeUnmount(() => {
 :deep(.slide.centered .slide-content) { align-items:center; text-align:center; }
 
 /* MERMAID STYLING */
-:deep(.mermaid-block), :deep(.diagram-wrapper) { display: flex; justify-content: center; align-items: center; overflow-x: auto; overflow-y: visible !important; padding: 16px 0; min-height: 140px; margin: 1em 0; }
-:deep(.mermaid-block svg), :deep(.diagram-wrapper svg) { overflow: visible !important; max-width: 100% !important; height: auto !important; font-family: inherit; transform: scale(var(--font-scale, 1)); transform-origin: center center; }
+:deep(.mermaid-block), :deep(.diagram-wrapper) { display: flex; justify-content: center; align-items: center; overflow-x: auto; overflow-y: visible !important; padding: 8px 0; }
+:deep(.mermaid-block svg), :deep(.diagram-wrapper svg) { overflow: visible !important; max-width: 100% !important; max-height: 55vh; height: auto; font-family: inherit; transform: scale(var(--font-scale, 1)); transform-origin: center center; }
 :deep(.mermaid-error), :deep(.error-box) { color: #dc2626; background-color: #fee2e2; border: 1px solid #f87171; border-radius: 8px; padding: 0.875rem 1rem; font-size: 0.875rem; font-family: var(--font-mono, monospace); white-space: pre-wrap; width: 100%; box-sizing: border-box; }
 .marpnext-modal-root[data-theme="dark"] :deep(.mermaid-error),
 .marpnext-modal-root[data-theme="dark"] :deep(.error-box) { background-color: #450a0a; color: #fca5a5; border-color: #991b1b; }
@@ -2165,7 +2167,7 @@ onBeforeUnmount(() => {
   line-height: 1.25 !important;
 }
 :deep(.mermaid-block foreignObject), :deep(.diagram-wrapper foreignObject) { overflow: visible !important; }
-:deep(.mermaid-block foreignObject div), :deep(.diagram-wrapper foreignObject div) { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; box-sizing: border-box !important; overflow: visible !important; white-space: nowrap !important; text-align: center !important; line-height: 1.25 !important; }
+:deep(.mermaid-block foreignObject div), :deep(.diagram-wrapper foreignObject div) { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; box-sizing: border-box !important; overflow: visible !important; text-align: center !important; line-height: 1.25 !important; }
 :deep(.mermaid-block .node rect),
 :deep(.mermaid-block .node polygon),
 :deep(.diagram-wrapper .node rect),
