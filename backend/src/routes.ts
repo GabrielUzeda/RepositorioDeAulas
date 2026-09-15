@@ -14,7 +14,7 @@ import { validateEmailWithTypo } from './emailValidator';
 
 const app = new Hono();
 
-async function logAudit(c: any, acao: string, recurso: string, detalhes?: object) {
+async function logAudit(c: any, acao: string, recurso: string, detalhes?: Record<string, unknown>) {
   try {
     const ip = extractClientIp(c);
     const userAgent = c.req.header('user-agent') || '';
@@ -24,7 +24,7 @@ async function logAudit(c: any, acao: string, recurso: string, detalhes?: object
 
     let sanitizedDetalhes: string | null = null;
     if (detalhes && typeof detalhes === 'object') {
-      const copy: Record<string, any> = { ...detalhes };
+      const copy: Record<string, unknown> = { ...detalhes };
       delete copy.password;
       delete copy.senha;
       delete copy.token;
@@ -1029,7 +1029,7 @@ app.get('/cursos/:id/disciplinas', async (c) => {
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);
-      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, id)) {
+      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role ?? 'professor' }, id)) {
         const rows = dbq('SELECT * FROM disciplinas WHERE curso_id = ? ORDER BY nome').all(id);
         return c.json(rows);
       }
@@ -1058,7 +1058,7 @@ app.get('/aulas', async (c) => {
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);
-      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, disciplina.curso_id)) {
+      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role ?? 'professor' }, disciplina.curso_id)) {
         const rows = dbq('SELECT * FROM aulas WHERE disciplina_id = ? ORDER BY ordem, titulo').all(disciplinaId);
         return c.json(rows);
       }
@@ -1095,7 +1095,7 @@ app.get('/aulas/:id', async (c) => {
       const payload = await verifyJwt(authHeader.slice(7));
       if (payload?.sub) {
         const profId = Number(payload.sub);
-        if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, disciplina.curso_id)) {
+        if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role ?? 'professor' }, disciplina.curso_id)) {
           return c.json(r);
         }
       }
@@ -1145,7 +1145,7 @@ app.get('/atividades', async (c) => {
     const payload = await verifyJwt(authHeader.slice(7));
     if (payload?.sub) {
       const profId = Number(payload.sub);
-      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, disciplina.curso_id)) {
+      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role ?? 'professor' }, disciplina.curso_id)) {
         const rows = dbq(selectQuery).all(disciplinaId);
         return c.json(rows.map(mapAtividade));
       }
@@ -1179,7 +1179,7 @@ app.get('/atividades/:id', async (c) => {
     if (payload?.sub) {
       const profId = Number(payload.sub);
       const disciplina = dbq('SELECT curso_id FROM disciplinas WHERE id = ?').get(atv.disciplina_id) as any;
-      if (disciplina && (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role }, disciplina.curso_id))) {
+      if (disciplina && (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role ?? 'professor' }, disciplina.curso_id))) {
         return c.json(atv);
       }
     }
@@ -1687,13 +1687,6 @@ app.get('/rascunhos/:codigo', draftLimiter, async (c) => {
 // Direitos do Titular (Art. 18 LGPD) - Consulta e exclusão de respostas próprias do aluno.
 // Exige prova de posse do e-mail via token de consulta (devolvido pelo POST /submeter-resposta).
 // O token NUNCA é logado. O backend guarda apenas o SHA-256 do token no DB.
-
-function timingSafeHexEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
 
 app.get('/aluno/minhas-respostas', submissionLimiter, async (c) => {
   const email = c.req.query('email');

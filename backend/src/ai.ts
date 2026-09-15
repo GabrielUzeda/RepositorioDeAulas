@@ -8,6 +8,32 @@ const aiRouter = new Hono();
 const NINE_ROUTER_URL = process.env.NINE_ROUTER_URL || 'http://127.0.0.1:20128/v1';
 const NINE_ROUTER_API_KEY = process.env.NINE_ROUTER_API_KEY || 'sk_local_9r';
 
+const OPENCODE_API_KEY = process.env.OPENCODE_API_KEY || '';
+const OPENCODE_BASE_URL = process.env.OPENCODE_BASE_URL || 'https://opencode.ai/zen/go/v1';
+const OPENCODE_DEFAULT_MODEL = process.env.OPENCODE_MODEL || 'deepseek-v4.1-flash';
+const OPENCODE_UA = process.env.OPENCODE_UA || 'opencode/1.18.30';
+
+function opencodeHeaders(): Record<string, string> {
+  const rid = () => crypto.randomUUID().replace(/-/g, '');
+  return {
+    'User-Agent': OPENCODE_UA,
+    'x-opencode-client': 'cli',
+    'x-opencode-project': 'global',
+    'x-opencode-session': `ses_${rid()}`,
+    'x-opencode-request': `msg_${rid()}`,
+    'x-request-id': `req_${rid()}`,
+  };
+}
+
+async function fetchFromOpenCode(endpoint: string, options: RequestInit = {}) {
+  if (!OPENCODE_API_KEY) throw new Error('OPENCODE_API_KEY not configured');
+  const headers = new Headers(opencodeHeaders());
+  new Headers(options.headers || {}).forEach((value, key) => headers.set(key, value));
+  headers.set('Authorization', `Bearer ${OPENCODE_API_KEY}`);
+  if (!headers.has('Content-Type') && options.body) headers.set('Content-Type', 'application/json');
+  return fetch(`${OPENCODE_BASE_URL}${endpoint}`, { ...options, headers });
+}
+
 export interface ModelCapability {
   vision?: boolean;
   reasoning?: boolean;
@@ -86,7 +112,7 @@ aiRouter.get('/models', professorAuth, async (c) => {
     if (!res.ok) {
       return c.json({ success: false, error: `9router returned HTTP ${res.status}` }, 502);
     }
-    const body = await res.json();
+    const body = (await res.json()) as { data?: AiModelItem[] };
     const rawModels: AiModelItem[] = Array.isArray(body?.data) ? body.data : [];
     
     const formatted = rawModels.map((m) => ({
@@ -102,6 +128,110 @@ aiRouter.get('/models', professorAuth, async (c) => {
     return c.json({ success: true, models: formatted });
   } catch (e: any) {
     return c.json({ success: false, error: e.message || 'Failed to fetch models from 9router' }, 503);
+  }
+});
+
+aiRouter.get('/opencode/health', professorAuth, async (c) => {
+  if (!OPENCODE_API_KEY) {
+    return c.json({ ok: false, status: 'unconfigured', error: 'OPENCODE_API_KEY não configurada' }, 503);
+  }
+  try {
+    const res = await fetchFromOpenCode('/chat/completions', {
+      method: 'POST',
+      signal: AbortSignal.timeout(45000),
+      body: JSON.stringify({
+        model: OPENCODE_DEFAULT_MODEL,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 1,
+        stream: false,
+      }),
+    });
+    if (res.ok) {
+      return c.json({ ok: true, status: 'online', model: OPENCODE_DEFAULT_MODEL, baseUrl: OPENCODE_BASE_URL });
+    }
+    const detail = await res.text().catch(() => '');
+    const status = res.status === 401 ? 'unauthorized' : 'degraded';
+    return c.json({ ok: false, status, error: `HTTP ${res.status}`, detail: detail.slice(0, 300) }, 502);
+  } catch (e: any) {
+    return c.json({ ok: false, status: 'offline', error: e.message || 'OpenCode unreachable' }, 503);
+  }
+});
+
+aiRouter.get('/opencode/models', professorAuth, async (c) => {
+  if (!OPENCODE_API_KEY) {
+    return c.json({ success: false, error: 'OPENCODE_API_KEY não configurada' }, 503);
+  }
+  try {
+    const res = await fetchFromOpenCode('/models', {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      return c.json({ success: false, error: `OpenCode returned HTTP ${res.status}` }, 502);
+    }
+    const body = (await res.json()) as { data?: AiModelItem[] };
+    const rawModels: AiModelItem[] = Array.isArray(body?.data) ? body.data : [];
+
+    return c.json({
+      success: true,
+      defaultModel: OPENCODE_DEFAULT_MODEL,
+      models: rawModels.map((m) => ({
+        id: m.id,
+        name: m.id,
+        provider: m.owned_by || 'opencode-go',
+        contextWindow: m.capabilities?.contextWindow || m.context_length || 0,
+        maxOutput: m.capabilities?.maxOutput || m.max_completion_tokens || 0,
+      })),
+    });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message || 'Failed to fetch models from OpenCode' }, 503);
+  }
+});
+
+aiRouter.post('/opencode/chat', professorAuth, async (c) => {
+  if (!OPENCODE_API_KEY) {
+    return c.json({ success: false, error: 'OPENCODE_API_KEY não configurada' }, 503);
+  }
+  let body: { messages?: { role: string; content: string }[]; model?: string; temperature?: number };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, error: 'JSON inválido' }, 400);
+  }
+  if (!Array.isArray(body?.messages) || body.messages.length === 0) {
+    return c.json({ success: false, error: 'messages é obrigatório' }, 400);
+  }
+  try {
+    const res = await fetchFromOpenCode('/chat/completions', {
+      method: 'POST',
+      signal: AbortSignal.timeout(120000),
+      body: JSON.stringify({
+        model: body.model || OPENCODE_DEFAULT_MODEL,
+        messages: body.messages,
+        temperature: body.temperature ?? 0.7,
+        stream: false,
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      return c.json({ success: false, error: `OpenCode returned HTTP ${res.status}`, detail: detail.slice(0, 500) }, 502);
+    }
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string; reasoning_content?: string } }[];
+      usage?: unknown;
+    };
+    const choice = data.choices?.[0];
+    if (!choice?.message) {
+      return c.json({ success: false, error: 'Resposta inesperada do OpenCode (sem choices)' }, 502);
+    }
+    return c.json({
+      success: true,
+      model: body.model || OPENCODE_DEFAULT_MODEL,
+      content: choice.message.content || '',
+      reasoning: choice.message.reasoning_content || '',
+      usage: data.usage ?? null,
+    });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message || 'OpenCode unreachable' }, 503);
   }
 });
 
@@ -139,27 +269,27 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
 
   let aulasContexto = '';
   if (targetAulasIds.length > 0) {
-    const placeholders = targetAulasIds.map(() => '?').join(',');
+    const aulasIdsJson = JSON.stringify(targetAulasIds);
     let aulas: { id: number; titulo: string; conteudo_md: string }[] = [];
 
     if (professorRole === 'admin') {
       const query = `
         SELECT a.id, a.titulo, a.conteudo_md 
         FROM aulas a
-        WHERE a.id IN (${placeholders})
+        WHERE a.id IN (SELECT value FROM json_each(?))
         ORDER BY a.ordem ASC
       `;
-      aulas = db.query(query).all(...targetAulasIds) as { id: number; titulo: string; conteudo_md: string }[];
+      aulas = db.query(query).all(aulasIdsJson) as { id: number; titulo: string; conteudo_md: string }[];
     } else {
       const query = `
         SELECT a.id, a.titulo, a.conteudo_md 
         FROM aulas a
         JOIN disciplinas d ON a.disciplina_id = d.id
         JOIN curso_professores cp ON d.curso_id = cp.curso_id
-        WHERE cp.professor_id = ? AND a.id IN (${placeholders})
+        WHERE cp.professor_id = ? AND a.id IN (SELECT value FROM json_each(?))
         ORDER BY a.ordem ASC
       `;
-      aulas = db.query(query).all(professorId, ...targetAulasIds) as { id: number; titulo: string; conteudo_md: string }[];
+      aulas = db.query(query).all(professorId, aulasIdsJson) as { id: number; titulo: string; conteudo_md: string }[];
     }
     
     if (aulas.length > 0) {
@@ -513,21 +643,21 @@ aiRouter.post('/generate-aula', professorAuth, async (c) => {
 
   let aulasContexto = '';
   if (targetAulasIds.length > 0) {
-    const placeholders = targetAulasIds.map(() => '?').join(',');
+    const aulasIdsJson = JSON.stringify(targetAulasIds);
     let aulas: { id: number; titulo: string; conteudo_md: string; ordem: number }[] = [];
 
     if (professorRole === 'admin') {
       aulas = db.query(
-        `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a WHERE a.id IN (${placeholders}) ORDER BY a.ordem ASC`
-      ).all(...targetAulasIds) as { id: number; titulo: string; conteudo_md: string; ordem: number }[];
+        `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a WHERE a.id IN (SELECT value FROM json_each(?)) ORDER BY a.ordem ASC`
+      ).all(aulasIdsJson) as { id: number; titulo: string; conteudo_md: string; ordem: number }[];
     } else {
       aulas = db.query(
         `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a
          JOIN disciplinas d ON a.disciplina_id = d.id
          JOIN curso_professores cp ON d.curso_id = cp.curso_id
-         WHERE cp.professor_id = ? AND a.id IN (${placeholders})
+         WHERE cp.professor_id = ? AND a.id IN (SELECT value FROM json_each(?))
          ORDER BY a.ordem ASC`
-      ).all(professorId, ...targetAulasIds) as { id: number; titulo: string; conteudo_md: string; ordem: number }[];
+      ).all(professorId, aulasIdsJson) as { id: number; titulo: string; conteudo_md: string; ordem: number }[];
     }
 
     if (aulas.length > 0) {
@@ -974,7 +1104,7 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
         try {
           const decryptedRespostas = await decryptData(row.respostas);
 
-          let mapObj: Record<string, any> | null = null;
+          let mapObj: Record<string, unknown> | null = null;
           if (typeof decryptedRespostas === 'string') {
             try {
               const parsed = JSON.parse(decryptedRespostas);
