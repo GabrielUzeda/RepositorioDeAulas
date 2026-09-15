@@ -1,0 +1,15 @@
+[Unit]
+Description=Backup diario do banco (Repositorio de Aulas)
+
+[Timer]
+# Todo dia as 03:30, com jitter para nao coincidir com outros jobs.
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=15m
+
+# Se a maquina estava desligada na hora marcada, roda ao ligar.
+Persistent=true
+
+Unit=aulas-backup.service
+
+[Install]
+WantedBy=timers.target

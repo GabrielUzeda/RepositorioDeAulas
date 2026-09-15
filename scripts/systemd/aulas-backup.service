@@ -1,0 +1,27 @@
+[Unit]
+Description=Backup consistente do banco SQLite (Repositorio de Aulas)
+Documentation=file:%h/RepositorioDeAulas_new/scripts/backup-db.sh
+After=docker.service
+
+# ATENCAO: os caminhos abaixo assumem o repositorio em ~/RepositorioDeAulas_new.
+# Se o seu clone estiver em outro lugar, ajuste TODAS as ocorrencias de
+# %h/RepositorioDeAulas_new (ou gere as units com scripts/systemd/install.sh).
+# Verifique com: systemd-analyze verify scripts/systemd/aulas-backup.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/RepositorioDeAulas_new
+
+# systemd nao carrega o PATH do shell de login; docker precisa ser encontrado.
+# Ajuste os caminhos conforme a sua instalacao.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EnvironmentFile=-%h/RepositorioDeAulas_new/.env
+
+# Copia off-host (opcional). Descomente e ajuste para enviar a outra maquina.
+# Environment=BACKUP_REMOTE=instance-20250413-155923:/var/backups/aulas
+# Environment=BACKUP_USE_GCLOUD=1
+
+ExecStart=%h/RepositorioDeAulas_new/scripts/backup-db.sh
+
+StandardOutput=journal
+StandardError=journal

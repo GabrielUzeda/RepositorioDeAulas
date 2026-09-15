@@ -12,10 +12,10 @@ function base64UrlEncode(data: ArrayBuffer | Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function base64UrlDecode(str: string): Uint8Array {
+function base64UrlDecode(str: string): Uint8Array<ArrayBuffer> {
   const padded = str.replace(/-/g, '+').replace(/_/g, '/');
   const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
@@ -27,7 +27,7 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function deriveKey(password: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
+async function deriveKey(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<CryptoKey> {
   const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
   const derivedBits = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
@@ -91,7 +91,15 @@ export function assertRequiredSecrets(): void {
   }
 }
 
-export async function signJwt(payload: Record<string, any>): Promise<string> {
+export interface JwtPayload {
+  sub: string | number;
+  role?: string;
+  email?: string;
+  iat?: number;
+  exp?: number;
+}
+
+export async function signJwt(payload: JwtPayload): Promise<string> {
   const header = { alg: JWT_ALG, typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
   const fullPayload = { ...payload, iat: now, exp: now + 86400 };
@@ -109,7 +117,7 @@ export async function signJwt(payload: Record<string, any>): Promise<string> {
   return `${signingInput}.${base64UrlEncode(new Uint8Array(signature))}`;
 }
 
-export async function verifyJwt(token: string): Promise<Record<string, any> | null> {
+export async function verifyJwt(token: string): Promise<JwtPayload | null> {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -192,6 +200,8 @@ export function extractClientIp(c: Context): string {
   }
   // Direct connection (no proxy / no XFF): use the real peer socket address so
   // clients get distinct buckets instead of all collapsing to 127.0.0.1 (M12).
+  // SAFETY: Bun expõe `socket` no Request em runtime, mas o tipo padrão não o declara.
+  // O acesso é defensivo (optional chaining) e o valor só é usado como string de IP.
   const sock = (c.req.raw as unknown as { socket?: { remoteAddress?: string } })?.socket;
   const remote = sock?.remoteAddress;
   if (remote) return remote;
