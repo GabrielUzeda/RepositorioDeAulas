@@ -143,7 +143,7 @@ describe('AI Module & 9router Integration', () => {
       expect(Array.isArray(data.pontos_atencao)).toBe(true);
       expect(Array.isArray(data.alunos_sintese)).toBe(true);
     }
-  });
+  }, 180000);
 
   test('POST /ai/synthesize-class-feedback accepts severidade, observacoes and atividades_pendentes', async () => {
     const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
@@ -178,7 +178,7 @@ describe('AI Module & 9router Integration', () => {
       const data = await res.json() as any;
       expect(data.success).toBe(true);
     }
-  });
+  }, 180000);
 
   test('POST /ai/evaluate-activity-responses validates auth and payload', async () => {
     const resNoAuth = await app.request('/ai/evaluate-activity-responses', {

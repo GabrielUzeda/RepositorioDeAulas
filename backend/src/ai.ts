@@ -2,39 +2,11 @@ import { Hono, type Context } from 'hono';
 import { professorAuth } from './auth';
 import { db } from './db';
 import { decryptData } from './utils';
+import { callAi, resolveConfig, resolveProvider, modelsUrl, type AiMessage } from './aiProvider';
 
 const aiRouter = new Hono();
 
-const NINE_ROUTER_URL = process.env.NINE_ROUTER_URL || 'http://127.0.0.1:20128/v1';
-const NINE_ROUTER_API_KEY = process.env.NINE_ROUTER_API_KEY || 'sk_local_9r';
-
-const OPENCODE_API_KEY = process.env.OPENCODE_API_KEY || '';
-const OPENCODE_BASE_URL = process.env.OPENCODE_BASE_URL || 'https://opencode.ai/zen/go/v1';
-const OPENCODE_DEFAULT_MODEL = process.env.OPENCODE_MODEL || 'deepseek-v4.1-flash';
-const OPENCODE_UA = process.env.OPENCODE_UA || 'opencode/1.18.30';
-
-function opencodeHeaders(): Record<string, string> {
-  const rid = () => crypto.randomUUID().replace(/-/g, '');
-  return {
-    'User-Agent': OPENCODE_UA,
-    'x-opencode-client': 'cli',
-    'x-opencode-project': 'global',
-    'x-opencode-session': `ses_${rid()}`,
-    'x-opencode-request': `msg_${rid()}`,
-    'x-request-id': `req_${rid()}`,
-  };
-}
-
-async function fetchFromOpenCode(endpoint: string, options: RequestInit = {}) {
-  if (!OPENCODE_API_KEY) throw new Error('OPENCODE_API_KEY not configured');
-  const headers = new Headers(opencodeHeaders());
-  new Headers(options.headers || {}).forEach((value, key) => headers.set(key, value));
-  headers.set('Authorization', `Bearer ${OPENCODE_API_KEY}`);
-  if (!headers.has('Content-Type') && options.body) headers.set('Content-Type', 'application/json');
-  return fetch(`${OPENCODE_BASE_URL}${endpoint}`, { ...options, headers });
-}
-
-export interface ModelCapability {
+interface ModelCapability {
   vision?: boolean;
   reasoning?: boolean;
   contextWindow?: number;
@@ -42,7 +14,7 @@ export interface ModelCapability {
   upstreamProvider?: string;
 }
 
-export interface AiModelItem {
+interface AiModelItem {
   id: string;
   owned_by?: string;
   capabilities?: ModelCapability;
@@ -50,190 +22,128 @@ export interface AiModelItem {
   max_completion_tokens?: number;
 }
 
-async function fetchFrom9Router(endpoint: string, options: RequestInit = {}) {
-  const customUrl = process.env.NINE_ROUTER_URL;
-  const baseUrl = customUrl || 'http://127.0.0.1:20128/v1';
-  const cleanBase = baseUrl.replace(/\/v1\/?$/, '');
-  const url = endpoint.startsWith('http') ? endpoint : `${cleanBase}${endpoint}`;
-  
-  const headers = new Headers(options.headers || {});
-  if (!headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${NINE_ROUTER_API_KEY}`);
-  }
-  if (!headers.has('Content-Type') && options.body) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  // Se estiver usando URL default 127.0.0.1, usa timeout inicial de 1.5s para fallback rápido no Docker dev
-  const isDefaultLocal = !customUrl && url.includes('127.0.0.1:20128');
-  const initialSignal = isDefaultLocal ? AbortSignal.timeout(1500) : options.signal;
-
-  try {
-    return await fetch(url, {
-      ...options,
-      headers,
-      signal: initialSignal,
-    });
-  } catch (err) {
-    if (isDefaultLocal) {
-      const fallbackUrl = url.replace('127.0.0.1:20128', 'host.docker.internal:20128');
-      try {
-        return await fetch(fallbackUrl, {
-          ...options,
-          headers,
-          signal: options.signal || AbortSignal.timeout(4000),
-        });
-      } catch {}
-    }
-    throw err;
-  }
-}
-
 aiRouter.get('/health', professorAuth, async (c) => {
+  let config: ReturnType<typeof resolveConfig>;
   try {
-    const res = await fetchFrom9Router('/api/health', {
-      signal: AbortSignal.timeout(3500),
+    config = resolveConfig();
+  } catch (e: any) {
+    return c.json({ ok: false, status: 'offline', error: e.message || 'Configuração de IA inválida' }, 503);
+  }
+
+  if (!config.apiKey) {
+    return c.json({
+      ok: false,
+      status: 'unconfigured',
+      provider: config.provider,
+      model: config.model,
+      error: 'AI_API_KEY nao configurada para o provider ' + config.provider,
+    }, 503);
+  }
+
+  try {
+    const provider = resolveProvider(config);
+    const res = await fetch(modelsUrl(config), {
+      headers: provider.buildHeaders(config.apiKey),
+      signal: AbortSignal.timeout(5000),
     });
     if (res.ok) {
-      const data = await res.json().catch(() => ({ ok: true }));
-      return c.json({ ok: true, status: 'online', data });
+      const data = await res.json().catch(() => undefined);
+      return c.json({
+        ok: true,
+        status: 'online',
+        provider: config.provider,
+        model: config.model,
+        baseUrl: config.baseUrl,
+        ...(data !== undefined ? { data } : {}),
+      });
     }
-    return c.json({ ok: false, status: 'degraded', error: `HTTP ${res.status}` }, 502);
+    return c.json({
+      ok: false,
+      status: 'degraded',
+      provider: config.provider,
+      model: config.model,
+      error: 'HTTP ' + res.status,
+    }, 502);
   } catch (e: any) {
-    return c.json({ ok: false, status: 'offline', error: e.message || '9router unreachable' }, 503);
+    return c.json({
+      ok: false,
+      status: 'offline',
+      provider: config.provider,
+      model: config.model,
+      error: e.message || 'Provider de IA indisponível',
+    }, 503);
   }
 });
 
 aiRouter.get('/models', professorAuth, async (c) => {
+  let config: ReturnType<typeof resolveConfig>;
   try {
-    const res = await fetchFrom9Router('/v1/models', {
-      signal: AbortSignal.timeout(3500),
+    config = resolveConfig();
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message || 'Configuração de IA inválida' }, 503);
+  }
+
+  if (!config.apiKey) {
+    return c.json({ success: false, error: 'AI_API_KEY nao configurada' }, 503);
+  }
+
+  try {
+    const provider = resolveProvider(config);
+    const res = await fetch(modelsUrl(config), {
+      headers: provider.buildHeaders(config.apiKey),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) {
-      return c.json({ success: false, error: `9router returned HTTP ${res.status}` }, 502);
+      return c.json({ success: false, error: 'Provider ' + config.provider + ' retornou HTTP ' + res.status }, 502);
     }
     const body = (await res.json()) as { data?: AiModelItem[] };
     const rawModels: AiModelItem[] = Array.isArray(body?.data) ? body.data : [];
-    
+
     const formatted = rawModels.map((m) => ({
       id: m.id,
-      name: m.id.split('/').pop() || m.id,
-      provider: m.id.includes('/') ? m.id.split('/')[0] : (m.owned_by || 'other'),
+      name: m.id,
+      provider: config.provider,
       reasoning: !!m.capabilities?.reasoning,
       vision: !!m.capabilities?.vision,
       contextWindow: m.capabilities?.contextWindow || m.context_length || 0,
       maxOutput: m.capabilities?.maxOutput || m.max_completion_tokens || 0,
     }));
 
-    return c.json({ success: true, models: formatted });
+    return c.json({ success: true, provider: config.provider, defaultModel: config.model, models: formatted });
   } catch (e: any) {
-    return c.json({ success: false, error: e.message || 'Failed to fetch models from 9router' }, 503);
+    return c.json({ success: false, error: e.message || 'Falha ao consultar modelos do provider' }, 503);
   }
 });
 
-aiRouter.get('/opencode/health', professorAuth, async (c) => {
-  if (!OPENCODE_API_KEY) {
-    return c.json({ ok: false, status: 'unconfigured', error: 'OPENCODE_API_KEY não configurada' }, 503);
-  }
+function parseActivityQuestions(content: string): any[] {
+  let parsedQuestions: any[] = [];
   try {
-    const res = await fetchFromOpenCode('/chat/completions', {
-      method: 'POST',
-      signal: AbortSignal.timeout(45000),
-      body: JSON.stringify({
-        model: OPENCODE_DEFAULT_MODEL,
-        messages: [{ role: 'user', content: 'ping' }],
-        max_tokens: 1,
-        stream: false,
-      }),
-    });
-    if (res.ok) {
-      return c.json({ ok: true, status: 'online', model: OPENCODE_DEFAULT_MODEL, baseUrl: OPENCODE_BASE_URL });
-    }
-    const detail = await res.text().catch(() => '');
-    const status = res.status === 401 ? 'unauthorized' : 'degraded';
-    return c.json({ ok: false, status, error: `HTTP ${res.status}`, detail: detail.slice(0, 300) }, 502);
-  } catch (e: any) {
-    return c.json({ ok: false, status: 'offline', error: e.message || 'OpenCode unreachable' }, 503);
-  }
-});
-
-aiRouter.get('/opencode/models', professorAuth, async (c) => {
-  if (!OPENCODE_API_KEY) {
-    return c.json({ success: false, error: 'OPENCODE_API_KEY não configurada' }, 503);
-  }
-  try {
-    const res = await fetchFromOpenCode('/models', {
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) {
-      return c.json({ success: false, error: `OpenCode returned HTTP ${res.status}` }, 502);
-    }
-    const body = (await res.json()) as { data?: AiModelItem[] };
-    const rawModels: AiModelItem[] = Array.isArray(body?.data) ? body.data : [];
-
-    return c.json({
-      success: true,
-      defaultModel: OPENCODE_DEFAULT_MODEL,
-      models: rawModels.map((m) => ({
-        id: m.id,
-        name: m.id,
-        provider: m.owned_by || 'opencode-go',
-        contextWindow: m.capabilities?.contextWindow || m.context_length || 0,
-        maxOutput: m.capabilities?.maxOutput || m.max_completion_tokens || 0,
-      })),
-    });
-  } catch (e: any) {
-    return c.json({ success: false, error: e.message || 'Failed to fetch models from OpenCode' }, 503);
-  }
-});
-
-aiRouter.post('/opencode/chat', professorAuth, async (c) => {
-  if (!OPENCODE_API_KEY) {
-    return c.json({ success: false, error: 'OPENCODE_API_KEY não configurada' }, 503);
-  }
-  let body: { messages?: { role: string; content: string }[]; model?: string; temperature?: number };
-  try {
-    body = await c.req.json();
+    const cleanJson = content
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+    const parsed = JSON.parse(cleanJson);
+    parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
   } catch {
-    return c.json({ success: false, error: 'JSON inválido' }, 400);
-  }
-  if (!Array.isArray(body?.messages) || body.messages.length === 0) {
-    return c.json({ success: false, error: 'messages é obrigatório' }, 400);
-  }
-  try {
-    const res = await fetchFromOpenCode('/chat/completions', {
-      method: 'POST',
-      signal: AbortSignal.timeout(120000),
-      body: JSON.stringify({
-        model: body.model || OPENCODE_DEFAULT_MODEL,
-        messages: body.messages,
-        temperature: body.temperature ?? 0.7,
-        stream: false,
-      }),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      return c.json({ success: false, error: `OpenCode returned HTTP ${res.status}`, detail: detail.slice(0, 500) }, 502);
+    const objMatch = content.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+      try {
+        const parsed = JSON.parse(objMatch[0]);
+        parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
+      } catch {}
     }
-    const data = (await res.json()) as {
-      choices?: { message?: { content?: string; reasoning_content?: string } }[];
-      usage?: unknown;
-    };
-    const choice = data.choices?.[0];
-    if (!choice?.message) {
-      return c.json({ success: false, error: 'Resposta inesperada do OpenCode (sem choices)' }, 502);
+    if (parsedQuestions.length === 0) {
+      const arrMatch = content.match(/\[[\s\S]*\]/);
+      if (arrMatch) {
+        try {
+          const parsed = JSON.parse(arrMatch[0]);
+          if (Array.isArray(parsed)) parsedQuestions = parsed;
+        } catch {}
+      }
     }
-    return c.json({
-      success: true,
-      model: body.model || OPENCODE_DEFAULT_MODEL,
-      content: choice.message.content || '',
-      reasoning: choice.message.reasoning_content || '',
-      usage: data.usage ?? null,
-    });
-  } catch (e: any) {
-    return c.json({ success: false, error: e.message || 'OpenCode unreachable' }, 503);
   }
-});
+  return parsedQuestions;
+}
 
 aiRouter.post('/generate-activity', professorAuth, async (c) => {
   const professorId = Number(c.get('professorId'));
@@ -246,7 +156,6 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
   }
 
   const {
-    modelo = 'qwenproxy/qwen3.8-max-thinking',
     tipo = 'normal',
     titulo = '',
     tema = '',
@@ -416,150 +325,32 @@ ${formatoJson}`;
 
   userPrompt += `\nGere as ${quantidade} questões no formato JSON especificado.`;
 
-  // Fallback prioritário de modelos:
-  // 1. DeepSeek V4 Flash (rápido e direto)
-  // 2. Qwen 3.7 Plus (qualidade e raciocínio)
-  // 3. Gemini 3.7 Flash Low (estável e rápido)
-  const candidateModels = [
-    'ag/gemini-3.7-flash-low',
-    'qwenproxy/qwen3.8-max-thinking',
-    'ocg/deepseek-v4-flash',
-    'qwenproxy/qwen3.7-plus',
-    'deepseek-v4-flash',
-    'kimchi/deepseek-v4-flash',
-    'ocg/qwen3.7-plus',
-  ];
-
-  const modelsToTry = modelo && !candidateModels.includes(modelo)
-    ? [modelo, ...candidateModels]
-    : candidateModels;
-
-  let lastError = 'Nenhum provedor de IA respondeu com sucesso';
-  let successfulResponse: { questions: any[]; modelo: string } | null = null;
-
-  const atividadeTempoInicio = Date.now();
-  const ATIVIDADE_TIMEOUT_GERAL_MS = 600000;
-
-  for (const currentModel of modelsToTry) {
-    const tempoDecorrido = Date.now() - atividadeTempoInicio;
-    if (tempoDecorrido >= ATIVIDADE_TIMEOUT_GERAL_MS) break;
-    try {
-      const aiResponse = await fetchFrom9Router('/v1/chat/completions', {
-        method: 'POST',
-        body: JSON.stringify({
-          model: currentModel,
-          stream: false,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.3
-        }),
-        signal: AbortSignal.timeout(Math.min(180000, ATIVIDADE_TIMEOUT_GERAL_MS - tempoDecorrido))
-      });
-
-      if (!aiResponse.ok) {
-        const errText = await aiResponse.text().catch(() => '');
-        lastError = `[${currentModel}] HTTP ${aiResponse.status}: ${errText.slice(0, 150)}`;
-        continue;
-      }
-
-      const rawText = await aiResponse.text();
-      let content = '';
-
-      // 1. Tenta parse direto de JSON
-      try {
-        const aiData = JSON.parse(rawText);
-        if (aiData?.error) {
-          lastError = `[${currentModel}] ${aiData.error.message || JSON.stringify(aiData.error)}`;
-          continue;
-        }
-        if (aiData?.choices?.[0]?.message?.content) {
-          content = aiData.choices[0].message.content;
-        }
-      } catch {}
-
-      // 2. Se não encontrou, processa chunks de SSE linha por linha
-      if (!content) {
-        const lines = rawText.split('\n');
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data:') && !trimmed.includes('[DONE]')) {
-            const jsonPart = trimmed.replace(/^data:\s*/, '');
-            try {
-              const parsed = JSON.parse(jsonPart);
-              if (parsed?.choices?.[0]?.message?.content) {
-                content = parsed.choices[0].message.content;
-              } else if (parsed?.choices?.[0]?.delta?.content) {
-                content += parsed.choices[0].delta.content;
-              }
-            } catch {}
-          }
-        }
-      }
-
-      // 3. Fallback: regex caso haja JSON bruto envolvido por marcadores
-      if (!content) {
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try {
-            const aiData = JSON.parse(jsonMatch[0]);
-            content = aiData?.choices?.[0]?.message?.content || '';
-          } catch {
-            content = '';
-          }
-        }
-      }
-
-      let parsedQuestions: any[] = [];
-      try {
-        const cleanJson = content
-          .replace(/```json/gi, '')
-          .replace(/```/g, '')
-          .trim();
-        const parsed = JSON.parse(cleanJson);
-        parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
-      } catch {
-        const objMatch = content.match(/\{[\s\S]*\}/);
-        if (objMatch) {
-          try {
-            const parsed = JSON.parse(objMatch[0]);
-            parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
-          } catch {}
-        }
-        if (parsedQuestions.length === 0) {
-          const arrMatch = content.match(/\[[\s\S]*\]/);
-          if (arrMatch) {
-            try {
-              const parsed = JSON.parse(arrMatch[0]);
-              if (Array.isArray(parsed)) parsedQuestions = parsed;
-            } catch {}
-          }
-        }
-      }
-
-      if (parsedQuestions.length > 0) {
-        successfulResponse = {
-          questions: parsedQuestions,
-          modelo: currentModel,
-        };
-        break;
-      } else {
-        lastError = `[${currentModel}] Resposta retornada sem formato JSON esperado.`;
-      }
-    } catch (e: any) {
-      lastError = `[${currentModel}] ${e.message || 'Erro de conexão/timeout'}`;
-    }
+  let content = '';
+  let modeloUtilizado = '';
+  try {
+    const messages: AiMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
+    const result = await callAi({
+      messages,
+      temperature: 0.3,
+      timeoutMs: 180000,
+      validate: (content) => parseActivityQuestions(content).length > 0,
+    });
+    content = result.content;
+    modeloUtilizado = result.modelUsed;
+  } catch (e: any) {
+    return c.json({ success: false, error: `Falha na geração com IA: ${e.message || 'Erro de conexão/timeout'}` }, 502);
   }
 
-  if (!successfulResponse) {
-    return c.json({
-      success: false,
-      error: `Falha na geração com IA em todos os provedores: ${lastError}`,
-    }, 502);
+  const parsedQuestions = parseActivityQuestions(content);
+
+  if (parsedQuestions.length === 0) {
+    return c.json({ success: false, error: 'A IA respondeu sem o formato JSON esperado' }, 502);
   }
 
-  const normalizedQuestions = successfulResponse.questions.map((q: any, index: number) => {
+  const normalizedQuestions = parsedQuestions.map((q: any, index: number) => {
     const result: any = {
       title: String(q.title || `Questão ${index + 1}`),
       content: String(q.content || q.enunciado || q.pergunta || '').trim(),
@@ -589,10 +380,17 @@ ${formatoJson}`;
   return c.json({
     success: true,
     questions: normalizedQuestions,
-    modelo_utilizado: successfulResponse.modelo,
+    modelo_utilizado: modeloUtilizado,
     total_gerado: normalizedQuestions.length
   });
 });
+
+function normalizeMarpMarkdown(content: string): string {
+  return content
+    .replace(/^```(?:markdown|md)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+}
 
 aiRouter.post('/generate-aula', professorAuth, async (c) => {
   const professorId = Number(c.get('professorId'));
@@ -605,7 +403,6 @@ aiRouter.post('/generate-aula', professorAuth, async (c) => {
   }
 
   const {
-    modelo,
     disciplina_id,
     tema = '',
     aulas_contexto_ids = [],
@@ -786,20 +583,6 @@ animation-duration: 0.5s
 ---
 </FRONT_MATTER_PADRAO>`;
 
-  const candidateModels = [
-    'ag/gemini-3.7-flash-low',
-    'qwenproxy/qwen3.8-max-thinking',
-    'ocg/deepseek-v4-flash',
-    'qwenproxy/qwen3.7-plus',
-    'deepseek-v4-flash',
-    'kimchi/deepseek-v4-flash',
-    'ocg/qwen3.7-plus',
-  ];
-
-  const modelsToTry = modelo && !candidateModels.includes(modelo)
-    ? [modelo, ...candidateModels]
-    : candidateModels;
-
   let userPrompt = '';
   if (tema) userPrompt += `TEMA / ASSUNTO DA AULA: ${tema}\n\n`;
   if (observacoes) userPrompt += `OBSERVAÇÕES DO PROFESSOR (requisitos específicos que DEVEM ser respeitados na geração): ${observacoes}\n\n`;
@@ -808,117 +591,64 @@ animation-duration: 0.5s
   }
   userPrompt += 'Gere a aula completa no formato Marp Next Markdown conforme as instruções. Responda APENAS com o markdown da aula, sem nenhum texto introdutório ou explicativo antes ou depois do bloco de slides.';
 
-  let lastError = 'Nenhum provedor de IA respondeu com sucesso';
-  let successResponse: { conteudo_md: string; titulo_sugerido: string; modelo: string } | null = null;
-
-  const aulaTempoInicio = Date.now();
-  const AULA_TIMEOUT_GERAL_MS = 600000;
-
-  for (const currentModel of modelsToTry) {
-    const tempoDecorrido = Date.now() - aulaTempoInicio;
-    if (tempoDecorrido >= AULA_TIMEOUT_GERAL_MS) break;
-    try {
-      const aiResponse = await fetchFrom9Router('/v1/chat/completions', {
-        method: 'POST',
-        body: JSON.stringify({
-          model: currentModel,
-          stream: false,
-          messages: [
-            { role: 'system', content: MARP_SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: 0.55,
-        }),
-        signal: AbortSignal.timeout(Math.min(180000, AULA_TIMEOUT_GERAL_MS - tempoDecorrido)),
-      });
-
-      if (!aiResponse.ok) {
-        const errText = await aiResponse.text().catch(() => '');
-        lastError = `[${currentModel}] HTTP ${aiResponse.status}: ${errText.slice(0, 150)}`;
-        continue;
-      }
-
-      const rawText = await aiResponse.text();
-      let content = '';
-
-      try {
-        const aiData = JSON.parse(rawText);
-        if (aiData?.error) {
-          lastError = `[${currentModel}] ${aiData.error.message || JSON.stringify(aiData.error)}`;
-          continue;
-        }
-        if (aiData?.choices?.[0]?.message?.content) {
-          content = aiData.choices[0].message.content;
-        }
-      } catch {}
-
-      if (!content) {
-        const lines = rawText.split('\n');
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data:') && !trimmed.includes('[DONE]')) {
-            const jsonPart = trimmed.replace(/^data:\s*/, '');
-            try {
-              const parsed = JSON.parse(jsonPart);
-              if (parsed?.choices?.[0]?.message?.content) {
-                content = parsed.choices[0].message.content;
-              } else if (parsed?.choices?.[0]?.delta?.content) {
-                content += parsed.choices[0].delta.content;
-              }
-            } catch {}
-          }
-        }
-      }
-
-      const cleaned = content
-        .replace(/^```(?:markdown|md)?\s*/i, '')
-        .replace(/\s*```\s*$/, '')
-        .trim();
-
-      if (cleaned && cleaned.includes('---')) {
-        const titleMatch = cleaned.match(/^---[\s\S]*?title:\s*(.+)/m);
-        const titulo_sugerido = titleMatch
-          ? titleMatch[1].trim().replace(/^['"]|['"]$/g, '')
-          : (tema || 'Nova Aula');
-
-        successResponse = { conteudo_md: cleaned, titulo_sugerido, modelo: currentModel };
-        break;
-      } else {
-        lastError = `[${currentModel}] Resposta não contém Markdown Marp válido (sem separadores ---).`;
-      }
-    } catch (e: any) {
-      lastError = `[${currentModel}] ${e.message || 'Erro de conexão/timeout'}`;
-    }
+  let content = '';
+  let modeloUtilizado = '';
+  try {
+    const messages: AiMessage[] = [
+      { role: 'system', content: MARP_SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ];
+    const result = await callAi({
+      messages,
+      temperature: 0.55,
+      timeoutMs: 180000,
+      validate: (content) => normalizeMarpMarkdown(content).includes('---'),
+    });
+    content = result.content;
+    modeloUtilizado = result.modelUsed;
+  } catch (e: any) {
+    return c.json({ success: false, error: `Falha na geração de aula com IA: ${e.message || 'Erro de conexão/timeout'}` }, 502);
   }
 
-  if (!successResponse) {
-    return c.json({ success: false, error: `Falha na geração de aula em todos os provedores: ${lastError}` }, 502);
+  const cleaned = normalizeMarpMarkdown(content);
+
+  if (!cleaned || !cleaned.includes('---')) {
+    return c.json({ success: false, error: 'A IA não retornou Markdown Marp válido' }, 502);
   }
+
+  const titleMatch = cleaned.match(/^---[\s\S]*?title:\s*(.+)/m);
+  const titulo_sugerido = titleMatch
+    ? titleMatch[1].trim().replace(/^['"]|['"]$/g, '')
+    : (tema || 'Nova Aula');
 
   return c.json({
     success: true,
-    conteudo_md: successResponse.conteudo_md,
-    titulo_sugerido: successResponse.titulo_sugerido,
-    modelo_utilizado: successResponse.modelo,
+    conteudo_md: cleaned,
+    titulo_sugerido,
+    modelo_utilizado: modeloUtilizado,
   });
 });
 
-export const EVAL_CANDIDATE_MODELS: readonly string[] = [
-  'ocg/deepseek-v4-flash',
-  'qwenproxy/qwen3.8-max',
-  'qwenproxy/qwen3.7-plus',
-  'ag/gemini-3-flash-agent',
-  'ag/gemini-3.7-flash-low',
-  'qwenproxy/qwen3.8-max-thinking',
-  'deepseek-v4-flash',
-];
+function parseEvaluationResult(content: string): { nota_sugerida: number; feedback: string; justificativa: string } | null {
+  try {
+    const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (typeof parsed.nota_sugerida !== 'number' || !parsed.feedback) return null;
+    return {
+      nota_sugerida: parsed.nota_sugerida,
+      feedback: parsed.feedback,
+      justificativa: parsed.justificativa,
+    };
+  } catch {
+    return null;
+  }
+}
 
-export async function evaluateStudentResponse({
+async function evaluateStudentResponse({
   questao_enunciado,
   resposta_aluno,
   gabarito,
   criterios,
-  modelo,
   observacoes,
   severidade = 'moderado',
 }: {
@@ -926,7 +656,6 @@ export async function evaluateStudentResponse({
   resposta_aluno: string;
   gabarito?: string;
   criterios?: string;
-  modelo?: string;
   observacoes?: string;
   severidade?: 'brando' | 'moderado' | 'rigoroso' | 'sistematico' | string;
 }): Promise<{
@@ -971,69 +700,41 @@ Regras:
   if (observacoes && observacoes.trim()) userPrompt += `OBSERVAÇÕES DO PROFESSOR:\n${observacoes.trim()}\n\n`;
   userPrompt += `RESPOSTA SUBMETIDA PELO ALUNO:\n${resposta_aluno}`;
 
-  const candidateModels = [...EVAL_CANDIDATE_MODELS];
-
-  const modelsToTry = modelo && candidateModels.includes(modelo)
-    ? [modelo, ...candidateModels.filter((m) => m !== modelo)]
-    : candidateModels;
-
-  let evaluationResult: any = null;
-  let lastError = '';
-
-  for (const currentModel of modelsToTry) {
-    try {
-      const aiResponse = await fetchFrom9Router('/v1/chat/completions', {
-        method: 'POST',
-        body: JSON.stringify({
-          model: currentModel,
-          stream: false,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.2
-        }),
-        signal: AbortSignal.timeout(30000)
-      });
-
-      if (!aiResponse.ok) continue;
-
-      const aiData: any = await aiResponse.json();
-      let content = aiData?.choices?.[0]?.message?.content || '';
-      content = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
-
-      const parsed = JSON.parse(content);
-      if (typeof parsed.nota_sugerida === 'number' && parsed.feedback) {
-        evaluationResult = {
-          nota_sugerida: Math.min(100, Math.max(0, Math.round(parsed.nota_sugerida))),
-          feedback: String(parsed.feedback).trim(),
-          justificativa: String(parsed.justificativa || '').trim(),
-          modelo_utilizado: currentModel
-        };
-        break;
-      }
-    } catch (e: any) {
-      lastError = e.message;
+  try {
+    const result = await callAi({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.2,
+      timeoutMs: 30000,
+      validate: (content) => parseEvaluationResult(content) !== null,
+    });
+    const parsed = parseEvaluationResult(result.content);
+    if (!parsed) {
+      throw new Error('Falha na avaliação por IA: resposta sem formato JSON esperado');
     }
+    return {
+      nota_sugerida: Math.min(100, Math.max(0, Math.round(parsed.nota_sugerida))),
+      feedback: String(parsed.feedback).trim(),
+      justificativa: String(parsed.justificativa || '').trim(),
+      modelo_utilizado: result.modelUsed,
+    };
+  } catch (e: any) {
+    throw new Error('Falha na avaliação por IA: ' + (e.message || 'Erro desconhecido'));
   }
-
-  if (!evaluationResult) {
-    throw new Error(`Falha na avaliação por IA: ${lastError || 'Não foi possível obter resposta válida'}`);
-  }
-
-  return evaluationResult;
 }
 
 aiRouter.post('/evaluate-response', professorAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const { questao_enunciado, resposta_aluno, gabarito, criterios, modelo, observacoes, severidade } = body;
+  const { questao_enunciado, resposta_aluno, gabarito, criterios, observacoes, severidade } = body;
 
   if (!questao_enunciado || !resposta_aluno) {
     return c.json({ success: false, error: 'questao_enunciado e resposta_aluno são obrigatórios.' }, 400);
   }
 
   try {
-    const result = await evaluateStudentResponse({ questao_enunciado, resposta_aluno, gabarito, criterios, modelo, observacoes, severidade });
+    const result = await evaluateStudentResponse({ questao_enunciado, resposta_aluno, gabarito, criterios, observacoes, severidade });
     return c.json({ success: true, ...result });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 502);
@@ -1083,12 +784,10 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
     try {
       const data = typeof atv.json_data === 'string' ? JSON.parse(atv.json_data) : atv.json_data;
       questions = data.questions || [];
-    } catch {}
+    } catch {
+      questions = [];
+    }
   }
-
-  const modeloSafe = typeof body.modelo === 'string' && EVAL_CANDIDATE_MODELS.includes(body.modelo)
-    ? body.modelo
-    : undefined;
 
   const observacoes = typeof body.observacoes === 'string' ? body.observacoes.trim() : undefined;
   const severidade = typeof body.severidade === 'string' ? body.severidade.trim() : 'moderado';
@@ -1109,7 +808,9 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
             try {
               const parsed = JSON.parse(decryptedRespostas);
               if (typeof parsed === 'object' && parsed !== null) mapObj = parsed;
-            } catch {}
+            } catch {
+              mapObj = null;
+            }
           } else if (typeof decryptedRespostas === 'object' && decryptedRespostas !== null) {
             mapObj = decryptedRespostas;
           }
@@ -1124,7 +825,7 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
               const q = !isNaN(qIdx) ? questions[qIdx] : null;
               return `Questão ${isNaN(qIdx) ? key : qIdx + 1}: ${q?.content || q?.title || `Questão ${isNaN(qIdx) ? key : qIdx + 1}`}`;
             }).join('\n\n');
-            respostasTexto = entries.map(([key, val], idx) => `Resposta ${idx + 1}: ${String(val)}`).join('\n\n');
+            respostasTexto = entries.map(([_key, val], idx) => `Resposta ${idx + 1}: ${String(val)}`).join('\n\n');
           } else {
             questoesTexto = atv.titulo + (atv.descricao ? `\n${atv.descricao}` : '');
             respostasTexto = String(decryptedRespostas || '');
@@ -1134,7 +835,6 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
             questao_enunciado: questoesTexto || atv.titulo || 'Atividade',
             resposta_aluno: respostasTexto || '(Sem resposta)',
             criterios: atv.descricao || undefined,
-            modelo: modeloSafe,
             observacoes,
             severidade
           });
@@ -1161,7 +861,6 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
     );
   }
 
-  // LGPD: Minimização de dados. Retorna apenas IDs, notas e feedbacks atualizados (sem payload bruto de respostas)
   const updatedRows = db.query('SELECT id, nota, feedback FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em DESC').all(atividade_id) as any[];
 
   return c.json({
@@ -1179,9 +878,28 @@ aiRouter.post('/evaluate-activity-responses', professorAuth, async (c) => {
   return handleEvaluateActivityResponses(c);
 });
 
+function parseSynthesis(content: string): any | null {
+  try {
+    const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (!parsed.feedback_geral) return null;
+    return {
+      feedback_geral: String(parsed.feedback_geral).trim(),
+      pontos_fortes: Array.isArray(parsed.pontos_fortes) ? parsed.pontos_fortes : [],
+      pontos_atencao: Array.isArray(parsed.pontos_atencao) ? parsed.pontos_atencao : [],
+      alunos_sintese: Array.isArray(parsed.alunos_sintese) ? parsed.alunos_sintese.map((s: any) => ({
+        aluno_email: String(s.aluno_email || '').trim().toLowerCase(),
+        feedback_individual: String(s.feedback_individual || '').trim()
+      })) : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 aiRouter.post('/synthesize-class-feedback', professorAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const { disciplina_nome, total_envios, respostas_resumo, alunos_detalhes, modelo, observacoes, severidade } = body;
+  const { disciplina_nome, total_envios, respostas_resumo, alunos_detalhes, observacoes, severidade } = body;
 
   const observacoesLimpo = typeof observacoes === 'string' ? observacoes.trim().slice(0, 2000) : undefined;
   const severidadeSafe = typeof severidade === 'string' ? severidade.trim() : 'moderado';
@@ -1274,64 +992,32 @@ Regras:
     });
   }
 
-  const candidateModels = [
-    'ag/gemini-3.7-flash-low',
-    'qwenproxy/qwen3.8-max-thinking',
-    'ocg/deepseek-v4-flash',
-    'deepseek-v4-flash',
-    'qwenproxy/qwen3.7-plus',
-  ];
-
-  const modelsToTry = modelo && !candidateModels.includes(modelo)
-    ? [modelo, ...candidateModels]
-    : candidateModels;
-
   let synthesisResult: any = null;
-  let lastError = '';
 
-  for (const currentModel of modelsToTry) {
-    try {
-      const aiResponse = await fetchFrom9Router('/v1/chat/completions', {
-        method: 'POST',
-        body: JSON.stringify({
-          model: currentModel,
-          stream: false,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.3
-        }),
-        signal: AbortSignal.timeout(60000)
-      });
-
-      if (!aiResponse.ok) continue;
-
-      const aiData: any = await aiResponse.json();
-      let content = aiData?.choices?.[0]?.message?.content || '';
-      content = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
-
-      const parsed = JSON.parse(content);
-      if (parsed.feedback_geral) {
-        synthesisResult = {
-          feedback_geral: String(parsed.feedback_geral).trim(),
-          pontos_fortes: Array.isArray(parsed.pontos_fortes) ? parsed.pontos_fortes : [],
-          pontos_atencao: Array.isArray(parsed.pontos_atencao) ? parsed.pontos_atencao : [],
-          alunos_sintese: Array.isArray(parsed.alunos_sintese) ? parsed.alunos_sintese.map((s: any) => ({
-            aluno_email: String(s.aluno_email || '').trim().toLowerCase(),
-            feedback_individual: String(s.feedback_individual || '').trim()
-          })) : [],
-          modelo_utilizado: currentModel
-        };
-        break;
-      }
-    } catch (e: any) {
-      lastError = e.message;
+  try {
+    const messages: AiMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
+    const result = await callAi({
+      messages,
+      temperature: 0.3,
+      timeoutMs: 60000,
+      validate: (content) => parseSynthesis(content) !== null,
+    });
+    const parsed = parseSynthesis(result.content);
+    if (parsed) {
+      synthesisResult = {
+        ...parsed,
+        modelo_utilizado: result.modelUsed
+      };
     }
+  } catch {
+    synthesisResult = null;
   }
 
   if (!synthesisResult) {
-    return c.json({ success: false, error: `Falha na síntese por IA: ${lastError || 'Não foi possível obter resposta'}` }, 502);
+    return c.json({ success: false, error: 'Falha na síntese por IA: resposta sem formato JSON esperado' }, 502);
   }
 
   return c.json({ success: true, ...synthesisResult });
