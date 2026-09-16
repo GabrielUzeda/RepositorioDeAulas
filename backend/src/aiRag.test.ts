@@ -24,7 +24,9 @@ const TITULO_DOC_CURSO = 'Doc Curso RAG XYZ';
 
 const MODELO_MOCK = 'modelo-mock-rag';
 
-const RESPOSTA_QUESTOES = JSON.stringify({ questions: [{ enunciado: 'Questao mock?', tipo: 'discursiva' }] });
+const RESPOSTA_QUESTOES = JSON.stringify({
+  questions: [{ enunciado: 'Questao mock?', tipo: 'discursiva' }],
+});
 const RESPOSTA_AULA = '# Aula Mock\n\n---\n\n## Slide 1\n\nConteudo da aula mock.';
 
 const originalEnv = new Map<string, string | undefined>();
@@ -41,7 +43,7 @@ let docCursoId = 0;
 function limparResiduos(): void {
   db.query('DELETE FROM documentos_orientadores WHERE titulo IN (?, ?)').run(
     TITULO_DOC_DISCIPLINA,
-    TITULO_DOC_CURSO,
+    TITULO_DOC_CURSO
   );
   db.query('DELETE FROM aulas WHERE titulo = ?').run(TITULO_AULA);
   db.query('DELETE FROM disciplinas WHERE slug = ?').run(SLUG_DISCIPLINA);
@@ -95,27 +97,46 @@ beforeAll(async () => {
   disciplinaId = Number(disciplina.lastInsertRowid);
 
   const aula = db
-    .query("INSERT INTO aulas (disciplina_id, titulo, caminho, descricao, ordem, conteudo_md) VALUES (?, ?, '', '', 1, ?)")
+    .query(
+      "INSERT INTO aulas (disciplina_id, titulo, caminho, descricao, ordem, conteudo_md) VALUES (?, ?, '', '', 1, ?)"
+    )
     .run(disciplinaId, TITULO_AULA, `Conteudo base da aula. ${MARCADOR_CONTEUDO_AULA}.`);
   aulaId = Number(aula.lastInsertRowid);
 
   const docDisciplina = db
     .query(
-      'INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes) VALUES (NULL, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes) VALUES (NULL, ?, ?, ?, ?, ?, ?)'
     )
-    .run(disciplinaId, TITULO_DOC_DISCIPLINA, 'd.txt', 'plano_ensino', `Ementa da disciplina. ${MARCADOR_DOC_DISCIPLINA}.`, 100);
+    .run(
+      disciplinaId,
+      TITULO_DOC_DISCIPLINA,
+      'd.txt',
+      'plano_ensino',
+      `Ementa da disciplina. ${MARCADOR_DOC_DISCIPLINA}.`,
+      100
+    );
   docDisciplinaId = Number(docDisciplina.lastInsertRowid);
 
   const docCurso = db
     .query(
-      'INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes) VALUES (?, NULL, ?, ?, ?, ?, ?)',
+      'INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes) VALUES (?, NULL, ?, ?, ?, ?, ?)'
     )
-    .run(cursoId, TITULO_DOC_CURSO, 'c.txt', 'outro', `Diretrizes gerais do curso. ${MARCADOR_DOC_CURSO}.`, 100);
+    .run(
+      cursoId,
+      TITULO_DOC_CURSO,
+      'c.txt',
+      'outro',
+      `Diretrizes gerais do curso. ${MARCADOR_DOC_CURSO}.`,
+      100
+    );
   docCursoId = Number(docCurso.lastInsertRowid);
 });
 
 afterAll(() => {
-  db.query('DELETE FROM documentos_orientadores WHERE id IN (?, ?)').run(docDisciplinaId, docCursoId);
+  db.query('DELETE FROM documentos_orientadores WHERE id IN (?, ?)').run(
+    docDisciplinaId,
+    docCursoId
+  );
   db.query('DELETE FROM aulas WHERE id = ?').run(aulaId);
   db.query('DELETE FROM disciplinas WHERE id = ?').run(disciplinaId);
   db.query('DELETE FROM cursos WHERE id = ?').run(cursoId);
@@ -200,7 +221,9 @@ describe('RAG: contexto de documentos e aulas chega ao prompt de IA', () => {
     });
     const textoResposta = await res.text();
     if (res.status !== 200) {
-      throw new Error(`POST /ai/generate-activity sem contexto retornou ${res.status}: ${textoResposta}`);
+      throw new Error(
+        `POST /ai/generate-activity sem contexto retornou ${res.status}: ${textoResposta}`
+      );
     }
     expect(res.status).toBe(200);
 

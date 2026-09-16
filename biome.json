@@ -8,7 +8,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!frontend/src/public/static/**"]
+    "includes": ["**", "!frontend/src/public/static"]
   },
   "formatter": {
     "enabled": true,

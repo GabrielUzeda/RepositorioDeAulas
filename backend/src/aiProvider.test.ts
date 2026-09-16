@@ -192,7 +192,9 @@ describe('AI Provider Abstraction', () => {
     });
     mockHandler = anthropicSuccess;
 
-    await expect(callAi({ messages: [{ role: 'user', content: 'oi' }] })).rejects.toThrow(/AI_API_KEY/);
+    await expect(callAi({ messages: [{ role: 'user', content: 'oi' }] })).rejects.toThrow(
+      /AI_API_KEY/
+    );
     expect(requests).toHaveLength(0);
   });
 
@@ -266,10 +268,11 @@ describe('AI Provider Abstraction', () => {
       AI_MODEL: 'modelo-primario',
       AI_FALLBACK_MODEL: 'modelo-reserva',
     });
-    mockHandler = () => jsonResponse(200, { choices: [{ message: { content: 'isto nao e json valido' } }] });
+    mockHandler = () =>
+      jsonResponse(200, { choices: [{ message: { content: 'isto nao e json valido' } }] });
 
     await expect(
-      callAi({ messages: [{ role: 'user', content: 'oi' }], validate: () => false }),
+      callAi({ messages: [{ role: 'user', content: 'oi' }], validate: () => false })
     ).rejects.toThrow(/Falha na IA/);
     expect(requests).toHaveLength(2);
   });
@@ -282,7 +285,8 @@ describe('AI Provider Abstraction', () => {
       AI_MODEL: 'modelo-primario',
       AI_FALLBACK_MODEL: 'modelo-reserva',
     });
-    mockHandler = () => jsonResponse(200, { choices: [{ message: { content: 'prosa qualquer' } }] });
+    mockHandler = () =>
+      jsonResponse(200, { choices: [{ message: { content: 'prosa qualquer' } }] });
 
     const result = await callAi({ messages: [{ role: 'user', content: 'oi' }] });
 
@@ -320,7 +324,9 @@ describe('AI Provider Abstraction', () => {
     };
     const provider = resolveProvider(config);
 
-    expect(extractText('{"choices":[{"message":{"content":"texto direto"}}]}', provider)).toBe('texto direto');
+    expect(extractText('{"choices":[{"message":{"content":"texto direto"}}]}', provider)).toBe(
+      'texto direto'
+    );
     expect(extractText('{"error":{"message":"quota"}}', provider)).toBe('');
   });
 

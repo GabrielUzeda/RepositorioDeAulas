@@ -27,17 +27,23 @@ aiRouter.get('/health', professorAuth, async (c) => {
   try {
     config = resolveConfig();
   } catch (e: any) {
-    return c.json({ ok: false, status: 'offline', error: e.message || 'Configuração de IA inválida' }, 503);
+    return c.json(
+      { ok: false, status: 'offline', error: e.message || 'Configuração de IA inválida' },
+      503
+    );
   }
 
   if (!config.apiKey) {
-    return c.json({
-      ok: false,
-      status: 'unconfigured',
-      provider: config.provider,
-      model: config.model,
-      error: 'AI_API_KEY nao configurada para o provider ' + config.provider,
-    }, 503);
+    return c.json(
+      {
+        ok: false,
+        status: 'unconfigured',
+        provider: config.provider,
+        model: config.model,
+        error: 'AI_API_KEY nao configurada para o provider ' + config.provider,
+      },
+      503
+    );
   }
 
   try {
@@ -57,21 +63,27 @@ aiRouter.get('/health', professorAuth, async (c) => {
         ...(data !== undefined ? { data } : {}),
       });
     }
-    return c.json({
-      ok: false,
-      status: 'degraded',
-      provider: config.provider,
-      model: config.model,
-      error: 'HTTP ' + res.status,
-    }, 502);
+    return c.json(
+      {
+        ok: false,
+        status: 'degraded',
+        provider: config.provider,
+        model: config.model,
+        error: 'HTTP ' + res.status,
+      },
+      502
+    );
   } catch (e: any) {
-    return c.json({
-      ok: false,
-      status: 'offline',
-      provider: config.provider,
-      model: config.model,
-      error: e.message || 'Provider de IA indisponível',
-    }, 503);
+    return c.json(
+      {
+        ok: false,
+        status: 'offline',
+        provider: config.provider,
+        model: config.model,
+        error: e.message || 'Provider de IA indisponível',
+      },
+      503
+    );
   }
 });
 
@@ -94,7 +106,10 @@ aiRouter.get('/models', professorAuth, async (c) => {
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) {
-      return c.json({ success: false, error: 'Provider ' + config.provider + ' retornou HTTP ' + res.status }, 502);
+      return c.json(
+        { success: false, error: 'Provider ' + config.provider + ' retornou HTTP ' + res.status },
+        502
+      );
     }
     const body = (await res.json()) as { data?: AiModelItem[] };
     const rawModels: AiModelItem[] = Array.isArray(body?.data) ? body.data : [];
@@ -109,9 +124,17 @@ aiRouter.get('/models', professorAuth, async (c) => {
       maxOutput: m.capabilities?.maxOutput || m.max_completion_tokens || 0,
     }));
 
-    return c.json({ success: true, provider: config.provider, defaultModel: config.model, models: formatted });
+    return c.json({
+      success: true,
+      provider: config.provider,
+      defaultModel: config.model,
+      models: formatted,
+    });
   } catch (e: any) {
-    return c.json({ success: false, error: e.message || 'Falha ao consultar modelos do provider' }, 503);
+    return c.json(
+      { success: false, error: e.message || 'Falha ao consultar modelos do provider' },
+      503
+    );
   }
 });
 
@@ -123,13 +146,21 @@ function parseActivityQuestions(content: string): any[] {
       .replace(/```/g, '')
       .trim();
     const parsed = JSON.parse(cleanJson);
-    parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
+    parsedQuestions = Array.isArray(parsed?.questions)
+      ? parsed.questions
+      : Array.isArray(parsed)
+        ? parsed
+        : [];
   } catch {
     const objMatch = content.match(/\{[\s\S]*\}/);
     if (objMatch) {
       try {
         const parsed = JSON.parse(objMatch[0]);
-        parsedQuestions = Array.isArray(parsed?.questions) ? parsed.questions : (Array.isArray(parsed) ? parsed : []);
+        parsedQuestions = Array.isArray(parsed?.questions)
+          ? parsed.questions
+          : Array.isArray(parsed)
+            ? parsed
+            : [];
       } catch {}
     }
     if (parsedQuestions.length === 0) {
@@ -173,7 +204,13 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
   }
 
   if (!tema && !titulo && targetAulasIds.length === 0) {
-    return c.json({ success: false, error: 'Informe um tema, título ou selecione ao menos uma aula para contextualizar' }, 400);
+    return c.json(
+      {
+        success: false,
+        error: 'Informe um tema, título ou selecione ao menos uma aula para contextualizar',
+      },
+      400
+    );
   }
 
   let aulasContexto = '';
@@ -188,7 +225,11 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
         WHERE a.id IN (SELECT value FROM json_each(?))
         ORDER BY a.ordem ASC
       `;
-      aulas = db.query(query).all(aulasIdsJson) as { id: number; titulo: string; conteudo_md: string }[];
+      aulas = db.query(query).all(aulasIdsJson) as {
+        id: number;
+        titulo: string;
+        conteudo_md: string;
+      }[];
     } else {
       const query = `
         SELECT a.id, a.titulo, a.conteudo_md 
@@ -198,12 +239,19 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
         WHERE cp.professor_id = ? AND a.id IN (SELECT value FROM json_each(?))
         ORDER BY a.ordem ASC
       `;
-      aulas = db.query(query).all(professorId, aulasIdsJson) as { id: number; titulo: string; conteudo_md: string }[];
+      aulas = db.query(query).all(professorId, aulasIdsJson) as {
+        id: number;
+        titulo: string;
+        conteudo_md: string;
+      }[];
     }
-    
+
     if (aulas.length > 0) {
       aulasContexto = aulas
-        .map((a, idx) => `--- AULA ${idx + 1}: ${a.titulo} ---\n${(a.conteudo_md || '').slice(0, 15000)}`)
+        .map(
+          (a, idx) =>
+            `--- AULA ${idx + 1}: ${a.titulo} ---\n${(a.conteudo_md || '').slice(0, 15000)}`
+        )
         .join('\n\n');
     }
   }
@@ -211,24 +259,37 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
   let docsContexto = '';
   let targetDisciplinaId = disciplina_id ? Number(disciplina_id) : null;
   if (!targetDisciplinaId && targetAulasIds.length > 0) {
-    const row = db.query('SELECT disciplina_id FROM aulas WHERE id = ?').get(targetAulasIds[0]) as any;
+    const row = db
+      .query('SELECT disciplina_id FROM aulas WHERE id = ?')
+      .get(targetAulasIds[0]) as any;
     if (row?.disciplina_id) targetDisciplinaId = row.disciplina_id;
   }
 
   if (targetDisciplinaId) {
-    const discRow = db.query('SELECT curso_id FROM disciplinas WHERE id = ?').get(targetDisciplinaId) as any;
+    const discRow = db
+      .query('SELECT curso_id FROM disciplinas WHERE id = ?')
+      .get(targetDisciplinaId) as any;
     const targetCursoId = discRow?.curso_id ? Number(discRow.curso_id) : null;
 
-    const docs = db.query(`
+    const docs = db
+      .query(`
       SELECT titulo, tipo, conteudo_texto 
       FROM documentos_orientadores 
       WHERE disciplina_id = ? OR (curso_id = ? AND disciplina_id IS NULL)
       ORDER BY id ASC
-    `).all(targetDisciplinaId, targetCursoId) as { titulo: string; tipo: string; conteudo_texto: string }[];
+    `)
+      .all(targetDisciplinaId, targetCursoId) as {
+      titulo: string;
+      tipo: string;
+      conteudo_texto: string;
+    }[];
 
     if (docs.length > 0) {
       docsContexto = docs
-        .map((d, idx) => `--- DOCUMENTO ORIENTADOR ${idx + 1} (${d.tipo.toUpperCase()}): ${d.titulo} ---\n${(d.conteudo_texto || '').slice(0, 5000)}`)
+        .map(
+          (d, idx) =>
+            `--- DOCUMENTO ORIENTADOR ${idx + 1} (${d.tipo.toUpperCase()}): ${d.titulo} ---\n${(d.conteudo_texto || '').slice(0, 5000)}`
+        )
         .join('\n\n');
     }
   }
@@ -236,11 +297,16 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
   const isDiscursive = tipo === 'normal' || tipo === 'prova';
 
   const tipoInstrucao: Record<string, string> = {
-    normal: 'Atividade Discursiva (Normal): Crie questões abertas e dissertativas. NÃO gere alternativas. Cada questão deve ter apenas um enunciado claro que o aluno responderá com texto livre.',
-    prova: 'Prova Discursiva: Crie questões dissertativas formais e rigorosas, sem alternativas. Cada questão deve exigir uma resposta elaborada e contextualizada do aluno.',
-    minigame: 'Minigame de Naves: Questões com enunciado direto e objetivo, com 4 alternativas curtas. NÃO inclua feedbacks nas alternativas (apenas text e correct).',
-    roleta: 'Roleta do Conhecimento: Perguntas instigantes e dinâmicas de múltipla escolha com 4 alternativas e feedback explicativo.',
-    reforco: 'Reforço Pedagógico: Questões formativas com 4 alternativas, onde cada alternativa incorreta explica claramente o equívoco no feedback pedagógico para auxiliar a fixação.'
+    normal:
+      'Atividade Discursiva (Normal): Crie questões abertas e dissertativas. NÃO gere alternativas. Cada questão deve ter apenas um enunciado claro que o aluno responderá com texto livre.',
+    prova:
+      'Prova Discursiva: Crie questões dissertativas formais e rigorosas, sem alternativas. Cada questão deve exigir uma resposta elaborada e contextualizada do aluno.',
+    minigame:
+      'Minigame de Naves: Questões com enunciado direto e objetivo, com 4 alternativas curtas. NÃO inclua feedbacks nas alternativas (apenas text e correct).',
+    roleta:
+      'Roleta do Conhecimento: Perguntas instigantes e dinâmicas de múltipla escolha com 4 alternativas e feedback explicativo.',
+    reforco:
+      'Reforço Pedagógico: Questões formativas com 4 alternativas, onde cada alternativa incorreta explica claramente o equívoco no feedback pedagógico para auxiliar a fixação.',
   };
 
   const selectedTipoInstrucao = tipoInstrucao[tipo] || tipoInstrucao.normal;
@@ -255,7 +321,7 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
   ]
 }`
     : tipo === 'minigame'
-    ? `{
+      ? `{
   "questions": [
     {
       "title": "Conceito Central / Tópico Abordado",
@@ -269,7 +335,7 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     }
   ]
 }`
-    : `{
+      : `{
   "questions": [
     {
       "title": "Conceito Central / Tópico Abordado",
@@ -341,7 +407,13 @@ ${formatoJson}`;
     content = result.content;
     modeloUtilizado = result.modelUsed;
   } catch (e: any) {
-    return c.json({ success: false, error: `Falha na geração com IA: ${e.message || 'Erro de conexão/timeout'}` }, 502);
+    return c.json(
+      {
+        success: false,
+        error: `Falha na geração com IA: ${e.message || 'Erro de conexão/timeout'}`,
+      },
+      502
+    );
   }
 
   const parsedQuestions = parseActivityQuestions(content);
@@ -357,11 +429,15 @@ ${formatoJson}`;
     };
 
     if (!isDiscursive) {
-      const rawOptions = Array.isArray(q.options) ? q.options : (Array.isArray(q.alternativas) ? q.alternativas : []);
+      const rawOptions = Array.isArray(q.options)
+        ? q.options
+        : Array.isArray(q.alternativas)
+          ? q.alternativas
+          : [];
       const options = rawOptions.map((opt: any) => ({
         text: String(opt.text || opt.label || opt.opcao || '').trim(),
         correct: Boolean(opt.correct || opt.isCorrect || opt.correta),
-        feedback: tipo === 'minigame' ? '' : String(opt.feedback || opt.justificativa || '').trim()
+        feedback: tipo === 'minigame' ? '' : String(opt.feedback || opt.justificativa || '').trim(),
       }));
 
       const hasCorrect = options.some((o: any) => o.correct);
@@ -381,7 +457,7 @@ ${formatoJson}`;
     success: true,
     questions: normalizedQuestions,
     modelo_utilizado: modeloUtilizado,
-    total_gerado: normalizedQuestions.length
+    total_gerado: normalizedQuestions.length,
   });
 });
 
@@ -417,17 +493,19 @@ aiRouter.post('/generate-aula', professorAuth, async (c) => {
   if (continuar_sequencia && disciplina_id) {
     let ultimaAula: { id: number } | undefined;
     if (professorRole === 'admin') {
-      ultimaAula = db.query(
-        `SELECT a.id FROM aulas a WHERE a.disciplina_id = ? ORDER BY a.ordem DESC LIMIT 1`
-      ).get(disciplina_id) as { id: number } | undefined;
+      ultimaAula = db
+        .query(`SELECT a.id FROM aulas a WHERE a.disciplina_id = ? ORDER BY a.ordem DESC LIMIT 1`)
+        .get(disciplina_id) as { id: number } | undefined;
     } else {
-      ultimaAula = db.query(
-        `SELECT a.id FROM aulas a
+      ultimaAula = db
+        .query(
+          `SELECT a.id FROM aulas a
          JOIN disciplinas d ON a.disciplina_id = d.id
          JOIN curso_professores cp ON d.curso_id = cp.curso_id
          WHERE cp.professor_id = ? AND a.disciplina_id = ?
          ORDER BY a.ordem DESC LIMIT 1`
-      ).get(professorId, disciplina_id) as { id: number } | undefined;
+        )
+        .get(professorId, disciplina_id) as { id: number } | undefined;
     }
     if (ultimaAula && !targetAulasIds.includes(ultimaAula.id)) {
       targetAulasIds.push(ultimaAula.id);
@@ -435,7 +513,13 @@ aiRouter.post('/generate-aula', professorAuth, async (c) => {
   }
 
   if (!tema && targetAulasIds.length === 0) {
-    return c.json({ success: false, error: 'Informe um tema ou selecione aulas de referência para contextualizar a geração' }, 400);
+    return c.json(
+      {
+        success: false,
+        error: 'Informe um tema ou selecione aulas de referência para contextualizar a geração',
+      },
+      400
+    );
   }
 
   let aulasContexto = '';
@@ -444,22 +528,34 @@ aiRouter.post('/generate-aula', professorAuth, async (c) => {
     let aulas: { id: number; titulo: string; conteudo_md: string; ordem: number }[] = [];
 
     if (professorRole === 'admin') {
-      aulas = db.query(
-        `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a WHERE a.id IN (SELECT value FROM json_each(?)) ORDER BY a.ordem ASC`
-      ).all(aulasIdsJson) as { id: number; titulo: string; conteudo_md: string; ordem: number }[];
+      aulas = db
+        .query(
+          `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a WHERE a.id IN (SELECT value FROM json_each(?)) ORDER BY a.ordem ASC`
+        )
+        .all(aulasIdsJson) as { id: number; titulo: string; conteudo_md: string; ordem: number }[];
     } else {
-      aulas = db.query(
-        `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a
+      aulas = db
+        .query(
+          `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a
          JOIN disciplinas d ON a.disciplina_id = d.id
          JOIN curso_professores cp ON d.curso_id = cp.curso_id
          WHERE cp.professor_id = ? AND a.id IN (SELECT value FROM json_each(?))
          ORDER BY a.ordem ASC`
-      ).all(professorId, aulasIdsJson) as { id: number; titulo: string; conteudo_md: string; ordem: number }[];
+        )
+        .all(professorId, aulasIdsJson) as {
+        id: number;
+        titulo: string;
+        conteudo_md: string;
+        ordem: number;
+      }[];
     }
 
     if (aulas.length > 0) {
       aulasContexto = aulas
-        .map((a, idx) => `--- AULA DE REFERÊNCIA ${idx + 1}: ${a.titulo} ---\n${(a.conteudo_md || '').slice(0, 18000)}`)
+        .map(
+          (a, idx) =>
+            `--- AULA DE REFERÊNCIA ${idx + 1}: ${a.titulo} ---\n${(a.conteudo_md || '').slice(0, 18000)}`
+        )
         .join('\n\n');
     }
   }
@@ -585,11 +681,13 @@ animation-duration: 0.5s
 
   let userPrompt = '';
   if (tema) userPrompt += `TEMA / ASSUNTO DA AULA: ${tema}\n\n`;
-  if (observacoes) userPrompt += `OBSERVAÇÕES DO PROFESSOR (requisitos específicos que DEVEM ser respeitados na geração): ${observacoes}\n\n`;
+  if (observacoes)
+    userPrompt += `OBSERVAÇÕES DO PROFESSOR (requisitos específicos que DEVEM ser respeitados na geração): ${observacoes}\n\n`;
   if (aulasContexto) {
     userPrompt += `AULAS ANTERIORES DE REFERÊNCIA (NÃO repita este conteúdo; use como base para dar sequência pedagógica sem sobreposição):\n\n${aulasContexto}\n\n`;
   }
-  userPrompt += 'Gere a aula completa no formato Marp Next Markdown conforme as instruções. Responda APENAS com o markdown da aula, sem nenhum texto introdutório ou explicativo antes ou depois do bloco de slides.';
+  userPrompt +=
+    'Gere a aula completa no formato Marp Next Markdown conforme as instruções. Responda APENAS com o markdown da aula, sem nenhum texto introdutório ou explicativo antes ou depois do bloco de slides.';
 
   let content = '';
   let modeloUtilizado = '';
@@ -607,7 +705,13 @@ animation-duration: 0.5s
     content = result.content;
     modeloUtilizado = result.modelUsed;
   } catch (e: any) {
-    return c.json({ success: false, error: `Falha na geração de aula com IA: ${e.message || 'Erro de conexão/timeout'}` }, 502);
+    return c.json(
+      {
+        success: false,
+        error: `Falha na geração de aula com IA: ${e.message || 'Erro de conexão/timeout'}`,
+      },
+      502
+    );
   }
 
   const cleaned = normalizeMarpMarkdown(content);
@@ -619,7 +723,7 @@ animation-duration: 0.5s
   const titleMatch = cleaned.match(/^---[\s\S]*?title:\s*(.+)/m);
   const titulo_sugerido = titleMatch
     ? titleMatch[1].trim().replace(/^['"]|['"]$/g, '')
-    : (tema || 'Nova Aula');
+    : tema || 'Nova Aula';
 
   return c.json({
     success: true,
@@ -629,9 +733,14 @@ animation-duration: 0.5s
   });
 });
 
-function parseEvaluationResult(content: string): { nota_sugerida: number; feedback: string; justificativa: string } | null {
+function parseEvaluationResult(
+  content: string
+): { nota_sugerida: number; feedback: string; justificativa: string } | null {
   try {
-    const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+    const cleaned = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
     const parsed = JSON.parse(cleaned);
     if (typeof parsed.nota_sugerida !== 'number' || !parsed.feedback) return null;
     return {
@@ -667,17 +776,21 @@ async function evaluateStudentResponse({
   let severidadeInstrucao = '';
   switch (severidade) {
     case 'brando':
-      severidadeInstrucao = 'Nível de severidade: BRANDO. Seja encorajador e flexível. Valorize a intenção, raciocínio e conceitos parciais, relevando pequenos desvios de sintaxe, formatação ou pontuação.';
+      severidadeInstrucao =
+        'Nível de severidade: BRANDO. Seja encorajador e flexível. Valorize a intenção, raciocínio e conceitos parciais, relevando pequenos desvios de sintaxe, formatação ou pontuação.';
       break;
     case 'rigoroso':
-      severidadeInstrucao = 'Nível de severidade: RIGOROSO. Exija precisão conceitual, clareza técnica e rigor na demonstração dos pontos solicitados. Penalize omissões conceituais ou imprecisões.';
+      severidadeInstrucao =
+        'Nível de severidade: RIGOROSO. Exija precisão conceitual, clareza técnica e rigor na demonstração dos pontos solicitados. Penalize omissões conceituais ou imprecisões.';
       break;
     case 'sistematico':
-      severidadeInstrucao = 'Nível de severidade: SISTEMÁTICO. Avalie item a item com método estrito e analítico, pontuando cada aspecto de forma pragmática e fundamentada.';
+      severidadeInstrucao =
+        'Nível de severidade: SISTEMÁTICO. Avalie item a item com método estrito e analítico, pontuando cada aspecto de forma pragmática e fundamentada.';
       break;
     case 'moderado':
     default:
-      severidadeInstrucao = 'Nível de severidade: MODERADO. Mantenha um equilíbrio justo entre rigor técnico e acolhimento pedagógico construtivo.';
+      severidadeInstrucao =
+        'Nível de severidade: MODERADO. Mantenha um equilíbrio justo entre rigor técnico e acolhimento pedagógico construtivo.';
       break;
   }
 
@@ -697,7 +810,8 @@ Regras:
   let userPrompt = `ENUNCIADO DA QUESTÃO:\n${questao_enunciado}\n\n`;
   if (gabarito) userPrompt += `GABARITO / EXPECTATIVA DE RESPOSTA:\n${gabarito}\n\n`;
   if (criterios) userPrompt += `CRITÉRIOS DE CORREÇÃO:\n${criterios}\n\n`;
-  if (observacoes && observacoes.trim()) userPrompt += `OBSERVAÇÕES DO PROFESSOR:\n${observacoes.trim()}\n\n`;
+  if (observacoes && observacoes.trim())
+    userPrompt += `OBSERVAÇÕES DO PROFESSOR:\n${observacoes.trim()}\n\n`;
   userPrompt += `RESPOSTA SUBMETIDA PELO ALUNO:\n${resposta_aluno}`;
 
   try {
@@ -730,11 +844,21 @@ aiRouter.post('/evaluate-response', professorAuth, async (c) => {
   const { questao_enunciado, resposta_aluno, gabarito, criterios, observacoes, severidade } = body;
 
   if (!questao_enunciado || !resposta_aluno) {
-    return c.json({ success: false, error: 'questao_enunciado e resposta_aluno são obrigatórios.' }, 400);
+    return c.json(
+      { success: false, error: 'questao_enunciado e resposta_aluno são obrigatórios.' },
+      400
+    );
   }
 
   try {
-    const result = await evaluateStudentResponse({ questao_enunciado, resposta_aluno, gabarito, criterios, observacoes, severidade });
+    const result = await evaluateStudentResponse({
+      questao_enunciado,
+      resposta_aluno,
+      gabarito,
+      criterios,
+      observacoes,
+      severidade,
+    });
     return c.json({ success: true, ...result });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 502);
@@ -743,15 +867,18 @@ aiRouter.post('/evaluate-response', professorAuth, async (c) => {
 
 export async function handleEvaluateActivityResponses(c: Context, forcedAtividadeId?: number) {
   const body = await c.req.json().catch(() => ({}));
-  const atividade_id = forcedAtividadeId !== undefined
-    ? Number(forcedAtividadeId)
-    : Number(body.atividade_id || body.atividadeId);
+  const atividade_id =
+    forcedAtividadeId !== undefined
+      ? Number(forcedAtividadeId)
+      : Number(body.atividade_id || body.atividadeId);
 
   if (!atividade_id || isNaN(atividade_id)) {
     return c.json({ success: false, error: 'atividade_id é obrigatório.' }, 400);
   }
 
-  const atv = db.query('SELECT id, disciplina_id, titulo, descricao, json_data FROM atividades WHERE id = ?').get(atividade_id) as any;
+  const atv = db
+    .query('SELECT id, disciplina_id, titulo, descricao, json_data FROM atividades WHERE id = ?')
+    .get(atividade_id) as any;
   if (!atv) {
     return c.json({ success: false, error: 'Atividade não encontrada.' }, 404);
   }
@@ -759,13 +886,21 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
   const profId = c.get('professorId');
   const profRole = c.get('professorRole');
   if (profRole !== 'admin') {
-    const d = db.query('SELECT curso_id FROM disciplinas WHERE id = ?').get(atv.disciplina_id) as any;
+    const d = db
+      .query('SELECT curso_id FROM disciplinas WHERE id = ?')
+      .get(atv.disciplina_id) as any;
     if (!d) return c.text('Access denied', 403);
-    const hasPerm = db.query('SELECT 1 FROM curso_professores WHERE curso_id = ? AND professor_id = ?').get(d.curso_id, Number(profId));
+    const hasPerm = db
+      .query('SELECT 1 FROM curso_professores WHERE curso_id = ? AND professor_id = ?')
+      .get(d.curso_id, Number(profId));
     if (!hasPerm) return c.text('Access denied', 403);
   }
 
-  const rows = db.query('SELECT id, respostas, nota, feedback FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em ASC').all(atividade_id) as any[];
+  const rows = db
+    .query(
+      'SELECT id, respostas, nota, feedback FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em ASC'
+    )
+    .all(atividade_id) as any[];
 
   if (rows.length === 0) {
     return c.json({
@@ -775,7 +910,7 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
       falhas_count: 0,
       sucessos: [],
       falhas: [],
-      avaliacoes: []
+      avaliacoes: [],
     });
   }
 
@@ -820,12 +955,16 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
 
           if (mapObj) {
             const entries = Object.entries(mapObj);
-            questoesTexto = entries.map(([key]) => {
-              const qIdx = Number(key);
-              const q = !isNaN(qIdx) ? questions[qIdx] : null;
-              return `Questão ${isNaN(qIdx) ? key : qIdx + 1}: ${q?.content || q?.title || `Questão ${isNaN(qIdx) ? key : qIdx + 1}`}`;
-            }).join('\n\n');
-            respostasTexto = entries.map(([_key, val], idx) => `Resposta ${idx + 1}: ${String(val)}`).join('\n\n');
+            questoesTexto = entries
+              .map(([key]) => {
+                const qIdx = Number(key);
+                const q = !isNaN(qIdx) ? questions[qIdx] : null;
+                return `Questão ${isNaN(qIdx) ? key : qIdx + 1}: ${q?.content || q?.title || `Questão ${isNaN(qIdx) ? key : qIdx + 1}`}`;
+              })
+              .join('\n\n');
+            respostasTexto = entries
+              .map(([_key, val], idx) => `Resposta ${idx + 1}: ${String(val)}`)
+              .join('\n\n');
           } else {
             questoesTexto = atv.titulo + (atv.descricao ? `\n${atv.descricao}` : '');
             respostasTexto = String(decryptedRespostas || '');
@@ -836,7 +975,7 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
             resposta_aluno: respostasTexto || '(Sem resposta)',
             criterios: atv.descricao || undefined,
             observacoes,
-            severidade
+            severidade,
           });
 
           db.query('UPDATE respostas_alunos SET nota = ?, feedback = ? WHERE id = ?').run(
@@ -849,19 +988,23 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
             id: row.id,
             nota: evalRes.nota_sugerida,
             feedback: evalRes.feedback,
-            justificativa: evalRes.justificativa
+            justificativa: evalRes.justificativa,
           });
         } catch (err: any) {
           falhas.push({
             id: row.id,
-            erro: err.message || 'Erro ao avaliar resposta'
+            erro: err.message || 'Erro ao avaliar resposta',
           });
         }
       })
     );
   }
 
-  const updatedRows = db.query('SELECT id, nota, feedback FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em DESC').all(atividade_id) as any[];
+  const updatedRows = db
+    .query(
+      'SELECT id, nota, feedback FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em DESC'
+    )
+    .all(atividade_id) as any[];
 
   return c.json({
     success: true,
@@ -870,7 +1013,7 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
     falhas_count: falhas.length,
     sucessos,
     falhas,
-    avaliacoes: updatedRows
+    avaliacoes: updatedRows,
   });
 }
 
@@ -880,17 +1023,24 @@ aiRouter.post('/evaluate-activity-responses', professorAuth, async (c) => {
 
 function parseSynthesis(content: string): any | null {
   try {
-    const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+    const cleaned = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
     const parsed = JSON.parse(cleaned);
     if (!parsed.feedback_geral) return null;
     return {
       feedback_geral: String(parsed.feedback_geral).trim(),
       pontos_fortes: Array.isArray(parsed.pontos_fortes) ? parsed.pontos_fortes : [],
       pontos_atencao: Array.isArray(parsed.pontos_atencao) ? parsed.pontos_atencao : [],
-      alunos_sintese: Array.isArray(parsed.alunos_sintese) ? parsed.alunos_sintese.map((s: any) => ({
-        aluno_email: String(s.aluno_email || '').trim().toLowerCase(),
-        feedback_individual: String(s.feedback_individual || '').trim()
-      })) : [],
+      alunos_sintese: Array.isArray(parsed.alunos_sintese)
+        ? parsed.alunos_sintese.map((s: any) => ({
+            aluno_email: String(s.aluno_email || '')
+              .trim()
+              .toLowerCase(),
+            feedback_individual: String(s.feedback_individual || '').trim(),
+          }))
+        : [],
     };
   } catch {
     return null;
@@ -899,24 +1049,36 @@ function parseSynthesis(content: string): any | null {
 
 aiRouter.post('/synthesize-class-feedback', professorAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const { disciplina_nome, total_envios, respostas_resumo, alunos_detalhes, observacoes, severidade } = body;
+  const {
+    disciplina_nome,
+    total_envios,
+    respostas_resumo,
+    alunos_detalhes,
+    observacoes,
+    severidade,
+  } = body;
 
-  const observacoesLimpo = typeof observacoes === 'string' ? observacoes.trim().slice(0, 2000) : undefined;
+  const observacoesLimpo =
+    typeof observacoes === 'string' ? observacoes.trim().slice(0, 2000) : undefined;
   const severidadeSafe = typeof severidade === 'string' ? severidade.trim() : 'moderado';
 
   let severidadeInstrucao = '';
   switch (severidadeSafe) {
     case 'brando':
-      severidadeInstrucao = 'Nível de severidade: BRANDO. Seja acolhedor e encorajador, valorizando o esforço e a participação dos alunos.';
+      severidadeInstrucao =
+        'Nível de severidade: BRANDO. Seja acolhedor e encorajador, valorizando o esforço e a participação dos alunos.';
       break;
     case 'rigoroso':
-      severidadeInstrucao = 'Nível de severidade: RIGOROSO. Seja criterioso e exigente, destacando omissões conceituais, atividades pendentes e necessidade de maior comprometimento.';
+      severidadeInstrucao =
+        'Nível de severidade: RIGOROSO. Seja criterioso e exigente, destacando omissões conceituais, atividades pendentes e necessidade de maior comprometimento.';
       break;
     case 'sistematico':
-      severidadeInstrucao = 'Nível de severidade: SISTEMÁTICO. Analise detalhadamente com método pragmático, objetivo e estruturado item a item.';
+      severidadeInstrucao =
+        'Nível de severidade: SISTEMÁTICO. Analise detalhadamente com método pragmático, objetivo e estruturado item a item.';
       break;
     default:
-      severidadeInstrucao = 'Nível de severidade: MODERADO. Mantenha equilíbrio justo entre rigor pedagógico e acolhimento construtivo.';
+      severidadeInstrucao =
+        'Nível de severidade: MODERADO. Mantenha equilíbrio justo entre rigor pedagógico e acolhimento construtivo.';
       break;
   }
 
@@ -956,9 +1118,12 @@ Regras:
   }
   userPrompt += `\n`;
 
-  const alunosLista = Array.isArray(alunos_detalhes) && alunos_detalhes.length > 0
-    ? alunos_detalhes
-    : Array.isArray(respostas_resumo) ? respostas_resumo : [];
+  const alunosLista =
+    Array.isArray(alunos_detalhes) && alunos_detalhes.length > 0
+      ? alunos_detalhes
+      : Array.isArray(respostas_resumo)
+        ? respostas_resumo
+        : [];
 
   if (alunosLista.length > 0) {
     userPrompt += `HISTÓRICO DE ATIVIDADES E FEEDBACKS POR ALUNO:\n`;
@@ -966,14 +1131,20 @@ Regras:
       const nome = item.aluno_nome || item.aluno || 'Anônimo';
       const email = item.aluno_email || '';
       const emailInfo = email ? ` (${email})` : '';
-      const mediaVal = item.media_calculada !== undefined && item.media_calculada !== null
-        ? item.media_calculada
-        : (item.media !== undefined && item.media !== null ? item.media : (item.nota !== undefined ? item.nota : null));
+      const mediaVal =
+        item.media_calculada !== undefined && item.media_calculada !== null
+          ? item.media_calculada
+          : item.media !== undefined && item.media !== null
+            ? item.media
+            : item.nota !== undefined
+              ? item.nota
+              : null;
       const media = mediaVal !== null ? ` | Média Geral da Disciplina: ${mediaVal}/100` : '';
       userPrompt += `\n[ALUNO ${idx + 1}] ${nome}${emailInfo}${media}:\n`;
       if (Array.isArray(item.atividades) && item.atividades.length > 0) {
         item.atividades.forEach((atv: any, atvIdx: number) => {
-          const notaStr = atv.nota !== null && atv.nota !== undefined ? `Nota: ${atv.nota}/100` : 'Sem nota';
+          const notaStr =
+            atv.nota !== null && atv.nota !== undefined ? `Nota: ${atv.nota}/100` : 'Sem nota';
           const feedStr = atv.feedback ? `Feedback: "${atv.feedback}"` : 'Sem comentários';
           userPrompt += `  - Atividade entregue "${atv.atividade_titulo || `Atividade ${atvIdx + 1}`}": ${notaStr} | ${feedStr}\n`;
         });
@@ -1009,7 +1180,7 @@ Regras:
     if (parsed) {
       synthesisResult = {
         ...parsed,
-        modelo_utilizado: result.modelUsed
+        modelo_utilizado: result.modelUsed,
       };
     }
   } catch {
@@ -1017,11 +1188,13 @@ Regras:
   }
 
   if (!synthesisResult) {
-    return c.json({ success: false, error: 'Falha na síntese por IA: resposta sem formato JSON esperado' }, 502);
+    return c.json(
+      { success: false, error: 'Falha na síntese por IA: resposta sem formato JSON esperado' },
+      502
+    );
   }
 
   return c.json({ success: true, ...synthesisResult });
 });
 
 export { aiRouter };
-

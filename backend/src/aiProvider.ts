@@ -1,4 +1,7 @@
-export interface AiMessage { role: 'system' | 'user' | 'assistant'; content: string }
+export interface AiMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
 
 export interface AiConfig {
   provider: string;
@@ -18,7 +21,12 @@ export interface AiProvider {
   readonly chatPath: string;
   readonly modelsPath: string;
   buildHeaders(apiKey: string): Record<string, string>;
-  buildBody(model: string, messages: AiMessage[], temperature: number, maxTokens: number): AiRequestBody;
+  buildBody(
+    model: string,
+    messages: AiMessage[],
+    temperature: number,
+    maxTokens: number
+  ): AiRequestBody;
   extractContent(data: unknown): string;
   extractError(data: unknown): string;
 }
@@ -30,7 +38,10 @@ export interface AiChatOptions {
   validate?: (content: string) => boolean;
 }
 
-export interface AiChatResult { content: string; modelUsed: string }
+export interface AiChatResult {
+  content: string;
+  modelUsed: string;
+}
 
 const VALID_PROVIDERS = ['opencode', '9router', 'openai', 'anthropic'];
 const DEFAULT_MODEL = 'deepseek-v4.1-flash';
@@ -100,11 +111,14 @@ export function resolveConfig(): AiConfig {
     apiKey = explicitApiKey;
     model = explicitModel || DEFAULT_MODEL;
   } else if (provider === 'opencode') {
-    baseUrl = explicitBaseUrl || trimmed(process.env.OPENCODE_BASE_URL) || DEFAULT_OPENCODE_BASE_URL;
+    baseUrl =
+      explicitBaseUrl || trimmed(process.env.OPENCODE_BASE_URL) || DEFAULT_OPENCODE_BASE_URL;
     apiKey = explicitApiKey || trimmed(process.env.OPENCODE_API_KEY);
     model = explicitModel || trimmed(process.env.OPENCODE_MODEL) || DEFAULT_MODEL;
   } else {
-    throw new Error(`Provider de IA desconhecido: ${provider}. Validos: ${VALID_PROVIDERS.join(', ')}`);
+    throw new Error(
+      `Provider de IA desconhecido: ${provider}. Validos: ${VALID_PROVIDERS.join(', ')}`
+    );
   }
 
   return {
@@ -174,7 +188,12 @@ function createOpenAiProvider(name: string): AiProvider {
       }
       return headers;
     },
-    buildBody(model: string, messages: AiMessage[], temperature: number, maxTokens: number): OpenAiChatBody {
+    buildBody(
+      model: string,
+      messages: AiMessage[],
+      temperature: number,
+      maxTokens: number
+    ): OpenAiChatBody {
       return {
         model,
         messages,
@@ -211,7 +230,12 @@ function createAnthropicProvider(anthropicVersion: string): AiProvider {
         'Content-Type': 'application/json',
       };
     },
-    buildBody(model: string, messages: AiMessage[], temperature: number, maxTokens: number): AnthropicChatBody {
+    buildBody(
+      model: string,
+      messages: AiMessage[],
+      temperature: number,
+      maxTokens: number
+    ): AnthropicChatBody {
       const systemParts: string[] = [];
       const rest: { role: AiMessage['role']; content: string }[] = [];
       for (const message of messages) {
@@ -251,10 +275,16 @@ function createAnthropicProvider(anthropicVersion: string): AiProvider {
 export function resolveProvider(config?: AiConfig): AiProvider {
   const resolved = config ?? resolveConfig();
   if (resolved.provider === 'anthropic') return createAnthropicProvider(resolved.anthropicVersion);
-  if (resolved.provider === 'opencode' || resolved.provider === '9router' || resolved.provider === 'openai') {
+  if (
+    resolved.provider === 'opencode' ||
+    resolved.provider === '9router' ||
+    resolved.provider === 'openai'
+  ) {
     return createOpenAiProvider(resolved.provider);
   }
-  throw new Error(`Provider de IA desconhecido: ${resolved.provider}. Validos: ${VALID_PROVIDERS.join(', ')}`);
+  throw new Error(
+    `Provider de IA desconhecido: ${resolved.provider}. Validos: ${VALID_PROVIDERS.join(', ')}`
+  );
 }
 
 export function modelsUrl(config: AiConfig): string {
@@ -307,7 +337,11 @@ export function extractText(raw: string, provider: AiProvider): string {
   return '';
 }
 
-async function fetchNineRouter(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+async function fetchNineRouter(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
   const customUrl = trimmed(process.env.NINE_ROUTER_URL);
   const isDefaultLocal = !customUrl && url.includes('127.0.0.1:20128');
   if (!isDefaultLocal) {
@@ -337,13 +371,19 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
 
   for (const model of models) {
     const body = JSON.stringify(
-      provider.buildBody(model, options.messages, options.temperature ?? 0.3, config.maxTokens),
+      provider.buildBody(model, options.messages, options.temperature ?? 0.3, config.maxTokens)
     );
     const headers = provider.buildHeaders(config.apiKey);
     try {
-      const response = provider.name === '9router'
-        ? await fetchNineRouter(endpoint, { method: 'POST', headers, body }, attemptTimeoutMs)
-        : await fetch(endpoint, { method: 'POST', headers, body, signal: AbortSignal.timeout(attemptTimeoutMs) });
+      const response =
+        provider.name === '9router'
+          ? await fetchNineRouter(endpoint, { method: 'POST', headers, body }, attemptTimeoutMs)
+          : await fetch(endpoint, {
+              method: 'POST',
+              headers,
+              body,
+              signal: AbortSignal.timeout(attemptTimeoutMs),
+            });
 
       if (response.ok) {
         const raw = await response.text();
