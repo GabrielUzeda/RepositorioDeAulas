@@ -382,7 +382,7 @@ export class MinigamePlayer {
         }
 
         // Particles
-        this.particles.forEach(p => p.draw(this.ctx));
+        this.particles.forEach(p => { p.draw(this.ctx); });
     }
 
     spawnEnemy() {
@@ -412,7 +412,7 @@ export class MinigamePlayer {
 
         // Option Buttons Reset
         const opts = document.getElementById('mg-options-area');
-        if (opts) Array.from(opts.children).forEach(b => b.classList.remove('opacity-40', 'pointer-events-none', '!bg-[#aa0000]', '!border-red-600', '!text-white'));
+        if (opts) Array.from(opts.children).forEach(b => { b.classList.remove('opacity-40', 'pointer-events-none', '!bg-[#aa0000]', '!border-red-600', '!text-white'); });
 
         this.loadNextQuestion();
     }
@@ -497,7 +497,7 @@ export class MinigamePlayer {
                 banner.innerText = "ERRO FATAL! CONTROLES TRAVADOS!";
                 banner.className = "bg-red-600 text-white font-black text-sm uppercase p-2 text-center animate-pulse block";
             }
-            document.querySelectorAll('#mg-options-area button').forEach(b => b.classList.add('opacity-40', 'pointer-events-none'));
+            document.querySelectorAll('#mg-options-area button').forEach(b => { b.classList.add('opacity-40', 'pointer-events-none'); });
             const impact = document.getElementById('mg-impact-overlay');
             if (impact) impact.classList.add('opacity-30');
         }
