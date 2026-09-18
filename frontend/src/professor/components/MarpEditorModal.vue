@@ -714,8 +714,7 @@ function renderKaTeX(container: HTMLElement) {
 
   const walker = document.createTreeWalker(contentDiv, NodeFilter.SHOW_TEXT);
   const textNodes: Text[] = [];
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (node.nodeValue && node.nodeValue.includes('$')) {
       if (node.parentElement && node.parentElement.closest('pre, code, script, style')) continue;
       textNodes.push(node as Text);
@@ -743,7 +742,7 @@ function renderKaTeX(container: HTMLElement) {
 function executeSlideScripts(container: HTMLElement) {
   container.querySelectorAll('script').forEach(oldScript => {
     const newScript = document.createElement('script');
-    Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+    Array.from(oldScript.attributes).forEach(attr => { newScript.setAttribute(attr.name, attr.value); });
     newScript.textContent = oldScript.textContent;
     try {
       oldScript.parentNode?.replaceChild(newScript, oldScript);
@@ -822,7 +821,7 @@ async function renderAllMermaid() {
                 svgEl.setAttribute('viewBox', (x - 12) + ' ' + (y - 12) + ' ' + (w + 24) + ' ' + (h + 24));
               }
               svgEl.style.overflow = 'visible';
-              svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach((node: Element) => (node as HTMLElement).style.overflow = 'visible');
+              svgEl.querySelectorAll('g, foreignObject, text, rect, div').forEach((node: Element) => { (node as HTMLElement).style.overflow = 'visible'; });
             }
           }).catch((err: any) => {
             wrapper.innerHTML = '<div class="mermaid-error error-box">Erro de sintaxe Mermaid: ' + (err?.message || err) + '</div>';
@@ -873,8 +872,7 @@ function getSlideStartCharIndex(source: string, slideIndex: number) {
   const body = source.slice(offset);
   const SEPARATOR_GLOBAL = /^(?:---|\*\*\*|<!--\s*(?:break|slide)\s*-->)\s*$/gm;
   let count = 0;
-  let match;
-  while ((match = SEPARATOR_GLOBAL.exec(body)) !== null) {
+  for (let match = SEPARATOR_GLOBAL.exec(body); match !== null; match = SEPARATOR_GLOBAL.exec(body)) {
     count++;
     if (count === slideIndex) {
       return offset + match.index + match[0].length + 1;
@@ -930,8 +928,7 @@ function getSlideIndexForCharIndex(source: string, charIndex: number): number {
 
   const SEPARATOR_GLOBAL = /^(?:---|\*\*\*|<!--\s*(?:break|slide)\s*-->)\s*$/gm;
   let slideIdx = 0;
-  let match;
-  while ((match = SEPARATOR_GLOBAL.exec(body)) !== null) {
+  for (let match = SEPARATOR_GLOBAL.exec(body); match !== null; match = SEPARATOR_GLOBAL.exec(body)) {
     if (offset + match.index > charIndex) break;
     slideIdx++;
   }
@@ -988,7 +985,7 @@ function handlePreviewScroll() {
         if (currentSlideNum !== i) {
           currentSlideNum = i;
           currentSlide.value = i;
-          slides.forEach((s, j) => s.classList.toggle('active', j === i));
+          slides.forEach((s, j) => { s.classList.toggle('active', j === i); });
           updateProgress();
         }
         break;
@@ -1130,8 +1127,7 @@ function updateFindMatches() {
       regex = new RegExp(escaped, flags);
     }
 
-    let match;
-    while ((match = regex.exec(text)) !== null) {
+    for (let match = regex.exec(text); match !== null; match = regex.exec(text)) {
       findMatches.push({ start: match.index, end: match.index + match[0].length });
       if (match[0].length === 0) regex.lastIndex++;
     }
