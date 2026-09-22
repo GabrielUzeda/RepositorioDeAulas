@@ -28,6 +28,10 @@ build/
 database/data/
 backend/database/data/
 backend/data/
+data/
+*.db
+*.db-shm
+*.db-wal
 backend/frontend_static/
 frontend/src/turmas/
 frontend/src/materias/
