@@ -3,6 +3,7 @@ import {
   callAi,
   extractText,
   modelsUrl,
+  resolveConfig,
   resolveProvider,
   type AiConfig,
   type AiProvider,
@@ -345,5 +346,73 @@ describe('AI Provider Abstraction', () => {
     const url = modelsUrl(config);
     expect(url.endsWith('/v1/models')).toBe(true);
     expect(url.includes('/v1/v1/')).toBe(false);
+  });
+
+  test('openai retornando finish_reason length lanca erro de resposta truncada', async () => {
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'modelo-primario',
+      AI_FALLBACK_MODEL: '',
+    });
+    mockHandler = () =>
+      jsonResponse(200, {
+        choices: [{ message: { content: 'texto truncado' }, finish_reason: 'length' }],
+      });
+
+    await expect(callAi({ messages: [{ role: 'user', content: 'oi' }] })).rejects.toThrow(
+      /resposta truncada por limite de tokens/
+    );
+  });
+
+  test('anthropic retornando stop_reason max_tokens lanca erro de resposta truncada', async () => {
+    applyEnv({
+      AI_PROVIDER: 'anthropic',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'claude-teste',
+      AI_FALLBACK_MODEL: '',
+    });
+    mockHandler = () =>
+      jsonResponse(200, {
+        content: [{ type: 'text', text: 'texto truncado' }],
+        stop_reason: 'max_tokens',
+      });
+
+    await expect(callAi({ messages: [{ role: 'user', content: 'oi' }] })).rejects.toThrow(
+      /resposta truncada por limite de tokens/
+    );
+  });
+
+  test('resolveConfig usa 16384 como maxTokens por padrao para opencode e 8192 para openai', () => {
+    applyEnv({
+      AI_PROVIDER: 'opencode',
+      AI_API_KEY: 'k',
+    });
+    const configOpenCode = resolveConfig();
+    expect(configOpenCode.maxTokens).toBe(16384);
+
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_API_KEY: 'k',
+    });
+    const configOpenAi = resolveConfig();
+    expect(configOpenAi.maxTokens).toBe(8192);
+  });
+
+  test('AiChatOptions permite sobrescrever maxTokens na chamada', async () => {
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'deepseek-v4.1-flash',
+    });
+    mockHandler = openAiSuccess;
+
+    await callAi({ messages: [{ role: 'user', content: 'oi' }], maxTokens: 4096 });
+    expect(requests).toHaveLength(1);
+    const body = asRecord(requests[0].body);
+    expect(body?.max_tokens).toBe(4096);
   });
 });

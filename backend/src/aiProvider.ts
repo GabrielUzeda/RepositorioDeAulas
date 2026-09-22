@@ -29,12 +29,14 @@ export interface AiProvider {
   ): AiRequestBody;
   extractContent(data: unknown): string;
   extractError(data: unknown): string;
+  isTruncated?(data: unknown, rawText?: string): boolean;
 }
 
 export interface AiChatOptions {
   messages: AiMessage[];
   temperature?: number;
   timeoutMs?: number;
+  maxTokens?: number;
   validate?: (content: string) => boolean;
 }
 
@@ -84,6 +86,37 @@ function parseJson(raw: string): JsonValue | undefined {
   }
 }
 
+export function isResponseTruncated(raw: string, data?: unknown): boolean {
+  const parsed = data !== undefined ? data : parseJson(raw);
+  const root = asRecord(parsed);
+
+  if (root) {
+    const choices = root.choices;
+    if (Array.isArray(choices) && choices.length > 0) {
+      for (const choice of choices) {
+        const ch = asRecord(choice);
+        if (ch && ch.finish_reason === 'length') {
+          return true;
+        }
+      }
+    }
+    if (root.stop_reason === 'max_tokens') {
+      return true;
+    }
+  }
+
+  if (raw && typeof raw === 'string') {
+    if (
+      /["']?finish_reason["']?\s*:\s*["']length["']/.test(raw) ||
+      /["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(raw)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function resolveConfig(): AiConfig {
   const provider = trimmed(process.env.AI_PROVIDER) || 'opencode';
   const explicitBaseUrl = trimmed(process.env.AI_BASE_URL);
@@ -91,7 +124,8 @@ export function resolveConfig(): AiConfig {
   const explicitModel = trimmed(process.env.AI_MODEL);
   const fallbackModel = trimmed(process.env.AI_FALLBACK_MODEL);
   const timeoutMs = envNumber(process.env.AI_TIMEOUT_MS, 180000);
-  const maxTokens = envNumber(process.env.AI_MAX_TOKENS, 8192);
+  const defaultMaxTokens = provider === 'opencode' || provider === '9router' ? 16384 : 8192;
+  const maxTokens = envNumber(process.env.AI_MAX_TOKENS, defaultMaxTokens);
   const anthropicVersion = trimmed(process.env.AI_ANTHROPIC_VERSION) || '2023-06-01';
 
   let baseUrl: string;
@@ -215,6 +249,20 @@ function createOpenAiProvider(name: string): AiProvider {
     extractError(data: unknown): string {
       return extractErrorValue(data);
     },
+    isTruncated(data: unknown, rawText?: string): boolean {
+      const root = asRecord(data);
+      const choices = root ? root.choices : undefined;
+      if (Array.isArray(choices) && choices.length > 0) {
+        for (const ch of choices) {
+          const record = asRecord(ch);
+          if (record && record.finish_reason === 'length') return true;
+        }
+      }
+      if (rawText && /["']?finish_reason["']?\s*:\s*["']length["']/.test(rawText)) {
+        return true;
+      }
+      return false;
+    },
   };
 }
 
@@ -268,6 +316,14 @@ function createAnthropicProvider(anthropicVersion: string): AiProvider {
     },
     extractError(data: unknown): string {
       return extractErrorValue(data);
+    },
+    isTruncated(data: unknown, rawText?: string): boolean {
+      const root = asRecord(data);
+      if (root && root.stop_reason === 'max_tokens') return true;
+      if (rawText && /["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(rawText)) {
+        return true;
+      }
+      return false;
     },
   };
 }
@@ -370,8 +426,9 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
   let lastError = 'falha desconhecida';
 
   for (const model of models) {
+    const callMaxTokens = options.maxTokens ?? config.maxTokens;
     const body = JSON.stringify(
-      provider.buildBody(model, options.messages, options.temperature ?? 0.3, config.maxTokens)
+      provider.buildBody(model, options.messages, options.temperature ?? 0.3, callMaxTokens)
     );
     const headers = provider.buildHeaders(config.apiKey);
     try {
@@ -387,6 +444,14 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
 
       if (response.ok) {
         const raw = await response.text();
+        const parsedJson = parseJson(raw);
+        const truncated = provider.isTruncated
+          ? provider.isTruncated(parsedJson, raw)
+          : isResponseTruncated(raw, parsedJson);
+        if (truncated) {
+          lastError = `[${model}] resposta truncada por limite de tokens (max_tokens atingido)`;
+          continue;
+        }
         const content = extractText(raw, provider);
         if (content) {
           if (options.validate && !options.validate(content)) {
