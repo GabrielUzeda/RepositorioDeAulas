@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
-import { existsSync, statSync, unlinkSync } from 'node:fs';
+import { existsSync, rmdirSync, statSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { db, purgeOldRanking } from './db';
-import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail, hashSenhaCurso } from './utils';
+import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail, hashSenhaCurso, parseJsonOrNull } from './utils';
 import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter, extractClientIp } from './auth';
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent, resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
@@ -422,6 +422,14 @@ function removeAulaFiles(caminho: string | null | undefined) {
     try {
       if (existsSync(p)) unlinkSync(p);
     } catch (e) { /* best effort */ }
+  }
+  for (const dir of [path.dirname(htmlPath), path.dirname(path.dirname(htmlPath))]) {
+    if (dir === baseDir || dir === path.join(baseDir, 'materias')) continue;
+    try {
+      if (existsSync(dir) && statSync(dir).isDirectory()) rmdirSync(dir);
+    } catch {
+      continue;
+    }
   }
 }
 
