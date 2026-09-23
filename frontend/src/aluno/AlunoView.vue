@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useCursoStore } from '@/shared/stores/curso';
 import { apiClient } from '@/shared/api/client';
-import { secureGet, secureSet } from '@/shared/utils/storage';
+import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
 import CursoCard from '@/aluno/components/CursoCard.vue';
 import DisciplinaCard from '@/aluno/components/DisciplinaCard.vue';
 import AulaCard from '@/aluno/components/AulaCard.vue';
@@ -47,16 +47,30 @@ onMounted(async () => {
 
 async function handleSelectCurso(curso: Curso) {
   selectedCurso.value = curso;
-  if (curso.possui_senha) {
-    const savedToken = await secureGet(`curso_access_${curso.id}`);
-    if (savedToken !== 'granted') {
-      pendingCurso.value = curso;
-      showPasswordModal.value = true;
-      return;
-    }
+
+  const senha = (await secureGet(`curso_senha_${curso.id}`)) || '';
+  cursoSenha.value = senha;
+
+  if (curso.possui_senha && !senha) {
+    pendingCurso.value = curso;
+    showPasswordModal.value = true;
+    return;
   }
+
   activeView.value = 'disciplinas';
-  await cursoStore.fetchDisciplinas(curso.id);
+  const carregou = await cursoStore.fetchDisciplinas(curso.id, senha);
+  if (carregou) return;
+
+  if (curso.possui_senha) {
+    await secureRemove(`curso_senha_${curso.id}`);
+    await secureRemove(`curso_access_${curso.id}`);
+    cursoSenha.value = '';
+    pendingCurso.value = curso;
+    showPasswordModal.value = true;
+    return;
+  }
+
+  activeView.value = 'cursos';
 }
 
 async function handleSelectDisciplina(disciplina: Disciplina) {

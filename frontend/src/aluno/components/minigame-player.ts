@@ -729,13 +729,17 @@ export class MinigamePlayer {
     document.getElementById('mg-btn-close-rank').onclick = () => modal.remove();
 
     // Fetch Data
-    fetch(`/api/ranking/${this.activityData.id}`)
-      .then((res) => res.json())
+    const senhaRanking = this.senhaCurso ? `?senha=${encodeURIComponent(this.senhaCurso)}` : '';
+    fetch(`/api/ranking/${this.activityData.id}${senhaRanking}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Falha ao carregar ranking (${res.status})`);
+        return res.json();
+      })
       .then((data) => {
         const list = document.getElementById('mg-rank-list');
         if (!list) return; // Modal closed
 
-        if (!data || data.length === 0) {
+        if (!Array.isArray(data) || data.length === 0) {
           list.innerHTML =
             '<div class="text-center text-gray-500 mt-32 italic">Nenhum registro encontrado.<br>Seja o primeiro!</div>';
           return;

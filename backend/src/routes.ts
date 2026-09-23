@@ -1028,7 +1028,7 @@ app.post('/cursos/slug/:slug/verificar-senha', async (c) => {
 app.get('/cursos/:id/disciplinas', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const curso = dbq('SELECT id FROM cursos WHERE id = ?').get(id);
+  const curso = dbq('SELECT id, senha FROM cursos WHERE id = ?').get(id) as any;
   if (!curso) return c.text('Curso não encontrado', 404);
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
@@ -1039,6 +1039,12 @@ app.get('/cursos/:id/disciplinas', async (c) => {
         const rows = dbq('SELECT * FROM disciplinas WHERE curso_id = ? ORDER BY nome').all(id);
         return c.json(rows);
       }
+    }
+  }
+  if (curso.senha) {
+    const senha = readCursoSenha(c);
+    if (!senha || !(await matchSenhaCurso(senha, curso.senha))) {
+      return c.text('Senha do curso incorreta', 401);
     }
   }
   const rows = dbq('SELECT id, curso_id, slug, nome, cor, icone, descricao FROM disciplinas WHERE curso_id = ? AND COALESCE(status, \'ativo\') = \'ativo\' ORDER BY nome').all(id);
@@ -1313,18 +1319,47 @@ app.post('/ranking', submissionLimiter, async (c) => {
       )
       .get(atividadeId, nomePublico, pontuacaoCap);
     return c.json(r, 200);
-  } catch (e: any) {
+  } catch {
     return c.text('Erro interno ao registrar ranking', 500);
   }
 });
 
-app.get('/ranking/:atividade_id', (c) => {
+app.get('/ranking/:atividade_id', async (c) => {
   const id = parseId(c.req.param('atividade_id'));
   if (id === null) return c.text('', 400);
+
+  const atv = dbq(`
+    SELECT a.id, cur.senha AS curso_senha, d.curso_id
+    FROM atividades a
+    LEFT JOIN disciplinas d ON d.id = a.disciplina_id
+    LEFT JOIN cursos cur ON cur.id = d.curso_id
+    WHERE a.id = ?
+  `).get(id) as any;
+  if (!atv) return c.text('Atividade não encontrada', 404);
+
+  let gestor = false;
+  const authHeader = c.req.header('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const payload = await verifyJwt(authHeader.slice(7));
+    if (payload?.sub) {
+      const profId = Number(payload.sub);
+      gestor =
+        payload.role === 'admin' ||
+        (atv.curso_id != null && canManageCurso({ id: profId, role: payload.role ?? 'professor' }, atv.curso_id));
+    }
+  }
+
+  if (!gestor && atv.curso_senha) {
+    const senha = readCursoSenha(c);
+    if (!senha || !(await matchSenhaCurso(senha, atv.curso_senha))) {
+      return c.text('Senha do curso incorreta', 401);
+    }
+  }
+
   try {
     const rows = dbq('SELECT id, atividade_id, nome_jogador, pontuacao, data_envio FROM ranking WHERE atividade_id = ? ORDER BY pontuacao DESC LIMIT 50').all(id);
     return c.json(rows);
-  } catch (e: any) {
+  } catch {
     return c.text('Erro interno ao listar ranking', 500);
   }
 });

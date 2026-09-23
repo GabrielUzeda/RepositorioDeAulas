@@ -31,17 +31,20 @@ export const useCursoStore = defineStore('curso', () => {
     }
   }
 
-  async function fetchDisciplinas(cursoId: number): Promise<void> {
+  async function fetchDisciplinas(cursoId: number, senha?: string): Promise<boolean> {
     if (loadedCursoId.value !== cursoId) {
       disciplinas.value = [];
       loadedCursoId.value = cursoId;
     }
     loadingDisciplinas.value = true;
     try {
-      const res = await apiClient.get<Disciplina[]>(`/cursos/${cursoId}/disciplinas`);
+      const senhaParam = senha ? `?senha=${encodeURIComponent(senha)}` : '';
+      const res = await apiClient.get<Disciplina[]>(`/cursos/${cursoId}/disciplinas${senhaParam}`);
       if (res.success && res.data) {
         disciplinas.value = res.data;
+        return true;
       }
+      return false;
     } finally {
       loadingDisciplinas.value = false;
     }
