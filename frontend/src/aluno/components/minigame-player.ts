@@ -1,5 +1,7 @@
 // @ts-nocheck
 
+import { shuffleArray, isOrderSensitiveOption } from '@/shared/utils/shuffle';
+
 export class MinigamePlayer {
   constructor(activityData, onComplete, senhaCurso = '', senhaAtividade = '') {
     this.activityData = activityData;
@@ -463,11 +465,11 @@ export class MinigamePlayer {
 
     const opts =
       q.alternativas && q.alternativas.length > 0 ? [...q.alternativas] : ['Verdadeiro', 'Falso'];
-    opts.sort(() => Math.random() - 0.5);
+    const orderedOpts = opts.some(isOrderSensitiveOption) ? opts : shuffleArray(opts);
 
-    this.currentOpts = opts;
+    this.currentOpts = orderedOpts;
 
-    opts.forEach((opt) => {
+    orderedOpts.forEach((opt) => {
       const btn = document.createElement('button');
       btn.className =
         'opt-btn w-full bg-[#1a1a1a] border border-[#444] p-3 text-[#00d4ff] font-bold text-base cursor-pointer font-mono hover:bg-[#2a2a2a] hover:border-white hover:text-white hover:scale-[1.02] hover:shadow-[0_0_10px_rgba(0,212,255,0.3)] transition-all active:scale-95';

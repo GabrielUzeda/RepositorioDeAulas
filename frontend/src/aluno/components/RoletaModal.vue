@@ -6,6 +6,7 @@ import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import BaseBadge from '@/shared/components/BaseBadge.vue';
+import { shuffleQuestionOptions } from '@/shared/utils/shuffle';
 
 const props = withDefaults(defineProps<{
   show: boolean;
@@ -52,7 +53,7 @@ watch(
 );
 
 function resetGame() {
-  availableQuestions.value = [...(props.questions || [])];
+  availableQuestions.value = shuffleQuestionOptions(props.questions || []);
   currentQuestion.value = null;
   selectedOption.value = null;
   answeredCount.value = 0;

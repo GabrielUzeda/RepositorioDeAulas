@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
+import { shuffleQuestionOptions } from '@/shared/utils/shuffle';
 import { useToast } from '@/shared/composables/useToast';
 import { validateEmailWithTypo } from '@/shared/utils/emailValidator';
 import type { Atividade, Question } from '@/shared/types';
@@ -101,6 +102,7 @@ watch(
               options: q.options || q.alternativas || []
             };
           });
+          questionsList.value = shuffleQuestionOptions(questionsList.value);
         } catch {
           questionsList.value = [];
         }

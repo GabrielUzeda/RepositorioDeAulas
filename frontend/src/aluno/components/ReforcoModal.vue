@@ -5,6 +5,7 @@ import type { Question, Atividade } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseBadge from '@/shared/components/BaseBadge.vue';
+import { shuffleQuestionOptions } from '@/shared/utils/shuffle';
 
 const props = withDefaults(defineProps<{
   show: boolean;
@@ -26,10 +27,11 @@ const started = ref(false);
 const currentIndex = ref(0);
 const selectedOptions = ref<Record<number, number>>({});
 const answeredCorrectly = ref<Set<number>>(new Set());
+const shuffledQuestions = ref<Question[]>([]);
 
 const currentQuestion = computed<Question | null>(() => {
-  if (!props.questions || props.questions.length === 0) return null;
-  return props.questions[currentIndex.value] || null;
+  if (!shuffledQuestions.value || shuffledQuestions.value.length === 0) return null;
+  return shuffledQuestions.value[currentIndex.value] || null;
 });
 
 const currentSelectedOptionIndex = computed<number | null>(() => {
@@ -42,8 +44,9 @@ const currentSelectedOption = computed(() => {
 });
 
 const acertosCount = computed(() => answeredCorrectly.value.size);
+const totalQuestions = computed(() => shuffledQuestions.value.length);
 const isCompleted = computed(() => {
-  return props.questions.length > 0 && acertosCount.value === props.questions.length;
+  return totalQuestions.value > 0 && acertosCount.value === totalQuestions.value;
 });
 
 function isOptCorrect(opt: any): boolean {
@@ -55,12 +58,14 @@ watch(
   () => props.show,
   (val) => {
     if (val) {
+      shuffledQuestions.value = shuffleQuestionOptions(props.questions || []);
       started.value = false;
       currentIndex.value = 0;
       selectedOptions.value = {};
       answeredCorrectly.value = new Set();
     }
-  }
+  },
+  { immediate: true }
 );
 
 function selectOption(optIndex: number) {
@@ -73,7 +78,7 @@ function selectOption(optIndex: number) {
     newSet.add(currentIndex.value);
     answeredCorrectly.value = newSet;
 
-    if (newSet.size === props.questions.length) {
+    if (newSet.size === totalQuestions.value) {
       success('Parabéns! Você acertou todas as questões de reforço!');
     }
   }
@@ -91,7 +96,7 @@ function getOptionFeedback(opt: any, question: Question): string {
 }
 
 function nextQuestion() {
-  if (currentIndex.value < props.questions.length - 1) {
+  if (currentIndex.value < totalQuestions.value - 1) {
     currentIndex.value++;
   }
 }
@@ -146,10 +151,10 @@ function prevQuestion() {
     <div v-else class="space-y-5">
       <!-- Header & Progress Counter -->
       <div class="flex justify-between items-center text-sm font-semibold text-secondary pb-1">
-        <span>Questão {{ currentIndex + 1 }} de {{ props.questions.length }}</span>
+        <span>Questão {{ currentIndex + 1 }} de {{ totalQuestions }}</span>
         <div class="flex items-center gap-2">
           <BaseBadge variant="success">
-            Acertos: {{ acertosCount }} / {{ props.questions.length }}
+            Acertos: {{ acertosCount }} / {{ totalQuestions }}
           </BaseBadge>
         </div>
       </div>
@@ -247,7 +252,7 @@ function prevQuestion() {
         </BaseButton>
 
         <BaseButton
-          v-if="currentIndex < props.questions.length - 1"
+          v-if="currentIndex < totalQuestions - 1"
           variant="primary"
           size="sm"
           @click="nextQuestion"

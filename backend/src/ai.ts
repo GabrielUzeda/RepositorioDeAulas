@@ -315,9 +315,9 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
       "title": "Conceito Central / Tópico Abordado",
       "content": "Enunciado direto e objetivo da questão aqui...",
       "options": [
-        { "text": "Alternativa A", "correct": true },
+        { "text": "Alternativa A", "correct": false },
         { "text": "Alternativa B", "correct": false },
-        { "text": "Alternativa C", "correct": false },
+        { "text": "Alternativa C", "correct": true },
         { "text": "Alternativa D", "correct": false }
       ]
     }
@@ -329,8 +329,8 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
       "title": "Conceito Central / Tópico Abordado",
       "content": "Enunciado claro e detalhado da questão aqui...",
       "options": [
-        { "text": "Texto da alternativa A", "correct": true, "feedback": "Justificativa pedagógica" },
-        { "text": "Texto da alternativa B", "correct": false, "feedback": "Justificativa pedagógica" },
+        { "text": "Texto da alternativa A", "correct": false, "feedback": "Justificativa pedagógica" },
+        { "text": "Texto da alternativa B", "correct": true, "feedback": "Justificativa pedagógica" },
         { "text": "Texto da alternativa C", "correct": false, "feedback": "Justificativa pedagógica" },
         { "text": "Texto da alternativa D", "correct": false, "feedback": "Justificativa pedagógica" }
       ]
