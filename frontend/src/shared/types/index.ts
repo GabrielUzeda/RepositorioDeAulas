@@ -205,3 +205,27 @@ export interface GenerateActivityPayload {
   disciplina_id?: number;
   aulas_ids?: number[];
 }
+
+export interface EstatisticaQuestao {
+  indice: number;
+  titulo: string;
+  objetivo: boolean;
+  respondentes: number | null;
+  acertos: number | null;
+  erros: number | null;
+  taxa_acerto: number | null;
+}
+
+export interface EstatisticaAtividade {
+  id: number;
+  titulo: string;
+  tipo: string;
+  total_submissoes: number;
+  suficientes: boolean;
+  questoes: EstatisticaQuestao[];
+}
+
+export interface DisciplinaEstatisticas {
+  min_agrupamento: number;
+  atividades: EstatisticaAtividade[];
+}

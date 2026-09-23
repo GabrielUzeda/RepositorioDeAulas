@@ -137,6 +137,16 @@ CREATE TABLE IF NOT EXISTS ranking (
   data_envio TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
+CREATE TABLE IF NOT EXISTS estatisticas_questoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  atividade_id INTEGER NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
+  questao_ref TEXT NOT NULL,
+  acertos INTEGER NOT NULL DEFAULT 0,
+  erros INTEGER NOT NULL DEFAULT 0,
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  UNIQUE(atividade_id, questao_ref)
+);
+
 CREATE TABLE IF NOT EXISTS audit_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   usuario_id INTEGER REFERENCES professores(id) ON DELETE SET NULL,

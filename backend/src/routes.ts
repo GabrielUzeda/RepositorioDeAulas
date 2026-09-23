@@ -1229,35 +1229,38 @@ app.get('/atividades/:id', async (c) => {
 
 
 
+interface CorrecaoQuestao {
+  indice: number;
+  ref: string;
+  acertou: boolean;
+}
+
 interface CorrecaoResultado {
   acertos: number;
   total: number;
   pontuacao: number;
+  porQuestao: CorrecaoQuestao[];
 }
 
 const MAX_RANKING_PONTUACAO = 1_000_000;
+const MIN_SUBMISSOES_ESTATISTICAS = 5;
 
 function corrigirObjetivas(jsonDataStr: string | null | undefined, respostasInput: any): CorrecaoResultado {
-  if (!jsonDataStr) return { acertos: 0, total: 0, pontuacao: 0 };
+  if (!jsonDataStr) return { acertos: 0, total: 0, pontuacao: 0, porQuestao: [] };
 
-  let questions: any[] = [];
-  try {
-    const parsed = typeof jsonDataStr === 'string' ? JSON.parse(jsonDataStr) : jsonDataStr;
-    questions = Array.isArray(parsed.questions) ? parsed.questions : [];
-  } catch {
-    return { acertos: 0, total: 0, pontuacao: 0 };
+  const parsed = typeof jsonDataStr === 'string' ? parseJsonOrNull<any>(jsonDataStr) : jsonDataStr;
+  if (!parsed || !Array.isArray(parsed.questions)) {
+    return { acertos: 0, total: 0, pontuacao: 0, porQuestao: [] };
   }
+  const questions: any[] = parsed.questions;
 
   let acertos = 0;
   let totalObjetivas = 0;
+  const porQuestao: CorrecaoQuestao[] = [];
 
   let respostasMap: Record<string, string> = {};
   if (typeof respostasInput === 'string') {
-    try {
-      respostasMap = JSON.parse(respostasInput);
-    } catch {
-      respostasMap = { "0": respostasInput };
-    }
+    respostasMap = parseJsonOrNull<Record<string, string>>(respostasInput) ?? { '0': respostasInput };
   } else if (typeof respostasInput === 'object' && respostasInput !== null) {
     if (Array.isArray(respostasInput)) {
       for (const item of respostasInput) {
@@ -1271,21 +1274,41 @@ function corrigirObjetivas(jsonDataStr: string | null | undefined, respostasInpu
   questions.forEach((q: any, idx: number) => {
     if (Array.isArray(q.options) && q.options.length > 0) {
       totalObjetivas++;
+      const keyId = q.id !== undefined ? String(q.id) : String(idx);
+      const keyTitle = typeof q.title === 'string' ? q.title : '';
+      const keyContent = typeof q.content === 'string' ? q.content : '';
       const correta = q.options.find((opt: any) => opt && opt.correct === true);
-      if (correta && typeof correta.text === 'string') {
-        const keyId = q.id !== undefined ? String(q.id) : String(idx);
-        const keyTitle = typeof q.title === 'string' ? q.title : '';
-        const keyContent = typeof q.content === 'string' ? q.content : '';
+      const respAluno = respostasMap[keyId] ?? respostasMap[String(idx)] ?? respostasMap[keyTitle] ?? respostasMap[keyContent];
 
-        const respAluno = respostasMap[keyId] ?? respostasMap[String(idx)] ?? respostasMap[keyTitle] ?? respostasMap[keyContent];
-        if (typeof respAluno === 'string' && respAluno.trim().toLowerCase() === correta.text.trim().toLowerCase()) {
-          acertos++;
-        }
-      }
+      const acertou =
+        Boolean(correta) &&
+        typeof correta.text === 'string' &&
+        typeof respAluno === 'string' &&
+        respAluno.trim().toLowerCase() === correta.text.trim().toLowerCase();
+
+      if (acertou) acertos++;
+      porQuestao.push({ indice: idx, ref: keyId, acertou });
     }
   });
-const pontuacao = totalObjetivas > 0 ? Math.round((acertos / totalObjetivas) * 100) : 0;
-  return { acertos, total: totalObjetivas, pontuacao };
+  const pontuacao = totalObjetivas > 0 ? Math.round((acertos / totalObjetivas) * 100) : 0;
+  return { acertos, total: totalObjetivas, pontuacao, porQuestao };
+}
+
+function ajustarEstatisticas(atividadeId: number, porQuestao: CorrecaoQuestao[], delta: number): void {
+  if (porQuestao.length === 0) return;
+  const upsert = db.query(`
+    INSERT INTO estatisticas_questoes (atividade_id, questao_ref, acertos, erros)
+    VALUES (?, ?, MAX(?, 0), MAX(?, 0))
+    ON CONFLICT(atividade_id, questao_ref) DO UPDATE SET
+      acertos = MAX(acertos + ?, 0),
+      erros = MAX(erros + ?, 0),
+      atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+  `);
+  for (const questao of porQuestao) {
+    const dAcerto = questao.acertou ? delta : 0;
+    const dErro = questao.acertou ? 0 : delta;
+    upsert.run(atividadeId, questao.ref, dAcerto, dErro, dAcerto, dErro);
+  }
 }
 
 function formatPublicName(fullName: string): string {
@@ -1444,21 +1467,30 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
     // Upsert: submissões repetidas do mesmo e-mail na mesma atividade
     // atualizam o registro anterior (última tentativa vence), mantendo o
     // consulta_token original para o direito de consulta LGPD.
-    const existente = dbq('SELECT id, criado_em FROM respostas_alunos WHERE atividade_id = ? AND aluno_email_hash = ?').get(atividadeId, emailHash) as any;
+    const existente = dbq('SELECT id, criado_em, respostas FROM respostas_alunos WHERE atividade_id = ? AND aluno_email_hash = ?').get(atividadeId, emailHash) as any;
 
     let r: any;
     if (existente) {
-      dbq(
-        'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ?, consulta_token_hash = ?, entregue_com_atraso = ? WHERE id = ?'
-      ).run(encNome, encEmail, encRespostas, tokenHash, entregueComAtraso, existente.id);
+      const respostasAnteriores = await decryptData(existente.respostas);
+      const porQuestaoAnterior = corrigirObjetivas(atv.json_data, respostasAnteriores).porQuestao;
+      db.transaction(() => {
+        ajustarEstatisticas(atividadeId, porQuestaoAnterior, -1);
+        dbq(
+          'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ?, consulta_token_hash = ?, entregue_com_atraso = ? WHERE id = ?'
+        ).run(encNome, encEmail, encRespostas, tokenHash, entregueComAtraso, existente.id);
+        ajustarEstatisticas(atividadeId, correcao.porQuestao, 1);
+      })();
       r = { id: existente.id, atividade_id: atividadeId, criado_em: existente.criado_em };
     } else {
-      r = db
-        .query(
-          `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash, entregue_com_atraso)
-           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
-        )
-        .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash, entregueComAtraso) as any;
+      db.transaction(() => {
+        r = db
+          .query(
+            `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash, entregue_com_atraso)
+             VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
+          )
+          .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash, entregueComAtraso) as any;
+        ajustarEstatisticas(atividadeId, correcao.porQuestao, 1);
+      })();
     }
 
     await logAudit(c, 'submeter_resposta', `atividade:${atividadeId}`, { email_hash: emailHash });
@@ -1777,7 +1809,24 @@ app.delete('/aluno/minhas-respostas', submissionLimiter, async (c) => {
   ).get(emailHash, tokenHash);
   if (!tokenCheck) return c.text('Token inválido para este e-mail.', 401);
 
+  const alvos = dbq(
+    'SELECT atividade_id, respostas FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?'
+  ).all(emailHash, tokenHash) as any[];
+  const ajustesEstatisticas = await Promise.all(
+    alvos.map(async (alvo) => {
+      const atvAlvo = dbq('SELECT json_data FROM atividades WHERE id = ?').get(alvo.atividade_id) as any;
+      const respostasDecifradas = await decryptData(alvo.respostas);
+      return {
+        atividadeId: Number(alvo.atividade_id),
+        porQuestao: corrigirObjetivas(atvAlvo?.json_data, respostasDecifradas).porQuestao,
+      };
+    })
+  );
+
   db.transaction(() => {
+    for (const ajuste of ajustesEstatisticas) {
+      ajustarEstatisticas(ajuste.atividadeId, ajuste.porQuestao, -1);
+    }
     dbq('DELETE FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?').run(emailHash, tokenHash);
     // [LGPD] Direito à eliminação (Art. 16): cascata para rascunhos e feedbacks
     // individuais do mesmo titular (mesmo e-mail/hash), que também contêm PII.
@@ -1814,12 +1863,16 @@ app.get('/atividades/:id/respostas', professorAuth, async (c) => {
 app.delete('/respostas/:id', professorAuth, async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('ID inválido', 400);
-  const resp = dbq('SELECT atividade_id FROM respostas_alunos WHERE id = ?').get(id) as any;
+  const resp = dbq('SELECT atividade_id, respostas FROM respostas_alunos WHERE id = ?').get(id) as any;
   if (!resp) return c.text('Resposta não encontrada', 404);
-  const atv = dbq('SELECT disciplina_id FROM atividades WHERE id = ?').get(resp.atividade_id) as any;
+  const atv = dbq('SELECT disciplina_id, json_data FROM atividades WHERE id = ?').get(resp.atividade_id) as any;
   if (atv && !(await canManageDisciplina(c, atv.disciplina_id))) return c.text('Access denied', 403);
 
-  dbq('DELETE FROM respostas_alunos WHERE id = ?').run(id);
+  const respostasDecifradas = await decryptData(resp.respostas);
+  db.transaction(() => {
+    ajustarEstatisticas(resp.atividade_id, corrigirObjetivas(atv?.json_data, respostasDecifradas).porQuestao, -1);
+    dbq('DELETE FROM respostas_alunos WHERE id = ?').run(id);
+  })();
 
   await logAudit(c, 'excluir_resposta_professor', `resposta:${id}`);
 
@@ -2059,6 +2112,75 @@ app.patch('/respostas/:id/email', professorAuth, async (c) => {
   await logAudit(c, 'atualizar_email_resposta', 'respostas_alunos', { resposta_id: id });
 
   return c.json({ success: true, message: 'E-mail do aluno atualizado com sucesso', aluno_email: rawEmail, aluno_email_hash: emailHash });
+});
+
+app.get('/disciplinas/:id/estatisticas', professorAuth, async (c) => {
+  const disciplinaId = parseId(c.req.param('id'));
+  if (disciplinaId === null) return c.text('ID inválido', 400);
+  if (!(await canManageDisciplina(c, disciplinaId))) return c.text('Access denied', 403);
+
+  const atividades = dbq(`
+    SELECT a.id, a.titulo, a.tipo, a.json_data,
+      (SELECT COUNT(*) FROM respostas_alunos r WHERE r.atividade_id = a.id) AS total_submissoes
+    FROM atividades a
+    WHERE a.disciplina_id = ?
+    ORDER BY a.ordem, a.titulo
+  `).all(disciplinaId) as any[];
+
+  const contadores = dbq(`
+    SELECT atividade_id, questao_ref, acertos, erros
+    FROM estatisticas_questoes
+    WHERE atividade_id IN (SELECT id FROM atividades WHERE disciplina_id = ?)
+  `).all(disciplinaId) as any[];
+
+  const atividadesComEstatisticas = atividades.map((atv) => {
+    const json = parseJsonOrNull<any>(atv.json_data);
+    const questoes: any[] = Array.isArray(json?.questions) ? json.questions : [];
+    const totalSubmissoes = Number(atv.total_submissoes) || 0;
+    const suficientes = totalSubmissoes >= MIN_SUBMISSOES_ESTATISTICAS;
+
+    const porRef = new Map<string, { acertos: number; erros: number }>();
+    for (const contador of contadores) {
+      if (Number(contador.atividade_id) !== Number(atv.id)) continue;
+      porRef.set(String(contador.questao_ref), {
+        acertos: Number(contador.acertos) || 0,
+        erros: Number(contador.erros) || 0,
+      });
+    }
+
+    const questoesSaida = questoes.map((q: any, idx: number) => {
+      const ref = q && q.id !== undefined ? String(q.id) : String(idx);
+      const contador = porRef.get(ref);
+      const acertosQuestao = contador ? contador.acertos : 0;
+      const errosQuestao = contador ? contador.erros : 0;
+      const respondentes = acertosQuestao + errosQuestao;
+      const tituloOriginal = String(q?.title || q?.content || `Questão ${idx + 1}`);
+      const visivel = suficientes && respondentes >= MIN_SUBMISSOES_ESTATISTICAS;
+      return {
+        indice: idx,
+        titulo: tituloOriginal.length > 140 ? `${tituloOriginal.slice(0, 137)}...` : tituloOriginal,
+        objetivo: Array.isArray(q?.options) && q.options.length > 0,
+        respondentes: visivel ? respondentes : null,
+        acertos: visivel ? acertosQuestao : null,
+        erros: visivel ? errosQuestao : null,
+        taxa_acerto: visivel ? Math.round((acertosQuestao / respondentes) * 100) : null,
+      };
+    });
+
+    return {
+      id: Number(atv.id),
+      titulo: atv.titulo,
+      tipo: atv.tipo || 'normal',
+      total_submissoes: totalSubmissoes,
+      suficientes,
+      questoes: questoesSaida,
+    };
+  });
+
+  return c.json({
+    min_agrupamento: MIN_SUBMISSOES_ESTATISTICAS,
+    atividades: atividadesComEstatisticas,
+  });
 });
 
 app.get('/disciplinas/:id/relatorio-feedback', professorAuth, async (c) => {

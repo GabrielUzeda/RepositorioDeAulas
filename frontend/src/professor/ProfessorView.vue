@@ -20,6 +20,7 @@ import BackButton from '@/shared/components/BackButton.vue';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseSelect from '@/shared/components/BaseSelect.vue';
 import ConfirmDialog from '../shared/components/ConfirmDialog.vue';
+import EstatisticasModal from '@/professor/components/EstatisticasModal.vue';
 import EmptyState from '../shared/components/EmptyState.vue';
 import type { Curso, Disciplina, Aula, Atividade } from '@/shared/types';
 
@@ -44,6 +45,7 @@ const showRespostasModal = ref(false);
 const selectedRespostasAtividade = ref<Atividade | null>(null);
 
 const showFeedbackConsolidadoModal = ref(false);
+const showEstatisticasModal = ref(false);
 const showDocumentosModal = ref(false);
 
 onMounted(async () => {
@@ -758,6 +760,16 @@ function handleOpenRespostas(atividade: Atividade) {
               </BaseButton>
 
               <BaseButton
+                variant="secondary"
+                size="sm"
+                class="inline-flex items-center justify-center gap-1.5"
+                @click="showEstatisticasModal = true"
+              >
+                <span class="material-icons text-sm">insights</span>
+                <span>Desempenho da Turma</span>
+              </BaseButton>
+
+              <BaseButton
                 v-if="cursoStore.aulas.length > 1 || cursoStore.atividades.length > 1"
                 :variant="isReordering ? 'primary' : 'secondary'"
                 size="sm"
@@ -1280,6 +1292,13 @@ function handleOpenRespostas(atividade: Atividade) {
       :disciplina-id="selectedDisciplina?.id || null"
       :disciplina-nome="selectedDisciplina?.nome"
       @close="showFeedbackConsolidadoModal = false"
+    />
+
+    <EstatisticasModal
+      :show="showEstatisticasModal"
+      :disciplina-id="selectedDisciplina?.id || null"
+      :disciplina-nome="selectedDisciplina?.nome"
+      @close="showEstatisticasModal = false"
     />
 
     <DocumentosDisciplinaModal

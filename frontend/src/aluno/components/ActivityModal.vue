@@ -369,7 +369,7 @@ async function handleSubmit() {
         <div class="p-4 bg-surface-alt border border-line rounded-xl space-y-3">
           <div class="flex items-start gap-2 text-secondary">
              <span class="material-icons text-accent text-lg mt-0.5">shield</span>
-             <p class="text-xs">Seus dados são protegidos pela LGPD e ECA Digital. Se você enviar a atividade mais de uma vez com o mesmo e-mail, sua resposta anterior será automaticamente atualizada (a última tentativa é a que prevalece).</p>
+             <p class="text-xs">Seus dados são protegidos pela LGPD e ECA Digital. Se você enviar a atividade mais de uma vez com o mesmo e-mail, sua resposta anterior será automaticamente atualizada (a última tentativa é a que prevalece). Suas respostas também geram estatísticas agregadas por questão para diagnóstico da turma, sem identificar alunos.</p>
           </div>
         </div>
 
