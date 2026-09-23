@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { professorAuth } from './auth';
 import { db } from './db';
-import { decryptData } from './utils';
+import { decryptData, parseJsonOrNull } from './utils';
 import { callAi, resolveConfig, resolveProvider, modelsUrl, type AiMessage } from './aiProvider';
 
 const aiRouter = new Hono();
@@ -138,40 +138,28 @@ aiRouter.get('/models', professorAuth, async (c) => {
   }
 });
 
+function extractQuestions(parsed: any): any[] {
+  if (Array.isArray(parsed?.questions)) return parsed.questions;
+  if (Array.isArray(parsed)) return parsed;
+  return [];
+}
+
 function parseActivityQuestions(content: string): any[] {
+  const cleanJson = content
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  const candidates: string[] = [cleanJson];
+  const objMatch = content.match(/\{[\s\S]*\}/);
+  if (objMatch) candidates.push(objMatch[0]);
+  const arrMatch = content.match(/\[[\s\S]*\]/);
+  if (arrMatch) candidates.push(arrMatch[0]);
+
   let parsedQuestions: any[] = [];
-  try {
-    const cleanJson = content
-      .replace(/```json/gi, '')
-      .replace(/```/g, '')
-      .trim();
-    const parsed = JSON.parse(cleanJson);
-    parsedQuestions = Array.isArray(parsed?.questions)
-      ? parsed.questions
-      : Array.isArray(parsed)
-        ? parsed
-        : [];
-  } catch {
-    const objMatch = content.match(/\{[\s\S]*\}/);
-    if (objMatch) {
-      try {
-        const parsed = JSON.parse(objMatch[0]);
-        parsedQuestions = Array.isArray(parsed?.questions)
-          ? parsed.questions
-          : Array.isArray(parsed)
-            ? parsed
-            : [];
-      } catch {}
-    }
-    if (parsedQuestions.length === 0) {
-      const arrMatch = content.match(/\[[\s\S]*\]/);
-      if (arrMatch) {
-        try {
-          const parsed = JSON.parse(arrMatch[0]);
-          if (Array.isArray(parsed)) parsedQuestions = parsed;
-        } catch {}
-      }
-    }
+  for (const candidate of candidates) {
+    if (parsedQuestions.length > 0) break;
+    parsedQuestions = extractQuestions(parseJsonOrNull(candidate));
   }
   return parsedQuestions;
 }

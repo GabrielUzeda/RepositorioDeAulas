@@ -177,48 +177,51 @@ CREATE TABLE IF NOT EXISTS rascunhos_editor (
 `);
 
 // Migrações defensivas para colunas adicionadas e relacionamentos N:N
-try {
-  db.run('ALTER TABLE atividades ADD COLUMN aula_id INTEGER REFERENCES aulas(id) ON DELETE SET NULL');
-} catch {}
+function hasColumn(table: string, column: string): boolean {
+  const row = db.query('SELECT 1 AS ok FROM pragma_table_info(?) WHERE name = ?').get(table, column);
+  return row != null;
+}
 
-try { db.run("ALTER TABLE cursos ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
-try { db.run("ALTER TABLE disciplinas ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
-try { db.run("ALTER TABLE atividades ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
-try { db.run("ALTER TABLE atividades ADD COLUMN data_limite TEXT"); } catch {}
-try { db.run("ALTER TABLE respostas_alunos ADD COLUMN entregue_com_atraso INTEGER DEFAULT 0"); } catch {}
+function addColumnIfMissing(table: string, column: string, alterSql: string): void {
+  if (hasColumn(table, column)) return;
+  db.run(alterSql);
+}
 
-try {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS aula_atividades (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      aula_id INTEGER NOT NULL REFERENCES aulas(id) ON DELETE CASCADE,
-      atividade_id INTEGER NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
-      ordem INTEGER DEFAULT 0,
-      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-      UNIQUE(aula_id, atividade_id)
-    )
-  `);
-  db.run(`
-    INSERT OR IGNORE INTO aula_atividades (aula_id, atividade_id)
-    SELECT aula_id, id FROM atividades WHERE aula_id IS NOT NULL
-  `);
-} catch {}
+addColumnIfMissing('atividades', 'aula_id', 'ALTER TABLE atividades ADD COLUMN aula_id INTEGER REFERENCES aulas(id) ON DELETE SET NULL');
+addColumnIfMissing('cursos', 'status', "ALTER TABLE cursos ADD COLUMN status TEXT DEFAULT 'ativo'");
+addColumnIfMissing('disciplinas', 'status', "ALTER TABLE disciplinas ADD COLUMN status TEXT DEFAULT 'ativo'");
+addColumnIfMissing('atividades', 'status', "ALTER TABLE atividades ADD COLUMN status TEXT DEFAULT 'ativo'");
+addColumnIfMissing('atividades', 'data_limite', 'ALTER TABLE atividades ADD COLUMN data_limite TEXT');
+addColumnIfMissing('respostas_alunos', 'entregue_com_atraso', 'ALTER TABLE respostas_alunos ADD COLUMN entregue_com_atraso INTEGER DEFAULT 0');
 
-try {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS documentos_orientadores (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      curso_id INTEGER REFERENCES cursos(id) ON DELETE CASCADE,
-      disciplina_id INTEGER REFERENCES disciplinas(id) ON DELETE CASCADE,
-      titulo TEXT NOT NULL,
-      nome_arquivo TEXT NOT NULL,
-      tipo TEXT CHECK(tipo IN ('ementa', 'plano_ensino', 'apostila', 'outro')) DEFAULT 'outro',
-      conteudo_texto TEXT NOT NULL,
-      tamanho_bytes INTEGER NOT NULL,
-      criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-    )
-  `);
-} catch {}
+db.run(`
+  CREATE TABLE IF NOT EXISTS aula_atividades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    aula_id INTEGER NOT NULL REFERENCES aulas(id) ON DELETE CASCADE,
+    atividade_id INTEGER NOT NULL REFERENCES atividades(id) ON DELETE CASCADE,
+    ordem INTEGER DEFAULT 0,
+    criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(aula_id, atividade_id)
+  )
+`);
+db.run(`
+  INSERT OR IGNORE INTO aula_atividades (aula_id, atividade_id)
+  SELECT aula_id, id FROM atividades WHERE aula_id IS NOT NULL
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS documentos_orientadores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    curso_id INTEGER REFERENCES cursos(id) ON DELETE CASCADE,
+    disciplina_id INTEGER REFERENCES disciplinas(id) ON DELETE CASCADE,
+    titulo TEXT NOT NULL,
+    nome_arquivo TEXT NOT NULL,
+    tipo TEXT CHECK(tipo IN ('ementa', 'plano_ensino', 'apostila', 'outro')) DEFAULT 'outro',
+    conteudo_texto TEXT NOT NULL,
+    tamanho_bytes INTEGER NOT NULL,
+    criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  )
+`);
 
 // [2] Índices para alta performance
 db.run(`

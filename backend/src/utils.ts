@@ -26,13 +26,21 @@ export function sanitizePathOrUrl(s: string): string {
     .join('_');
 }
 
+export function parseJsonOrNull<T = any>(text: string): T | null {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 function b64url(data: Uint8Array): string {
   let binary = '';
   for (const byte of data) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function parseB64url(str: string): Uint8Array {
+function parseB64url(str: string): Uint8Array<ArrayBuffer> {
   let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4) base64 += '=';
   const binary = atob(base64);
@@ -41,7 +49,7 @@ function parseB64url(str: string): Uint8Array {
   return bytes;
 }
 
-function getRawKey(): Uint8Array {
+function getRawKey(): Uint8Array<ArrayBuffer> {
   const secret = process.env.ENCRYPTION_KEY_256 || process.env.JWT_SECRET || 'dev-encryption-key-32-bytes-ok!';
   const encoder = new TextEncoder();
   const bytes = encoder.encode(secret);

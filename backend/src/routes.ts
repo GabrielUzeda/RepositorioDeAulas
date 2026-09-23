@@ -118,10 +118,8 @@ function mapAtividade(row: any) {
   if (row == null) return row;
   let aula_ids: number[] = [];
   if (row.aula_ids_json) {
-    try {
-      const parsed = JSON.parse(row.aula_ids_json);
-      if (Array.isArray(parsed)) aula_ids = parsed.filter((n: any) => n != null);
-    } catch {}
+    const parsed = parseJsonOrNull(row.aula_ids_json);
+    if (Array.isArray(parsed)) aula_ids = parsed.filter((n: any) => n != null);
   }
   if (aula_ids.length === 0 && row.aula_id) {
     aula_ids = [Number(row.aula_id)];
@@ -1335,7 +1333,7 @@ app.post('/admin/expurgar-ranking', adminAuth, (c) => {
   try {
     const deletados = purgeOldRanking(30);
     return c.json({ mensagem: `Expurgo concluído. ${deletados} registros antigos ( > 30 dias) foram removidos do ranking.`, deletados });
-  } catch (e: any) {
+  } catch {
     return c.text('Erro ao expurgar registros do ranking', 500);
   }
 });
@@ -1491,7 +1489,7 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
       total: correcao.total,
       pontuacao: correcao.pontuacao
     }, existente ? 200 : 201);
-  } catch (e: any) {
+  } catch {
     return c.text('Erro interno ao salvar resposta', 500);
   }
 }
@@ -1687,7 +1685,7 @@ app.get('/rascunhos/:codigo', draftLimiter, async (c) => {
         expira_em: rascunho.expira_em
       }
     });
-  } catch (err) {
+  } catch {
     return c.json({ success: false, error: 'Erro ao descriptografar rascunho' }, 500);
   }
 });
