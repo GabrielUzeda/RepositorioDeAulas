@@ -249,8 +249,7 @@ npx playwright test
 
 ## 🔒 Conformidade LGPD & Segurança
 
-* **Auditoria LGPD:** A documentação completa da auditoria de privacidade (ROPA, RIPD, DPO, Bases Legais, Matriz de Retenção, Política de Privacidade e Incidentes) está mantida na pasta [.lgpd/STATUS.md](.lgpd/STATUS.md).
-* **Débito Técnico & Roadmap:** Acompanhe os débitos técnicos corrigidos e pendentes de segurança em [DEBITO_TECNICO.md](DEBITO_TECNICO.md).
+* **Débito Técnico & Roadmap:** Os débitos técnicos conhecidos (papel `owner` acima de `admin`, validador pré-salvamento das aulas Marp e outros) ficam registrados em [AGENTS.md](AGENTS.md) → seção *Débito técnico conhecido*.
 
 ---
 

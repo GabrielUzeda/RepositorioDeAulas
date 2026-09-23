@@ -371,3 +371,18 @@ Há `DESIGN.md` na raiz documentando tokens de cor, escalas de raio/sombra/tipog
 
 ### 11.5 Remediação — concluída (2026-08-13)
 1. ✅ Contraste de botões success/danger + erros (tokens `on-*`/`danger-text`). 2. ✅ Bordas ≥3:1 (`--c-line:#64748b`). 3. ✅ Tokenizar cores fixas (`cat-*`). 4. ✅ Tokens de raio/sombra/tipografia. 5. ✅ `DESIGN.md` criado.
+
+---
+
+## 12. Débito técnico conhecido
+
+Itens reconhecidos e **não** implementados, com o motivo e o ponto de entrada para quem for atacar:
+
+| Item | Onde mexer | Situação |
+|---|---|---|
+| **Papel `owner` acima de `admin`** | `backend/src/db.ts` (seed/migração), `backend/src/auth.ts` (novo middleware), `frontend/src/admin/AdminView.vue` | Decisão pendente (ver armadilha 17). Hoje qualquer admin exclui/rebaixa outro admin, inclusive a si mesmo, e o último admin pode sumir. Perguntas em aberto: quem nasce `owner` (promover o admin semeado no seed?); admins podem criar/remover admins ou vira exclusivo do owner; como revogar privilégio na hora (**o `role` viaja no JWT por 24h** — exige versão de token ou TTL curto para owner); esconder a gestão de professores de quem não é owner. |
+| **Validador antes de salvar a aula (Marp)** | `frontend/src/professor/components/MarpEditorModal.vue` (caminho de salvar) e `backend/src/marp.ts` | Pendente. Hoje só existe `repairRawHtmlBlocks()`, que **conserta na renderização**: um bloco HTML cru sem fechamento (`<style>`, `<script>`, `<template>`, `<textarea>`) faz o parser engolir o resto do documento e sumir com os slides seguintes. Falta uma barreira **preventiva no save** (`POST /aulas`, `PUT /aulas/:id`, `POST /marp/render`) que detecte tag crua sem fechamento, JS com erro de sintaxe (ex.: `new Function(...)` em sandbox, sem executar no contexto da página) e Markdown malformado, apontando o slide/linha antes de gravar `conteudo_md`. |
+| **`Record<string, any>` em `dbq`/`parseBody`** | `backend/src/routes.ts` | Débito consciente: migrar para `unknown` gera 35+ erros de tipo em ~60 pontos e não muda nada em runtime (tipo é apagado). Revisitar só com tempo dedicado. |
+| **`biome format` não é gate** | repositório | O repo não é format-clean (arquivos antigos também acusam) e o hook só bloqueia **erros** de lint. Caminho combinado: um commit isolado com `npm run format` (sem mudança de lógica) + `.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`), feito em momento sem branches abertas; só depois tornar `biome format --check` bloqueante. |
+
+> Referência de armadilhas relacionadas: §10 itens 13–16 (correção objetiva não persistida, estatísticas agregadas, ranking com senha e compose dev × e2e).
