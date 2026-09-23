@@ -222,8 +222,11 @@ test.describe('Aluno — Atividades Avançadas & Modalidades Interativas', () =>
     }
     expect(postRank.ok()).toBeTruthy();
 
-    // Consulta o ranking
-    const getRank = await request.get(`${E2E_BACKEND_URL}/ranking/${minigameAtv.id}`);
+    // Consulta o ranking (exige a senha do curso para o público)
+    const getRankSemSenha = await request.get(`${E2E_BACKEND_URL}/ranking/${minigameAtv.id}`);
+    expect(getRankSemSenha.status()).toBe(401);
+
+    const getRank = await request.get(`${E2E_BACKEND_URL}/ranking/${minigameAtv.id}?senha=curso123`);
     expect(getRank.ok()).toBeTruthy();
     const rankList = await getRank.json();
     expect(rankList.length).toBeGreaterThan(0);

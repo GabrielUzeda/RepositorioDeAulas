@@ -215,7 +215,7 @@ test.describe('Fluxo completo: professor → aula/atividade → aluno → avalia
     // Feedback geral da turma — deve conter o aluno e a nota/feedback da atividade já persistidos
     await expect(dialog.getByText(alunoNome)).toBeVisible({ timeout: 15000 });
     await expect(dialog.getByText('Atividades Enviadas & Notas:')).toBeVisible();
-    await expect(dialog.getByText(`${notaEsperada}/100`)).toBeVisible();
+    await expect(dialog.getByText(`Média da Disciplina: ${notaEsperada}/100`)).toBeVisible();
 
     // Salva feedback da TURMA
     await page.getByPlaceholder(/Digite um comunicado/).fill(feedbackTurma);
