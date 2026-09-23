@@ -45,14 +45,17 @@ RepositorioDeAulas_new/
 bun install          # instalar deps
 bun run dev          # bun run --watch src/index.ts (porta 8080)
 bun run start        # produção
-bun test             # testes (suítes: auth, emailValidator, marp, ai, features)
+bun test             # testes (suítes: auth, emailValidator, marp, ai, aiRag, features, atividades, respostas, utils, aiProvider)
 ```
+
+> **DB de teste:** `backend/bunfig.toml` registra `src/testSetup.ts` como *preload*: a cada `bun test` o `data/test.db` (com `-wal`/`-shm`) é **apagado**, o seed roda limpo e `DISABLE_RATE_LIMIT=true` é ligado. Nunca dependa de estado deixado por execuções anteriores — a suíte é hermética. Helpers de fluxo (login, criar professor/curso/disciplina/aula/atividade) ficam em `backend/src/testHelpers.ts`.
 
 ### Frontend (workdir `frontend/`)
 ```bash
 npm install
 npm run dev          # vite --port 5173
 npm run build        # vue-tsc && vite build  (gera dist/ — necessário p/ E2E)
+bun test             # testes unitários (frontend/tests/, ex.: shuffle.test.ts)
 ```
 
 ### Typecheck / lint
@@ -60,6 +63,24 @@ npm run build        # vue-tsc && vite build  (gera dist/ — necessário p/ E2E
 npx vue-tsc --noEmit            # frontend (workdir frontend/)
 npx vite build --outDir /tmp/... # build sem tocar dist root
 ```
+
+### Git hooks (gate de qualidade local — `main`)
+> ⚠️ Os hooks vivem **apenas em `.git/hooks/`** (não versionados) e não há CI no repositório — clone novo nasce sem eles. Se reescrever os hooks, considere versioná-los (`scripts/git-hooks/` + `git config core.hooksPath`).
+
+**`pre-commit`** — 5 passos, todos bloqueantes; o gate **não escreve arquivos nem mexe no índice do git** (sem `--write`/`git add`):
+1. **Lint** (Biome) em `backend/src`, `frontend/src` e `frontend/tests` — bloqueia **apenas erros** (warning pré-existente passa; `biome lint` sai com código 0 só com warnings). Usa o binário local pinado pelo `package.json`; fallback `ghcr.io/biomejs/biome:2.5.8`.
+2. **Paridade byte-a-byte** de `backend/src/marpTheme.css` × `frontend/src/shared/marpTheme.css` — edite os DOIS com o mesmo conteúdo.
+3. Backend: `docker run --rm -e DATABASE_PATH=/tmp/pre-commit-test.db -v $PWD/backend:/app -w /app oven/bun:alpine bun test`.
+4. Frontend: `docker run --rm -v $PWD/frontend:/app -w /app oven/bun:alpine bun test` (testes em `frontend/tests/`; passo ignorado se não houver arquivo `*.test.ts`).
+5. Frontend: `docker run --rm -v $PWD/frontend:/app -w /app node:20-alpine npx vue-tsc --noEmit`.
+
+Para reproduzir tudo de uma vez: `bash .git/hooks/pre-commit` (verde = 96 testes de backend + 10 de frontend + typecheck). **Não** está no hook: a suíte E2E do Playwright.
+
+**Formatação (`biome format`) NÃO é gate — de propósito.** O repositório não é `biome format`-clean (arquivos antigos também acusam), então colocar format no hook bloquearia todo commit e geraria conflito em qualquer branch aberta. Se um dia normalizar, faça em **commit isolado** (só `npm run format`, sem mudança de lógica) + arquivo `.git-blame-ignore-revs` + `git config blame.ignoreRevsFile .git-blame-ignore-revs`; só depois disso considere torná-lo bloqueante.
+
+**`post-merge`** roda somente quando o merge/pull é na `main`: `[1/4]` build do frontend em `/tmp/repoaulas-deploy-dist` → `[2/4]` `rsync` de `backend/` (exclui `node_modules/` e `data/`) + `docker-compose.prod.yml` + `dist/` → `[3/4]` `docker compose up -d --build --force-recreate` no servidor + espera `/health` 200 → `[4/4]` `node scripts/smoke-test-prod.mjs` (`--dry-run` também disponível).
+
+**`scripts/smoke-test-prod.mjs`** (prod, 100% HTTP/API, com cleanup): health, login admin, cria professor/curso/vínculo, login do professor, disciplina, aula (Marp), **roleta com o gabarito fora da 1ª posição** (e valida que o `correct` chega ao aluno) e **prova validando que o gabarito NÃO vaza** no endpoint público, submissão conferindo `acertos/total/pontuacao`, **consulta LGPD com o `consulta_token`** e envio do código de rascunho. Envs: `PROD_API_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `NOTIFY_EMAIL` e `SMOKE_SKIP_EMAIL=true` (roda sem disparar e-mail — use para validar localmente contra o stack dev). Atenção: o cleanup apaga o curso (cascata no DB), mas os arquivos `.md/.html` da aula gerada permanecem em `frontend/dist/materias/<slug>/` (slug fixo `disciplina_smoke_test`, sobrescrito a cada deploy).
 
 ### E2E — ver seção 8 (rodar sempre via Docker).
 
@@ -134,7 +155,9 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 - `disciplinas` (curso_id, slug, nome, cor, icone, descricao)
 - `aulas` (disciplina_id, titulo, **caminho** → `materias/{slug}/aulas/{slug}.html`, descricao, ordem, conteudo_md)
 - `atividades` (disciplina_id, aula_id [NULL=geral], external_id, titulo, descricao, caminho, icone, `json_data`, tipo, senha, allow_password, ordem)
-- `respostas_alunos` (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas [criptografadas], acertos, total, pontuacao, **nota REAL, feedback TEXT, enviado_em**, consulta_token, criado_em)
+- `respostas_alunos` (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas [criptografadas], consulta_token_hash, **nota REAL, feedback TEXT, enviado_em, entregue_com_atraso**, criado_em)
+  - **Não existem** colunas `acertos`/`total`/`pontuacao` aqui: a correção objetiva é calculada na submissão e devolvida só na resposta HTTP (ver armadilha 13).
+- `estatisticas_questoes` (atividade_id, questao_ref, acertos, erros, atualizado_em, UNIQUE(atividade_id, questao_ref)) — **agregado por questão, sem nenhum dado pessoal**: alimenta o diagnóstico da turma; é ajustado na primeira submissão, no reenvio (troca a contribuição) e em toda exclusão (professor ou LGPD).
 - `rascunhos_atividades` (codigo_recuperacao, atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas_json [criptografadas], expira_em [30 dias], criado_em, atualizado_em)
 - `disciplina_feedbacks` (disciplina_id, aluno_email_hash [NULL=turma], feedback_geral, enviado_em, criado_em, atualizado_em, UNIQUE(disciplina_id, aluno_email_hash))
 
@@ -149,6 +172,7 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 - **Tailwind JIT** só gera classes **literais** — paletas de cores são escritas por extenso (ex.: `bg-indigo-600`); nunca monte strings de classe dinamicamente.
 - **Reuse de UI:** prefira os componentes de `src/shared/components/` (ver seção 3) a repetir Tailwind literal. Antes de escrever um botão/input/card/modal/spinner/empty novo, verifique se o componente base já existe ou se o padrão merece ser extraído para lá.
 - Nomes de arquivos: PascalCase para componentes (`.vue`), camelCase para stores/utilities.
+- **Randomização de alternativas:** as atividades de múltipla escolha (roleta, reforço, minigame) e o `ActivityModal` (normal/prova) DEVEM exibir as alternativas em ordem aleatória — o gabarito não pode ficar em posição fixa. Use `shuffleQuestionOptions`/`shuffleArray` de `src/shared/utils/shuffle.ts` (Fisher-Yates + guarda `isOrderSensitiveOption`, que preserva a ordem de opções meta: "Todas/Nenhuma das anteriores", "Verdadeiro/Falso", itens romanos, "alternativa X"). A correção do backend é por **texto** da alternativa (`corrigirObjetivas`), então a ordem visual não afeta a nota. Na geração por IA, os exemplos de `formatoJson` em `backend/src/ai.ts` **devem manter a alternativa correta em posições variadas** (nunca sempre a primeira) — é sinal de viés para o modelo.
 - Tipagem forte via TS em frontend e backend (Bun).
 - Conexões/erros de DB não usam ORM; SQLite cru com `dbq`.
 
@@ -159,7 +183,7 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 - Nome/email/respostas do aluno são **criptografados** ao submeter; e-mail vira hash para joins.
 - `DELETE /respostas/:id` existe para direito de exclusão (LGPD).
 - Consulta do aluno a suas respostas: `GET /aluno/minhas-respostas?email+token` e `DELETE` (token = `consulta_token`).
-- E-mails reais exigem SMTP no `.env`; sem SMTP, envios degradam silenciosamente (não lançam erro).
+- E-mails reais exigem SMTP no `.env`; sem SMTP (ou com SMTP quebrado) `sendMail` **resolve** com `{success:false}` em vez de lançar. Quem decide o que fazer com a falha é quem chama: o envio de feedback em lote só conta/marca `enviado_em` quando `success === true` (falha deixa pendente para reenvio).
 
 ---
 
@@ -193,7 +217,7 @@ O repositório opera em 4 grandes papéis/fluxos encadeados, do gerenciamento ad
    - **Aulas & Marp**: Abre a disciplina e cria/edita aulas usando o **Marp Markdown Editor** (com suporte a slides, KaTeX, Mermaid e preview em tempo real).
    - **Atividades & Reordenação**: Cria/edita atividades interativas e utiliza os botões ou recurso **Drag & Drop** (`Reordenar`) para definir a sequência pedagógica de aulas e atividades.
    - **Avaliação**: Acessa `Respostas` em cada atividade, atribui notas numéricas e feedbacks individuais.
-   - **Relatórios**: Clica em `Gerar Feedback da Disciplina` para redigir a devolutiva geral da turma, ajustar os comentários individuais e disparar notificações por e-mail via `POST /disciplinas/:id/enviar-emails-feedback`.
+   - **Relatórios**: Clica em `Gerar Feedback da Disciplina` para redigir a devolutiva geral da turma, ajustar os comentários individuais e disparar notificações por e-mail via `POST /disciplinas/:id/enviar-emails-feedback`. O botão `Desempenho da Turma` abre o diagnóstico agregado (`GET /disciplinas/:id/estatisticas`): acertos/erros por questão, com aviso de "Maioria acertou/errou", sem identificar aluno e com números ocultos quando a atividade tem menos de 5 respostas.
 
 3. **Aluno (Área Pública - `/`)**:
    - Navega anonimamente pelos cursos disponíveis.
@@ -219,7 +243,9 @@ O sistema suporta 4 tipos principais de atividades interativas (armazenadas na c
 ## 8. Testes E2E (Playwright via Docker — caminho oficial)
 
 ### Escopo
-Há 16 specs em `e2e/tests/`. Status verificados (todos 100% passando):
+Há 16 specs em `e2e/tests/` (37 testes). Status verificados (todos 100% passando).
+
+> **Revisão de seletores (2026-09-23):** a suíte estava com 3 falhas por rótulos desatualizados (não por bug de produto). Corrigido em `melhorias-recentes.spec.ts` e `fluxo-completo.spec.ts`: título do editor é **'Nova Atividade Interativa'** (não "Editor de Atividade Interativa"), botão de questão é **'Adicionar Pergunta'**, modo split é **'Lado a Lado'**, botão do RAG é **'Anexar Documento Geral do Curso'/'Anexar Documento da Disciplina'**, o campo de enunciado usa `placeholder="Digite o enunciado completo da questão para o aluno..."`, a aba do aluno é `role="tab"` (**não** button), a média aparece como **'Média da Disciplina: N/100'** ("N/100" sozinho casa 2 elementos → use o texto com prefixo) e o clique na disciplina deve mirar o `h3` **pelo nome** (`.first()` corre corrida com o card do curso). Fechar o modal RAG: `getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true })`.
 
 | Spec | Status | Cobre |
 |---|---|---|
@@ -261,6 +287,23 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 
 ## 9. Guia de escrita de testes E2E
 
+### Testes de unidade/integração (`bun test`) — cobertura atual
+
+| Arquivo | Cobre |
+|---|---|
+| `backend/src/auth.test.ts` | login/registro, aprovação, JWT, rate limit, isolamento multi-professor, headers de segurança |
+| `backend/src/features.test.ts` | RAG (documentos de disciplina/curso), prazos + `entregue_com_atraso`, ciclo de vida (status), feedback em lote, avaliações em lote, relatório com médias |
+| `backend/src/atividades.test.ts` | gabarito (`stripGabarito` em prova vs roleta/reforço/minigame), senha de atividade/curso, autorização por curso, vínculo multi-aula (`aula_ids`), sanitização de `caminho`, validação de payload |
+| `backend/src/respostas.test.ts` | correção objetiva por texto (objeto/array/string), PII cifrada em repouso, gates de status/senha, upsert por e-mail, LGPD (consulta + exclusão em cascata), ranking (nome público, teto, ordenação), rascunhos (código, upsert, expiração com limpeza lazy) |
+| `backend/src/utils.test.ts` | `sanitizeSlug`/`sanitizePathOrUrl` (traversal), `parseJsonOrNull`, round-trip de `encryptData`/`decryptData`, `hashEmail`, `hashSenhaCurso`, verificação de senha de curso (hash + legado texto puro), conteúdo estático protegido, `health`/`db-test` |
+| `backend/src/autorizacao.test.ts` | matriz de autorização: rotas admin-only (admin 2xx / professor 403 / anônimo 401), professor intruso em disciplina/aula/atividade/status/respostas/avaliação/relatório/feedback/documentos com verificação de estado inalterado, token malformado/adulterado/sem `Bearer`, e o que é público por padrão |
+| `backend/src/estatisticas.test.ts` | agregado por questão: contadores na 1ª submissão, reenvio que **substitui** a contribuição (não infla), exclusão pelo professor e exclusão LGPD devolvendo a contribuição, supressão com menos de 5 respostas (k-anonimato), questão discursiva nunca com números, authz (401/403/400) |
+| `backend/src/professor.test.ts` | `POST /marp/render` (authz, validação, HTML standalone + alias `/api`), rascunhos do editor (CRUD, isolamento entre professores, limite de 20, limpeza de expirados) e CRUD admin de professores (sem vazar `senha_hash`/`salt`, 409 de e-mail duplicado, status inválido, troca de senha refletida no login, vínculos com cursos) |
+| `backend/src/mailer.test.ts` | mailer com **SMTP falso in-process**: envelope (from/to/subject), template real com substituição + escape HTML, nome de template com traversal, template ausente, degradação sem SMTP; e rotas de e-mail (código de rascunho e feedback em lote contando/marcando só o que realmente saiu) |
+| `frontend/tests/shuffle.test.ts` | `shuffleArray` (permutação, Fisher-Yates sem viés, não-mutação), `isOrderSensitiveOption`, `shuffleQuestionOptions` (preserva alternativas meta, não muta a origem) |
+
+**Padrão de escrita (backend):** use `backend/src/testHelpers.ts` (`adminToken()` via `signJwt` — sem passar pelo rate limit de login; `unique()` para slugs/e-mails; `createProfessor`/`createCurso`/`createDisciplina`/`createAula`/`createAtividade`) e sempre limpe o que criou no `afterAll` (`deleteCurso`/`deleteProfessor`). Afirme a **resposta HTTP** e, quando fizer sentido, o **estado no banco** — teste também a *ausência* de efeito colateral (ex.: linha que não foi alterada) em cenários de acesso negado.
+
 ### Helpers (`e2e/helpers.ts`)
 - `unique(prefix)` / `uniqueName(prefix)` — sufixo `_{Date.now()}_{rand}`
 - `setupAdminContext(request)` → `{adminToken}`; `createProfessor(...)` → `{id, nome, email, password}` (senha `'senha12345'`, role professor); `createCurso(request, adminToken, professorIds=[])` → `{id, nome, slug}` (sem senha por padrão); `createMateria(request, profToken, cursoId)` → `{id, nome, slug}` (disciplina; a senha da disciplina foi removida — o acesso é controlado pela senha do curso); `cleanupEntities(request, adminToken, cursoId?, professorId?)`.
@@ -288,13 +331,19 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 2. **`GET /cursos/:id` não expõe a senha nem seu hash** — devolve `possui_senha: 0 | 1` (booleano); `GET /cursos/:id/disciplinas` anônimo omite campos restritos. Validação de senha é feita via `POST /cursos/:id/verificar-senha`.
 3. **Tailwind JIT** só com classes literais.
 4. **Marp** grava em `resolveFrontendDir()` → no container `/app/frontend_static` (bind de `./frontend/dist/`). Se `frontend/dist/` não existir no host, o mount cria pasta vazia e aulas dão 404 → **rode `npm run build` no frontend antes de E2E**.
-5. **E-mail**: sem SMTP, `enviar-emails-feedback` roda com `enviados=0` (não lança). Para testar entrega real, adicionar um SMTP fake (ex.: Mailhog) ao compose.
+5. **E-mail**: sem SMTP, `enviar-emails-feedback` roda com `enviados=0` (não lança) e **não marca `enviado_em`** — o gate é o `success` devolvido por `sendMail`. Para testar a cadeia completa sem depender de servidor externo, `backend/src/mailer.test.ts` sobe um SMTP falso **in-process** (`Bun.listen`) e captura envelope/corpo. Para entrega real, o compose E2E já usa Mailhog.
 6. **Não existe `hashData`** — use `hashEmail` (bug histórico já corrigido em `routes.ts`).
 7. **Compose e2e usa `DATABASE_PATH`** (não `DB_PATH`) para bater com o reset do `global-setup`.
 8. **`e2e/node_modules` local pode estar quebrado** (root/stale; lock `@playwright/test@1.62.1` vs package.json `1.50.0` e imagem `v1.50.0-noble`) → **rode por Docker** (container faz `npm install` limpo). Não troque versões sem necessidade.
 9. **`npm run build` no frontend pode falhar com EACCES** em `dist/assets` (dono root) — problema pré-existente do ambiente local.
 10. **Vite proxy não cobre `/disciplinas`** — aulas são servidas sob `/materias`.
 11. **Legado**: `frontend-vue/` é a app Vue antiga — não editar.
+12. **Senha do curso em `GET /cursos/:id/disciplinas`**: o caminho anônimo **exige a senha** (`?senha=` ou `x-curso-senha`); gestor (admin/dono) passa sem ela e recebe também as disciplinas ocultas + a coluna `status`. O frontend tem que repassar a senha já guardada — `cursoStore.fetchDisciplinas(cursoId, senha)` e o `AlunoView.handleSelectCurso` lê `secureGet('curso_senha_<id>')`; se a senha salva estiver inválida (professor trocou), o fetch falha, o storage é limpo e o `PasswordModal` reabre. Não chame esse endpoint sem senha para curso protegido: volta 401 e a lista fica vazia.
+13. **A correção objetiva NÃO é persistida por aluno**: `corrigirObjetivas` roda na submissão e o resultado (`acertos`/`total`/`pontuacao`) só existe na **resposta HTTP** do POST — `respostas_alunos` não tem essas colunas. O boletim do professor usa `nota`, não acertos. O que existe de coletivo é a tabela `estatisticas_questoes` (por questão, anônima).
+14. **Estatísticas da turma (`estatisticas_questoes`)**: são contadores **cumulativos por questão** e obedecem à invariante "agregado = soma das respostas atualmente guardadas" — por isso o reenvio do mesmo aluno remove a contribuição antiga antes de somar a nova, e toda exclusão (professor ou LGPD) decrementa (com piso 0). `GET /disciplinas/:id/estatisticas` só devolve números quando a atividade tem **≥ 5 submissões** (`MIN_SUBMISSOES_ESTATISTICAS`, k-anonimato); abaixo disso tudo vem `null`. Questões discursivas nunca têm números. Chave do contador é a mesma `questao_ref` usada na correção (`q.id` quando houver, senão o índice) — se o professor reescrever/reordenar questões, contadores órfãos podem sobrar (a leitura ignora, pois enumera as questões atuais do `json_data`).
+15. **Ranking também exige senha do curso**: `GET /ranking/:atividade_id` valida a senha do curso dono da atividade (mesmo `readCursoSenha`: `?senha=`, `x-curso-senha`, `x-materia-senha` ou cookie `curso_senha`); admin/gestor do curso passa sem ela e atividade inexistente devolve 404. O `minigame-player.ts` anexa `?senha=$senhaCurso` na consulta — ao criar um novo consumidor do ranking (ou uma spec E2E), passe a senha, senão vem 401.
+16. **Cuidado com o compose E2E vs. o dev**: `docker-compose.yml` (dev) e `docker-compose.e2e.yml` compartilham o mesmo *project name* **e os mesmos nomes de serviço** (`bun-server`, `vite`) — só os `container_name` diferem (`e2e-*`). Consequência: `down --remove-orphans` no arquivo E2E **derruba o stack de dev**, e mesmo o `down` simples pode afetar os containers do dev. Receita segura usada nas verificações: `docker compose -f docker-compose.e2e.yml up -d bun-server mailhog vite` → `docker compose -f docker-compose.e2e.yml run --rm --no-deps playwright npx playwright test` → `docker compose -f docker-compose.e2e.yml down --remove-orphans` → **restaurar o dev** com `docker compose up -d` e conferir `/health` (8080) e o Vite (5173).
+17. **Papel de `owner` — PENDENTE (decidido deixar para depois)**: hoje só existe `admin`, e nenhum guarda impede excluir/rebaixar o último admin (inclusive a si mesmo). A decisão foi **não** criar a guarda de "último admin", porque o modelo alvo é um `owner` acima de `admin`. Perguntas em aberto para quando for implementar: quem nasce `owner` (promover o admin semeado no seed?); admins podem criar/remover admins ou isso vira exclusivo do owner; e como revogar privilégio na hora — hoje o `role` viaja no JWT por 24h, então rebaixar alguém não tira o poder dele até o token expirar (exigiria versão de token ou TTL curto para owner).
 
 ---
 
