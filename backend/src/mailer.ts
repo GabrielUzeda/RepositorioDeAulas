@@ -21,6 +21,7 @@ const queue: MailJob[] = [];
 let running = false;
 let templatesDirCache: string | null = null;
 let transporterCache: nodemailer.Transporter | null = null;
+let transporterCacheKey = '';
 
 function resolveTemplatesDir(): string {
   if (templatesDirCache) return templatesDirCache;
@@ -35,12 +36,13 @@ function resolveTemplatesDir(): string {
 }
 
 function getTransporter(): nodemailer.Transporter {
-  if (transporterCache) return transporterCache;
-
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT);
   const user = process.env.SMTP_USERNAME;
   const pass = process.env.SMTP_PASSWORD;
+  const cacheKey = `${host ?? ''}|${port}|${user ?? ''}|${pass ? Bun.hash(pass) : ''}`;
+
+  if (transporterCache && transporterCacheKey === cacheKey) return transporterCache;
 
   if (!host || !port) {
     throw new Error('SMTP não configurado');
@@ -56,7 +58,10 @@ function getTransporter(): nodemailer.Transporter {
     (transportOptions as any).auth = { user, pass };
   }
 
-  transporterCache = nodemailer.createTransport(transportOptions);
+  const novoTransporter = nodemailer.createTransport(transportOptions);
+  if (transporterCache) transporterCache.close?.();
+  transporterCache = novoTransporter;
+  transporterCacheKey = cacheKey;
   return transporterCache;
 }
 

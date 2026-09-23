@@ -2482,11 +2482,16 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
     `;
 
     try {
-      await sendMail({
+      const entrega = await sendMail({
         to: item.aluno_email,
         subject: `[Feedback] ${disciplina.nome} - Relatório de Avaliação`,
         html: htmlContent,
       });
+
+      if (!entrega.success) {
+        console.error('Falha ao entregar feedback para', item.aluno_email, '-', entrega.message);
+        continue;
+      }
 
       const respIds = item.respostas.map(r => r.id);
       dbq(`UPDATE respostas_alunos SET enviado_em = ? WHERE id IN (${respIds.map(() => '?').join(',')})`).run(nowIso, ...respIds);
@@ -2494,7 +2499,7 @@ app.post('/disciplinas/:id/enviar-emails-feedback', professorAuth, async (c) => 
 
       totalEnviados++;
     } catch (err) {
-      console.error(`Erro ao enviar e-mail de feedback para ${item.aluno_email}:`, err);
+      console.error('Erro ao enviar e-mail de feedback para', item.aluno_email, '-', err);
     }
   }
 
