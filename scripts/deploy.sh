@@ -6,8 +6,7 @@
 # Um backup que pode ser ignorado nao protege nada.
 #
 # Uso:
-#   ./scripts/deploy.sh            # producao (docker-compose.prod.yml, sem nginx)
-#   ./scripts/deploy.sh nginx      # producao com nginx + certbot
+#   ./scripts/deploy.sh            # producao (docker-compose.prod.yml)
 #   ./scripts/deploy.sh dev        # ambiente de desenvolvimento
 #   SKIP_GIT_PULL=1 ./scripts/deploy.sh   # nao roda git pull
 #
@@ -20,17 +19,12 @@ cd "$REPO_ROOT"
 
 MODE="${1:-prod}"
 COMPOSE_FILE=""
-PROFILE_ARGS=""
 
 case "$MODE" in
 prod) COMPOSE_FILE="docker-compose.prod.yml" ;;
-nginx)
-  COMPOSE_FILE="docker-compose.prod.yml"
-  PROFILE_ARGS="with-nginx"
-  ;;
 dev) COMPOSE_FILE="docker-compose.yml" ;;
 *)
-  printf '[deploy] uso: %s [prod|nginx|dev]\n' "$0" >&2
+  printf '[deploy] uso: %s [prod|dev]\n' "$0" >&2
   exit 1
   ;;
 esac
@@ -55,11 +49,7 @@ else
 fi
 
 log "3/3 subindo containers ($COMPOSE_FILE)"
-if [ -n "$PROFILE_ARGS" ]; then
-  docker compose -f "$COMPOSE_FILE" --profile "$PROFILE_ARGS" up -d
-else
-  docker compose -f "$COMPOSE_FILE" up -d
-fi
+docker compose -f "$COMPOSE_FILE" up -d
 
 docker compose -f "$COMPOSE_FILE" ps
 log "deploy concluido. Para reverter o banco: ./scripts/restore-db.sh"

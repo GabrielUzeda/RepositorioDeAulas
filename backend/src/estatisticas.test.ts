@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
-import { db } from './db';
+import { db, runDataRetentionPurge } from './db';
 import app from './routes';
 import {
   adminToken,
@@ -296,5 +296,135 @@ describe('Estatísticas agregadas por questão (diagnóstico da turma)', () => {
       headers: authHeaders(admin),
     });
     expect(inexistente.status).toBe(403);
+  });
+
+  test('expurgo de retenção devolve a contribuição dos contadores', async () => {
+    const atvExpurgo = await createAtividade(dono.token, discId, {
+      tipo: 'reforco',
+      titulo: 'Reforço Expurgo',
+      json_data: { questions: questoesObjetivas },
+    });
+
+    for (let i = 0; i < 5; i++) {
+      await submeter(atvExpurgo.id, emailAluno(20 + i), { q1: CERTO_Q1, q2: ERRADO_Q2 });
+    }
+    expect(atividadeDe(await buscarEstatisticas(), atvExpurgo.id).questoes[0].acertos).toBe(5);
+
+    const antigas = db
+      .query('SELECT id FROM respostas_alunos WHERE atividade_id = ? ORDER BY id LIMIT 3')
+      .all(atvExpurgo.id) as any[];
+    for (const antiga of antigas) {
+      db.query("UPDATE respostas_alunos SET criado_em = datetime('now','-730 days') WHERE id = ?").run(antiga.id);
+    }
+
+    await runDataRetentionPurge();
+
+    const restantes = db
+      .query('SELECT COUNT(*) AS total FROM respostas_alunos WHERE atividade_id = ?')
+      .get(atvExpurgo.id) as any;
+    expect(restantes.total).toBe(2);
+
+    const contadorQ1 = db
+      .query("SELECT acertos, erros FROM estatisticas_questoes WHERE atividade_id = ? AND questao_ref = 'q1'")
+      .get(atvExpurgo.id) as any;
+    const contadorQ2 = db
+      .query("SELECT acertos, erros FROM estatisticas_questoes WHERE atividade_id = ? AND questao_ref = 'q2'")
+      .get(atvExpurgo.id) as any;
+    expect(contadorQ1.acertos + contadorQ1.erros).toBe(2);
+    expect(contadorQ1.acertos).toBe(2);
+    expect(contadorQ2.acertos + contadorQ2.erros).toBe(2);
+    expect(contadorQ2.erros).toBe(2);
+
+    const depoisDoExpurgo = atividadeDe(await buscarEstatisticas(), atvExpurgo.id);
+    expect(depoisDoExpurgo.total_submissoes).toBe(2);
+    expect(depoisDoExpurgo.suficientes).toBe(false);
+  });
+
+  test('editar o json_data da atividade recalcula os contadores', async () => {
+    const atvEdicao = await createAtividade(dono.token, discId, {
+      tipo: 'reforco',
+      titulo: 'Reforço Edição',
+      json_data: { questions: questoesObjetivas },
+    });
+    for (let i = 0; i < 5; i++) {
+      await submeter(atvEdicao.id, emailAluno(30 + i), { q1: CERTO_Q1, q2: ERRADO_Q2 });
+    }
+    expect(atividadeDe(await buscarEstatisticas(), atvEdicao.id).questoes[0].acertos).toBe(5);
+
+    const caminho = (db.query('SELECT caminho FROM atividades WHERE id = ?').get(atvEdicao.id) as any).caminho;
+    const questoesInvertidas = questoesObjetivas.map((q) => ({
+      ...q,
+      options: q.options.map((o) => ({ ...o, correct: !o.correct })),
+    }));
+
+    const edicao = await app.request(`/atividades/${atvEdicao.id}`, {
+      method: 'PUT',
+      headers: jsonHeaders(dono.token),
+      body: JSON.stringify({
+        disciplina_id: discId,
+        titulo: 'Reforço Edição',
+        caminho,
+        tipo: 'reforco',
+        json_data: { questions: questoesInvertidas },
+      }),
+    });
+    expect(edicao.status).toBe(200);
+
+    const depois = atividadeDe(await buscarEstatisticas(), atvEdicao.id);
+    expect(depois.questoes[0].acertos).toBe(0);
+    expect(depois.questoes[0].erros).toBe(5);
+    expect(depois.questoes[1].acertos).toBe(5);
+    expect(depois.questoes[1].erros).toBe(0);
+  });
+
+  test('aceita atividades cujo json_data usa a chave perguntas', async () => {
+    const atvPerguntas = await createAtividade(dono.token, discId, {
+      tipo: 'reforco',
+      titulo: 'Reforço Perguntas',
+      json_data: { perguntas: questoesObjetivas },
+    });
+    for (let i = 0; i < 5; i++) {
+      await submeter(atvPerguntas.id, emailAluno(40 + i), { q1: CERTO_Q1, q2: CERTO_Q2 });
+    }
+
+    const comCinco = atividadeDe(await buscarEstatisticas(), atvPerguntas.id);
+    expect(comCinco.questoes.length).toBe(2);
+    expect(comCinco.questoes[0].objetivo).toBe(true);
+    expect(comCinco.questoes[0].acertos).toBe(5);
+    expect(comCinco.questoes[1].acertos).toBe(5);
+
+    const correcao = await submeter(atvPerguntas.id, emailAluno(45), { q1: CERTO_Q1, q2: ERRADO_Q2 });
+    expect(correcao.acertos).toBe(1);
+    expect(correcao.total).toBe(2);
+  });
+
+  test('submissões simultâneas do mesmo e-mail não duplicam a contribuição', async () => {
+    const atvCorrida = await createAtividade(dono.token, discId, {
+      tipo: 'reforco',
+      titulo: 'Reforço Corrida',
+      json_data: { questions: questoesObjetivas },
+    });
+    const email = emailAluno(50);
+    const corpo = JSON.stringify({
+      aluno_nome: 'Aluno Corrida',
+      aluno_email: email,
+      respostas: { q1: CERTO_Q1, q2: CERTO_Q2 },
+    });
+
+    const respostas = await Promise.all([
+      app.request(`/atividades/${atvCorrida.id}/respostas`, { method: 'POST', headers: jsonHeaders(), body: corpo }),
+      app.request(`/atividades/${atvCorrida.id}/respostas`, { method: 'POST', headers: jsonHeaders(), body: corpo }),
+    ]);
+    expect(respostas.map((res) => res.status).sort()).toEqual([200, 201]);
+
+    const linhas = db
+      .query('SELECT COUNT(*) AS total FROM respostas_alunos WHERE atividade_id = ?')
+      .get(atvCorrida.id) as any;
+    expect(linhas.total).toBe(1);
+
+    const contador = db
+      .query("SELECT acertos FROM estatisticas_questoes WHERE atividade_id = ? AND questao_ref = 'q1'")
+      .get(atvCorrida.id) as any;
+    expect(contador.acertos).toBe(1);
   });
 });

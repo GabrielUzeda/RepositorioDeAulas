@@ -166,7 +166,7 @@ describe('Atividades: gabarito, autorização e vínculos com aulas', () => {
       method: 'DELETE',
       headers: authHeaders(profIntruso.token),
     });
-    expect(excluirIntruso.status).toBeGreaterThanOrEqual(400);
+    expect(excluirIntruso.status).toBe(403);
 
     const aindaExiste = db.query('SELECT id, titulo FROM atividades WHERE id = ?').get(atv.id) as any;
     expect(aindaExiste?.id).toBe(atv.id);

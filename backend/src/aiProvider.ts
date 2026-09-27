@@ -92,7 +92,7 @@ export function isResponseTruncated(raw: string, data?: unknown): boolean {
 
   if (root) {
     const choices = root.choices;
-    if (Array.isArray(choices) && choices.length > 0) {
+    if (Array.isArray(choices)) {
       for (const choice of choices) {
         const ch = asRecord(choice);
         if (ch && ch.finish_reason === 'length') {
@@ -100,18 +100,14 @@ export function isResponseTruncated(raw: string, data?: unknown): boolean {
         }
       }
     }
-    if (root.stop_reason === 'max_tokens') {
-      return true;
-    }
+    return root.stop_reason === 'max_tokens';
   }
 
-  if (raw && typeof raw === 'string') {
-    if (
+  if (typeof raw === 'string' && raw.length > 0) {
+    return (
       /["']?finish_reason["']?\s*:\s*["']length["']/.test(raw) ||
       /["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(raw)
-    ) {
-      return true;
-    }
+    );
   }
 
   return false;
@@ -251,17 +247,17 @@ function createOpenAiProvider(name: string): AiProvider {
     },
     isTruncated(data: unknown, rawText?: string): boolean {
       const root = asRecord(data);
-      const choices = root ? root.choices : undefined;
-      if (Array.isArray(choices) && choices.length > 0) {
-        for (const ch of choices) {
-          const record = asRecord(ch);
-          if (record && record.finish_reason === 'length') return true;
+      if (root) {
+        const choices = root.choices;
+        if (Array.isArray(choices)) {
+          for (const ch of choices) {
+            const record = asRecord(ch);
+            if (record && record.finish_reason === 'length') return true;
+          }
         }
+        return false;
       }
-      if (rawText && /["']?finish_reason["']?\s*:\s*["']length["']/.test(rawText)) {
-        return true;
-      }
-      return false;
+      return Boolean(rawText && /["']?finish_reason["']?\s*:\s*["']length["']/.test(rawText));
     },
   };
 }
@@ -319,11 +315,8 @@ function createAnthropicProvider(anthropicVersion: string): AiProvider {
     },
     isTruncated(data: unknown, rawText?: string): boolean {
       const root = asRecord(data);
-      if (root && root.stop_reason === 'max_tokens') return true;
-      if (rawText && /["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(rawText)) {
-        return true;
-      }
-      return false;
+      if (root) return root.stop_reason === 'max_tokens';
+      return Boolean(rawText && /["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(rawText));
     },
   };
 }

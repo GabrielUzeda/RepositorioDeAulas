@@ -18,8 +18,6 @@ import {
   unique,
 } from './testHelpers';
 
-const NAO_PERMITIDO = [401, 403, 404];
-
 describe('Matriz de autorização (admin, dono do curso, intruso e anônimo)', () => {
   let admin = '';
   let dono = { id: 0, token: '' };
@@ -42,10 +40,6 @@ describe('Matriz de autorização (admin, dono do curso, intruso e anônimo)', (
       ],
     },
   ];
-
-  function esperaNaoPermitido(status: number) {
-    expect(NAO_PERMITIDO).toContain(status);
-  }
 
   beforeAll(async () => {
     admin = await adminToken();
@@ -174,13 +168,13 @@ describe('Matriz de autorização (admin, dono do curso, intruso e anônimo)', (
       headers: jsonHeaders(intruso.token),
       body: JSON.stringify({ nome: 'Renomeada pelo intruso' }),
     });
-    esperaNaoPermitido(editarDisciplina.status);
+    expect(editarDisciplina.status).toBe(404);
 
     const excluirDisciplina = await app.request(`/disciplinas/${discId}`, {
       method: 'DELETE',
       headers: authHeaders(intruso.token),
     });
-    esperaNaoPermitido(excluirDisciplina.status);
+    expect(excluirDisciplina.status).toBe(403);
 
     const criarAula = await app.request('/aulas', {
       method: 'POST',
@@ -194,27 +188,27 @@ describe('Matriz de autorização (admin, dono do curso, intruso e anônimo)', (
       headers: jsonHeaders(intruso.token),
       body: JSON.stringify({ disciplina_id: discId, titulo: 'Aula Renomeada' }),
     });
-    esperaNaoPermitido(editarAula.status);
+    expect(editarAula.status).toBe(403);
 
     const excluirAula = await app.request(`/aulas/${aulaId}`, {
       method: 'DELETE',
       headers: authHeaders(intruso.token),
     });
-    esperaNaoPermitido(excluirAula.status);
+    expect(excluirAula.status).toBe(403);
 
     const statusAtividade = await app.request(`/atividades/${atvId}/status`, {
       method: 'PATCH',
       headers: jsonHeaders(intruso.token),
       body: JSON.stringify({ status: 'oculto' }),
     });
-    esperaNaoPermitido(statusAtividade.status);
+    expect(statusAtividade.status).toBe(403);
 
     const statusDisciplina = await app.request(`/disciplinas/${discId}/status`, {
       method: 'PATCH',
       headers: jsonHeaders(intruso.token),
       body: JSON.stringify({ status: 'oculto' }),
     });
-    esperaNaoPermitido(statusDisciplina.status);
+    expect(statusDisciplina.status).toBe(403);
 
     const disciplina = db.query('SELECT nome, status FROM disciplinas WHERE id = ?').get(discId) as any;
     expect(disciplina.nome).not.toBe('Renomeada pelo intruso');
@@ -322,5 +316,56 @@ describe('Matriz de autorização (admin, dono do curso, intruso e anônimo)', (
 
     const listarProfessores = await app.request('/professores');
     expect(listarProfessores.status).toBe(401);
+  });
+
+  test('GET /disciplinas/:id exige a senha do curso e esconde disciplina oculta', async () => {
+    const cursoProtegido = await createCurso(admin, { senha: 'senha-forte-123' });
+    await linkProfessorToCurso(admin, dono.id, cursoProtegido.id);
+    const disciplinaProtegida = await createDisciplina(dono.token, cursoProtegido.id, 'Disciplina Protegida');
+
+    try {
+      const semSenha = await app.request(`/disciplinas/${disciplinaProtegida.id}`);
+      expect(semSenha.status).toBe(401);
+
+      const senhaErrada = await app.request(`/disciplinas/${disciplinaProtegida.id}?senha=errada`);
+      expect(senhaErrada.status).toBe(401);
+
+      const comSenha = await app.request(`/disciplinas/${disciplinaProtegida.id}?senha=senha-forte-123`);
+      expect(comSenha.status).toBe(200);
+      const publica = await readBody(comSenha);
+      expect(publica.nome).toBe(disciplinaProtegida.nome);
+      expect(publica.status).toBeUndefined();
+
+      const comoDono = await app.request(`/disciplinas/${disciplinaProtegida.id}`, {
+        headers: authHeaders(dono.token),
+      });
+      expect(comoDono.status).toBe(200);
+      expect((await readBody(comoDono)).status).toBe('ativo');
+
+      const comoIntruso = await app.request(`/disciplinas/${disciplinaProtegida.id}`, {
+        headers: authHeaders(intruso.token),
+      });
+      expect(comoIntruso.status).toBe(401);
+
+      const inexistente = await app.request('/disciplinas/999999');
+      expect(inexistente.status).toBe(404);
+
+      const ocultar = await app.request(`/disciplinas/${disciplinaProtegida.id}/status`, {
+        method: 'PATCH',
+        headers: jsonHeaders(dono.token),
+        body: JSON.stringify({ status: 'oculto' }),
+      });
+      expect(ocultar.status).toBe(200);
+
+      const ocultaAnonima = await app.request(`/disciplinas/${disciplinaProtegida.id}?senha=senha-forte-123`);
+      expect(ocultaAnonima.status).toBe(404);
+
+      const ocultaParaODono = await app.request(`/disciplinas/${disciplinaProtegida.id}`, {
+        headers: authHeaders(dono.token),
+      });
+      expect(ocultaParaODono.status).toBe(200);
+    } finally {
+      await deleteCurso(admin, cursoProtegido.id);
+    }
   });
 });

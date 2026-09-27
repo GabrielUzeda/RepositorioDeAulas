@@ -394,10 +394,7 @@ async function main() {
         if (cursosRes.ok) {
           const cursos = await cursosRes.json();
           for (const c of cursos) {
-            if (
-              c.nome &&
-              (c.nome.startsWith('Curso Smoke Test') || c.nome === 'Curso do Professor 2')
-            ) {
+            if (c.nome && c.nome.startsWith('Curso Smoke Test')) {
               await removerAulasDoCurso(c.id);
               await fetch(`${BASE}/cursos/${c.id}`, {
                 method: 'DELETE',
@@ -414,7 +411,7 @@ async function main() {
         if (profsRes.ok) {
           const profs = await profsRes.json();
           for (const p of profs) {
-            if (p.email && (p.email.startsWith('smoke_prof_') || p.email.startsWith('prof_'))) {
+            if (p.email && p.email.startsWith('smoke_prof_')) {
               await fetch(`${BASE}/professores/${p.id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${adminToken}` },

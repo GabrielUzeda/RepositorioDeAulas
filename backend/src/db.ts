@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { hashPassword } from './auth';
+import { calcularAjustesDasRespostas, ajustarEstatisticas } from './estatisticas';
 
 const isTestEnv = process.env.NODE_ENV === 'test' || (typeof Bun !== 'undefined' && Array.isArray(Bun.argv) && Bun.argv.some(arg => arg.includes('test')));
 const dbPath = process.env.DATABASE_PATH || (isTestEnv ? './data/test.db' : './data/app.db');
@@ -428,7 +429,7 @@ export function purgeOldRanking(days: number = 30): number {
 }
 
 // [5] Retenção LGPD (Art. 15/16): purga de dados pessoais antigos e ranking (30 dias).
-export function runDataRetentionPurge(): { respostas: number; ranking: number } {
+export async function runDataRetentionPurge(): Promise<{ respostas: number; ranking: number }> {
   const result = { respostas: 0, ranking: 0 };
   const raw = Number(process.env.RETENTION_DAYS);
   const days = Number.isInteger(raw) && raw > 0 ? raw : 365;
@@ -441,11 +442,22 @@ export function runDataRetentionPurge(): { respostas: number; ranking: number } 
 
     if (cutoff) {
       while (true) {
-        const res = db
-          .query(`DELETE FROM respostas_alunos WHERE id IN (SELECT id FROM respostas_alunos WHERE criado_em < ? LIMIT 500)`)
-          .run(cutoff);
-        result.respostas += res.changes;
-        if (res.changes < 500) break;
+        const lote = db
+          .query('SELECT id, atividade_id, respostas FROM respostas_alunos WHERE criado_em < ? ORDER BY id LIMIT 500')
+          .all(cutoff) as any[];
+        if (lote.length === 0) break;
+
+        const ajustes = await calcularAjustesDasRespostas(db, lote);
+        db.transaction(() => {
+          for (const ajuste of ajustes) {
+            ajustarEstatisticas(db, ajuste.atividadeId, ajuste.porQuestao, -1);
+          }
+          const remover = db.query('DELETE FROM respostas_alunos WHERE id = ?');
+          for (const linha of lote) {
+            remover.run(Number(linha.id));
+          }
+        })();
+        result.respostas += lote.length;
       }
 
       // [LGPD] Purgar rascunhos expirados e feedbacks individuais antigos do mesmo titular.

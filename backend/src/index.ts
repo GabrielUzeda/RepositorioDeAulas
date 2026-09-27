@@ -13,8 +13,8 @@ initMailer();
 
 // [4.4] Retenção LGPD (Art. 15/16): purga de dados antigos na inicialização e
 // diariamente. `.unref()` evita que o timer impeça o encerramento do processo.
-runDataRetentionPurge();
-setInterval(runDataRetentionPurge, 24 * 60 * 60 * 1000).unref();
+void runDataRetentionPurge();
+setInterval(() => void runDataRetentionPurge(), 24 * 60 * 60 * 1000).unref();
 
 // [PERF] Purga de ranking em background (a cada 6h) em vez de inline por request.
 purgeOldRanking(30);

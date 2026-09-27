@@ -682,7 +682,10 @@ export class MinigamePlayer {
       }),
       headers,
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Falha ao registrar ranking (${res.status})`);
+        return res.json();
+      })
       .then(() => {
         if (submitBtn) submitBtn.innerText = 'MARCO REGISTRADO!';
         if (rankMsg) {
@@ -700,7 +703,7 @@ export class MinigamePlayer {
         }
         if (rankMsg) {
           rankMsg.style.color = '#ff4444';
-          rankMsg.innerText = 'FALHA NA CONEXÃO. TENTE NOVAMENTE.';
+          rankMsg.innerText = 'FALHA AO REGISTRAR O MARCO. TENTE NOVAMENTE.';
         }
       });
   }

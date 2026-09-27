@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { db } from './db';
 import { sanitizeSlug } from './utils';
@@ -1145,6 +1145,14 @@ export function processMarpContent(
 
   if (!existsSync(htmlPath)) {
     return { error: 'MarpNext completed but HTML output file was not created.' };
+  }
+
+  for (const stale of [`${htmlPath}.gz`, `${htmlPath}.gz.meta`]) {
+    try {
+      if (existsSync(stale)) unlinkSync(stale);
+    } catch {
+      void 0;
+    }
   }
 
   return { caminho: `materias/${materiaSlug}/aulas/${slug}.html` };

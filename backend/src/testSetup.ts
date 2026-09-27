@@ -1,6 +1,16 @@
 import { existsSync, rmSync } from 'node:fs';
+import path from 'node:path';
 
 const testDb = process.env.DATABASE_PATH || './data/test.db';
+const pareceBancoDeTeste = path.basename(testDb).toLowerCase().includes('test');
+
+if (!pareceBancoDeTeste && process.env.ALLOW_TEST_DB_RESET !== 'true') {
+  console.error(
+    `[testSetup] Recusando apagar "${testDb}": o nome do arquivo não indica um banco de teste. ` +
+      'Aponte DATABASE_PATH para um arquivo com "test" no nome ou defina ALLOW_TEST_DB_RESET=true.'
+  );
+  process.exit(1);
+}
 
 for (const suffix of ['', '-wal', '-shm']) {
   const file = `${testDb}${suffix}`;

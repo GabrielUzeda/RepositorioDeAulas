@@ -5,12 +5,23 @@ import { existsSync, rmdirSync, statSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { db, purgeOldRanking } from './db';
 import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail, hashSenhaCurso, parseJsonOrNull } from './utils';
+import {
+  corrigirObjetivas,
+  ajustarEstatisticas,
+  calcularAjustesDasRespostas,
+  recomputarEstatisticasAtividade,
+  extrairQuestoes,
+  refDaQuestao,
+  MIN_SUBMISSOES_ESTATISTICAS,
+} from './estatisticas';
 import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter, extractClientIp } from './auth';
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent, resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
+import { executarEmFila } from './fila';
 import { aiRouter, handleEvaluateActivityResponses } from './ai';
 import { extractTextFromBuffer } from './documentParser';
 import { validateEmailWithTypo } from './emailValidator';
+import { clientAcceptsGzip, isCompressible, getGzipSidecar, cacheControlFor } from './gzipStatic';
 
 const app = new Hono();
 
@@ -64,13 +75,47 @@ const CSP_HTML = [
   "object-src 'none'",
 ].join('; ');
 
-function serveFileWithCsp(filePath: string, contentType?: string): Response | null {
+const CONTENT_TYPES_BY_EXT: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.xml': 'application/xml',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.woff': 'font/woff',
+};
+
+function serveFileWithCsp(filePath: string, contentType?: string, acceptEncoding?: string | null, isIndexFallback = false): Response | null {
   if (!existsSync(filePath) || !statSync(filePath).isFile()) return null;
+  const size = statSync(filePath).size;
+  const effectiveType = contentType || CONTENT_TYPES_BY_EXT[path.extname(filePath).toLowerCase()];
+  const compressible = isCompressible(effectiveType, filePath, size);
+  const isHtml = filePath.endsWith('.html') || !!effectiveType?.includes('text/html');
+  const cacheControl = cacheControlFor(filePath, isIndexFallback);
   const headers: Record<string, string> = {};
-  if (contentType) headers['Content-Type'] = contentType;
-  if (filePath.endsWith('.html') || contentType?.includes('text/html')) {
-    headers['Content-Security-Policy'] = CSP_HTML;
+  if (cacheControl) headers['Cache-Control'] = cacheControl;
+  if (compressible) {
+    headers.Vary = 'Accept-Encoding';
+    if (clientAcceptsGzip(acceptEncoding ?? null)) {
+      const sidecar = getGzipSidecar(filePath);
+      if (sidecar) {
+        try {
+          const gzipHeaders: Record<string, string> = { ...headers };
+          gzipHeaders['Content-Type'] = effectiveType || 'application/octet-stream';
+          gzipHeaders['Content-Encoding'] = 'gzip';
+          gzipHeaders['Content-Length'] = String(statSync(sidecar.gzPath).size);
+          if (isHtml) gzipHeaders['Content-Security-Policy'] = CSP_HTML;
+          return new Response(Bun.file(sidecar.gzPath), { headers: gzipHeaders });
+        } catch {
+          void 0;
+        }
+      }
+    }
   }
+  if (contentType) headers['Content-Type'] = contentType;
+  if (isHtml) headers['Content-Security-Policy'] = CSP_HTML;
   return new Response(Bun.file(filePath), { headers });
 }
 
@@ -416,10 +461,11 @@ function removeAulaFiles(caminho: string | null | undefined) {
   const baseDir = resolveFrontendDir();
   const htmlPath = path.join(baseDir, caminho);
   const mdPath = htmlPath.replace(/\.html$/, '.md');
-  for (const p of [htmlPath, mdPath]) {
+  const targets = [htmlPath, mdPath, `${htmlPath}.gz`, `${htmlPath}.gz.meta`, `${mdPath}.gz`, `${mdPath}.gz.meta`];
+  for (const p of targets) {
     try {
       if (existsSync(p)) unlinkSync(p);
-    } catch (e) { /* best effort */ }
+    } catch { /* best effort */ }
   }
   for (const dir of [path.dirname(htmlPath), path.dirname(path.dirname(htmlPath))]) {
     if (dir === baseDir || dir === path.join(baseDir, 'materias')) continue;
@@ -571,6 +617,8 @@ async function updateAtividade(c: any) {
 
   const primaryAulaId = hasAulaUpdate ? (aulaIds.length > 0 ? aulaIds[0] : null) : ((dbq('SELECT aula_id FROM atividades WHERE id = ?').get(id) as any)?.aula_id ?? null);
 
+  const jsonAnterior = (dbq('SELECT json_data FROM atividades WHERE id = ?').get(id) as any)?.json_data ?? null;
+
   const r = db
     .query(
       `UPDATE atividades
@@ -598,6 +646,10 @@ async function updateAtividade(c: any) {
     ) as any;
   if (!r) return c.text('Atividade not found', 404);
 
+  if ((r.json_data ?? null) !== jsonAnterior) {
+    await recomputarEstatisticasAtividade(db, id);
+  }
+
   if (hasAulaUpdate) {
     dbq('DELETE FROM aula_atividades WHERE atividade_id = ?').run(id);
     if (aulaIds.length > 0) {
@@ -620,7 +672,11 @@ app.put('/cursos/:id', adminAuth, updateCurso);
 app.delete('/cursos/:id', adminAuth, (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
+  const aulasDoCurso = dbq(
+    'SELECT a.caminho FROM aulas a JOIN disciplinas d ON d.id = a.disciplina_id WHERE d.curso_id = ?'
+  ).all(id) as any[];
   dbq('DELETE FROM cursos WHERE id = ?').run(id);
+  for (const aula of aulasDoCurso) removeAulaFiles(aula.caminho);
   return c.body(null, 204);
 });
 
@@ -670,7 +726,9 @@ app.delete('/disciplinas/:id', professorAuth, async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
   if (!(await canManageDisciplina(c, id))) return c.text('Access denied', 403);
+  const aulasDaDisciplina = dbq('SELECT caminho FROM aulas WHERE disciplina_id = ?').all(id) as any[];
   dbq('DELETE FROM disciplinas WHERE id = ?').run(id);
+  for (const aula of aulasDaDisciplina) removeAulaFiles(aula.caminho);
   await logAudit(c, 'excluir_disciplina', `disciplina:${id}`);
   return c.body(null, 204);
 });
@@ -1051,12 +1109,31 @@ app.get('/cursos/:id/disciplinas', async (c) => {
   return c.json(rows);
 });
 
-app.get('/disciplinas/:id', (c) => {
+app.get('/disciplinas/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('', 400);
-  const r = dbq('SELECT id, curso_id, slug, nome, cor, icone, descricao FROM disciplinas WHERE id = ?').get(id);
+  const r = dbq('SELECT id, curso_id, slug, nome, cor, icone, descricao, status FROM disciplinas WHERE id = ?').get(id) as any;
   if (!r) return c.text('Disciplina not found', 404);
-  return c.json(r);
+
+  const authHeader = c.req.header('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const payload = await verifyJwt(authHeader.slice(7));
+    if (payload?.sub) {
+      const profId = Number(payload.sub);
+      if (payload.role === 'admin' || canManageCurso({ id: profId, role: payload.role ?? 'professor' }, r.curso_id)) {
+        return c.json(r);
+      }
+    }
+  }
+
+  if (r.status && r.status !== 'ativo') return c.text('Disciplina not found', 404);
+  const curso = dbq('SELECT id, senha, status FROM cursos WHERE id = ?').get(r.curso_id) as any;
+  if (!curso || (curso.status && curso.status !== 'ativo')) return c.text('Disciplina not found', 404);
+  if (curso.senha) {
+    const senha = readCursoSenha(c);
+    if (!senha || !(await matchSenhaCurso(senha, curso.senha))) return c.text('Senha do curso incorreta', 401);
+  }
+  return c.json({ id: r.id, curso_id: r.curso_id, slug: r.slug, nome: r.nome, cor: r.cor, icone: r.icone, descricao: r.descricao });
 });
 
 app.get('/aulas', async (c) => {
@@ -1229,87 +1306,7 @@ app.get('/atividades/:id', async (c) => {
 
 
 
-interface CorrecaoQuestao {
-  indice: number;
-  ref: string;
-  acertou: boolean;
-}
-
-interface CorrecaoResultado {
-  acertos: number;
-  total: number;
-  pontuacao: number;
-  porQuestao: CorrecaoQuestao[];
-}
-
 const MAX_RANKING_PONTUACAO = 1_000_000;
-const MIN_SUBMISSOES_ESTATISTICAS = 5;
-
-function corrigirObjetivas(jsonDataStr: string | null | undefined, respostasInput: any): CorrecaoResultado {
-  if (!jsonDataStr) return { acertos: 0, total: 0, pontuacao: 0, porQuestao: [] };
-
-  const parsed = typeof jsonDataStr === 'string' ? parseJsonOrNull<any>(jsonDataStr) : jsonDataStr;
-  if (!parsed || !Array.isArray(parsed.questions)) {
-    return { acertos: 0, total: 0, pontuacao: 0, porQuestao: [] };
-  }
-  const questions: any[] = parsed.questions;
-
-  let acertos = 0;
-  let totalObjetivas = 0;
-  const porQuestao: CorrecaoQuestao[] = [];
-
-  let respostasMap: Record<string, string> = {};
-  if (typeof respostasInput === 'string') {
-    respostasMap = parseJsonOrNull<Record<string, string>>(respostasInput) ?? { '0': respostasInput };
-  } else if (typeof respostasInput === 'object' && respostasInput !== null) {
-    if (Array.isArray(respostasInput)) {
-      for (const item of respostasInput) {
-        if (item && item.questao !== undefined) respostasMap[String(item.questao)] = String(item.resposta ?? '');
-      }
-    } else {
-      respostasMap = respostasInput;
-    }
-  }
-
-  questions.forEach((q: any, idx: number) => {
-    if (Array.isArray(q.options) && q.options.length > 0) {
-      totalObjetivas++;
-      const keyId = q.id !== undefined ? String(q.id) : String(idx);
-      const keyTitle = typeof q.title === 'string' ? q.title : '';
-      const keyContent = typeof q.content === 'string' ? q.content : '';
-      const correta = q.options.find((opt: any) => opt && opt.correct === true);
-      const respAluno = respostasMap[keyId] ?? respostasMap[String(idx)] ?? respostasMap[keyTitle] ?? respostasMap[keyContent];
-
-      const acertou =
-        Boolean(correta) &&
-        typeof correta.text === 'string' &&
-        typeof respAluno === 'string' &&
-        respAluno.trim().toLowerCase() === correta.text.trim().toLowerCase();
-
-      if (acertou) acertos++;
-      porQuestao.push({ indice: idx, ref: keyId, acertou });
-    }
-  });
-  const pontuacao = totalObjetivas > 0 ? Math.round((acertos / totalObjetivas) * 100) : 0;
-  return { acertos, total: totalObjetivas, pontuacao, porQuestao };
-}
-
-function ajustarEstatisticas(atividadeId: number, porQuestao: CorrecaoQuestao[], delta: number): void {
-  if (porQuestao.length === 0) return;
-  const upsert = db.query(`
-    INSERT INTO estatisticas_questoes (atividade_id, questao_ref, acertos, erros)
-    VALUES (?, ?, MAX(?, 0), MAX(?, 0))
-    ON CONFLICT(atividade_id, questao_ref) DO UPDATE SET
-      acertos = MAX(acertos + ?, 0),
-      erros = MAX(erros + ?, 0),
-      atualizado_em = strftime('%Y-%m-%dT%H:%M:%SZ','now')
-  `);
-  for (const questao of porQuestao) {
-    const dAcerto = questao.acertou ? delta : 0;
-    const dErro = questao.acertou ? 0 : delta;
-    upsert.run(atividadeId, questao.ref, dAcerto, dErro, dAcerto, dErro);
-  }
-}
 
 function formatPublicName(fullName: string): string {
   const parts = String(fullName || '').trim().split(/\s+/);
@@ -1465,33 +1462,36 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
 
   try {
     // Upsert: submissões repetidas do mesmo e-mail na mesma atividade
-    // atualizam o registro anterior (última tentativa vence), mantendo o
-    // consulta_token original para o direito de consulta LGPD.
-    const existente = dbq('SELECT id, criado_em, respostas FROM respostas_alunos WHERE atividade_id = ? AND aluno_email_hash = ?').get(atividadeId, emailHash) as any;
-
+    // atualizam o registro anterior (última tentativa vence). O consulta_token
+    // é regenerado a cada envio e devolvido na resposta HTTP.
     let r: any;
-    if (existente) {
-      const respostasAnteriores = await decryptData(existente.respostas);
-      const porQuestaoAnterior = corrigirObjetivas(atv.json_data, respostasAnteriores).porQuestao;
-      db.transaction(() => {
-        ajustarEstatisticas(atividadeId, porQuestaoAnterior, -1);
-        dbq(
-          'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ?, consulta_token_hash = ?, entregue_com_atraso = ? WHERE id = ?'
-        ).run(encNome, encEmail, encRespostas, tokenHash, entregueComAtraso, existente.id);
-        ajustarEstatisticas(atividadeId, correcao.porQuestao, 1);
-      })();
-      r = { id: existente.id, atividade_id: atividadeId, criado_em: existente.criado_em };
-    } else {
-      db.transaction(() => {
-        r = db
-          .query(
-            `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash, entregue_com_atraso)
-             VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
-          )
-          .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash, entregueComAtraso) as any;
-        ajustarEstatisticas(atividadeId, correcao.porQuestao, 1);
-      })();
-    }
+    const eraReenvio = await executarEmFila(`submissao:${atividadeId}:${emailHash}`, async () => {
+      const existente = dbq('SELECT id, criado_em, respostas FROM respostas_alunos WHERE atividade_id = ? AND aluno_email_hash = ?').get(atividadeId, emailHash) as any;
+
+      if (existente) {
+        const respostasAnteriores = await decryptData(existente.respostas);
+        const porQuestaoAnterior = corrigirObjetivas(atv.json_data, respostasAnteriores).porQuestao;
+        db.transaction(() => {
+          ajustarEstatisticas(db, atividadeId, porQuestaoAnterior, -1);
+          dbq(
+            'UPDATE respostas_alunos SET aluno_nome = ?, aluno_email = ?, respostas = ?, consulta_token_hash = ?, entregue_com_atraso = ? WHERE id = ?'
+          ).run(encNome, encEmail, encRespostas, tokenHash, entregueComAtraso, existente.id);
+          ajustarEstatisticas(db, atividadeId, correcao.porQuestao, 1);
+        })();
+        r = { id: existente.id, atividade_id: atividadeId, criado_em: existente.criado_em };
+      } else {
+        db.transaction(() => {
+          r = db
+            .query(
+              `INSERT INTO respostas_alunos (atividade_id, aluno_nome, aluno_email, aluno_email_hash, respostas, consulta_token_hash, entregue_com_atraso)
+               VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, atividade_id, criado_em`
+            )
+            .get(atividadeId, encNome, encEmail, emailHash, encRespostas, tokenHash, entregueComAtraso) as any;
+          ajustarEstatisticas(db, atividadeId, correcao.porQuestao, 1);
+        })();
+      }
+      return Boolean(existente);
+    });
 
     await logAudit(c, 'submeter_resposta', `atividade:${atividadeId}`, { email_hash: emailHash });
 
@@ -1555,7 +1555,7 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
       acertos: correcao.acertos,
       total: correcao.total,
       pontuacao: correcao.pontuacao
-    }, existente ? 200 : 201);
+    }, eraReenvio ? 200 : 201);
   } catch {
     return c.text('Erro interno ao salvar resposta', 500);
   }
@@ -1812,20 +1812,11 @@ app.delete('/aluno/minhas-respostas', submissionLimiter, async (c) => {
   const alvos = dbq(
     'SELECT atividade_id, respostas FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?'
   ).all(emailHash, tokenHash) as any[];
-  const ajustesEstatisticas = await Promise.all(
-    alvos.map(async (alvo) => {
-      const atvAlvo = dbq('SELECT json_data FROM atividades WHERE id = ?').get(alvo.atividade_id) as any;
-      const respostasDecifradas = await decryptData(alvo.respostas);
-      return {
-        atividadeId: Number(alvo.atividade_id),
-        porQuestao: corrigirObjetivas(atvAlvo?.json_data, respostasDecifradas).porQuestao,
-      };
-    })
-  );
+  const ajustesEstatisticas = await calcularAjustesDasRespostas(db, alvos);
 
   db.transaction(() => {
     for (const ajuste of ajustesEstatisticas) {
-      ajustarEstatisticas(ajuste.atividadeId, ajuste.porQuestao, -1);
+      ajustarEstatisticas(db, ajuste.atividadeId, ajuste.porQuestao, -1);
     }
     dbq('DELETE FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?').run(emailHash, tokenHash);
     // [LGPD] Direito à eliminação (Art. 16): cascata para rascunhos e feedbacks
@@ -1870,7 +1861,7 @@ app.delete('/respostas/:id', professorAuth, async (c) => {
 
   const respostasDecifradas = await decryptData(resp.respostas);
   db.transaction(() => {
-    ajustarEstatisticas(resp.atividade_id, corrigirObjetivas(atv?.json_data, respostasDecifradas).porQuestao, -1);
+    ajustarEstatisticas(db, resp.atividade_id, corrigirObjetivas(atv?.json_data, respostasDecifradas).porQuestao, -1);
     dbq('DELETE FROM respostas_alunos WHERE id = ?').run(id);
   })();
 
@@ -2134,8 +2125,7 @@ app.get('/disciplinas/:id/estatisticas', professorAuth, async (c) => {
   `).all(disciplinaId) as any[];
 
   const atividadesComEstatisticas = atividades.map((atv) => {
-    const json = parseJsonOrNull<any>(atv.json_data);
-    const questoes: any[] = Array.isArray(json?.questions) ? json.questions : [];
+    const questoes: any[] = extrairQuestoes(atv.json_data);
     const totalSubmissoes = Number(atv.total_submissoes) || 0;
     const suficientes = totalSubmissoes >= MIN_SUBMISSOES_ESTATISTICAS;
 
@@ -2149,7 +2139,7 @@ app.get('/disciplinas/:id/estatisticas', professorAuth, async (c) => {
     }
 
     const questoesSaida = questoes.map((q: any, idx: number) => {
-      const ref = q && q.id !== undefined ? String(q.id) : String(idx);
+      const ref = refDaQuestao(q, idx);
       const contador = porRef.get(ref);
       const acertosQuestao = contador ? contador.acertos : 0;
       const errosQuestao = contador ? contador.erros : 0;
@@ -2821,7 +2811,7 @@ async function serveStaticDisciplinaContent(c: any) {
   }
 
   const abs = path.join(resolveFrontendDir(), 'materias', safe);
-  const served = serveFileWithCsp(abs);
+  const served = serveFileWithCsp(abs, undefined, c.req.header('accept-encoding'));
   if (!served) return c.text('Not found', 404);
   const senha = readCursoSenha(c);
   if (senha) {
@@ -2846,13 +2836,13 @@ app.use('*', async (c, next) => {
     if (target !== base && !target.startsWith(base + path.sep)) {
       return; // tentativa de path traversal: mantém 404
     }
-    const fileResp = serveFileWithCsp(target);
+    const fileResp = serveFileWithCsp(target, undefined, c.req.header('accept-encoding'));
     if (fileResp) {
       c.res = fileResp;
       return;
     }
     const indexPath = path.join(base, 'index.html');
-    const indexResp = serveFileWithCsp(indexPath, 'text/html; charset=utf-8');
+    const indexResp = serveFileWithCsp(indexPath, 'text/html; charset=utf-8', c.req.header('accept-encoding'), true);
     if (indexResp) {
       c.res = indexResp;
       return;

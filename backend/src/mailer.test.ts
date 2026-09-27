@@ -108,6 +108,11 @@ const smtpOriginal = {
   from: process.env.MAIL_FROM,
 };
 
+function restaurarEnv(nome: string, valor: string | undefined) {
+  if (valor === undefined) delete process.env[nome];
+  else process.env[nome] = valor;
+}
+
 beforeAll(() => {
   fake = startFakeSmtp();
   process.env.SMTP_HOST = '127.0.0.1';
@@ -117,9 +122,9 @@ beforeAll(() => {
 
 afterAll(() => {
   fake.server.stop(true);
-  process.env.SMTP_HOST = smtpOriginal.host;
-  process.env.SMTP_PORT = smtpOriginal.port;
-  process.env.MAIL_FROM = smtpOriginal.from;
+  restaurarEnv('SMTP_HOST', smtpOriginal.host);
+  restaurarEnv('SMTP_PORT', smtpOriginal.port);
+  restaurarEnv('MAIL_FROM', smtpOriginal.from);
 });
 
 describe('Mailer: composição, templates e degradação', () => {
@@ -200,8 +205,32 @@ describe('Mailer: composição, templates e degradação', () => {
       expect(resultado.success).toBe(false);
       expect(resultado.message).toContain('SMTP não configurado');
     } finally {
-      process.env.SMTP_HOST = host;
-      process.env.SMTP_PORT = port;
+      restaurarEnv('SMTP_HOST', host);
+      restaurarEnv('SMTP_PORT', port);
+    }
+  });
+
+  test('falha de transporte SMTP resolve com success false sem lançar', async () => {
+    const sonda = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data() {} } });
+    const portaFechada = sonda.port;
+    sonda.stop(true);
+
+    const hostAnterior = process.env.SMTP_HOST;
+    const portaAnterior = process.env.SMTP_PORT;
+    process.env.SMTP_HOST = '127.0.0.1';
+    process.env.SMTP_PORT = String(portaFechada);
+
+    try {
+      const resultado = await sendMail({
+        to: 'aluno.transporte@example.com',
+        subject: 'SMTP caído',
+        html: '<p>não deve sair</p>',
+      });
+      expect(resultado.success).toBe(false);
+      expect(resultado.message).toContain('Erro ao enviar email');
+    } finally {
+      restaurarEnv('SMTP_HOST', hostAnterior);
+      restaurarEnv('SMTP_PORT', portaAnterior);
     }
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { unlinkSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword, verifyPassword, signJwt, verifyJwt } from './auth';
-import { resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
+import { resolveFrontendDir } from './marp';
 import { db, runDataRetentionPurge, purgeOldRanking } from './db';
 import app from './routes';
 
@@ -448,7 +448,7 @@ describe('Auth Module & Multi-Professor System', () => {
       )
       .get(atvId, 'Aluno Novo', 'novo@exemplo.com', 'hash_novo', 'y') as any;
 
-    runDataRetentionPurge();
+    await runDataRetentionPurge();
 
     expect(db.query('SELECT id FROM respostas_alunos WHERE id = ?').get(old.id)).toBeNull();
     expect(db.query('SELECT id FROM respostas_alunos WHERE id = ?').get(fresh.id)).toBeDefined();

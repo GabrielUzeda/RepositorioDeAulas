@@ -36,76 +36,24 @@ Utilizado por desenvolvedores para alterar o código com **Hot Reload** (HMR) em
 ---
 
 ### 2. `docker-compose.prod.yml` — Ambiente de Produção (Servidor)
-Utilizado para publicar a aplicação em produção. Possui **dois modos** controlados por **Docker Compose Profiles**:
+Utilizado para publicar a aplicação em produção. O Docker sobe **apenas o `bun-server`** (Bun + Hono + SPA Vue buildado); não há container de borda. TLS, HSTS, redirect HTTP→HTTPS e o desafio ACME são responsabilidade do proxy reverso no host.
 
----
+#### 🔒 Borda TLS (dona de HSTS/redirect/ACME)
 
-#### ❓ Por que existem as Opções A e B?
+O proxy do host é a **única borda** e deve garantir:
 
-* **Opção A (`--profile with-nginx`)** — Para servidores dedicados ou VPSs **sem** Nginx instalado no host. O próprio Docker sobe um container Nginx que cuida das portas 80/443, emite e renova automaticamente os certificados HTTPS via **ACME/Let's Encrypt (Certbot)**.
-* **Opção B (sem profile)** — Para servidores onde **já existe um Nginx (ou outro proxy) no host** gerenciando certificados SSL. O Docker sobe apenas o `bun-server` em uma porta interna (padrão `8080`), e o proxy do host repassa o tráfego.
-
----
-
-#### 📌 Opção A: Com nginx + HTTPS Automático via Let's Encrypt (Servidor Dedicado)
-
-Nesta opção o Docker gerencia tudo: Nginx (reverse proxy), Certbot (emissão/renovação de certificados ACME) e o bun-server (API + SPA).
-
-**Pré-requisito:** o domínio `SERVER_NAME` deve apontar para o IP do servidor antes de emitir o certificado.
-
-**1. Configure o `.env`:**
-```bash
-cp example.env .env
-# Edite e defina obrigatoriamente:
-# SERVER_NAME=repositorio.dominio.com
-# sslDir=/var/www/ssl
-# verificationDir=/var/www/certbot
-# PROFESSOR_PASSWORD=SuaSenhaForte!
-# JWT_SECRET=SuaChaveSecreta
-```
-
-**2. Primeiro boot — Suba apenas o nginx para liberar a porta 80 para o desafio ACME:**
-```bash
-docker compose -f docker-compose.prod.yml --profile with-nginx up -d
-```
-> O nginx sobe em modo HTTP-only (sem certificado ainda) e o bun-server fica disponível internamente.
->
-> A configuração do nginx fica na pasta [`nginx/`](nginx/) (`nginx.conf.template` +
-> `docker-entrypoint.sh` + `conf.d/*.template`). O entrypoint detecta se o certificado
-> de `${SERVER_NAME}` já existe e alterna automaticamente entre HTTP-only e HTTPS.
-> **Importante:** `/api`, `/materias`, `/disciplinas` e `/cursos` são **sempre proxy**
-> para o bun-server — isso preserva a verificação de senha de curso e o CSP emitidos
-> pelo Bun nos HTMLs gerados pelo Marp (nunca servidos direto do disco pelo nginx).
-
-**3. Emita o certificado SSL (execute uma única vez):**
-```bash
-docker compose -f docker-compose.prod.yml run --rm certbot certonly \
-  --webroot -w /var/www/certbot \
-  -d repositorio.dominio.com \
-  --email seu@email.com \
-  --agree-tos --no-eff-email
-```
-
-**4. Reinicie o nginx para carregar o certificado:**
-```bash
-docker compose -f docker-compose.prod.yml restart nginx
-```
-
-**5. Renovação automática:** O container `certbot` já executa `certbot renew` a cada 12 horas automaticamente. Nenhuma configuração adicional é necessária.
-
-**Acesso:** `https://repositorio.dominio.com` — com HTTPS/TLS ativo e renovação automática.
-
----
-
-#### 📌 Opção B: Sem nginx no container (Proxy Externo no Host)
-
-Para servidores onde o Nginx (ou qualquer outro proxy) já roda no host e você quer apenas acrescentar este projeto como mais um subdomínio.
+* **Remover o prefixo `/api/`** ao repassar para o bun-server (o backend registra as rotas sem `/api`).
+* **Repassar `/materias`, `/disciplinas` e `/cursos`** ao bun-server — preserva a senha de curso e o CSP emitidos pelo Bun (nunca servir `dist/` direto do disco).
+* **Enviar `Host` e os cabeçalhos `X-Forwarded-*`** (`X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP`).
+* **Repassar `Accept-Encoding` sem recompressão** (passthrough) — o Bun já emite gzip.
+* **Emitir `Strict-Transport-Security: max-age=31536000; includeSubDomains`** (HSTS).
+* **Cache de assets é opcional** — o Bun já emite os cabeçalhos de cache.
 
 **1. Configure o `.env`:**
 ```bash
 cp example.env .env
 # PORT=8080   (ou outra porta interna livre)
-# BIND_ADDRESS=127.0.0.1   (IP de escuta do Bun no host — padrão loopback. Use 0.0.0.0 apenas se o Docker rodar em outra máquina/VM)
+# HOST=127.0.0.1   (IP de escuta do Bun no host — o código usa HOST [default 0.0.0.0]; use 127.0.0.1 quando este proxy for a única borda)
 ```
 
 **2. Suba apenas o bun-server:**
@@ -140,6 +88,8 @@ server {
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Accept-Encoding $http_accept_encoding;
+        gzip off;
     }
 
     # Todo o resto (SPA, /materias, /disciplinas, /cursos): repassa ao Bun,
@@ -150,6 +100,8 @@ server {
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Accept-Encoding $http_accept_encoding;
+        gzip off;
         proxy_set_header   Upgrade           $http_upgrade;
         proxy_set_header   Connection        "upgrade";
     }
@@ -168,11 +120,9 @@ sudo nginx -t && sudo systemctl reload nginx
 ### 3. `docker-compose.e2e.yml` — Ambiente de Testes E2E (Playwright)
 Ambiente isolado em portas alternativas para rodar testes automatizados de ponta a ponta sem interferir no banco de dados de desenvolvimento ou produção.
 
-* **Serviços:** `e2e-bun-server` (porta `18080`, banco `e2e-test.db`) + `e2e-vite` (porta `15173`).
-* **Como iniciar:**
-  ```bash
-  docker compose -f docker-compose.e2e.yml up -d --build
-  ```
+* **Serviços:** `e2e-bun-server` (porta `18080`, banco `e2e-test.db`), `e2e-vite` (porta `15173`), `e2e-mailhog` (SMTP `11025` / UI `18025`) e o runner `e2e-playwright`.
+* **Projeto Compose isolado:** o arquivo declara `name: repoaulas-e2e`, então `up`/`down` do E2E não afetam o stack de desenvolvimento.
+* **Como iniciar:** `cd e2e && npm install && npx playwright test` — o `global-setup` sobe e derruba a stack isolada sozinho.
 
 ---
 
@@ -211,15 +161,11 @@ cp example.env .env
 
 | Variável | Descrição | Padrão |
 |---|---|---|
-| `SERVER_NAME` | Domínio público da aplicação (usado pelo nginx/certbot) | — |
-| `sslDir` | Pasta no host com os certificados SSL/TLS | `/var/www/ssl` |
-| `verificationDir` | Pasta para validação ACME/HTTP-01 do Certbot | `/var/www/certbot` |
 | `PROFESSOR_EMAIL` | E-mail do Administrador criado no 1º boot | `admin@escola.com` |
 | `PROFESSOR_PASSWORD` | Senha inicial do Administrador (Obrigatório alterar) | — |
 | `JWT_SECRET` | Chave secreta para assinatura dos tokens JWT (obrigatória forte em produção) | — |
-| `PORT` | Porta TCP do backend exposta no host (Opção B) | `8080` |
-| `BIND_ADDRESS` | IP de escuta do backend no host | `127.0.0.1` |
-| `HOST` | IP de escuta do servidor backend | `0.0.0.0` |
+| `PORT` | Porta TCP do backend exposta no host | `8080` |
+| `HOST` | IP de escuta do servidor backend (variável lida pelo código) | `0.0.0.0` |
 | `DATA_DIR` | Pasta de dados e SQLite | `./backend/data` |
 | `DATABASE_PATH` | Caminho do arquivo SQLite principal (o código NÃO lê `DB_PATH`) | `./backend/data/app.db` |
 | `SMTP_HOST` | Servidor SMTP para envio de e-mails | `smtp.zoho.com` |
@@ -240,10 +186,11 @@ bun test
 
 ### Executar Testes E2E (Playwright)
 ```bash
-docker compose -f docker-compose.e2e.yml up -d --build
 cd e2e
+npm install
 npx playwright test
 ```
+O `global-setup` gerencia a stack isolada (`docker compose -f docker-compose.e2e.yml`) sozinho; exige `PROFESSOR_PASSWORD` (ou `E2E_ADMIN_PASSWORD`).
 
 ---
 
