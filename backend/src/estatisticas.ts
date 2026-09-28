@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { parseJsonOrNull, decryptData } from './utils';
+import { executarEmFila } from './fila';
 
 export interface CorrecaoQuestao {
   indice: number;
@@ -25,6 +26,19 @@ export interface RespostaArmazenada {
 }
 
 export const MIN_SUBMISSOES_ESTATISTICAS = 5;
+
+export function serializarEstatisticas<T>(atividadeId: number, tarefa: () => Promise<T>): Promise<T> {
+  return executarEmFila(`estat:${Number(atividadeId)}`, tarefa);
+}
+
+export function serializarEstatisticasMultiplas<T>(atividadeIds: number[], tarefa: () => Promise<T>): Promise<T> {
+  const chaves = [...new Set(atividadeIds.map((id) => Number(id)))].sort((a, b) => a - b);
+  const encadeado = chaves.reduceRight<() => Promise<T>>(
+    (proxima, id) => () => executarEmFila(`estat:${id}`, proxima),
+    tarefa
+  );
+  return encadeado();
+}
 
 export function extrairQuestoes(jsonData: string | null | undefined | any): any[] {
   const parsed = typeof jsonData === 'string' ? parseJsonOrNull<any>(jsonData) : jsonData;
@@ -120,28 +134,30 @@ export async function calcularAjustesDasRespostas(
   return ajustes;
 }
 
-export async function recomputarEstatisticasAtividade(db: Database, atividadeId: number): Promise<void> {
-  const atv = db.query('SELECT json_data FROM atividades WHERE id = ?').get(atividadeId) as any;
-  const linhas = db.query('SELECT respostas FROM respostas_alunos WHERE atividade_id = ?').all(atividadeId) as any[];
+export function recomputarEstatisticasAtividade(db: Database, atividadeId: number): Promise<void> {
+  return serializarEstatisticas(atividadeId, async () => {
+    const atv = db.query('SELECT json_data FROM atividades WHERE id = ?').get(atividadeId) as any;
+    const linhas = db.query('SELECT respostas FROM respostas_alunos WHERE atividade_id = ?').all(atividadeId) as any[];
 
-  const acumulado = new Map<string, { acertos: number; erros: number }>();
-  for (const linha of linhas) {
-    const decifradas = await decryptData(String(linha?.respostas ?? ''));
-    for (const questao of corrigirObjetivas(atv?.json_data, decifradas).porQuestao) {
-      const atual = acumulado.get(questao.ref) ?? { acertos: 0, erros: 0 };
-      if (questao.acertou) atual.acertos++;
-      else atual.erros++;
-      acumulado.set(questao.ref, atual);
+    const acumulado = new Map<string, { acertos: number; erros: number }>();
+    for (const linha of linhas) {
+      const decifradas = await decryptData(String(linha?.respostas ?? ''));
+      for (const questao of corrigirObjetivas(atv?.json_data, decifradas).porQuestao) {
+        const atual = acumulado.get(questao.ref) ?? { acertos: 0, erros: 0 };
+        if (questao.acertou) atual.acertos++;
+        else atual.erros++;
+        acumulado.set(questao.ref, atual);
+      }
     }
-  }
 
-  db.transaction(() => {
-    db.query('DELETE FROM estatisticas_questoes WHERE atividade_id = ?').run(atividadeId);
-    const inserir = db.query(
-      'INSERT INTO estatisticas_questoes (atividade_id, questao_ref, acertos, erros) VALUES (?, ?, ?, ?)'
-    );
-    for (const [ref, contagem] of acumulado) {
-      inserir.run(atividadeId, ref, contagem.acertos, contagem.erros);
-    }
-  })();
+    db.transaction(() => {
+      db.query('DELETE FROM estatisticas_questoes WHERE atividade_id = ?').run(atividadeId);
+      const inserir = db.query(
+        'INSERT INTO estatisticas_questoes (atividade_id, questao_ref, acertos, erros) VALUES (?, ?, ?, ?)'
+      );
+      for (const [ref, contagem] of acumulado) {
+        inserir.run(atividadeId, ref, contagem.acertos, contagem.erros);
+      }
+    })();
+  });
 }

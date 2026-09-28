@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { hashPassword } from './auth';
-import { calcularAjustesDasRespostas, ajustarEstatisticas } from './estatisticas';
+import { calcularAjustesDasRespostas, ajustarEstatisticas, serializarEstatisticasMultiplas } from './estatisticas';
 
 const isTestEnv = process.env.NODE_ENV === 'test' || (typeof Bun !== 'undefined' && Array.isArray(Bun.argv) && Bun.argv.some(arg => arg.includes('test')));
 const dbPath = process.env.DATABASE_PATH || (isTestEnv ? './data/test.db' : './data/app.db');
@@ -447,17 +447,23 @@ export async function runDataRetentionPurge(): Promise<{ respostas: number; rank
           .all(cutoff) as any[];
         if (lote.length === 0) break;
 
-        const ajustes = await calcularAjustesDasRespostas(db, lote);
-        db.transaction(() => {
-          for (const ajuste of ajustes) {
-            ajustarEstatisticas(db, ajuste.atividadeId, ajuste.porQuestao, -1);
-          }
+        const idsAtividades = [...new Set(lote.map((linha) => Number(linha.atividade_id)))];
+        const removidas = await serializarEstatisticasMultiplas(idsAtividades, async () => {
+          const ajustes = await calcularAjustesDasRespostas(db, lote);
           const remover = db.query('DELETE FROM respostas_alunos WHERE id = ?');
-          for (const linha of lote) {
-            remover.run(Number(linha.id));
-          }
-        })();
-        result.respostas += lote.length;
+          let apagadas = 0;
+          db.transaction(() => {
+            for (let i = 0; i < lote.length; i++) {
+              const resultado = remover.run(Number(lote[i].id));
+              if (resultado.changes > 0) {
+                ajustarEstatisticas(db, ajustes[i].atividadeId, ajustes[i].porQuestao, -1);
+                apagadas += Number(resultado.changes);
+              }
+            }
+          })();
+          return apagadas;
+        });
+        result.respostas += removidas;
       }
 
       // [LGPD] Purgar rascunhos expirados e feedbacks individuais antigos do mesmo titular.

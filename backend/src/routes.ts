@@ -12,12 +12,13 @@ import {
   recomputarEstatisticasAtividade,
   extrairQuestoes,
   refDaQuestao,
+  serializarEstatisticas,
+  serializarEstatisticasMultiplas,
   MIN_SUBMISSOES_ESTATISTICAS,
 } from './estatisticas';
 import { professorAuth, adminAuth, hashPassword, verifyPassword, signJwt, verifyJwt, isValidEmail, createRateLimiter, extractClientIp } from './auth';
 import { sendMail, type MailRequest } from './mailer';
 import { processMarpContent, resolveFrontendDir, generateMarpNextStandaloneHtml } from './marp';
-import { executarEmFila } from './fila';
 import { aiRouter, handleEvaluateActivityResponses } from './ai';
 import { extractTextFromBuffer } from './documentParser';
 import { validateEmailWithTypo } from './emailValidator';
@@ -1458,19 +1459,21 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
   const encEmail = await encryptData(email);
   const encRespostas = await encryptData(respostasStr);
 
-  const correcao = corrigirObjetivas(atv.json_data, respostasInput);
+  let correcao = corrigirObjetivas(atv.json_data, respostasInput);
 
   try {
     // Upsert: submissões repetidas do mesmo e-mail na mesma atividade
     // atualizam o registro anterior (última tentativa vence). O consulta_token
     // é regenerado a cada envio e devolvido na resposta HTTP.
     let r: any;
-    const eraReenvio = await executarEmFila(`submissao:${atividadeId}:${emailHash}`, async () => {
+    const eraReenvio = await serializarEstatisticas(atividadeId, async () => {
+      const jsonAtual = (dbq('SELECT json_data FROM atividades WHERE id = ?').get(atividadeId) as any)?.json_data ?? null;
+      correcao = corrigirObjetivas(jsonAtual, respostasInput);
       const existente = dbq('SELECT id, criado_em, respostas FROM respostas_alunos WHERE atividade_id = ? AND aluno_email_hash = ?').get(atividadeId, emailHash) as any;
 
       if (existente) {
         const respostasAnteriores = await decryptData(existente.respostas);
-        const porQuestaoAnterior = corrigirObjetivas(atv.json_data, respostasAnteriores).porQuestao;
+        const porQuestaoAnterior = corrigirObjetivas(jsonAtual, respostasAnteriores).porQuestao;
         db.transaction(() => {
           ajustarEstatisticas(db, atividadeId, porQuestaoAnterior, -1);
           dbq(
@@ -1809,21 +1812,27 @@ app.delete('/aluno/minhas-respostas', submissionLimiter, async (c) => {
   ).get(emailHash, tokenHash);
   if (!tokenCheck) return c.text('Token inválido para este e-mail.', 401);
 
-  const alvos = dbq(
-    'SELECT atividade_id, respostas FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?'
-  ).all(emailHash, tokenHash) as any[];
-  const ajustesEstatisticas = await calcularAjustesDasRespostas(db, alvos);
+  const atividadesAlvo = (dbq(
+    'SELECT DISTINCT atividade_id FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?'
+  ).all(emailHash, tokenHash) as any[]).map((linha) => Number(linha.atividade_id));
 
-  db.transaction(() => {
-    for (const ajuste of ajustesEstatisticas) {
-      ajustarEstatisticas(db, ajuste.atividadeId, ajuste.porQuestao, -1);
-    }
-    dbq('DELETE FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?').run(emailHash, tokenHash);
-    // [LGPD] Direito à eliminação (Art. 16): cascata para rascunhos e feedbacks
-    // individuais do mesmo titular (mesmo e-mail/hash), que também contêm PII.
-    dbq('DELETE FROM rascunhos_atividades WHERE aluno_email_hash = ?').run(emailHash);
-    dbq('DELETE FROM disciplina_feedbacks WHERE aluno_email_hash = ?').run(emailHash);
-  })();
+  await serializarEstatisticasMultiplas(atividadesAlvo, async () => {
+    const alvos = dbq(
+      'SELECT atividade_id, respostas FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?'
+    ).all(emailHash, tokenHash) as any[];
+    const ajustesEstatisticas = await calcularAjustesDasRespostas(db, alvos);
+
+    db.transaction(() => {
+      for (const ajuste of ajustesEstatisticas) {
+        ajustarEstatisticas(db, ajuste.atividadeId, ajuste.porQuestao, -1);
+      }
+      dbq('DELETE FROM respostas_alunos WHERE aluno_email_hash = ? AND consulta_token_hash = ?').run(emailHash, tokenHash);
+      // [LGPD] Direito à eliminação (Art. 16): cascata para rascunhos e feedbacks
+      // individuais do mesmo titular (mesmo e-mail/hash), que também contêm PII.
+      dbq('DELETE FROM rascunhos_atividades WHERE aluno_email_hash = ?').run(emailHash);
+      dbq('DELETE FROM disciplina_feedbacks WHERE aluno_email_hash = ?').run(emailHash);
+    })();
+  });
 
   await logAudit(c, 'excluir_respostas_aluno', 'respostas_alunos', { email_hash: emailHash });
 
@@ -1854,16 +1863,21 @@ app.get('/atividades/:id/respostas', professorAuth, async (c) => {
 app.delete('/respostas/:id', professorAuth, async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.text('ID inválido', 400);
-  const resp = dbq('SELECT atividade_id, respostas FROM respostas_alunos WHERE id = ?').get(id) as any;
+  const resp = dbq('SELECT atividade_id FROM respostas_alunos WHERE id = ?').get(id) as any;
   if (!resp) return c.text('Resposta não encontrada', 404);
-  const atv = dbq('SELECT disciplina_id, json_data FROM atividades WHERE id = ?').get(resp.atividade_id) as any;
+  const atv = dbq('SELECT disciplina_id FROM atividades WHERE id = ?').get(resp.atividade_id) as any;
   if (atv && !(await canManageDisciplina(c, atv.disciplina_id))) return c.text('Access denied', 403);
 
-  const respostasDecifradas = await decryptData(resp.respostas);
-  db.transaction(() => {
-    ajustarEstatisticas(db, resp.atividade_id, corrigirObjetivas(atv?.json_data, respostasDecifradas).porQuestao, -1);
-    dbq('DELETE FROM respostas_alunos WHERE id = ?').run(id);
-  })();
+  await serializarEstatisticas(Number(resp.atividade_id), async () => {
+    const alvo = dbq('SELECT respostas FROM respostas_alunos WHERE id = ?').get(id) as any;
+    if (!alvo) return;
+    const jsonAtual = (dbq('SELECT json_data FROM atividades WHERE id = ?').get(resp.atividade_id) as any)?.json_data ?? null;
+    const respostasDecifradas = await decryptData(alvo.respostas);
+    db.transaction(() => {
+      ajustarEstatisticas(db, resp.atividade_id, corrigirObjetivas(jsonAtual, respostasDecifradas).porQuestao, -1);
+      dbq('DELETE FROM respostas_alunos WHERE id = ?').run(id);
+    })();
+  });
 
   await logAudit(c, 'excluir_resposta_professor', `resposta:${id}`);
 
