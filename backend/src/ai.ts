@@ -3,6 +3,7 @@ import { professorAuth } from './auth';
 import { db } from './db';
 import { decryptData } from './utils';
 import { callAi, resolveConfig, resolveProvider, modelsUrl, type AiMessage } from './aiProvider';
+import { obterContextoDocumentosSobDemanda } from './documentIndexer';
 
 const aiRouter = new Hono();
 
@@ -265,33 +266,21 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     if (row?.disciplina_id) targetDisciplinaId = row.disciplina_id;
   }
 
+  let targetCursoId: number | null = null;
   if (targetDisciplinaId) {
     const discRow = db
       .query('SELECT curso_id FROM disciplinas WHERE id = ?')
       .get(targetDisciplinaId) as any;
-    const targetCursoId = discRow?.curso_id ? Number(discRow.curso_id) : null;
+    if (discRow?.curso_id) targetCursoId = Number(discRow.curso_id);
+  }
 
-    const docs = db
-      .query(`
-      SELECT titulo, tipo, conteudo_texto 
-      FROM documentos_orientadores 
-      WHERE disciplina_id = ? OR (curso_id = ? AND disciplina_id IS NULL)
-      ORDER BY id ASC
-    `)
-      .all(targetDisciplinaId, targetCursoId) as {
-      titulo: string;
-      tipo: string;
-      conteudo_texto: string;
-    }[];
-
-    if (docs.length > 0) {
-      docsContexto = docs
-        .map(
-          (d, idx) =>
-            `--- DOCUMENTO ORIENTADOR ${idx + 1} (${d.tipo.toUpperCase()}): ${d.titulo} ---\n${(d.conteudo_texto || '').slice(0, 5000)}`
-        )
-        .join('\n\n');
-    }
+  if (targetDisciplinaId || targetCursoId) {
+    docsContexto = obterContextoDocumentosSobDemanda({
+      disciplinaId: targetDisciplinaId,
+      cursoId: targetCursoId,
+      temaOuAssunto: tema || titulo || 'Conteudo geral',
+      limiteTrechos: 4,
+    });
   }
 
   const isDiscursive = tipo === 'normal' || tipo === 'prova';
@@ -552,12 +541,39 @@ aiRouter.post('/generate-aula', professorAuth, async (c) => {
 
     if (aulas.length > 0) {
       aulasContexto = aulas
-        .map(
-          (a, idx) =>
-            `--- AULA DE REFERÊNCIA ${idx + 1}: ${a.titulo} ---\n${(a.conteudo_md || '').slice(0, 18000)}`
-        )
+        .map((a, idx) => {
+          const conteudo = a.conteudo_md || '';
+          const textoFinal = conteudo.length > 16000 ? conteudo.slice(0, 16000) : conteudo;
+          return `--- AULA DE REFERÊNCIA ${idx + 1}: ${a.titulo} ---\n${textoFinal}`;
+        })
         .join('\n\n');
     }
+  }
+
+  let targetDisciplinaId = disciplina_id ? Number(disciplina_id) : null;
+  if (!targetDisciplinaId && targetAulasIds.length > 0) {
+    const row = db
+      .query('SELECT disciplina_id FROM aulas WHERE id = ?')
+      .get(targetAulasIds[0]) as any;
+    if (row?.disciplina_id) targetDisciplinaId = row.disciplina_id;
+  }
+
+  let targetCursoId: number | null = null;
+  if (targetDisciplinaId) {
+    const discRow = db
+      .query('SELECT curso_id FROM disciplinas WHERE id = ?')
+      .get(targetDisciplinaId) as any;
+    if (discRow?.curso_id) targetCursoId = Number(discRow.curso_id);
+  }
+
+  let docsContexto = '';
+  if (targetDisciplinaId) {
+    docsContexto = obterContextoDocumentosSobDemanda({
+      disciplinaId: targetDisciplinaId,
+      cursoId: targetCursoId,
+      temaOuAssunto: tema || 'Conteudo geral',
+      limiteTrechos: 4,
+    });
   }
 
   const MARP_SYSTEM_PROMPT = `<INSTRUCOES>
@@ -685,6 +701,9 @@ animation-duration: 0.5s
     userPrompt += `OBSERVAÇÕES DO PROFESSOR (requisitos específicos que DEVEM ser respeitados na geração): ${observacoes}\n\n`;
   if (aulasContexto) {
     userPrompt += `AULAS ANTERIORES DE REFERÊNCIA (NÃO repita este conteúdo; use como base para dar sequência pedagógica sem sobreposição):\n\n${aulasContexto}\n\n`;
+  }
+  if (docsContexto) {
+    userPrompt += `DOCUMENTOS ORIENTADORES DA DISCIPLINA E CURSO (SOB DEMANDA):\n\n${docsContexto}\n\n`;
   }
   userPrompt +=
     'Gere a aula completa no formato Marp Next Markdown conforme as instruções. Responda APENAS com o markdown da aula, sem nenhum texto introdutório ou explicativo antes ou depois do bloco de slides.';

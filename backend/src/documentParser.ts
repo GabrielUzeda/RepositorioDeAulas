@@ -1,5 +1,13 @@
 import { extractText } from 'unpdf';
 
+function cleanTextPreservingNewlines(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/[^\x20-\x7E\n\r\t\u00A0-\u00FF\u0100-\u017F]/g, ' ')
+    .replace(/[^\S\r\n]+/g, ' ')
+    .trim();
+}
+
 export async function extractTextFromBuffer(buffer: Uint8Array, filename: string): Promise<string> {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
 
@@ -11,16 +19,19 @@ export async function extractTextFromBuffer(buffer: Uint8Array, filename: string
     return extractTextFromPdf(buffer);
   }
 
-  // Fallback UTF-8 decode
   const decoded = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
-  return decoded.replace(/[^\x20-\x7E\n\r\t\u00A0-\u00FF\u0100-\u017F]/g, ' ').replace(/\s+/g, ' ').trim();
+  return cleanTextPreservingNewlines(decoded);
 }
 
 export async function extractTextFromPdf(buffer: Uint8Array): Promise<string> {
   try {
-    const { text } = await extractText(buffer, { mergePages: true });
-    if (text && text.trim()) {
-      return text.replace(/\s+/g, ' ').trim();
+    const result = await extractText(buffer, { mergePages: false });
+    const pages = Array.isArray(result.text) ? result.text : [result.text];
+    if (pages && pages.length > 0) {
+      const joined = pages.filter(Boolean).join('\n\n');
+      if (joined.trim()) {
+        return cleanTextPreservingNewlines(joined);
+      }
     }
   } catch (err) {
     console.error('Erro ao extrair texto do PDF via unpdf:', err);
@@ -56,11 +67,11 @@ export async function extractTextFromPdf(buffer: Uint8Array): Promise<string> {
   }
 
   if (textChunks.length > 0) {
-    return textChunks.join(' ').replace(/\s+/g, ' ').trim();
+    return cleanTextPreservingNewlines(textChunks.join('\n\n'));
   }
 
   const readable = raw.replace(/[^\x20-\x7E\n\r\t\u00A0-\u00FF\u0100-\u017F]/g, ' ');
-  return readable.replace(/\s+/g, ' ').trim();
+  return cleanTextPreservingNewlines(readable);
 }
 
 function cleanPdfString(str: string): string {
@@ -72,3 +83,4 @@ function cleanPdfString(str: string): string {
     .replace(/\\\)/g, ')')
     .replace(/\\\\/g, '\\');
 }
+

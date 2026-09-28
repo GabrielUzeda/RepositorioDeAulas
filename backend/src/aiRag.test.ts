@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:tes
 import { signJwt } from './auth';
 import app from './routes';
 import { db } from './db';
+import { indexarDocumento } from './documentIndexer';
 
 const ENV_KEYS = [
   'AI_PROVIDER',
@@ -116,6 +117,7 @@ beforeAll(async () => {
       100
     );
   docDisciplinaId = Number(docDisciplina.lastInsertRowid);
+  indexarDocumento(docDisciplinaId, null, disciplinaId, TITULO_DOC_DISCIPLINA, `Ementa da disciplina. ${MARCADOR_DOC_DISCIPLINA}.`);
 
   const docCurso = db
     .query(
@@ -130,6 +132,7 @@ beforeAll(async () => {
       100
     );
   docCursoId = Number(docCurso.lastInsertRowid);
+  indexarDocumento(docCursoId, cursoId, null, TITULO_DOC_CURSO, `Diretrizes gerais do curso. ${MARCADOR_DOC_CURSO}.`);
 });
 
 afterAll(() => {
@@ -164,7 +167,7 @@ describe('RAG: contexto de documentos e aulas chega ao prompt de IA', () => {
       },
       body: JSON.stringify({
         tipo: 'normal',
-        tema: 'Tema de teste',
+        tema: 'Ementa da disciplina',
         quantidade: 1,
         disciplina_id: disciplinaId,
         aulas_ids: [aulaId],
