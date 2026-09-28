@@ -52,7 +52,7 @@ O proxy do host é a **única borda** e deve garantir:
 **1. Configure o `.env`:**
 ```bash
 cp example.env .env
-# PORT=8080   (ou outra porta interna livre)
+# PORT=8080   (ou outra porta interna livre — se mudar, ajuste o proxy_pass do Nginx para a MESMA porta)
 # HOST=127.0.0.1   (IP de escuta do Bun no host — o código usa HOST [default 0.0.0.0]; use 127.0.0.1 quando este proxy for a única borda)
 ```
 
