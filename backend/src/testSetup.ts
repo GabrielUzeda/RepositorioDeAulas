@@ -1,5 +1,10 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+
+const testStatic = process.env.FRONTEND_STATIC_DIR || path.join(os.tmpdir(), 'repoaulas-test-static');
+process.env.FRONTEND_STATIC_DIR = testStatic;
+mkdirSync(testStatic, { recursive: true });
 
 const testDb = process.env.DATABASE_PATH || './data/test.db';
 const pareceBancoDeTeste = path.basename(testDb).toLowerCase().includes('test');

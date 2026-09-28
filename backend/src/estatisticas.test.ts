@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
 import { db, runDataRetentionPurge } from './db';
 import app from './routes';
+import { serializarEstatisticas, serializarEstatisticasMultiplas } from './estatisticas';
 import {
   adminToken,
   authHeaders,
@@ -461,5 +462,110 @@ describe('Estatísticas agregadas por questão (diagnóstico da turma)', () => {
       .get(atvMeta.id) as any;
     expect(depois.id).toBe(antes.id);
     expect(depois.acertos).toBe(5);
+  });
+
+  test('recomputo concorrente com submissão preserva a contribuição', async () => {
+    const atvFila = await createAtividade(dono.token, discId, {
+      tipo: 'reforco',
+      titulo: 'Reforço Fila',
+      json_data: { questions: questoesObjetivas },
+    });
+    await submeter(atvFila.id, emailAluno(70), { q1: CERTO_Q1, q2: CERTO_Q2 });
+    await submeter(atvFila.id, emailAluno(71), { q1: CERTO_Q1, q2: CERTO_Q2 });
+
+    const caminho = (db.query('SELECT caminho FROM atividades WHERE id = ?').get(atvFila.id) as any).caminho;
+    const questoesRevisadas = questoesObjetivas.map((q, i) =>
+      i === 0 ? { ...q, content: 'Quanto é 2 + 2? (revisada)' } : q
+    );
+
+    const [edicao, envio] = await Promise.all([
+      app.request(`/atividades/${atvFila.id}`, {
+        method: 'PUT',
+        headers: jsonHeaders(dono.token),
+        body: JSON.stringify({
+          disciplina_id: discId,
+          titulo: 'Reforço Fila',
+          caminho,
+          tipo: 'reforco',
+          json_data: { questions: questoesRevisadas },
+        }),
+      }),
+      app.request(`/atividades/${atvFila.id}/respostas`, {
+        method: 'POST',
+        headers: jsonHeaders(),
+        body: JSON.stringify({
+          aluno_nome: 'Aluno Fila',
+          aluno_email: emailAluno(72),
+          respostas: { q1: CERTO_Q1, q2: CERTO_Q2 },
+        }),
+      }),
+    ]);
+    expect(edicao.status).toBe(200);
+    expect(envio.status).toBe(201);
+
+    const total = (db
+      .query('SELECT COUNT(*) AS n FROM respostas_alunos WHERE atividade_id = ?')
+      .get(atvFila.id) as any).n;
+    expect(total).toBe(3);
+    const contador = db
+      .query("SELECT acertos, erros FROM estatisticas_questoes WHERE atividade_id = ? AND questao_ref = 'q1'")
+      .get(atvFila.id) as any;
+    expect(contador.acertos).toBe(total);
+    expect(contador.acertos + contador.erros).toBe(total);
+  });
+});
+
+describe('Fila de estatísticas por atividade (serializarEstatisticas)', () => {
+  function pausa(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  test('tarefas da mesma atividade não se sobrepõem e preservam a ordem', async () => {
+    const eventos: string[] = [];
+    await Promise.all([
+      serializarEstatisticas(900001, async () => {
+        eventos.push('inicio-1');
+        await pausa(20);
+        eventos.push('fim-1');
+      }),
+      serializarEstatisticas(900001, async () => {
+        eventos.push('inicio-2');
+        eventos.push('fim-2');
+      }),
+    ]);
+    expect(eventos).toEqual(['inicio-1', 'fim-1', 'inicio-2', 'fim-2']);
+  });
+
+  test('atividades diferentes rodam em paralelo', async () => {
+    const eventos: string[] = [];
+    await Promise.all([
+      serializarEstatisticas(900002, async () => {
+        eventos.push('a-inicio');
+        await pausa(20);
+        eventos.push('a-fim');
+      }),
+      serializarEstatisticas(900003, async () => {
+        eventos.push('b-inicio');
+        eventos.push('b-fim');
+      }),
+    ]);
+    expect(eventos).toEqual(['a-inicio', 'b-inicio', 'b-fim', 'a-fim']);
+  });
+
+  test('chaves múltiplas em ordens opostas não travam e não se intercalam', async () => {
+    const eventos: string[] = [];
+    await Promise.all([
+      serializarEstatisticasMultiplas([900012, 900011], async () => {
+        eventos.push('x-inicio');
+        await pausa(15);
+        eventos.push('x-fim');
+      }),
+      serializarEstatisticasMultiplas([900011, 900012], async () => {
+        eventos.push('y-inicio');
+        await pausa(1);
+        eventos.push('y-fim');
+      }),
+    ]);
+    expect(eventos).toEqual(['x-inicio', 'x-fim', 'y-inicio', 'y-fim']);
   });
 });
