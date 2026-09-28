@@ -38,7 +38,7 @@ export function cacheControlFor(filePath: string, isIndexFallback = false): stri
   const normalized = (filePath || '').replace(/\\/g, '/').toLowerCase();
   const base = normalized.slice(normalized.lastIndexOf('/') + 1);
   if (isIndexFallback || base === 'index.html') return CACHE_NO_CACHE;
-  if (normalized.includes('/assets/')) return CACHE_ASSETS_IMMUTABLE;
+  if (normalized.includes('/assets/') && !normalized.includes('/materias/')) return CACHE_ASSETS_IMMUTABLE;
   return null;
 }
 
@@ -71,7 +71,7 @@ export function isCompressible(
   return COMPRESSIBLE_EXTENSIONS.has(ext);
 }
 
-function writeAtomic(target: string, data: Uint8Array): void {
+function writeAtomic(target: string, data: Uint8Array | string): void {
   const tmp = `${target}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
   writeFileSync(tmp, data);
   try {

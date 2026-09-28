@@ -19,7 +19,7 @@ import { GZIP_MIN_BYTES, clientAcceptsGzip, getGzipSidecar, isCompressible, cach
 //   cd backend && FRONTEND_STATIC_DIR=/tmp/opencode/mt2-fe bun test src/gzipStatic.test.ts
 const staticBase = resolveFrontendDir();
 
-async function bytesOf(res: Response): Promise<Uint8Array> {
+async function bytesOf(res: Response): Promise<Uint8Array<ArrayBuffer>> {
   return new Uint8Array(await res.arrayBuffer());
 }
 
@@ -105,6 +105,7 @@ describe('gzipStatic: helpers puros', () => {
     expect(cacheControlFor('/app/frontend_static/qualquer', true)).toBe(CACHE_NO_CACHE);
     expect(cacheControlFor('/tmp/base/materias/logica/aulas/intro.html')).toBeNull();
     expect(cacheControlFor('/tmp/base/materias/logica/aula.css')).toBeNull();
+    expect(cacheControlFor('/tmp/base/materias/assets/a.html')).toBeNull();
     expect(cacheControlFor('')).toBeNull();
   });
 });
@@ -301,6 +302,37 @@ describe('gzipStatic: entrega HTTP com gzip + passthrough', () => {
       expect(identity.status).toBe(200);
       expect(identity.headers.get('content-encoding')).toBeNull();
       expect(identity.headers.get('cache-control')).toBe(CACHE_ASSETS_IMMUTABLE);
+    } finally {
+      cleanupFiles(assetPath, `${assetPath}.gz`, `${assetPath}.gz.meta`);
+      if (!assetsExisted) {
+        try {
+          rmSync(assetsDir, { recursive: true, force: true });
+        } catch {
+          void 0;
+        }
+      }
+    }
+  });
+
+  test('pedido direto a sidecar .gz ou .meta responde 404', async () => {
+    const assetsDir = path.join(staticBase, 'assets');
+    const assetsExisted = existsSync(assetsDir);
+    const assetPath = path.join(assetsDir, 'block-sidecar-abc123.js');
+    createdFiles.push(assetPath);
+    writeFile(assetPath, `export const z = "${'b'.repeat(3000)}";`);
+    try {
+      const gz = await app.request('/assets/block-sidecar-abc123.js', {
+        headers: { 'accept-encoding': 'gzip' },
+      });
+      expect(gz.status).toBe(200);
+      expect(gz.headers.get('content-encoding')).toBe('gzip');
+      expect(existsSync(`${assetPath}.gz`)).toBe(true);
+      expect((await app.request('/assets/block-sidecar-abc123.js.gz')).status).toBe(404);
+      expect((await app.request('/assets/block-sidecar-abc123.js.gz.meta')).status).toBe(404);
+
+      const aulaHtml = await app.request(`/${aulaCaminho}`, { headers: { 'accept-encoding': 'gzip' } });
+      expect(aulaHtml.headers.get('content-encoding')).toBe('gzip');
+      expect((await app.request(`/${aulaCaminho}.gz`)).status).toBe(404);
     } finally {
       cleanupFiles(assetPath, `${assetPath}.gz`, `${assetPath}.gz.meta`);
       if (!assetsExisted) {

@@ -89,6 +89,7 @@ const CONTENT_TYPES_BY_EXT: Record<string, string> = {
 };
 
 function serveFileWithCsp(filePath: string, contentType?: string, acceptEncoding?: string | null, isIndexFallback = false): Response | null {
+  if (filePath.endsWith('.gz') || filePath.endsWith('.meta')) return null;
   if (!existsSync(filePath) || !statSync(filePath).isFile()) return null;
   const size = statSync(filePath).size;
   const effectiveType = contentType || CONTENT_TYPES_BY_EXT[path.extname(filePath).toLowerCase()];
@@ -2847,6 +2848,7 @@ app.use('*', async (c, next) => {
   await next();
   if (c.res.status === 404 && existsSync(frontendStaticDir)) {
     const reqPath = c.req.path;
+    if (reqPath.endsWith('.gz') || reqPath.endsWith('.meta')) return;
     const base = path.resolve(frontendStaticDir);
     // [SEG] Resolve o caminho e impede traversal de diretório (ex.: /../../etc/passwd).
     const target = path.resolve(base, reqPath.replace(/^\/+/, ''));
