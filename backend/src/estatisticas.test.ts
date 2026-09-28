@@ -427,4 +427,39 @@ describe('Estatísticas agregadas por questão (diagnóstico da turma)', () => {
       .get(atvCorrida.id) as any;
     expect(contador.acertos).toBe(1);
   });
+
+  test('editar campos fora das questões não recalcula os contadores', async () => {
+    const atvMeta = await createAtividade(dono.token, discId, {
+      tipo: 'reforco',
+      titulo: 'Reforço Meta',
+      json_data: { questions: questoesObjetivas, meta: { autor: 'A' } },
+    });
+    for (let i = 0; i < 5; i++) {
+      await submeter(atvMeta.id, emailAluno(60 + i), { q1: CERTO_Q1, q2: ERRADO_Q2 });
+    }
+    const caminho = (db.query('SELECT caminho FROM atividades WHERE id = ?').get(atvMeta.id) as any).caminho;
+    const antes = db
+      .query("SELECT id, acertos FROM estatisticas_questoes WHERE atividade_id = ? AND questao_ref = 'q1'")
+      .get(atvMeta.id) as any;
+    expect(antes.acertos).toBe(5);
+
+    const edicao = await app.request(`/atividades/${atvMeta.id}`, {
+      method: 'PUT',
+      headers: jsonHeaders(dono.token),
+      body: JSON.stringify({
+        disciplina_id: discId,
+        titulo: 'Reforço Meta',
+        caminho,
+        tipo: 'reforco',
+        json_data: { questions: questoesObjetivas, meta: { autor: 'B' } },
+      }),
+    });
+    expect(edicao.status).toBe(200);
+
+    const depois = db
+      .query("SELECT id, acertos FROM estatisticas_questoes WHERE atividade_id = ? AND questao_ref = 'q1'")
+      .get(atvMeta.id) as any;
+    expect(depois.id).toBe(antes.id);
+    expect(depois.acertos).toBe(5);
+  });
 });

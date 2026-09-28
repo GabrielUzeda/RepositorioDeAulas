@@ -648,7 +648,9 @@ async function updateAtividade(c: any) {
     ) as any;
   if (!r) return c.text('Atividade not found', 404);
 
-  if ((r.json_data ?? null) !== jsonAnterior) {
+  const questoesAntes = JSON.stringify(extrairQuestoes(jsonAnterior));
+  const questoesDepois = JSON.stringify(extrairQuestoes(r.json_data ?? null));
+  if (questoesAntes !== questoesDepois) {
     await recomputarEstatisticasAtividade(db, id);
   }
 
