@@ -135,7 +135,7 @@ describe('AI Provider Abstraction', () => {
     expect(body.model).toBe('deepseek-v4.1-flash');
     expect(body.temperature).toBe(0.3);
     expect(body.max_tokens).toBe(8192);
-    expect(body.stream).toBe(false);
+    expect(body.stream).toBe(true);
     const messages = body.messages;
     expect(Array.isArray(messages)).toBe(true);
     if (!Array.isArray(messages)) throw new Error('messages ausente');

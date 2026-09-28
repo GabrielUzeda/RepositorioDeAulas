@@ -86,6 +86,96 @@ function parseJson(raw: string): JsonValue | undefined {
   }
 }
 
+function extractUsage(parsed: unknown, raw: string): { prompt_tokens: number; completion_tokens: number; reasoning_tokens: number } {
+  let prompt_tokens = 0;
+  let completion_tokens = 0;
+  let reasoning_tokens = 0;
+
+  const root = asRecord(parsed);
+  if (root) {
+    const usage = asRecord(root.usage);
+    if (usage) {
+      prompt_tokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
+      completion_tokens = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
+      const details = asRecord(usage.completion_tokens_details);
+      reasoning_tokens = Number(details?.reasoning_tokens ?? usage.reasoning_tokens ?? 0);
+    }
+  }
+
+  if (raw && typeof raw === 'string') {
+    const lines = raw.split('\n');
+    for (const line of lines) {
+      const line_ = line.trim();
+      if (line_.startsWith('data:') && !line_.includes('[DONE]')) {
+        const payload = line_.replace(/^data:\s*/, '');
+        const chunk = parseJson(payload);
+        const chunkRoot = asRecord(chunk);
+        if (chunkRoot) {
+          const usage = asRecord(chunkRoot.usage);
+          if (usage) {
+            prompt_tokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? prompt_tokens);
+            completion_tokens = Number(usage.completion_tokens ?? usage.output_tokens ?? completion_tokens);
+            const details = asRecord(usage.completion_tokens_details);
+            reasoning_tokens = Number(details?.reasoning_tokens ?? usage.reasoning_tokens ?? reasoning_tokens);
+          }
+        }
+      }
+    }
+  }
+
+  return { prompt_tokens, completion_tokens, reasoning_tokens };
+}
+
+function extractFinishReason(parsed: unknown, raw: string): string {
+  const root = asRecord(parsed);
+  if (root) {
+    const choices = root.choices;
+    if (Array.isArray(choices) && choices.length > 0) {
+      const ch = asRecord(choices[0]);
+      if (ch && typeof ch.finish_reason === 'string') {
+        return ch.finish_reason;
+      }
+    }
+    if (typeof root.stop_reason === 'string') {
+      return root.stop_reason;
+    }
+    if (typeof root.finish_reason === 'string') {
+      return root.finish_reason;
+    }
+  }
+
+  if (raw && typeof raw === 'string') {
+    const match = raw.match(/["']?finish_reason["']?\s*:\s*["']([^"']+)["']/);
+    if (match && match[1]) return match[1];
+    const matchStop = raw.match(/["']?stop_reason["']?\s*:\s*["']([^"']+)["']/);
+    if (matchStop && matchStop[1]) return matchStop[1];
+
+    const lines = raw.split('\n');
+    for (const line of lines) {
+      const line_ = line.trim();
+      if (line_.startsWith('data:') && !line_.includes('[DONE]')) {
+        const payload = line_.replace(/^data:\s*/, '');
+        const chunk = parseJson(payload);
+        const chunkRoot = asRecord(chunk);
+        if (chunkRoot) {
+          const choices = chunkRoot.choices;
+          if (Array.isArray(choices) && choices.length > 0) {
+            const ch = asRecord(choices[0]);
+            if (ch && typeof ch.finish_reason === 'string') {
+              return ch.finish_reason;
+            }
+          }
+          if (typeof chunkRoot.stop_reason === 'string') {
+            return chunkRoot.stop_reason;
+          }
+        }
+      }
+    }
+  }
+
+  return 'stop';
+}
+
 export function isResponseTruncated(raw: string, data?: unknown): boolean {
   const parsed = data !== undefined ? data : parseJson(raw);
   const root = asRecord(parsed);
@@ -95,12 +185,12 @@ export function isResponseTruncated(raw: string, data?: unknown): boolean {
     if (Array.isArray(choices) && choices.length > 0) {
       for (const choice of choices) {
         const ch = asRecord(choice);
-        if (ch && ch.finish_reason === 'length') {
+        if (ch && (ch.finish_reason === 'length' || ch.finish_reason === 'max_tokens')) {
           return true;
         }
       }
     }
-    if (root.stop_reason === 'max_tokens') {
+    if (root.stop_reason === 'max_tokens' || root.stop_reason === 'length') {
       return true;
     }
   }
@@ -108,9 +198,33 @@ export function isResponseTruncated(raw: string, data?: unknown): boolean {
   if (raw && typeof raw === 'string') {
     if (
       /["']?finish_reason["']?\s*:\s*["']length["']/.test(raw) ||
-      /["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(raw)
+      /["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(raw) ||
+      /["']?finish_reason["']?\s*:\s*["']max_tokens["']/.test(raw)
     ) {
       return true;
+    }
+    const lines = raw.split('\n');
+    for (const line of lines) {
+      const line_ = line.trim();
+      if (line_.startsWith('data:') && !line_.includes('[DONE]')) {
+        const payload = line_.replace(/^data:\s*/, '');
+        const chunk = parseJson(payload);
+        const chunkRoot = asRecord(chunk);
+        if (chunkRoot) {
+          const choices = chunkRoot.choices;
+          if (Array.isArray(choices) && choices.length > 0) {
+            for (const choice of choices) {
+              const ch = asRecord(choice);
+              if (ch && (ch.finish_reason === 'length' || ch.finish_reason === 'max_tokens')) {
+                return true;
+              }
+            }
+          }
+          if (chunkRoot.stop_reason === 'max_tokens' || chunkRoot.stop_reason === 'length') {
+            return true;
+          }
+        }
+      }
     }
   }
 
@@ -233,7 +347,7 @@ function createOpenAiProvider(name: string): AiProvider {
         messages,
         temperature,
         max_tokens: maxTokens,
-        stream: false,
+        stream: true,
       };
     },
     extractContent(data: unknown): string {
@@ -243,8 +357,14 @@ function createOpenAiProvider(name: string): AiProvider {
       const first = asRecord(choices[0]);
       if (!first) return '';
       const message = asRecord(first.message);
-      if (!message) return '';
-      return pickString(message.content);
+      if (message) {
+        return pickString(message.content);
+      }
+      const delta = asRecord(first.delta);
+      if (delta) {
+        return pickString(delta.content) || pickString(delta.text);
+      }
+      return '';
     },
     extractError(data: unknown): string {
       return extractErrorValue(data);
@@ -255,11 +375,29 @@ function createOpenAiProvider(name: string): AiProvider {
       if (Array.isArray(choices) && choices.length > 0) {
         for (const ch of choices) {
           const record = asRecord(ch);
-          if (record && record.finish_reason === 'length') return true;
+          if (record && (record.finish_reason === 'length' || record.finish_reason === 'max_tokens')) return true;
         }
       }
-      if (rawText && /["']?finish_reason["']?\s*:\s*["']length["']/.test(rawText)) {
-        return true;
+      if (rawText) {
+        if (/["']?finish_reason["']?\s*:\s*["']length["']/.test(rawText) || /["']?finish_reason["']?\s*:\s*["']max_tokens["']/.test(rawText)) {
+          return true;
+        }
+        const lines = rawText.split('\n');
+        for (const line of lines) {
+          const line_ = line.trim();
+          if (line_.startsWith('data:') && !line_.includes('[DONE]')) {
+            const payload = line_.replace(/^data:\s*/, '');
+            const chunk = parseJson(payload);
+            const chunkRoot = asRecord(chunk);
+            const chs = chunkRoot?.choices;
+            if (Array.isArray(chs) && chs.length > 0) {
+              for (const c of chs) {
+                const rec = asRecord(c);
+                if (rec && (rec.finish_reason === 'length' || rec.finish_reason === 'max_tokens')) return true;
+              }
+            }
+          }
+        }
       }
       return false;
     },
@@ -319,8 +457,8 @@ function createAnthropicProvider(anthropicVersion: string): AiProvider {
     },
     isTruncated(data: unknown, rawText?: string): boolean {
       const root = asRecord(data);
-      if (root && root.stop_reason === 'max_tokens') return true;
-      if (rawText && /["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(rawText)) {
+      if (root && (root.stop_reason === 'max_tokens' || root.stop_reason === 'length')) return true;
+      if (rawText && (/["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(rawText) || /["']?stop_reason["']?\s*:\s*["']length["']/.test(rawText))) {
         return true;
       }
       return false;
@@ -359,26 +497,56 @@ export function extractText(raw: string, provider: AiProvider): string {
 
   const streamed: string[] = [];
   const lines = raw.split('\n');
+  let hasDataLines = false;
+  let hasDoneOrFinishReason = false;
+
   for (const line of lines) {
     const line_ = line.trim();
-    if (!line_.startsWith('data:') || line_.includes('[DONE]')) continue;
-    const payload = line_.replace(/^data:\s*/, '');
-    const chunk = parseJson(payload);
-    if (chunk === undefined) continue;
-    let piece = provider.extractContent(chunk);
-    if (!piece) {
-      const choices = asRecord(chunk)?.choices;
-      if (Array.isArray(choices) && choices.length > 0) {
-        const delta = asRecord(asRecord(choices[0])?.delta);
-        piece = delta ? pickString(delta.content) : '';
+    if (line_.startsWith('data:')) {
+      hasDataLines = true;
+      if (line_.includes('[DONE]')) {
+        hasDoneOrFinishReason = true;
+        continue;
       }
+      const payload = line_.replace(/^data:\s*/, '');
+      const chunk = parseJson(payload);
+      if (chunk === undefined) continue;
+
+      const rootChunk = asRecord(chunk);
+      if (rootChunk) {
+        const choices = rootChunk.choices;
+        if (Array.isArray(choices) && choices.length > 0) {
+          const ch = asRecord(choices[0]);
+          if (ch && typeof ch.finish_reason === 'string' && ch.finish_reason !== null) {
+            hasDoneOrFinishReason = true;
+          }
+        }
+        if (typeof rootChunk.stop_reason === 'string' && rootChunk.stop_reason !== null) {
+          hasDoneOrFinishReason = true;
+        }
+      }
+
+      let piece = provider.extractContent(chunk);
+      if (!piece) {
+        const choices = asRecord(chunk)?.choices;
+        if (Array.isArray(choices) && choices.length > 0) {
+          const delta = asRecord(asRecord(choices[0])?.delta);
+          piece = delta ? pickString(delta.content) : '';
+        }
+      }
+      if (!piece) {
+        const delta = asRecord(asRecord(chunk)?.delta);
+        piece = delta ? pickString(delta.text) : '';
+      }
+      if (piece) streamed.push(piece);
     }
-    if (!piece) {
-      const delta = asRecord(asRecord(chunk)?.delta);
-      piece = delta ? pickString(delta.text) : '';
-    }
-    if (piece) streamed.push(piece);
   }
+
+  if (hasDataLines && !hasDoneOrFinishReason && streamed.length > 0) {
+    console.log('[AI-Provider] ALERTA: Stream SSE cortado prematuramente sem [DONE] ou finish_reason');
+    return '';
+  }
+
   if (streamed.length > 0) return streamed.join('');
 
   const match = raw.match(/\{[\s\S]*\}/);
@@ -427,6 +595,13 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
 
   for (const model of models) {
     const callMaxTokens = options.maxTokens ?? config.maxTokens;
+    const promptChars = options.messages.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+    const startTime = performance.now();
+
+    console.log(
+      `[AI-Provider] Início da chamada | provider: ${config.provider} | model: ${model} | mensagens: ${options.messages.length} | prompt_chars: ${promptChars} | timeout_ms: ${attemptTimeoutMs} | max_tokens: ${callMaxTokens}`
+    );
+
     const body = JSON.stringify(
       provider.buildBody(model, options.messages, options.temperature ?? 0.3, callMaxTokens)
     );
@@ -442,25 +617,47 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
               signal: AbortSignal.timeout(attemptTimeoutMs),
             });
 
+      const elapsedSec = Number(((performance.now() - startTime) / 1000).toFixed(2));
+
       if (response.ok) {
         const raw = await response.text();
         const parsedJson = parseJson(raw);
         const truncated = provider.isTruncated
           ? provider.isTruncated(parsedJson, raw)
           : isResponseTruncated(raw, parsedJson);
+        
         if (truncated) {
+          const finishReason = extractFinishReason(parsedJson, raw) || 'length';
+          console.log(
+            `[AI-Provider] ALERTA: Resposta truncada | model: ${model} | tempo_s: ${elapsedSec} | finish_reason: ${finishReason}`
+          );
           lastError = `[${model}] resposta truncada por limite de tokens (max_tokens atingido)`;
           continue;
         }
+
         const content = extractText(raw, provider);
+        const contentChars = content.length;
+        const usage = extractUsage(parsedJson, raw);
+        const finishReason = extractFinishReason(parsedJson, raw) || 'stop';
+
         if (content) {
           if (options.validate && !options.validate(content)) {
+            console.log(
+              `[AI-Provider] ALERTA: Validação reprovada | model: ${model} | tempo_s: ${elapsedSec} | content_chars: ${contentChars}`
+            );
             lastError = `[${model}] resposta com formato invalido`;
             continue;
           }
+          console.log(
+            `[AI-Provider] Sucesso | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | tokens_prompt: ${usage.prompt_tokens} | tokens_completion: ${usage.completion_tokens} | tokens_reasoning: ${usage.reasoning_tokens} | finish_reason: ${finishReason} | content_chars: ${contentChars}`
+          );
           return { content, modelUsed: model };
         }
+
         const bodyError = extractRawBodyError(raw, provider);
+        console.log(
+          `[AI-Provider] ERRO: Resposta sem conteúdo | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | body_error: ${(bodyError || raw).slice(0, 100)}`
+        );
         lastError = bodyError
           ? `[${model}] resposta sem conteudo: ${bodyError.slice(0, 200)}`
           : `[${model}] resposta sem conteudo`;
@@ -470,9 +667,16 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
       const detail = await response.text().catch(() => '');
       const extracted = provider.extractError(parseJson(detail));
       const message = extracted || detail;
+      console.log(
+        `[AI-Provider] ERRO: HTTP ${response.status} | model: ${model} | tempo_s: ${elapsedSec} | mensagem: ${message.slice(0, 200)}`
+      );
       lastError = `[${model}] HTTP ${response.status}: ${message.slice(0, 200)}`;
     } catch (error) {
+      const elapsedSec = Number(((performance.now() - startTime) / 1000).toFixed(2));
       const message = error instanceof Error ? error.message : String(error);
+      console.log(
+        `[AI-Provider] ERRO: Exceção de rede | model: ${model} | tempo_s: ${elapsedSec} | mensagem: ${message}`
+      );
       lastError = `[${model}] ${message}`;
     }
   }
