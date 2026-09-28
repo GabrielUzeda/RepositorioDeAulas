@@ -154,7 +154,25 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 
 ---
 
-## 6. LGPD / privacidade (pontos relevantes ao mexer)
+## 6. RAG Agêntico Sob Demanda com SQLite FTS5 (`documentIndexer.ts`)
+
+A plataforma implementa um sistema de RAG (Retrieval-Augmented Generation) agêntico e sob demanda utilizando SQLite FTS5 nativo (`bun:sqlite`), otimizado para documentos orientadores (ementas, planos de ensino, apostilas e PDFs).
+
+### Arquitetura e Componentes
+1. **Fatiamento e Extração de Seções (`fatiarEmSecoes`)**:
+   - Analisa o texto dos documentos orientadores identificando cabeçalhos estruturados (`#`, `##`, `###`), marcações de unidades/módulos/capítulos, e segmentando parágrafos extensos com teto rígido de até 1800 caracteres (com fallback de quebra por janela fixa de ~1500 caracteres em blocos contínuos sem quebras de linha).
+2. **Armazenamento e Tabela Virtual FTS5 (`documento_secoes` e `documento_secoes_fts`)**:
+   - Cada seção fatiada é persistida em `documento_secoes` (relacionada ao documento, disciplina e curso) e indexada na tabela virtual FTS5 `documento_secoes_fts` para busca textual de altíssima performance.
+3. **Mapa / Grafo de Tópicos (`obterMapaDocumentos`)**:
+   - Constrói estruturalmente a árvore de seções e tópicos disponíveis nos documentos associados à disciplina/curso, limitando a no máximo 15 seções ou 1200 caracteres no total (com indicador `... (+ N seções adicionais disponíveis)`), fornecendo ao modelo de IA a visão macro do conteúdo orientador.
+4. **Recuperação Cirúrgica Sob Demanda (`obterContextoDocumentosSobDemanda`)**:
+   - Combina o mapa global de tópicos com busca booleana cirúrgica via FTS5 (`MATCH`) filtrada pelo tema ou assunto da solicitação (após sanitização de operadores FTS5 como `AND`, `OR`, `NOT`, `NEAR`, parênteses e símbolos), injetando no prompt apenas os trechos mais relevantes.
+5. **Ciclo de Vida Integrado**:
+   - Ao cadastrar um documento (`POST /disciplinas/:id/documentos` ou `POST /cursos/:id/documentos`), o indexador executa o fatiamento e a indexação FTS5 em transação atômica (`db.transaction`). Ao excluí-lo, os índices e seções são removidos em cascata via trigger SQLite (`trg_delete_documento_secoes_fts`) e `removerIndiceDocumento`.
+
+---
+
+## 7. LGPD / privacidade (pontos relevantes ao mexer)
 
 - Nome/email/respostas do aluno são **criptografados** ao submeter; e-mail vira hash para joins.
 - `DELETE /respostas/:id` existe para direito de exclusão (LGPD).
@@ -163,11 +181,11 @@ Biblioteca de componentes compartilhados entre Admin/Professor/Aluno. **Todos us
 
 ---
 
-## 7. Fluxos de negócio e Jornada End-to-End
+## 8. Fluxos de negócio e Jornada End-to-End
 
 O repositório opera em 4 grandes papéis/fluxos encadeados, do gerenciamento administrativo até a entrega pedagógica:
 
-### 7.1 Jornada End-to-End do Sistema
+### 8.1 Jornada End-to-End do Sistema
 
 ```
 [1. Administrador] ──► Criar Professores & Cursos ──► Vincular Professores aos Cursos
@@ -201,7 +219,7 @@ O repositório opera em 4 grandes papéis/fluxos encadeados, do gerenciamento ad
    - **Aulas**: Abre os slides renderizados pelo backend/Marp em popup seguro (window.open).
    - **Atividades**: Responde a atividade (passo-a-passo por pergunta ou minigame/roleta), salva rascunho local ou no servidor (código de 30 dias), opcionalmente marca a checkbox para **receber comprovante com suas respostas por e-mail** (conforme LGPD) e submete a resposta.
 
-### 7.2 Modalidades e Tipos de Atividades Disponíveis
+### 8.2 Modalidades e Tipos de Atividades Disponíveis
 
 O sistema suporta 4 tipos principais de atividades interativas (armazenadas na coluna `tipo` e estruturadas em `json_data`):
 
@@ -216,7 +234,7 @@ O sistema suporta 4 tipos principais de atividades interativas (armazenadas na c
 
 ---
 
-## 8. Testes E2E (Playwright via Docker — caminho oficial)
+## 9. Testes E2E (Playwright via Docker — caminho oficial)
 
 ### Escopo
 Há 16 specs em `e2e/tests/`. Status verificados (todos 100% passando):
@@ -236,9 +254,9 @@ Há 16 specs em `e2e/tests/`. Status verificados (todos 100% passando):
 | `atividade-rascunhos.spec.ts` | ✅ atual | Salvamento e restauração de rascunhos de atividades (30 dias) |
 | `aula-ia.spec.ts` | ✅ atual | Geração e pré-visualização de aulas assistidas por IA |
 | `email-feedback.spec.ts` | ✅ atual | Entrega real de e-mails de feedback pedagógico via Mailhog |
-| `fluxo-completo.spec.ts` | ✅ atual | Jornada completa de ponta a ponta (Professor → Aluno → Avaliação → Feedback) |
+| `fluxo-completo.spec.ts` | ✅ **atualizado** | Jornada completa de ponta a ponta (Professor → Aluno → Avaliação → Feedback) |
 | `relacao-aula-atividade.spec.ts` | ✅ **novo** | Matriz completa: aula sem atividade, aula com atividade vinculada e atividade geral, com visão do professor e resolução do aluno |
-| `melhorias-recentes.spec.ts` | ✅ **novo** | Modal RAG de documentos, prazos/deadlines no editor, prévia em tempo real, validação com correção de typo de e-mail e ciclo de vida |
+| `melhorias-recentes.spec.ts` | ✅ **atualizado** | Modal RAG de documentos, prazos/deadlines no editor, prévia em tempo real, validação com correção de typo de e-mail e ciclo de vida |
 
 ### Como executar
 ```bash
@@ -259,7 +277,7 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 
 ---
 
-## 9. Guia de escrita de testes E2E
+## 10. Guia de escrita de testes E2E
 
 ### Helpers (`e2e/helpers.ts`)
 - `unique(prefix)` / `uniqueName(prefix)` — sufixo `_{Date.now()}_{rand}`
@@ -269,7 +287,7 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 
 ### Seletores atuais (verificados) — resumo rápido
 - **Login**: placeholders `professor@local` e `••••••••`; botão `Entrar`.
-- **Aluno**: heading `Área do Aluno`; card curso/disciplina = `h3` (nome); tabs `Aulas (N)`/`Atividades (N)`; aula abre em popup com URL contendo `/materias/`; PasswordModal: `Acesso Restrito` + placeholder `Digite a senha`.
+- **Aluno**: texto 'Área do Aluno' (getByText); card curso/disciplina = `h3` (nome); tabs `Aulas (N)`/`Atividades (N)`; aula abre em popup com URL contendo `/materias/`; PasswordModal: `Acesso Restrito` + placeholder `Digite a senha`.
 - **ActivityModal (aluno)**: duas `getByLabel('Seu Nome *'/'Seu E-mail *')`; opções objetivas são **botões** (nome = texto da opção, ex. `Brasília`); success `h3 'Resposta Enviada com Sucesso!'` + `Correção do servidor: X / Y acertos`.
 - **Professor**: heading `Painel do Professor`; curso card `h3`; disciplina `h3` + botão `Gerenciar Aulas & Atividades`; botão `Respostas` (seletor: `getByRole('button', { name: /Respostas/i })`); `Gerar Feedback da Disciplina`.
 - **RespostasModal**: `Total de Envios: {n}`; botão `Avaliar / Ver`; inputs `placeholder='Ex: 85'` (nota) e `placeholder='Escreva um comentário pedagógico para este aluno...'` (feedback); sucesso `Avaliação Salva!`; botão `Fechar`.
@@ -282,7 +300,7 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 
 ---
 
-## 10. Armadilhas validadas (leia antes de editar != código)
+## 11. Armadilhas validadas (leia antes de editar != código)
 
 1. **Senha é exclusiva do curso**: `disciplinas` não possui mais coluna `senha`. O acesso anônimo a aulas/atividades checa apenas `cursos.senha`. Para fluxo anônimo sem modal de senha, crie o curso sem senha.
 2. **`GET /cursos/:id` não expõe a senha nem seu hash** — devolve `possui_senha: 0 | 1` (booleano); `GET /cursos/:id/disciplinas` anônimo omite campos restritos. Validação de senha é feita via `POST /cursos/:id/verificar-senha`.
@@ -298,18 +316,18 @@ PROFESSOR_PASSWORD=ProfessorUzeda! npx playwright test --config e2e/playwright.c
 
 ---
 
-## 11. Design System — estado atual (débito técnico resolvido)
+## 12. Design System — estado atual (débito técnico resolvido)
 
 > Débito de design system resolvido em 2026-08-13 (ver histórico de commit). Documentação canônica de tokens/escalas/contraste: **`DESIGN.md`** (raiz). Esta seção é o espelho para IAs.
 
-### 11.1 Tokens de cor (fonte de verdade)
+### 12.1 Tokens de cor (fonte de verdade)
 Definidos em `frontend/src/shared/style.css` como CSS vars, mapeados em `tailwind.config.js` (`colors → var(--c-*)`): `surface, surface-alt, primary, secondary, line, accent, danger, success` (+ `on-success, on-danger, danger-text` e `cat-{minigame,roleta,reforco,default}`/`-bg`). Dark mode via classe `.dark` (ThemeToggle). Tokens de raio (`rounded-control/card/modal/pill`), sombra (`shadow-card/modal`) e tipografia (`text-display/h1/h2/caption`) também definidos em `tailwind.config.js`; espaçamento segue a escala padrão do Tailwind.
 
-### 11.2 Padronização de cor (resolvido)
+### 12.2 Padronização de cor (resolvido)
 - Todos os componentes (**base/modais** e **conteúdo**) usam os tokens `--c-*`; não há mais sistemas de cor paralelos. Chips de categoria de atividade usam `cat-*`, e `RoletaModal`/`MinigameModal`/`AdminView`/`AtividadeCard` migraram de cores Tailwind fixas (`purple-/pink-/cyan-/sky-`) para tokens. `ColorPicker`/`IconPicker` continuam exceção legítima (paleta de seleção).
 - **Regra ao editar UI:** prefira os tokens `--c-*`; não introduza novas cores Tailwind literais fixas (quebram o dark mode).
 
-### 11.3 Contraste WCAG 2.1 AA 4.5:1 — resolvido
+### 12.3 Contraste WCAG 2.1 AA 4.5:1 — resolvido
 Texto normal exige ≥4.5:1; não-texto (bordas) exige ≥3:1. Resolvido via tokens dedicados:
 - Botões de **sucesso/danger** e mensagens de **erro** usam `--c-on-success` / `--c-on-danger` / `--c-danger-text` (garante ≥4.5:1 nos dois temas).
 - Bordas/separadores usam `--c-line:#64748b` (≥3:1 contra `surface` em ambos os temas).
@@ -317,8 +335,13 @@ Texto normal exige ≥4.5:1; não-texto (bordas) exige ≥3:1. Resolvido via tok
 
 **Ao mexer em botões/erros:** usar os tokens `--c-on-success`/`--c-on-danger`/`--c-danger-text` (garante ≥4.5:1 nos dois temas); manter `--c-line` em ≥3:1.
 
-### 11.4 Design system documentado
+### 12.4 Design system documentado
 Há `DESIGN.md` na raiz documentando tokens de cor, escalas de raio/sombra/tipografia, regra de contraste WCAG AA e catálogo de componentes. Ao criar componente, documente props/uso aqui e no `DESIGN.md`.
 
-### 11.5 Remediação — concluída (2026-08-13)
+### 12.5 Remediação — concluída (2026-08-13)
 1. ✅ Contraste de botões success/danger + erros (tokens `on-*`/`danger-text`). 2. ✅ Bordas ≥3:1 (`--c-line:#64748b`). 3. ✅ Tokenizar cores fixas (`cat-*`). 4. ✅ Tokens de raio/sombra/tipografia. 5. ✅ `DESIGN.md` criado.
+
+---
+
+## 13. Backlog e Pendências de IA
+- **Validação semântica de integridade do Markdown de IA**: Implementar checagem estrutural no output gerado pela IA (fechamento correto de blocos ```, tags HTML balanceadas e presença obrigatória do slide de encerramento/fixação), disparando mecanismo de auto-retry ou fallback automático caso o modelo interrompa o texto prematuramente.
