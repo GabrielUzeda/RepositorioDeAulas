@@ -459,6 +459,7 @@ async function updateDisciplina(c: any) {
 
 function removeAulaFiles(caminho: string | null | undefined) {
   if (!caminho || !caminho.startsWith('materias/') || caminho.includes('..')) return;
+  if (dbq('SELECT 1 FROM aulas WHERE caminho = ? LIMIT 1').get(caminho)) return;
   const baseDir = resolveFrontendDir();
   const htmlPath = path.join(baseDir, caminho);
   const mdPath = htmlPath.replace(/\.html$/, '.md');
