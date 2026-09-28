@@ -100,7 +100,7 @@ export function isResponseTruncated(raw: string, data?: unknown): boolean {
         }
       }
     }
-    return root.stop_reason === 'max_tokens';
+    if (root.stop_reason === 'max_tokens') return true;
   }
 
   if (typeof raw === 'string' && raw.length > 0) {
@@ -255,7 +255,6 @@ function createOpenAiProvider(name: string): AiProvider {
             if (record && record.finish_reason === 'length') return true;
           }
         }
-        return false;
       }
       return Boolean(rawText && /["']?finish_reason["']?\s*:\s*["']length["']/.test(rawText));
     },
@@ -315,7 +314,7 @@ function createAnthropicProvider(anthropicVersion: string): AiProvider {
     },
     isTruncated(data: unknown, rawText?: string): boolean {
       const root = asRecord(data);
-      if (root) return root.stop_reason === 'max_tokens';
+      if (root && root.stop_reason === 'max_tokens') return true;
       return Boolean(rawText && /["']?stop_reason["']?\s*:\s*["']max_tokens["']/.test(rawText));
     },
   };
