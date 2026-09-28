@@ -1,5 +1,6 @@
 # Stack isolado para testes E2E (Playwright).
 # Usa portas e DB separados para não interferir no stack de desenvolvimento.
+name: repoaulas-e2e
 services:
   bun-server:
     image: oven/bun:1

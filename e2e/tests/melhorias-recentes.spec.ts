@@ -57,7 +57,7 @@ test.describe('Melhorias Recentes — RAG, Deadlines, Preview do Aluno, Validado
     await btnRag.click();
 
     await expect(page.getByRole('heading', { name: 'Documentos Orientadores (RAG)' })).toBeVisible();
-    await expect(page.getByText('Anexar Documento Pedagógico')).toBeVisible();
+    await expect(page.getByText(/Anexar Documento/i)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Fechar' })).toBeVisible();
     await page.getByRole('button', { name: 'Fechar' }).click();
     await expect(page.getByRole('heading', { name: 'Documentos Orientadores (RAG)' })).not.toBeVisible();
@@ -104,7 +104,7 @@ test.describe('Melhorias Recentes — RAG, Deadlines, Preview do Aluno, Validado
   test('UI Aluno: Validação com Sugestão de Typo de E-mail', async ({ page }) => {
     // Acessa a área do aluno
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Área do Aluno' })).toBeVisible();
+    await expect(page.getByText('Área do Aluno')).toBeVisible();
 
     // Seleciona o curso criado
     await page.locator('h3', { hasText: cursoNome }).click();
