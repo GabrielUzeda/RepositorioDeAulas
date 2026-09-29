@@ -4,6 +4,7 @@ import { initMailer } from './mailer';
 import { runDataRetentionPurge, purgeOldRanking } from './db';
 import { assertRequiredSecrets } from './auth';
 import { regenerateAllAulasHtml } from './marp';
+import { backfillDocumentosLegados } from './documentIndexer';
 
 // [SEG] Fail-closed em produção: ausência de segredos críticos aborta o boot
 // antes de expor qualquer endpoint (evita JWT/criptografia com chaves padrão).
@@ -23,6 +24,8 @@ setInterval(() => purgeOldRanking(30), 6 * 60 * 60 * 1000).unref();
 // Sincroniza e regenera o HTML standalone de todas as aulas cadastradas no boot
 const totalRegeneradas = regenerateAllAulasHtml();
 console.log(`[marp] ${totalRegeneradas} aulas sincronizadas no boot`);
+
+backfillDocumentosLegados();
 
 console.log(`[server] Servidor Bun rodando em ${process.env.HOST || '0.0.0.0'}:${Number(process.env.PORT) || 8080}`);
 console.log('[mail] Endpoint: POST /send-mail');

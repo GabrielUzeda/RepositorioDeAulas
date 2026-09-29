@@ -5,6 +5,8 @@ import {
   modelsUrl,
   resolveConfig,
   resolveProvider,
+  isTransientNetworkError,
+  calculateBackoffWithJitter,
   type AiConfig,
   type AiProvider,
 } from './aiProvider';
@@ -135,7 +137,7 @@ describe('AI Provider Abstraction', () => {
     expect(body.model).toBe('deepseek-v4.1-flash');
     expect(body.temperature).toBe(0.3);
     expect(body.max_tokens).toBe(8192);
-    expect(body.stream).toBe(false);
+    expect(body.stream).toBe(true);
     const messages = body.messages;
     expect(Array.isArray(messages)).toBe(true);
     if (!Array.isArray(messages)) throw new Error('messages ausente');
@@ -414,5 +416,55 @@ describe('AI Provider Abstraction', () => {
     expect(requests).toHaveLength(1);
     const body = asRecord(requests[0].body);
     expect(body?.max_tokens).toBe(4096);
+  });
+
+  test('isTransientNetworkError detecta erros transitórios de rede e timeout', () => {
+    expect(isTransientNetworkError(new Error('fetch failed: ECONNRESET'))).toBe(true);
+    expect(isTransientNetworkError(new Error('ETIMEDOUT: connect timed out'))).toBe(true);
+    expect(isTransientNetworkError(new Error('The operation was aborted due to timeout'))).toBe(true);
+    expect(isTransientNetworkError(new Error('Token inválido ou expirado'))).toBe(false);
+  });
+
+  test('calculateBackoffWithJitter gera intervalos progressivos com variação positiva', () => {
+    const d0 = calculateBackoffWithJitter(0, 100, 5000);
+    const d1 = calculateBackoffWithJitter(1, 100, 5000);
+    const d2 = calculateBackoffWithJitter(2, 100, 5000);
+
+    expect(d0).toBeGreaterThanOrEqual(100);
+    expect(d1).toBeGreaterThanOrEqual(200);
+    expect(d2).toBeGreaterThanOrEqual(400);
+  });
+
+  test('callAi executa retry automático em falhas HTTP 502/503 e tem sucesso na tentativa seguinte', async () => {
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'modelo-retry',
+      AI_FALLBACK_MODEL: '',
+    });
+
+    let attemptCount = 0;
+    mockHandler = (req) => {
+      attemptCount++;
+      if (attemptCount === 1) {
+        return new Response(JSON.stringify({ error: 'Gateway temporariamente fora do ar' }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return openAiSuccess(req);
+    };
+
+    const res = await callAi({
+      messages: [{ role: 'user', content: 'teste retry' }],
+      maxRetries: 2,
+      retryBaseMs: 5,
+    });
+
+    expect(res.content).toBe('resposta openai');
+    expect(res.modelUsed).toBe('modelo-retry');
+    expect(attemptCount).toBe(2);
+    expect(requests).toHaveLength(2);
   });
 });

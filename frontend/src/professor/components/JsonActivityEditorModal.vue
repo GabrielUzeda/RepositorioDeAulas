@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
+import { useAutoSave } from '@/shared/composables/useAutoSave';
+import { useAiJob } from '@/shared/composables/useAiJob';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
 import type { Atividade, Question, QuestionOption, RascunhoEditor, Aula } from '@/shared/types';
@@ -76,7 +78,70 @@ const hasLinkedAulas = computed(() => effectiveLinkedAulas.value.length > 0);
 const aiTema = ref('');
 const aiObservacoes = ref('');
 const aiQuantidadeStr = ref('5');
-const isGeneratingAi = ref(false);
+
+const aiJob = useAiJob<{
+  success: boolean;
+  questions: Question[];
+  modelo_utilizado: string;
+  total_gerado: number;
+}>();
+
+interface ActivityEditorDraft extends Record<string, unknown> {
+  titulo?: string;
+  descricao?: string;
+  tipo?: 'normal' | 'prova' | 'minigame' | 'roleta' | 'reforco';
+  selectedAulaIds?: number[];
+  allowPassword?: boolean;
+  senha?: string;
+  dataLimite?: string;
+  aiTema?: string;
+  aiObservacoes?: string;
+  aiQuantidadeStr?: string;
+  questions?: Question[];
+}
+
+const autoSaveKey = computed(() => `autosave:activity_editor:disciplina_${props.disciplinaId ?? 'global'}_${props.atividade?.id ?? 'new'}`);
+
+const {
+  scheduleAutoSave: triggerAutoSave,
+  restoreDraft: restoreActivityDraft,
+  clearDraft: clearActivityDraft,
+} = useAutoSave<ActivityEditorDraft>({
+  key: autoSaveKey,
+  debounceMs: 400,
+});
+
+function persistCurrentState() {
+  if (isInitializing.value) return;
+  triggerAutoSave({
+    titulo: titulo.value,
+    descricao: descricao.value,
+    tipo: tipo.value,
+    selectedAulaIds: selectedAulaIds.value,
+    allowPassword: allowPassword.value,
+    senha: senha.value,
+    dataLimite: dataLimite.value,
+    aiTema: aiTema.value,
+    aiObservacoes: aiObservacoes.value,
+    aiQuantidadeStr: aiQuantidadeStr.value,
+    questions: questions.value,
+  });
+}
+
+watch(
+  [titulo, descricao, tipo, allowPassword, senha, dataLimite, aiTema, aiObservacoes, aiQuantidadeStr],
+  () => {
+    persistCurrentState();
+  }
+);
+
+watch(
+  [selectedAulaIds, questions],
+  () => {
+    persistCurrentState();
+  },
+  { deep: true }
+);
 
 const showDraftsModal = ref(false);
 const isLoadingDrafts = ref(false);
@@ -242,13 +307,12 @@ watch(
 );
 
 async function handleGenerateAiQuestions() {
-  if (isGeneratingAi.value) return;
+  if (aiJob.isRunning.value) return;
   if (!hasLinkedAulas.value && !aiTema.value.trim() && !titulo.value.trim()) {
     error('Informe o tema ou tópico específico para gerar questões com IA em atividades gerais.');
     return;
   }
 
-  isGeneratingAi.value = true;
   try {
     const targetAulasIds = effectiveLinkedAulas.value.map((a) => a.id);
     const payload = {
@@ -266,27 +330,21 @@ async function handleGenerateAiQuestions() {
       })),
     };
 
-    const res = await apiClient.post<{
-      success: boolean;
-      questions: Question[];
-      modelo_utilizado: string;
-      total_gerado: number;
-    }>('/ai/generate-activity', payload);
+    const res = await aiJob.startJob('/ai/generate-activity', payload);
 
-    if (res.success && Array.isArray(res.data?.questions) && res.data.questions.length > 0) {
-      const normalized = res.data.questions.map(normalizeQuestion);
+    if (res && Array.isArray(res.questions) && res.questions.length > 0) {
+      const normalized = res.questions.map(normalizeQuestion);
       const startIndex = questions.value.length;
       questions.value.push(...normalized);
       activeQIndex.value = startIndex;
       showBasicInfo.value = false;
       success(`${normalized.length} questões geradas por IA foram adicionadas com sucesso!`);
     } else {
-      error(res.error || 'A IA não retornou questões compatíveis.');
+      error(aiJob.error.value || 'A IA não retornou questões compatíveis.');
     }
-  } catch (e: any) {
-    error(e?.message || 'Falha ao comunicar com o serviço de IA.');
-  } finally {
-    isGeneratingAi.value = false;
+  } catch (e: unknown) {
+    const errMessage = e instanceof Error ? e.message : 'Falha ao comunicar com o serviço de IA.';
+    error(errMessage);
   }
 }
 
@@ -355,6 +413,7 @@ function setCorrectOption(qIndex: number, oIndex: number) {
 
 async function handleClearAll() {
   resetToEmpty();
+  clearActivityDraft();
   await secureRemove(draftStorageKey.value);
   success('Editor limpo com sucesso!');
 }
@@ -362,6 +421,7 @@ async function handleClearAll() {
 async function handleSave() {
   if (isSaving.value || props.loading) return;
   isSaving.value = true;
+  clearActivityDraft();
   await secureRemove(draftStorageKey.value);
   const targetAulaIds = selectedAulaIds.value;
   const primaryAulaId = targetAulaIds.length > 0 ? targetAulaIds[0] : null;
@@ -697,7 +757,7 @@ async function handleDeleteDraft(draftId: number) {
                   min="1"
                   max="20"
                   placeholder="Ex: 5"
-                  :disabled="isGeneratingAi"
+                  :disabled="aiJob.isRunning.value"
                 />
               </div>
 
@@ -707,7 +767,7 @@ async function handleDeleteDraft(draftId: number) {
                 <BaseInput
                   v-model="aiTema"
                   placeholder="Ex: Condicionais e Laços de Repetição em TypeScript"
-                  :disabled="isGeneratingAi"
+                  :disabled="aiJob.isRunning.value"
                   required
                 />
               </div>
@@ -719,23 +779,41 @@ async function handleDeleteDraft(draftId: number) {
                   v-model="aiObservacoes"
                   :rows="2"
                   placeholder="Ex: Nível intermediário, inclua exemplos práticos de código e explicações claras em cada alternativa..."
-                  :disabled="isGeneratingAi"
+                  :disabled="aiJob.isRunning.value"
                 />
               </div>
 
+              <!-- Reconnection & Progress Alerts -->
+              <div v-if="aiJob.isReconnecting.value" class="md:col-span-12 p-2.5 rounded-xl bg-surface-alt border border-line text-secondary text-xs flex items-center gap-2">
+                <span class="material-icons animate-spin text-sm text-accent">sync</span>
+                <span>{{ aiJob.stepMessage.value || 'Aguardando conexão de rede para continuar a geração de questões...' }}</span>
+              </div>
+              <div v-else-if="aiJob.isRunning.value" class="md:col-span-12 p-2.5 rounded-xl bg-surface-alt border border-line text-secondary text-xs flex items-center gap-2">
+                <span class="material-icons animate-spin text-sm text-accent">auto_awesome</span>
+                <span>{{ aiJob.stepMessage.value || 'Gerando questões com IA...' }} ({{ aiJob.progress.value }}%)</span>
+              </div>
+
               <!-- Botão Gerar e Adicionar Questões -->
-              <div class="md:col-span-12 pt-1">
+              <div class="md:col-span-12 pt-1 flex items-center gap-2">
                 <BaseButton
                   variant="primary"
                   size="md"
-                  block
-                  :loading="isGeneratingAi"
-                  :disabled="isGeneratingAi || (!hasLinkedAulas && !aiTema.trim() && !titulo.trim())"
+                  :block="!aiJob.isRunning.value"
+                  class="flex-1"
+                  :loading="aiJob.isRunning.value"
+                  :disabled="aiJob.isRunning.value || (!hasLinkedAulas && !aiTema.trim() && !titulo.trim())"
                   @click="handleGenerateAiQuestions"
                 >
                   <span class="material-icons text-base">auto_awesome</span>
-                  <span class="material-icons text-base">auto_awesome</span>
-                  <span>{{ isGeneratingAi ? 'Gerando e Adicionando Questões com IA...' : 'Gerar e Adicionar Questões na Atividade' }}</span>
+                  <span>{{ aiJob.isReconnecting.value ? 'Reconectando...' : (aiJob.isRunning.value ? 'Gerando questões...' : 'Gerar e Adicionar Questões na Atividade') }}</span>
+                </BaseButton>
+                <BaseButton
+                  v-if="aiJob.isRunning.value"
+                  variant="danger"
+                  size="md"
+                  @click="aiJob.cancelJob()"
+                >
+                  Cancelar
                 </BaseButton>
               </div>
             </div>

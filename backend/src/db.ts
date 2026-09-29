@@ -4,7 +4,11 @@ import { dirname } from 'path';
 import { hashPassword } from './auth';
 import { calcularAjustesDasRespostas, ajustarEstatisticas, serializarEstatisticasMultiplas } from './estatisticas';
 
+
 const isTestEnv = process.env.NODE_ENV === 'test' || (typeof Bun !== 'undefined' && Array.isArray(Bun.argv) && Bun.argv.some(arg => arg.includes('test')));
+if (isTestEnv && !process.env.FRONTEND_STATIC_DIR) {
+  process.env.FRONTEND_STATIC_DIR = './data/frontend_static';
+}
 const dbPath = process.env.DATABASE_PATH || (isTestEnv ? './data/test.db' : './data/app.db');
 const dbDir = dirname(dbPath);
 
@@ -185,9 +189,20 @@ CREATE TABLE IF NOT EXISTS rascunhos_editor (
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
+
+CREATE TABLE IF NOT EXISTS ai_jobs (
+  id TEXT PRIMARY KEY,
+  tipo TEXT NOT NULL,
+  status TEXT NOT NULL,
+  progresso TEXT,
+  parametros TEXT,
+  resultado TEXT,
+  erro TEXT,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
 `);
 
-// Migrações defensivas para colunas adicionadas e relacionamentos N:N
 function hasColumn(table: string, column: string): boolean {
   const row = db.query('SELECT 1 AS ok FROM pragma_table_info(?) WHERE name = ?').get(table, column);
   return row != null;
@@ -231,13 +246,35 @@ db.run(`
     conteudo_texto TEXT NOT NULL,
     tamanho_bytes INTEGER NOT NULL,
     criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-  )
+  );
+
+  CREATE TABLE IF NOT EXISTS documento_secoes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    documento_id INTEGER REFERENCES documentos_orientadores(id) ON DELETE CASCADE,
+    disciplina_id INTEGER REFERENCES disciplinas(id) ON DELETE CASCADE,
+    curso_id INTEGER REFERENCES cursos(id) ON DELETE CASCADE,
+    titulo_secao TEXT NOT NULL,
+    conteudo TEXT NOT NULL,
+    ordem INTEGER DEFAULT 0,
+    criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+
+  CREATE VIRTUAL TABLE IF NOT EXISTS documento_secoes_fts USING fts5(
+    secao_id UNINDEXED,
+    documento_id UNINDEXED,
+    disciplina_id UNINDEXED,
+    curso_id UNINDEXED,
+    titulo_secao,
+    conteudo
+  );
 `);
 
 // [2] Índices para alta performance
 db.run(`
 CREATE INDEX IF NOT EXISTS idx_documentos_orientadores_disc ON documentos_orientadores(disciplina_id);
 CREATE INDEX IF NOT EXISTS idx_documentos_orientadores_curso ON documentos_orientadores(curso_id);
+CREATE INDEX IF NOT EXISTS idx_documento_secoes_doc ON documento_secoes(documento_id);
+CREATE INDEX IF NOT EXISTS idx_documento_secoes_disc ON documento_secoes(disciplina_id);
 CREATE INDEX IF NOT EXISTS idx_ranking_atividade_pontuacao ON ranking(atividade_id, pontuacao DESC);
 CREATE INDEX IF NOT EXISTS idx_respostas_atividade ON respostas_alunos(atividade_id);
 CREATE INDEX IF NOT EXISTS idx_respostas_aluno_email_hash ON respostas_alunos(aluno_email_hash);
@@ -246,157 +283,177 @@ CREATE INDEX IF NOT EXISTS idx_disciplinas_curso ON disciplinas(curso_id);
 CREATE INDEX IF NOT EXISTS idx_disciplina_feedbacks_disc ON disciplina_feedbacks(disciplina_id);
 CREATE INDEX IF NOT EXISTS idx_curso_professores_professor ON curso_professores(professor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_criado_em ON audit_logs(criado_em);
+CREATE INDEX IF NOT EXISTS idx_ai_jobs_status ON ai_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_ai_jobs_criado_em ON ai_jobs(criado_em);
 CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_professor ON rascunhos_editor(professor_id);
 CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_expira_em ON rascunhos_editor(expira_em);
 CREATE INDEX IF NOT EXISTS idx_atividades_aula ON atividades(aula_id);
 CREATE INDEX IF NOT EXISTS idx_aula_atividades_aula ON aula_atividades(aula_id);
 CREATE INDEX IF NOT EXISTS idx_aula_atividades_atv ON aula_atividades(atividade_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_delete_documento_secoes_fts
+AFTER DELETE ON documento_secoes
+BEGIN
+  DELETE FROM documento_secoes_fts WHERE secao_id = old.id;
+END;
 `);
 
 // [3] Função de Seed Automático para ambiente Demo
 export async function seedDemoData() {
-  const countCursos = db.query('SELECT COUNT(*) as total FROM cursos').get() as { total: number };
-  if (countCursos.total > 0) return;
-
-  const email = process.env.PROFESSOR_EMAIL || 'admin@escola.com';
+  const adminEmail = process.env.PROFESSOR_EMAIL || 'admin@escola.com';
   const rawPass = process.env.PROFESSOR_PASSWORD || 'MudeEstaSenha!';
   const { hash, salt } = await hashPassword(rawPass);
 
-  const insertAdmin = db.query(
-    `INSERT INTO professores (email, nome, role, status, senha_hash, salt) VALUES (?, ?, 'admin', 'ativo', ?, ?)`
-  );
-  insertAdmin.run(email, 'Administrador Demo', hash, salt);
+  const adminRow = db.query('SELECT id FROM professores WHERE email = ?').get(adminEmail) as any;
+  let adminId: number;
+  if (adminRow) {
+    adminId = Number(adminRow.id);
+  } else {
+    const res = db.query(
+      `INSERT INTO professores (email, nome, role, status, senha_hash, salt) VALUES (?, ?, 'admin', 'ativo', ?, ?)`
+    ).run(adminEmail, 'Administrador Demo', hash, salt);
+    adminId = Number(res.lastInsertRowid);
+  }
 
-  const admin = db.query('SELECT id FROM professores WHERE email = ?').get(email) as any;
-  const adminId = Number(admin.id);
+  const countCursos = db.query('SELECT COUNT(*) as total FROM cursos').get() as { total: number };
+  if (countCursos.total > 0 && !isTestEnv) return;
 
-  const insertCurso = db.query(
-    `INSERT INTO cursos (slug, nome, cor, icone, descricao, senha) VALUES (?, ?, ?, ?, ?, ?)`
-  );
-  const cursoResult = insertCurso.run(
-    'demo-course',
-    'Curso de Demonstração',
-    'bg-indigo-600',
-    'school',
-    'Curso de exemplo com disciplinas variadas.\n- Web Mobile 2026\n- Web Mobile 2025\nA senha de acesso é "asdf1234".\nEste curso contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)',
-    'asdf1234'
-  );
-  const cursoId = Number(cursoResult.lastInsertRowid);
-
-  db.query('INSERT INTO curso_professores (curso_id, professor_id) VALUES (?, ?)').run(cursoId, adminId);
-
-  const insertDisciplina = db.query(
-    `INSERT INTO disciplinas (curso_id, slug, nome, cor, icone, descricao) VALUES (?, ?, ?, ?, ?, ?)`
-  );
-  const disciplinaResult = insertDisciplina.run(
-    cursoId,
-    'demo-class',
-    'Disciplina de Demonstração',
-    'bg-indigo-600',
-    'school',
-    'Clique aqui para entrar na disciplina. A senha de acesso ao curso é "asdf1234".\nEsta disciplina contém os seguintes exemplos:\n- Aulas (conteúdo teórico)\n- Provas (avaliação)\n- Minigames (simulação tática)\n- Roleta (sorteio de perguntas)\n- Reforço (exercícios extras)'
-  );
-  const disciplinaId = Number(disciplinaResult.lastInsertRowid);
-
-  const insertAula = db.query(
-    `INSERT INTO aulas (disciplina_id, titulo, caminho, icone, descricao, ordem, conteudo_md) VALUES (?, ?, ?, ?, ?, ?, ?)`
-  );
-  insertAula.run(
-    disciplinaId,
-    'Boas-vindas ao Sistema',
-    '/static/boas-vindas.html',
-    '00',
-    'Comece por aqui: Entenda como navegar e usar o sistema.',
-    1,
-    '# Bem-vindo ao Repositório de Aulas!\nEste sistema foi desenvolvido para facilitar o acesso a materiais didáticos e atividades interativas.\n### Como usar:\n1. Navegue pelas guias "Aulas" e "Atividades".\n2. Clique nos cards para abrir o conteúdo.\n3. Acompanhe seu progresso e divirta-se aprendendo!'
-  );
-
-  const insertAtividade = db.query(
-    `INSERT INTO atividades (disciplina_id, external_id, titulo, descricao, caminho, icone, tipo, ordem, senha, allow_password, json_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  );
-
-  const atividades = [
-    {
-      external_id: 'demo-minigame',
-      titulo: 'Minigame: Simulação Tática (Exemplo)',
-      descricao: 'Teste seus conhecimentos táticos em Redes de Computadores abatendo ameaças virtuais!',
-      caminho: '/static/atividades/minigame.html',
-      icone: 'sports_esports',
-      tipo: 'minigame',
-      ordem: 1,
-      senha: null,
-      allow_password: 0,
-      json_data:
-        '{"meta":{"type":"minigame","title":"Simulação Tática: Defesa de Redes"},"questions":[{"content":"Qual protocolo é utilizado para transferência segura de arquivos cifrados via SSH?","options":[{"text":"SFTP","correct":true,"feedback":"Excelente! SFTP roda sobre SSH (porta 22)."},{"text":"FTP","correct":false,"feedback":"FTP transmite dados em texto claro (inseguro)."},{"text":"HTTP","correct":false,"feedback":"HTTP não utiliza criptografia por padrão."},{"text":"Telnet","correct":false,"feedback":"Telnet é não criptografado."}]},{"content":"Qual tecnologia cria um túnel criptografado seguro sobre uma rede pública?","options":[{"text":"VPN","correct":true,"feedback":"Perfeito! VPN provê confidencialidade e integridade."},{"text":"NAT","correct":false,"feedback":"NAT apenas traduz endereços IP."},{"text":"DNS","correct":false,"feedback":"DNS apenas resolve nomes de domínio."},{"text":"DHCP","correct":false,"feedback":"DHCP distribui endereços IP dinamicamente."}]},{"content":"Qual porta padrão é utilizada pelo protocolo seguro HTTPS?","options":[{"text":"443","correct":true,"feedback":"Correto! HTTPS opera por padrão na porta 443 com TLS/SSL."},{"text":"80","correct":false,"feedback":"Porta 80 é utilizada pelo HTTP não criptografado."},{"text":"21","correct":false,"feedback":"Porta 21 é utilizada pelo FTP."},{"text":"22","correct":false,"feedback":"Porta 22 é utilizada pelo SSH."}]}]}',
-    },
-    {
-      external_id: 'demo-roleta',
-      titulo: 'Roleta do Conhecimento: Hardware (Exemplo)',
-      descricao: 'Gire a roleta e responda a perguntas sorteadas de Arquitetura de Computadores!',
-      caminho: '/static/atividades/roleta.html',
-      icone: 'casino',
-      tipo: 'roleta',
-      ordem: 2,
-      senha: null,
-      allow_password: 0,
-      json_data:
-        '{"meta":{"type":"roleta","title":"Roleta do Conhecimento: Hardware"},"questions":[{"content":"Qual é a principal função da memória cache L1/L2/L3 na CPU?","options":[{"text":"Reduzir o tempo de acesso a dados frequentes da RAM","correct":true,"feedback":"Correto! A cache é extremamente rápida e fica próxima dos núcleos."},{"text":"Armazenar arquivos permanentemente após desligar","correct":false,"feedback":"Incorreto. A memória cache é volátil."},{"text":"Gerenciar o tráfego da placa de rede local","correct":false,"feedback":"Incorreto. Tráfego de rede é gerenciado pela NIC/Kernel."},{"text":"Resfriar os núcleos do processador sob alta carga","correct":false,"feedback":"Incorreto. O resfriamento é realizado pelo cooler."}]},{"content":"Qual componente é responsável pelo processamento gráfico vetorial em paralelo?","options":[{"text":"GPU","correct":true,"feedback":"Exato! A GPU possui milhares de núcleos para cálculo paralelo."},{"text":"Fonte ATX","correct":false,"feedback":"A fonte de alimentação apenas fornece energia elétrica."},{"text":"Chipset Ponte Sul (Southbridge)","correct":false,"feedback":"O chipset ponte sul gerencia barramentos de I/O lentos."},{"text":"Memória ROM","correct":false,"feedback":"A ROM armazena firmware como a BIOS/UEFI."}]},{"content":"O que significa a sigla SSD em dispositivos de armazenamento de dados?","options":[{"text":"Solid State Drive","correct":true,"feedback":"Perfeito! SSD utiliza memória flash sem partes mecânicas."},{"text":"Super Speed Disk","correct":false,"feedback":"Incorreto. Trata-se de Solid State Drive."},{"text":"System Storage Data","correct":false,"feedback":"Incorreto. Trata-se de Solid State Drive."},{"text":"Synchronous Serial Device","correct":false,"feedback":"Incorreto. Trata-se de Solid State Drive."}]}]}',
-    },
-    {
-      external_id: 'demo-prova',
-      titulo: 'Prova 01: Fundamentos de TI (Exemplo)',
-      descricao: 'Avaliação formal cobrindo conceitos de Sistemas Operacionais, Hardware e Redes.',
-      caminho: '/static/atividades/prova.html',
-      icone: 'quiz',
-      tipo: 'prova',
-      ordem: 3,
-      senha: '123',
-      allow_password: 1,
-      json_data:
-        '{"meta":{"type":"prova","title":"Prova 01: Fundamentos de TI"},"questions":[{"content":"Qual sistema operacional de código aberto é baseado no Kernel Linux?","options":[{"text":"Ubuntu","correct":true,"feedback":"Correto! Ubuntu é uma distribuição Linux."},{"text":"Windows 11","correct":false,"feedback":"Windows utiliza o kernel proprietário Windows NT."},{"text":"macOS Sonoma","correct":false,"feedback":"macOS é baseado na família BSD/Darwin."},{"text":"MS-DOS","correct":false,"feedback":"MS-DOS é um sistema legado monocamada."}]},{"content":"Em arquitetura de computadores, o que caracteriza a memória RAM?","options":[{"text":"Leitura/escrita rápida e volatilidade ao desligar","correct":true,"feedback":"Correto! A RAM perde todo o conteúdo sem alimentação elétrica."},{"text":"Armazenamento óptico não gravável","correct":false,"feedback":"Incorreto. Mídias ópticas são CDs/DVDs."},{"text":"Armazenamento magnético permanente","correct":false,"feedback":"Incorreto. Discos rígidos (HDDs) utilizam armazenamento magnético."},{"text":"Execução exclusiva de instruções da BIOS","correct":false,"feedback":"Incorreto. A BIOS é mantida em memória ROM/Flash."}]}]}',
-    },
-    {
-      external_id: 'demo-reforco',
-      titulo: 'Reforço: Prática de Fixação (Exemplo)',
-      descricao: 'Exercícios práticos adaptativos com feedback explicativo imediato para consolidar o aprendizado.',
-      caminho: '/static/atividades/reforco.html',
-      icone: 'fitness_center',
-      tipo: 'reforco',
-      ordem: 4,
-      senha: null,
-      allow_password: 0,
-      json_data:
-        '{"meta":{"type":"reforco","title":"Reforço: Prática de Fixação"},"questions":[{"content":"Qual é a diferença fundamental entre Hardware e Software em um sistema computacional?","options":[{"text":"Hardware é a parte física (equipamentos); Software é a parte lógica (programas)","correct":true,"feedback":"Isso mesmo! Hardware é a infraestrutura tangível, enquanto o Software consiste nas instruções de código."},{"text":"Hardware executa apenas arquivos de texto; Software gerencia a memória física","correct":false,"feedback":"Incorreto. Hardware refere-se aos componentes físicos do computador."},{"text":"Software é o gabinete e periféricos; Hardware são os algoritmos da aplicação","correct":false,"feedback":"Incorreto. Os papéis estão invertidos nessa afirmação."},{"text":"Não há diferença; ambos representam o mesmo conceito em TI","correct":false,"feedback":"Incorreto. Trata-se de conceitos distintos mas complementares."}]},{"content":"A memória RAM é classificada como volátil porque:","options":[{"text":"Perde todo o seu conteúdo armazenado ao interromper o fornecimento de energia","correct":true,"feedback":"Correto! Por ser volátil, exige corrente contínua para preservar o estado dos transistores."},{"text":"Armazena dados indefinidamente em chips semicondutores selados","correct":false,"feedback":"Incorreto. Dispositivos não-voláteis como SSDs mantêm dados sem energia."},{"text":"Pode ser lida apenas uma vez durante a inicialização do sistema","correct":false,"feedback":"Incorreto. A RAM permite leitura e escrita ilimitadas enquanto energizada."},{"text":"É imune a falhas elétricas ou quedas de tensão","correct":false,"feedback":"Incorreto. Qualquer interrupção elétrica apaga a RAM."}]}]}',
-    },
-    {
-      external_id: 'demo-normal',
-      titulo: 'Atividade Aberta: Questionário Geral (Exemplo)',
-      descricao: 'Responda com suas palavras as perguntas sobre os tópicos estudados.',
-      caminho: '/static/atividades/normal.html',
-      icone: 'edit_note',
-      tipo: 'normal',
-      ordem: 5,
-      senha: null,
-      allow_password: 0,
-      json_data:
-        '{"questions":[{"content":"Descreva a diferença entre IPv4 e IPv6."},{"content":"Explique a importância da segurança da informação na empresa."}]}',
-    },
-  ];
-
-  for (const atv of atividades) {
-    insertAtividade.run(
-      disciplinaId,
-      atv.external_id,
-      atv.titulo,
-      atv.descricao,
-      atv.caminho,
-      atv.icone,
-      atv.tipo,
-      atv.ordem,
-      atv.senha,
-      atv.allow_password,
-      atv.json_data
+  const cursoRow = db.query('SELECT id FROM cursos WHERE slug = ?').get('demo-course') as any;
+  let cursoId = cursoRow ? Number(cursoRow.id) : null;
+  if (!cursoId) {
+    const insertCurso = db.query(
+      `INSERT INTO cursos (slug, nome, cor, icone, descricao, senha) VALUES (?, ?, ?, ?, ?, ?)`
     );
+    const cursoResult = insertCurso.run(
+      'demo-course',
+      'Curso de Demonstração',
+      'bg-indigo-600',
+      'school',
+      'Curso de exemplo com disciplinas variadas.',
+      'asdf1234'
+    );
+    cursoId = Number(cursoResult.lastInsertRowid);
+  }
+  db.query('INSERT OR IGNORE INTO curso_professores (curso_id, professor_id) VALUES (?, ?)').run(cursoId, adminId);
+
+  const discRow = db.query('SELECT id FROM disciplinas WHERE curso_id = ? AND slug = ?').get(cursoId, 'demo-class') as any;
+  let disciplinaId = discRow ? Number(discRow.id) : null;
+  if (!disciplinaId) {
+    const insertDisciplina = db.query(
+      `INSERT INTO disciplinas (curso_id, slug, nome, cor, icone, descricao) VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    const disciplinaResult = insertDisciplina.run(
+      cursoId,
+      'demo-class',
+      'Disciplina de Demonstração',
+      'bg-indigo-600',
+      'school',
+      'Disciplina de exemplo.'
+    );
+    disciplinaId = Number(disciplinaResult.lastInsertRowid);
+
+    const insertAula = db.query(
+      `INSERT INTO aulas (disciplina_id, titulo, caminho, icone, descricao, ordem, conteudo_md) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    const aulaRes = insertAula.run(
+      disciplinaId,
+      'Boas-vindas ao Sistema',
+      'materias/demo-class/aulas/boas-vindas.html',
+      '00',
+      'Comece por aqui.',
+      1,
+      '# Bem-vindo!'
+    );
+    const aulaId = Number(aulaRes.lastInsertRowid);
+
+    const atividades = [
+      {
+        external_id: 'demo-roleta',
+        titulo: 'Roleta do Conhecimento: Quiz Rápido de TI',
+        descricao: 'Gire a roleta e responda à pergunta sorteada!',
+        caminho: '/static/atividades/roleta.html',
+        icone: 'casino',
+        tipo: 'roleta',
+        ordem: 1,
+        senha: null,
+        allow_password: 0,
+        json_data: '{"questions":[{"title":"TI","content":"O que é HTML?","options":[{"text":"Linguagem de marcação","correct":true},{"text":"Sistema operacional","correct":false}]}]}'
+      },
+      {
+        external_id: 'demo-minigame',
+        titulo: 'Minigame Espacial: Batalha de Perguntas',
+        descricao: 'Teste seus reflexos e conhecimentos neste minigame espacial.',
+        caminho: '/static/atividades/minigame.html',
+        icone: 'sports_esports',
+        tipo: 'minigame',
+        ordem: 2,
+        senha: null,
+        allow_password: 0,
+        json_data: '{"questions":[{"content":"Qual protocolo é seguro para transferência de arquivos?","options":[{"text":"FTP","correct":false},{"text":"SFTP","correct":true},{"text":"HTTP","correct":false}]}]}'
+      },
+      {
+        external_id: 'demo-prova',
+        titulo: 'Prova 01: Fundamentos de TI',
+        descricao: 'Avaliação formal de conhecimentos. Senha de acesso: 123',
+        caminho: '/static/atividades/prova.html',
+        icone: 'quiz',
+        tipo: 'prova',
+        ordem: 3,
+        senha: '123',
+        allow_password: 1,
+        json_data: '{"meta":{"title":"Prova 01"},"questions":[{"content":"Explique a arquitetura cliente-servidor."}]}'
+      },
+      {
+        external_id: 'demo-reforco',
+        titulo: 'Reforço: Prática de Fixação',
+        descricao: 'Exercícios extras para praticar com feedback imediato.',
+        caminho: '/static/atividades/reforco.html',
+        icone: 'psychology',
+        tipo: 'reforco',
+        ordem: 4,
+        senha: null,
+        allow_password: 0,
+        json_data: '{"meta":{"type":"reforco","title":"Prática de Fixação"},"questions":[{"content":"Hardware é a parte física.","options":[{"text":"Verdadeiro","correct":true},{"text":"Falso","correct":false}]}]}'
+      },
+      {
+        external_id: 'demo-normal',
+        titulo: 'Atividade Aberta: Questionário Geral',
+        descricao: 'Responda as questões e envie para avaliação.',
+        caminho: '/static/atividades/normal.html',
+        icone: 'edit_note',
+        tipo: 'normal',
+        ordem: 5,
+        senha: null,
+        allow_password: 0,
+        json_data: '{"questions":[{"content":"Questão 1"}]}'
+      }
+    ];
+
+    const insertAtividade = db.query(
+      `INSERT INTO atividades (disciplina_id, aula_id, external_id, titulo, descricao, caminho, icone, tipo, ordem, senha, allow_password, json_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    const insertAulaAtividade = db.query(
+      `INSERT OR IGNORE INTO aula_atividades (aula_id, atividade_id) VALUES (?, ?)`
+    );
+
+    for (const atv of atividades) {
+      const resAtv = insertAtividade.run(
+        disciplinaId,
+        aulaId,
+        atv.external_id,
+        atv.titulo,
+        atv.descricao,
+        atv.caminho,
+        atv.icone,
+        atv.tipo,
+        atv.ordem,
+        atv.senha,
+        atv.allow_password,
+        atv.json_data
+      );
+      const atvId = Number(resAtv.lastInsertRowid);
+      insertAulaAtividade.run(aulaId, atvId);
+    }
   }
 }
 
@@ -428,9 +485,34 @@ export function purgeOldRanking(days: number = 30): number {
   }
 }
 
-// [5] Retenção LGPD (Art. 15/16): purga de dados pessoais antigos e ranking (30 dias).
-export async function runDataRetentionPurge(): Promise<{ respostas: number; ranking: number }> {
-  const result = { respostas: 0, ranking: 0 };
+// [4.1] Expurgo de jobs de IA antigos (Gatilho automático de 7 dias)
+export function purgeOldAiJobs(days: number = 7): number {
+  const rawAiJobsDays = Number(process.env.AI_JOBS_RETENTION_DAYS);
+  const targetDays = Number.isInteger(rawAiJobsDays) && rawAiJobsDays > 0 ? rawAiJobsDays : days;
+  try {
+    const cutoffRow = db
+      .query(`SELECT strftime('%Y-%m-%dT%H:%M:%SZ','now', ?) AS c`)
+      .get(`-${targetDays} days`) as { c: string };
+    const cutoff = cutoffRow?.c;
+    if (!cutoff) return 0;
+
+    let totalDeleted = 0;
+    while (true) {
+      const res = db
+        .query(`DELETE FROM ai_jobs WHERE id IN (SELECT id FROM ai_jobs WHERE criado_em < ? LIMIT 500)`)
+        .run(cutoff);
+      totalDeleted += res.changes;
+      if (res.changes < 500) break;
+    }
+    return totalDeleted;
+  } catch (e) {
+    console.error('Erro ao expurgar jobs de IA antigos:', e);
+    return 0;
+  }
+}
+
+export async function runDataRetentionPurge(): Promise<{ respostas: number; ranking: number; ai_jobs: number }> {
+  const result = { respostas: 0, ranking: 0, ai_jobs: 0 };
   const raw = Number(process.env.RETENTION_DAYS);
   const days = Number.isInteger(raw) && raw > 0 ? raw : 365;
 
@@ -482,6 +564,7 @@ export async function runDataRetentionPurge(): Promise<{ respostas: number; rank
     }
 
     result.ranking = purgeOldRanking(30);
+    result.ai_jobs = purgeOldAiJobs(7);
     return result;
   } catch (e) {
     console.error('Erro no expurgo LGPD:', e);

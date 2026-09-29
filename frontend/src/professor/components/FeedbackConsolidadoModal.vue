@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
+import { useAutoSave } from '@/shared/composables/useAutoSave';
+import { useAiJob } from '@/shared/composables/useAiJob';
 import { apiClient } from '@/shared/api/client';
 import type { DisciplinaFeedbackRelatorio, AlunoFeedbackConsolidado } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
@@ -29,9 +31,58 @@ const atividadesConsideradas = ref<Array<{ id: number; titulo: string }>>([]);
 const isSendingAll = ref(false);
 const sendingEmailFor = ref<string | null>(null);
 const confirmReenvioOpen = ref(false);
-const isSynthesizingAi = ref(false);
 const aiPontosFortes = ref<string[]>([]);
 const aiPontosAtencao = ref<string[]>([]);
+
+const aiJob = useAiJob<{
+  success?: boolean;
+  feedback_geral?: string;
+  pontos_fortes?: string[];
+  pontos_atencao?: string[];
+  alunos_sintese?: Array<{ aluno_email: string; feedback_individual: string }>;
+}>();
+
+interface FeedbackConsolidadoDraft extends Record<string, unknown> {
+  feedbackTurma?: string;
+  alunosFeedbacks?: Record<string, string>;
+}
+
+const autoSaveKey = computed(() => `autosave:feedback_consolidado:${props.disciplinaId ?? 'global'}`);
+
+const {
+  scheduleAutoSave: triggerAutoSave,
+  restoreDraft: restoreFeedbackDraft,
+  clearDraft: clearFeedbackDraft,
+} = useAutoSave<FeedbackConsolidadoDraft>({
+  key: autoSaveKey,
+  debounceMs: 400,
+});
+
+function persistCurrentFeedbacks() {
+  if (isLoading.value || !props.disciplinaId) return;
+  const alunosFeedbacks: Record<string, string> = {};
+  for (const a of alunos.value) {
+    if (a.aluno_email && a.feedback_geral) {
+      alunosFeedbacks[a.aluno_email.trim().toLowerCase()] = a.feedback_geral;
+    }
+  }
+  triggerAutoSave({
+    feedbackTurma: feedbackTurma.value,
+    alunosFeedbacks,
+  });
+}
+
+watch(feedbackTurma, () => {
+  persistCurrentFeedbacks();
+});
+
+watch(
+  alunos,
+  () => {
+    persistCurrentFeedbacks();
+  },
+  { deep: true }
+);
 
 const showAiConfigModal = ref(false);
 const aiSeveridade = ref<'brando' | 'moderado' | 'rigoroso' | 'sistematico'>('moderado');
@@ -67,6 +118,22 @@ async function fetchRelatorio() {
       feedbackTurma.value = payload.feedback_turma || '';
       alunos.value = payload.alunos || [];
       atividadesConsideradas.value = payload.atividades_consideradas || [];
+
+      // Restaura rascunho local não enviado se houver
+      const draft = restoreFeedbackDraft();
+      if (draft) {
+        if (!feedbackTurma.value && draft.feedbackTurma) {
+          feedbackTurma.value = draft.feedbackTurma;
+        }
+        if (draft.alunosFeedbacks) {
+          for (const aluno of alunos.value) {
+            const draftText = draft.alunosFeedbacks[aluno.aluno_email.trim().toLowerCase()];
+            if (!aluno.feedback_geral && draftText) {
+              aluno.feedback_geral = draftText;
+            }
+          }
+        }
+      }
     } else {
       useToast().error(res.error || 'Erro ao carregar relatório de feedback.');
     }
@@ -78,8 +145,7 @@ async function fetchRelatorio() {
 }
 
 async function handleGenerateAiSynthesis() {
-  if (!props.disciplinaId || isSynthesizingAi.value || alunos.value.length === 0) return;
-  isSynthesizingAi.value = true;
+  if (!props.disciplinaId || aiJob.isRunning.value || alunos.value.length === 0) return;
 
   try {
     const alunosDetalhes = alunos.value.map(a => {
@@ -96,7 +162,7 @@ async function handleGenerateAiSynthesis() {
       };
     });
 
-    const res = await apiClient.post<any>('/ai/synthesize-class-feedback', {
+    const res = await aiJob.startJob('/ai/synthesize-class-feedback', {
       disciplina_nome: props.disciplinaNome || 'Disciplina',
       total_envios: alunos.value.length,
       severidade: aiSeveridade.value,
@@ -104,16 +170,16 @@ async function handleGenerateAiSynthesis() {
       alunos_detalhes: alunosDetalhes
     });
 
-    if (res.success && res.data) {
-      if (res.data.feedback_geral) {
-        feedbackTurma.value = res.data.feedback_geral;
+    if (res) {
+      if (res.feedback_geral) {
+        feedbackTurma.value = res.feedback_geral;
       }
-      aiPontosFortes.value = res.data.pontos_fortes || [];
-      aiPontosAtencao.value = res.data.pontos_atencao || [];
+      aiPontosFortes.value = res.pontos_fortes || [];
+      aiPontosAtencao.value = res.pontos_atencao || [];
 
-      if (Array.isArray(res.data.alunos_sintese)) {
+      if (Array.isArray(res.alunos_sintese)) {
         const sinteseMap = new Map<string, string>();
-        for (const item of res.data.alunos_sintese) {
+        for (const item of res.alunos_sintese) {
           if (item.aluno_email && item.feedback_individual) {
             sinteseMap.set(String(item.aluno_email).trim().toLowerCase(), String(item.feedback_individual).trim());
           }
@@ -128,12 +194,11 @@ async function handleGenerateAiSynthesis() {
 
       useToast().success('Síntese pedagógica da turma e feedbacks individuais sintetizados com sucesso!');
     } else {
-      useToast().error(res.error || 'Erro ao gerar síntese da turma com IA.');
+      useToast().error(aiJob.error.value || 'Erro ao gerar síntese da turma com IA.');
     }
-  } catch (err: any) {
-    useToast().error(err.message || 'Erro de comunicação com o serviço de IA.');
-  } finally {
-    isSynthesizingAi.value = false;
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : 'Erro de comunicação com o serviço de IA.';
+    useToast().error(errMessage);
   }
 }
 
@@ -147,6 +212,7 @@ async function handleSaveFeedbackTurma() {
       feedback_geral: feedbackTurma.value
     });
     if (res.success) {
+      clearFeedbackDraft();
       useToast().success('Feedback Geral da Turma salvo com sucesso!');
     } else {
       useToast().error(res.error || 'Erro ao salvar feedback da turma.');
@@ -173,6 +239,7 @@ async function handleSaveAllFeedbacks() {
       feedbacks: payload
     });
     if (res.success) {
+      clearFeedbackDraft();
       useToast().success('Todos os feedbacks (turma e individuais) salvos com sucesso!');
     } else {
       useToast().error(res.error || 'Erro ao salvar feedbacks.');
@@ -325,15 +392,23 @@ function formatDate(isoStr: string) {
               <BaseButton
                 variant="ghost"
                 size="sm"
-                :disabled="isSynthesizingAi || alunos.length === 0"
+                :disabled="aiJob.isRunning.value || alunos.length === 0"
                 class="text-xs text-accent font-semibold flex items-center gap-1 hover:bg-accent/10 px-2.5 py-1.5 rounded border border-accent/20"
                 title="Sintetizar desempenho da turma e feedbacks individuais dos alunos com IA"
                 @click="handleGenerateAiSynthesis"
               >
-                <span class="material-icons text-sm" :class="{ 'animate-spin': isSynthesizingAi }">
-                  {{ isSynthesizingAi ? 'sync' : 'auto_awesome' }}
+                <span class="material-icons text-sm" :class="{ 'animate-spin': aiJob.isRunning.value }">
+                  {{ aiJob.isRunning.value ? 'sync' : 'auto_awesome' }}
                 </span>
-                <span>{{ isSynthesizingAi ? 'Gerando Síntese...' : 'Sintetizar com IA' }}</span>
+                <span>{{ aiJob.isReconnecting.value ? 'Reconectando...' : (aiJob.isRunning.value ? 'Gerando Síntese...' : 'Sintetizar com IA') }}</span>
+              </BaseButton>
+              <BaseButton
+                v-if="aiJob.isRunning.value"
+                variant="danger"
+                size="sm"
+                @click="aiJob.cancelJob()"
+              >
+                Cancelar IA
               </BaseButton>
               <BaseButton variant="secondary" size="sm" :loading="isSavingTurma" @click="handleSaveAllFeedbacks" title="Salvar feedback da turma e individuais de todos os alunos">
                 <span class="material-icons text-xs">done_all</span>
@@ -345,6 +420,16 @@ function formatDate(isoStr: string) {
               </BaseButton>
             </div>
           </div>
+          <!-- Reconnection & Progress Alerts -->
+          <div v-if="aiJob.isReconnecting.value" class="p-2.5 rounded-xl bg-surface-alt border border-line text-secondary text-xs flex items-center gap-2">
+            <span class="material-icons animate-spin text-sm text-accent">sync</span>
+            <span>{{ aiJob.stepMessage.value || 'Aguardando conexão de rede para continuar a síntese...' }}</span>
+          </div>
+          <div v-else-if="aiJob.isRunning.value" class="p-2.5 rounded-xl bg-surface-alt border border-line text-secondary text-xs flex items-center gap-2">
+            <span class="material-icons animate-spin text-sm text-accent">auto_awesome</span>
+            <span>{{ aiJob.stepMessage.value || 'Sintetizando feedback da turma com IA...' }} ({{ aiJob.progress.value }}%)</span>
+          </div>
+
           <BaseTextarea
             v-model="feedbackTurma"
             :rows="3"

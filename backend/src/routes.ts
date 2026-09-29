@@ -23,6 +23,7 @@ import { aiRouter, handleEvaluateActivityResponses } from './ai';
 import { extractTextFromBuffer } from './documentParser';
 import { validateEmailWithTypo } from './emailValidator';
 import { clientAcceptsGzip, isCompressible, getGzipSidecar, cacheControlFor } from './gzipStatic';
+import { indexarDocumento, removerIndiceDocumento } from './documentIndexer';
 
 const app = new Hono();
 
@@ -493,7 +494,9 @@ async function createAula(c: any) {
   let finalCaminho = sanitizePathOrUrl(body.caminho ?? '');
   if (markdown !== null && markdown !== undefined) {
     const res = processMarpContent(disciplina.slug, body.titulo ?? '', markdown);
-    if (res.error) return c.text(res.error, 500);
+    if (res.error) {
+      return c.text(res.error, 500);
+    }
     finalCaminho = res.caminho!;
   }
   const r = db
@@ -895,6 +898,14 @@ app.post('/disciplinas/:id/documentos', professorAuth, async (c) => {
     `)
     .get(disciplina.curso_id, disciplinaId, titulo, nomeArquivo, tipo, conteudoTexto, tamanhoBytes) as any;
 
+  if (r?.id) {
+    try {
+      indexarDocumento(r.id, r.curso_id, r.disciplina_id, r.titulo, conteudoTexto);
+    } catch (e) {
+      console.error('Erro ao indexar documento de disciplina:', e);
+    }
+  }
+
   return c.json({ success: true, ...r }, 201);
 });
 
@@ -907,6 +918,7 @@ app.delete('/disciplinas/:id/documentos/:docId', professorAuth, async (c) => {
   const doc = dbq('SELECT id FROM documentos_orientadores WHERE id = ? AND disciplina_id = ?').get(docId, disciplinaId);
   if (!doc) return c.text('Documento não encontrado', 404);
 
+  removerIndiceDocumento(docId);
   dbq('DELETE FROM documentos_orientadores WHERE id = ?').run(docId);
   return c.body(null, 204);
 });
@@ -995,6 +1007,14 @@ app.post('/cursos/:id/documentos', professorAuth, async (c) => {
     `)
     .get(cursoId, titulo, nomeArquivo, tipo, conteudoTexto, tamanhoBytes) as any;
 
+  if (r?.id) {
+    try {
+      indexarDocumento(r.id, r.curso_id, r.disciplina_id, r.titulo, conteudoTexto);
+    } catch (e) {
+      console.error('Erro ao indexar documento de curso:', e);
+    }
+  }
+
   return c.json({ success: true, ...r }, 201);
 });
 
@@ -1009,6 +1029,7 @@ app.delete('/cursos/:id/documentos/:docId', professorAuth, async (c) => {
   const doc = dbq('SELECT id FROM documentos_orientadores WHERE id = ? AND curso_id = ? AND disciplina_id IS NULL').get(docId, cursoId);
   if (!doc) return c.text('Documento não encontrado', 404);
 
+  removerIndiceDocumento(docId);
   dbq('DELETE FROM documentos_orientadores WHERE id = ?').run(docId);
   return c.body(null, 204);
 });
