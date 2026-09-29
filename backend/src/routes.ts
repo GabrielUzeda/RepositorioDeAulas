@@ -890,6 +890,10 @@ app.post('/disciplinas/:id/documentos', professorAuth, async (c) => {
     return c.json({ error: 'Não foi possível extrair texto do documento ou conteúdo vazio.' }, 400);
   }
 
+  if (!['ementa', 'plano_ensino', 'apostila', 'outro'].includes(tipo)) {
+    return c.json({ error: 'Tipo de documento inválido.' }, 400);
+  }
+
   const r = db
     .query(`
       INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes)
@@ -997,6 +1001,10 @@ app.post('/cursos/:id/documentos', professorAuth, async (c) => {
 
   if (!conteudoTexto) {
     return c.json({ error: 'Não foi possível extrair texto do documento ou conteúdo vazio.' }, 400);
+  }
+
+  if (!['ementa', 'plano_ensino', 'apostila', 'outro'].includes(tipo)) {
+    return c.json({ error: 'Tipo de documento inválido.' }, 400);
   }
 
   const r = db

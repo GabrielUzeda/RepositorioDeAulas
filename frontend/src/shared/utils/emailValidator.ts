@@ -98,7 +98,7 @@ export function isDomainKnown(domain: string): boolean {
 }
 
 export function validateEmailWithTypo(email: string): EmailValidationResult {
-  const trimmed = (email || '').trim().toLowerCase();
+  const trimmed = String(email ?? '').trim().toLowerCase();
   if (!trimmed) {
     return { isValid: false, error: 'O e-mail é obrigatório.' };
   }
