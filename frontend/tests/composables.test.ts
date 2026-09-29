@@ -115,7 +115,24 @@ describe('useAutoSave composable', () => {
 
     expect(restoreDraft()).toEqual({ content: 'segunda versao' });
   });
+
+  test('isolamento de rascunhos entre chaves diferentes', () => {
+    const autoSave1 = useAutoSave<{ text: string }>({ key: 'autosave:disc_1' });
+    const autoSave2 = useAutoSave<{ text: string }>({ key: 'autosave:disc_2' });
+
+    autoSave1.saveDraft({ text: 'Rascunho disciplina 1' });
+    autoSave2.saveDraft({ text: 'Rascunho disciplina 2' });
+
+    expect(autoSave1.restoreDraft()).toEqual({ text: 'Rascunho disciplina 1' });
+    expect(autoSave2.restoreDraft()).toEqual({ text: 'Rascunho disciplina 2' });
+
+    autoSave1.clearDraft();
+    expect(autoSave1.hasDraft.value).toBe(false);
+    expect(autoSave2.hasDraft.value).toBe(true);
+    expect(autoSave2.restoreDraft()).toEqual({ text: 'Rascunho disciplina 2' });
+  });
 });
+
 
 describe('useAiJob composable', () => {
   let originalPost: any;
@@ -284,4 +301,101 @@ describe('useAiJob composable', () => {
     expect(status.value).toBe('cancelled');
     expect(isRunning.value).toBe(false);
   });
+
+  test('pollJob lida com status failed e erro durante o polling', async () => {
+    apiClient.post = mock(async () => ({
+      success: true,
+      data: { job_id: 'job-fail-poll' },
+      status: 200,
+    })) as any;
+
+    apiClient.get = mock(async () => ({
+      success: true,
+      data: { status: 'failed', error: 'Falha simulada na IA' },
+      status: 200,
+    })) as any;
+
+    let errorCallbackCalled = false;
+    let errorMessage = '';
+
+    const { startJob, status, error } = useAiJob();
+    const res = await startJob('/ai/generate-aula', {}, {
+      pollIntervalMs: 15,
+      onError: (err) => {
+        errorCallbackCalled = true;
+        errorMessage = err;
+      },
+    });
+
+    expect(res).toBeNull();
+    expect(status.value).toBe('failed');
+    expect(error.value).toContain('Falha simulada na IA');
+    expect(errorCallbackCalled).toBe(true);
+    expect(errorMessage).toContain('Falha simulada na IA');
+  });
+
+  test('pollJob esgota tentativas de polling (maxPollAttempts)', async () => {
+    apiClient.post = mock(async () => ({
+      success: true,
+      data: { job_id: 'job-timeout-poll' },
+      status: 200,
+    })) as any;
+
+    apiClient.get = mock(async () => ({
+      success: true,
+      data: { status: 'processing', progress: 20, step_message: 'Processando...' },
+      status: 200,
+    })) as any;
+
+    let errorCalled = false;
+    const { startJob, status, error } = useAiJob();
+    const res = await startJob('/ai/generate-aula', {}, {
+      pollIntervalMs: 10,
+      maxPollAttempts: 2,
+      onError: () => { errorCalled = true; },
+    });
+
+    expect(res).toBeNull();
+    expect(status.value).toBe('failed');
+    expect(error.value).toBe('Tempo limite de processamento atingido.');
+    expect(errorCalled).toBe(true);
+  });
+
+  test('pollJob dispara callback onProgress', async () => {
+    apiClient.post = mock(async () => ({
+      success: true,
+      data: { job_id: 'job-progress' },
+      status: 200,
+    })) as any;
+
+    let pollCalls = 0;
+    apiClient.get = mock(async () => {
+      pollCalls++;
+      if (pollCalls === 1) {
+        return {
+          success: true,
+          data: { status: 'processing', progress: 40, step_message: '40% - Etapa 1' },
+          status: 200,
+        };
+      }
+      return {
+        success: true,
+        data: { status: 'completed', progress: 100, result: { ok: true } },
+        status: 200,
+      };
+    }) as any;
+
+    const progressUpdates: number[] = [];
+    const { startJob } = useAiJob();
+    await startJob('/ai/generate-aula', {}, {
+      pollIntervalMs: 15,
+      onProgress: (pct) => {
+        progressUpdates.push(pct);
+      },
+    });
+
+    expect(progressUpdates.length).toBeGreaterThan(0);
+    expect(progressUpdates).toContain(40);
+  });
 });
+

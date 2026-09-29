@@ -708,6 +708,18 @@ aiRouter.post('/generate-aula', professorAuth, async (c) => {
     body = {};
   }
 
+  const { tema = '', aulas_contexto_ids = [] } = body;
+  const targetAulasIds = Array.isArray(aulas_contexto_ids) ? aulas_contexto_ids.map(Number).filter(Boolean) : [];
+  if (!tema && targetAulasIds.length === 0) {
+    return c.json(
+      {
+        success: false,
+        error: 'Informe um tema ou selecione aulas de referência para contextualizar a geração',
+      },
+      400
+    );
+  }
+
   const isAsync = body.async === true || c.req.query('async') === 'true';
 
   if (isAsync) {
