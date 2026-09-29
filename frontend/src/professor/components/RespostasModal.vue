@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
+import { useAiJob } from '@/shared/composables/useAiJob';
 import { validateEmailWithTypo } from '@/shared/utils/emailValidator';
 import { apiClient } from '@/shared/api/client';
 import type { Atividade, RespostaAluno, Question } from '@/shared/types';
@@ -30,8 +31,19 @@ const showMobileDetail = ref(false);
 const editingNota = ref<number | null>(null);
 const editingFeedback = ref('');
 const isSavingAll = ref(false);
-const isEvaluatingAiBatch = ref(false);
 const aiJustificativa = ref('');
+
+interface EvaluateActivityBatchResult {
+  success: boolean;
+  total: number;
+  avaliados: number;
+  falhas_count: number;
+  sucessos: Array<{ id: number; nota: number; feedback: string; justificativa?: string }>;
+  falhas: Array<{ id: number; erro: string }>;
+  avaliacoes: Array<{ id: number; nota: number; feedback: string; justificativa?: string }>;
+}
+
+const aiJob = useAiJob<EvaluateActivityBatchResult>();
 
 const showAiConfigModal = ref(false);
 const aiSeveridade = ref<'brando' | 'moderado' | 'rigoroso' | 'sistematico'>('moderado');
@@ -255,18 +267,17 @@ function handleSelectResposta(resp: RespostaAluno) {
 }
 
 async function handleSuggestAiAvaliacaoTodas() {
-  if (!props.atividade || isEvaluatingAiBatch.value || respostas.value.length === 0) return;
+  if (!props.atividade || aiJob.isRunning.value || respostas.value.length === 0) return;
 
-  isEvaluatingAiBatch.value = true;
   try {
-    const res = await apiClient.post<any>('/ai/evaluate-activity-responses', {
+    const res = await aiJob.startJob('/ai/evaluate-activity-responses', {
       atividade_id: props.atividade.id,
       severidade: aiSeveridade.value,
       observacoes: aiObservacoes.value.trim() || undefined
     });
 
-    if (res.success && res.data) {
-      const { avaliados, total, falhas_count, avaliacoes, sucessos } = res.data;
+    if (res && res.success) {
+      const { avaliados, total, falhas_count, avaliacoes, sucessos } = res;
       const updates = Array.isArray(avaliacoes) && avaliacoes.length > 0
         ? avaliacoes
         : (Array.isArray(sucessos) ? sucessos : []);
@@ -280,7 +291,7 @@ async function handleSuggestAiAvaliacaoTodas() {
       }
 
       if (selectedResposta.value) {
-        const updatedSelected = updates.find((item: any) => item.id === selectedResposta.value?.id);
+        const updatedSelected = updates.find((item: { id: number; nota: number; feedback: string; justificativa?: string }) => item.id === selectedResposta.value?.id);
         if (updatedSelected) {
           selectedResposta.value.nota = updatedSelected.nota;
           selectedResposta.value.feedback = updatedSelected.feedback;
@@ -298,12 +309,11 @@ async function handleSuggestAiAvaliacaoTodas() {
         useToast().success(`Todas as ${avaliados} respostas foram avaliadas com IA! Clique em "Salvar Todas" para confirmar as notas.`);
       }
     } else {
-      useToast().error(res.error || 'Não foi possível corrigir as respostas com IA.');
+      useToast().error(aiJob.error.value || 'Não foi possível corrigir as respostas com IA.');
     }
-  } catch (err: any) {
-    useToast().error(err.message || 'Erro ao comunicar com o serviço de IA.');
-  } finally {
-    isEvaluatingAiBatch.value = false;
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : 'Erro ao comunicar com o serviço de IA.';
+    useToast().error(errMessage);
   }
 }
 
@@ -419,15 +429,25 @@ function scoreColor(nota: number | null | undefined) {
           <BaseButton
             variant="ghost"
             size="sm"
-            :disabled="isEvaluatingAiBatch || respostas.length === 0"
+            :disabled="aiJob.isRunning.value || respostas.length === 0"
             class="text-xs text-accent font-semibold flex items-center gap-1.5 hover:bg-accent/10 px-3 py-1.5 rounded-lg border border-accent/20"
             title="Corrigir todas as respostas dos alunos com IA"
             @click="handleSuggestAiAvaliacaoTodas"
           >
-            <span class="material-icons text-sm" :class="{ 'animate-spin': isEvaluatingAiBatch }">
-              {{ isEvaluatingAiBatch ? 'sync' : 'auto_awesome' }}
+            <span class="material-icons text-sm" :class="{ 'animate-spin': aiJob.isRunning.value }">
+              {{ aiJob.isRunning.value ? 'sync' : 'auto_awesome' }}
             </span>
-            <span>{{ isEvaluatingAiBatch ? 'Avaliando todas com IA...' : 'Corrigir Todas com IA' }}</span>
+            <span>{{ aiJob.isReconnecting.value ? 'Reconectando...' : (aiJob.isRunning.value ? 'Avaliando com IA...' : 'Corrigir Todas com IA') }}</span>
+          </BaseButton>
+
+          <BaseButton
+            v-if="aiJob.isRunning.value"
+            variant="danger"
+            size="sm"
+            class="text-xs font-semibold px-2.5 py-1.5"
+            @click="aiJob.cancelJob()"
+          >
+            Cancelar IA
           </BaseButton>
 
           <BaseButton
@@ -445,6 +465,15 @@ function scoreColor(nota: number | null | undefined) {
         </div>
       </div>
     </template>
+
+    <div v-if="aiJob.isReconnecting.value" class="m-3 p-2.5 rounded-xl bg-surface-alt border border-line text-secondary text-xs flex items-center gap-2">
+      <span class="material-icons animate-spin text-sm text-accent">sync</span>
+      <span>{{ aiJob.stepMessage.value || 'Aguardando conexão de rede para continuar a correção...' }}</span>
+    </div>
+    <div v-else-if="aiJob.isRunning.value" class="m-3 p-2.5 rounded-xl bg-surface-alt border border-line text-secondary text-xs flex items-center gap-2">
+      <span class="material-icons animate-spin text-sm text-accent">auto_awesome</span>
+      <span>{{ aiJob.stepMessage.value || 'Avaliando respostas com IA...' }} ({{ aiJob.progress.value }}%)</span>
+    </div>
 
     <div v-if="isLoading" class="flex flex-col items-center justify-center py-20 gap-3">
       <BaseSpinner />

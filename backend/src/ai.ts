@@ -4,6 +4,7 @@ import { db } from './db';
 import { decryptData } from './utils';
 import { callAi, resolveConfig, resolveProvider, modelsUrl, type AiMessage } from './aiProvider';
 import { obterContextoDocumentosSobDemanda } from './documentIndexer';
+import { getJob, cancelJob, createJob, registerJobProcessor, type JobCheckpointFn } from './aiJobs';
 
 const aiRouter = new Hono();
 
@@ -162,7 +163,9 @@ function parseActivityQuestions(content: string): any[] {
           : Array.isArray(parsed)
             ? parsed
             : [];
-      } catch {}
+      } catch (_e) {
+        parsedQuestions = [];
+      }
     }
     if (parsedQuestions.length === 0) {
       const arrMatch = content.match(/\[[\s\S]*\]/);
@@ -170,7 +173,9 @@ function parseActivityQuestions(content: string): any[] {
         try {
           const parsed = JSON.parse(arrMatch[0]);
           if (Array.isArray(parsed)) parsedQuestions = parsed;
-        } catch {}
+        } catch (_e) {
+          parsedQuestions = [];
+        }
       }
     }
   }
@@ -457,23 +462,28 @@ function normalizeMarpMarkdown(content: string): string {
     .trim();
 }
 
-aiRouter.post('/generate-aula', professorAuth, async (c) => {
-  const professorId = Number(c.get('professorId'));
-  const professorRole = c.get('professorRole') || 'professor';
-  let body: any;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ success: false, error: 'JSON inválido' }, 400);
-  }
-
+export async function generateAulaOutlineAndContent(options: {
+  disciplina_id?: number;
+  tema?: string;
+  aulas_contexto_ids?: number[];
+  continuar_sequencia?: boolean;
+  observacoes?: string;
+  professorId?: number;
+  professorRole?: string;
+  checkpoint?: JobCheckpointFn;
+  isCancelled?: () => boolean;
+}) {
   const {
     disciplina_id,
     tema = '',
     aulas_contexto_ids = [],
     continuar_sequencia = false,
     observacoes = '',
-  } = body;
+    professorId = 1,
+    professorRole = 'admin',
+    checkpoint,
+    isCancelled,
+  } = options;
 
   const targetAulasIds: number[] = Array.isArray(aulas_contexto_ids)
     ? aulas_contexto_ids.map(Number).filter(Boolean)
@@ -502,13 +512,7 @@ aiRouter.post('/generate-aula', professorAuth, async (c) => {
   }
 
   if (!tema && targetAulasIds.length === 0) {
-    return c.json(
-      {
-        success: false,
-        error: 'Informe um tema ou selecione aulas de referência para contextualizar a geração',
-      },
-      400
-    );
+    throw new Error('Informe um tema ou selecione aulas de referência para contextualizar a geração');
   }
 
   let aulasContexto = '';
@@ -576,10 +580,53 @@ aiRouter.post('/generate-aula', professorAuth, async (c) => {
     });
   }
 
+  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+
+  // FASE 1: Agente Planejador / Outline
+  const plannerSystemPrompt = `Você é um coordenador pedagógico e designer instrucional sênior. Sua tarefa é planejar a estrutura detalhada (outline) de uma aula completa de 12 a 16 slides sobre o tema fornecido.
+Defina:
+1. Título principal e subtítulo contextual.
+2. Objetivos de aprendizagem práticos.
+3. Checagem de pré-requisitos e abertura freiriana.
+4. Lista slide a slide dos tópicos de desenvolvimento (mínimo 10 slides de desenvolvimento, com conceitos progressivos, exemplos, diagramas planejados e reflexões).
+5. Aplicação prática, reflexão e perguntas de fixação.
+Responda em formato estruturado (JSON ou Markdown claro detalhando o outline).`;
+
+  let plannerUserPrompt = `TEMA: ${tema || 'Conteúdo geral'}\n`;
+  if (observacoes) plannerUserPrompt += `OBSERVAÇÕES: ${observacoes}\n`;
+  if (aulasContexto) plannerUserPrompt += `\nAULAS DE REFERÊNCIA:\n${aulasContexto}\n`;
+  if (docsContexto) plannerUserPrompt += `\nDOCUMENTOS ORIENTADORES:\n${docsContexto}\n`;
+  plannerUserPrompt += `Gere o outline pedagógico estruturado para esta aula.`;
+
+  let outlineResult = '';
+  let modeloUtilizado = '';
+  try {
+    const plannerMessages: AiMessage[] = [
+      { role: 'system', content: plannerSystemPrompt },
+      { role: 'user', content: plannerUserPrompt },
+    ];
+    const pRes = await callAi({
+      messages: plannerMessages,
+      temperature: 0.4,
+      timeoutMs: 120000,
+    });
+    outlineResult = pRes.content;
+    modeloUtilizado = pRes.modelUsed;
+  } catch (e: any) {
+    outlineResult = tema || 'Outline gerado automaticamente';
+  }
+
+  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+
+  await checkpoint?.('35% - Planejando estrutura pedagógica e tópicos...', { fase: 'outline', outline: outlineResult });
+
+  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+
+  // FASE 2: Agente Redator / Expansão Marp
   const MARP_SYSTEM_PROMPT = `<INSTRUCOES>
 Você é um especialista em didática, design instrucional e metodologias de ensino inclusivo para adolescentes e adultos.
 Você é ótimo combinando clareza formal com narrativas, analogias e educação preventiva.
-Sua tarefa é gerar conteúdo didático no formato do motor Marp Next a partir de um tema.
+Sua tarefa é gerar conteúdo didático no formato do motor Marp Next a partir de um tema e outline estruturado.
 Lembre-se: slides também são materiais de estudo, portanto podem conter explicações detalhadas, desde que com tom formal, clareza e organização.
 Responda somente com a aula gerada.
 </INSTRUCOES>
@@ -609,111 +656,20 @@ Responda somente com a aula gerada.
 22. Use o cabeçalho '#' (título) SOMENTE para marcar grandes blocos da aula: no slide de título da aula e ao iniciar uma nova seção/tema com troca drástica de conteúdo (marcação de novo bloco). Nos slides regulares do desenvolvimento, demarque o que se está vendo com o subtítulo '##' (ex.: '## Estrutura while em Python'), não com '#' — evite que cada slide vire um título. NUNCA escreva as palavras 'Subtítulo:' ou 'Título:' em texto corrido. Se a aula percorre várias estruturas/fenômenos (ex.: for, while, do-while), cada um recebe seu próprio slide/sequência demarcado com '##' que nomeie exatamente o elemento, para o aluno saber onde está e o que dominar a cada passo.
 23. Use negrito (**texto**) sempre que possível para demarcar as informações mais importantes de cada slide, destacando os pontos-chave que merecem atenção do aluno.
 24. Compatibilidade com Dark Mode em HTML/CSS: Os slides suportam alternância entre modo claro e modo escuro (dark mode), o que altera as cores do slide (fundo, textos e bordas). Ao gerar elementos em HTML/CSS customizados, considere sempre essas alterações de tema: defina pares contrastantes explícitos de fundo e texto ou use as variáveis de tema (como var(--text-primary), var(--text-secondary), var(--slide-bg), var(--border)) para garantir que o HTML interno não fique invisível nem sofra perda de contraste ao alternar para o dark mode.
-</REGRAS>
+</REGRAS>`;
 
-<PRINCIPIOS_PEDAGOGICOS_REFERENCIA>
-Fundamento didático para aprimorar a qualidade pedagógica da aula:
-- ABERTURA FREIRIANA obrigatória: os primeiros slides (antes de qualquer conceito técnico) devem partir do mundo vivido do aluno. Use uma história curta, analogia ou situação cotidiana concreta que responda de forma autossuficiente às perguntas "por que isso existe?", "qual problema resolve?", "para que vou usar isso?". O aluno não deve chegar ao conteúdo técnico com essas dúvidas em aberto.
-- Construção linear e acumulativa: a aula é uma escada — cada degrau apoia-se exclusivamente nos anteriores. Não cite conceito antes de construí-lo. Não pule etapas. Não pressuponha conhecimento que ainda não foi apresentado nesta aula.
-- Checagem de pré-requisitos antes de cada conteúdo novo: pergunte-se "o que é necessário de conhecimento prévio para entender este conteúdo?" e "isso já foi dado nas aulas passadas relacionadas?". Se sim, recapture a base em um slide de conexão antes do tema novo (ex.: ensinar laços de repetição exige um contexto bom de índices; recupere índices brevemente antes de falar de loops). A aula nova se apoia nas anteriores sem repeti-las.
-- Coloque o estudante no centro do processo: além de expor conteúdo, proponha situações em que ele constrói o conhecimento — problemas, casos, perguntas reflexivas.
-- Parta do "aqui e agora" e do saber prévio do aluno: conecte cada conceito novo a algo que o aluno já conhece ou vive no cotidiano, usando exemplos reais antes do formalismo.
-- Progressão do concreto ao abstrato e do cotidiano ao científico: apoie a explicação formal em analogias e situações concretas; facilite a transição para a notação/simbolismo quando pertinente.
-- Use estratégias ativas integradas ao expositivo: perguntas que provoquem reflexão e transferência para a vida real ao longo dos slides, não só no fim.
-- Contextualização à generalização: ancore o conhecimento poderoso em fenômenos do cotidiano e da realidade do aluno; favoreça conexões cognitivas e emocionais com o que já é relevante para ele.
-- Aprendizagem significativa: relacione cada tópico ao que o aluno já sabe; proponha perguntas e verificações ao longo da aula para engajar a curiosidade e fixar o aprendizado.
-- Antecipe erros comuns e armadilhas típicas do tema em slide(s) dedicado(s), explicando por que ocorrem e como evitá-los — sem nomeá-los como "Erros Comuns", integre-os naturalmente.
-- Linguagem inclusiva e acessível: clareza formal sem infantilização, adaptável a adolescentes e adultos.
-</PRINCIPIOS_PEDAGOGICOS_REFERENCIA>
-
-<ESTRUTURA_OBRIGATORIA>
-A aula é uma CONSTRUÇÃO PROGRESSIVA. Cada seção prepara o terreno para a próxima. Nunca apresse. Nunca salte etapas. O total mínimo é 14 slides (excluindo fixação e material complementar).
-
-1. Slide de título — '#' título e '##' subtítulo contextual (use cabeçalhos Markdown, nunca as palavras "Título:"/"Subtítulo:" em texto corrido).
-
-2. Abertura contextual (1 a 2 slides) — SEM nenhum termo técnico ainda. Use analogia ou situação do cotidiano que responda "por que esse assunto existe?", "qual problema resolve no mundo real?", "onde o aluno vai encontrar isso?". O objetivo é criar vínculo emocional e motivacional com o tema antes de qualquer definição.
-
-3. Objetivos da aula (1 slide) — lista de bullets curtos e mensuráveis do que o aluno será capaz de fazer ao final, em linguagem de resultado prático (ex.: "Diferenciar os mecanismos de repetição condicionada e contada."). Sem jargão acadêmico; foque em competências concretas.
-
-3b. Recapitulação de pré-requisitos (1 slide, SOMENTE se houver aulas anteriores fornecidas como referência) — antes de apresentar o conteúdo novo, identifique o conhecimento prévio necessário para entender esta aula ("o que eu preciso já saber para aprender isso?"). Se esse conhecimento já foi dado nas aulas anteriores relacionadas, faça um recapitulação breve e objetiva (um slide) desse pré-requisito, usando linguagem que conecte: "lembrando o que já vimos em [tema anterior]...". NÃO repita o conteúdo integral; apenas recapture a base necessária para o novo assunto se apoiar nela.
-
-4. Desenvolvimento linear — mínimo de 10 slides, um conceito ou mecanismo por slide:
-   - Cada slide introduz APENAS um novo elemento.
-   - Conceitos mais simples primeiro; complexidade cresce gradualmente.
-   - Use exemplos práticos, analogias, diagramas (Mermaid), código comentado, HTML/CSS animado quando ilustrativo.
-   - Inclua perguntas de reflexão ao longo do desenvolvimento (não só no fim).
-   - Quando pertinente, dedique um slide a armadilhas e erros comuns ligados ao conceito recém-apresentado.
-
-5. Aplicação prática / estudo de caso (1 a 2 slides) — mostre o conteúdo completo funcionando em um contexto real ou próximo do real. O aluno deve ver "o todo" depois de ter aprendido "as partes".
-
-5b. Reflexão (1 slide) — 2 a 3 perguntas abertas e provocativas que conectem o conteúdo ao mundo do aluno (ex.: "Pense em uma tarefa repetitiva do seu dia a dia: como você descreveria ao computador o momento exato de parar?"). Diferente das perguntas de fixação (que checam compreensão técnica), a reflexão convida o aluno a transferir o conhecimento para a própria experiência.
-
-6. Síntese visual (1 slide) — resumo do caminho percorrido, diagrama ou tabela unindo os conceitos.
-
-7. Verifique o que você aprendeu (1 slide) — 3 a 5 perguntas reflexivas de fixação do conteúdo.
-
-8. Material Complementar (1 slide) — livros, documentações e links de referência para aprofundamento.
-</ESTRUTURA_OBRIGATORIA>
-
-<FERRAMENTAS_DISPONIVEIS>
-- KaTeX: fórmulas matemáticas ($...$ inline, $$...$$ bloco)
-- Mermaid: diagramas de fluxo, sequência, ER, Gantt (bloco mermaid; slides em paisagem com espaço vertical limitado — prefira diagramas mais largos que altos, fluxo achatado/horizontal, evitando gráficos que estourem a altura do slide)
-- HTML/CSS/JS inline: pode usar HTML + <style> + <script> embutidos nos slides para exemplos ilustrativos vivos. RECOMENDAÇÃO: ouse criar animações didáticas quando elas ajudarem a visualizar mecanismos dinâmicos (ex.: destacar iterativamente cada item de um vetor com caixas que "acendem" em sequência via @keyframes com animation-delay escalonado, simulando o passo a passo de um laço/percurso). Padrão de referência para animar "leitura sequencial" de um vetor:
-
-<div style="text-align:center"><div class="index-grid">
-  <div class="index-box scanner-1"><div class="box-index">ÍNDICE 0</div><div class="box-value">A</div></div>
-  <div class="index-box scanner-2"><div class="box-index">ÍNDICE 1</div><div class="box-value">B</div></div>
-  <div class="index-box scanner-3"><div class="box-index">ÍNDICE 2</div><div class="box-value">C</div></div>
-  <div class="index-box scanner-4"><div class="box-index">ÍNDICE 3</div><div class="box-value">D</div></div>
-</div></div>
-<style>
-  .index-grid{display:flex;gap:20px;justify-content:center;margin:30px 0}
-  .index-box{width:110px;height:130px;border:2px solid #ced4da;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;font-family:monospace;background:#f8f9fa;transition:all .3s ease}
-  .box-index{background:#343a40;color:#fff;padding:8px;font-weight:bold;text-align:center;font-size:.9em;letter-spacing:1px}
-  .box-value{flex:1;display:flex;align-items:center;justify-content:center;font-size:2.5em}
-  @keyframes loopScanner{0%,15%{background-color:#0d6efd;border-color:#0d6efd;transform:scale(1.08);box-shadow:0 0 20px rgba(13,110,253,.6)}16%,100%{background-color:#f8f9fa;border-color:#ced4da;transform:scale(1);box-shadow:none}}
-  .scanner-1{animation:loopScanner 5s infinite;animation-delay:0s}
-  .scanner-2{animation:loopScanner 5s infinite;animation-delay:1.25s}
-  .scanner-3{animation:loopScanner 5s infinite;animation-delay:2.5s}
-  .scanner-4{animation:loopScanner 5s infinite;animation-delay:3.75s}
-</style>
-
-Tome liberdade de adaptar cores, tamanhos e delays ao contexto. Importar bibliotecas externas via CDN também é permitido e recomendável quando derem animações mais sofisticadas — ex.: GSAP (https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js) para animações sincronizadas e Lottie (https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js) para ilustrações animadas em JSON — sempre via <script src>. Mantenha as animações simples, robustas a replay e que não dependam de interação do usuário para provocar o efeito (o slide deve se explicar sozinho em loop). IMPORTANTE: Considere sempre as alterações de cores do dark mode nos slides; garanta que elementos HTML internos possuam contraste adequado tanto no tema claro quanto no escuro (definindo pares explícitos de background/color ou utilizando variáveis CSS do slide).
-- Tabelas Markdown
-- Blocos de código com highlight de sintaxe
-- Classes Marp: centered, split, invert
-- Animações: fade, fade-up, slide-up, zoom-in, flip-y etc (via diretiva: <!-- animation: NOME -->)
-</FERRAMENTAS_DISPONIVEIS>
-
-<FRONT_MATTER_PADRAO>
----
-theme: default
-title: [TÍTULO DA AULA]
-animation: fade-up
-animation-stagger: 0.12s
-animation-duration: 0.5s
----
-</FRONT_MATTER_PADRAO>`;
-
-  let userPrompt = '';
-  if (tema) userPrompt += `TEMA / ASSUNTO DA AULA: ${tema}\n\n`;
-  if (observacoes)
-    userPrompt += `OBSERVAÇÕES DO PROFESSOR (requisitos específicos que DEVEM ser respeitados na geração): ${observacoes}\n\n`;
-  if (aulasContexto) {
-    userPrompt += `AULAS ANTERIORES DE REFERÊNCIA (NÃO repita este conteúdo; use como base para dar sequência pedagógica sem sobreposição):\n\n${aulasContexto}\n\n`;
-  }
-  if (docsContexto) {
-    userPrompt += `DOCUMENTOS ORIENTADORES DA DISCIPLINA E CURSO (SOB DEMANDA):\n\n${docsContexto}\n\n`;
-  }
-  userPrompt +=
-    'Gere a aula completa no formato Marp Next Markdown conforme as instruções. Responda APENAS com o markdown da aula, sem nenhum texto introdutório ou explicativo antes ou depois do bloco de slides.';
+  let writerUserPrompt = `TEMA / ASSUNTO DA AULA: ${tema}\n\n`;
+  if (outlineResult) writerUserPrompt += `OUTLINE ESTRUTURAL PLANEJADO:\n${outlineResult}\n\n`;
+  if (observacoes) writerUserPrompt += `OBSERVAÇÕES DO PROFESSOR: ${observacoes}\n\n`;
+  if (aulasContexto) writerUserPrompt += `AULAS ANTERIORES DE REFERÊNCIA:\n\n${aulasContexto}\n\n`;
+  if (docsContexto) writerUserPrompt += `DOCUMENTOS ORIENTADORES:\n\n${docsContexto}\n\n`;
+  writerUserPrompt += 'Gere a aula completa no formato Marp Next Markdown seguindo rigorosamente o outline e as instruções. Responda APENAS com o markdown da aula, sem nenhum texto introdutório ou explicativo.';
 
   let content = '';
-  let modeloUtilizado = '';
   try {
     const messages: AiMessage[] = [
       { role: 'system', content: MARP_SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt },
+      { role: 'user', content: writerUserPrompt },
     ];
     const result = await callAi({
       messages,
@@ -722,21 +678,22 @@ animation-duration: 0.5s
       validate: (content) => normalizeMarpMarkdown(content).includes('---'),
     });
     content = result.content;
-    modeloUtilizado = result.modelUsed;
+    modeloUtilizado = result.modelUsed || modeloUtilizado;
   } catch (e: any) {
-    return c.json(
-      {
-        success: false,
-        error: `Falha na geração de aula com IA: ${e.message || 'Erro de conexão/timeout'}`,
-      },
-      502
-    );
+    throw new Error(`Falha na expansão de slides com IA: ${e.message || 'Erro de conexão/timeout'}`);
   }
 
+  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+
+  await checkpoint?.('85% - Expandindo slides e diagramas Marp...', { fase: 'slides' });
+
+  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+
+  // FASE 3: Validação & Limpeza
   const cleaned = normalizeMarpMarkdown(content);
 
   if (!cleaned || !cleaned.includes('---')) {
-    return c.json({ success: false, error: 'A IA não retornou Markdown Marp válido' }, 502);
+    throw new Error('A IA não retornou Markdown Marp válido');
   }
 
   const titleMatch = cleaned.match(/^---[\s\S]*?title:\s*(.+)/m);
@@ -744,12 +701,52 @@ animation-duration: 0.5s
     ? titleMatch[1].trim().replace(/^['"]|['"]$/g, '')
     : tema || 'Nova Aula';
 
-  return c.json({
+  return {
     success: true,
     conteudo_md: cleaned,
     titulo_sugerido,
     modelo_utilizado: modeloUtilizado,
-  });
+    outline: outlineResult,
+  };
+}
+
+registerJobProcessor('aula', async (job, checkpoint, isCancelled) => {
+  return generateAulaOutlineAndContent({ ...job.parametros, checkpoint, isCancelled });
+});
+
+aiRouter.post('/generate-aula', professorAuth, async (c) => {
+  const professorId = Number(c.get('professorId'));
+  const professorRole = c.get('professorRole') || 'professor';
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    body = {};
+  }
+
+  const isAsync = body.async === true || c.req.query('async') === 'true';
+
+  if (isAsync) {
+    const job = createJob('aula', { ...body, professorId, professorRole }, true);
+    return c.json({ success: true, job_id: job.id, status: 'pendente' }, 202);
+  }
+
+  try {
+    const result = await generateAulaOutlineAndContent({
+      ...body,
+      professorId,
+      professorRole,
+    });
+    return c.json(result);
+  } catch (e: any) {
+    return c.json(
+      {
+        success: false,
+        error: e.message || 'Falha na geração de aula com IA',
+      },
+      502
+    );
+  }
 });
 
 function parseEvaluationResult(
@@ -1214,6 +1211,76 @@ Regras:
   }
 
   return c.json({ success: true, ...synthesisResult });
+});
+
+aiRouter.post('/jobs', professorAuth, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { tipo, parametros } = body;
+  if (!tipo || typeof tipo !== 'string') {
+    return c.json({ success: false, error: 'O campo "tipo" é obrigatório.' }, 400);
+  }
+  const job = createJob(tipo, parametros || {}, true);
+  return c.json(
+    {
+      success: true,
+      job_id: job.id,
+      status: 'pendente',
+      job: {
+        id: job.id,
+        tipo: job.tipo,
+        status: job.status,
+        progresso: job.progresso,
+      },
+    },
+    202
+  );
+});
+
+aiRouter.get('/jobs/:id', professorAuth, async (c) => {
+  const id = c.req.param('id') || '';
+  const job = getJob(id);
+  if (!job) {
+    return c.json({ success: false, error: 'Job não encontrado.' }, 404);
+  }
+  const pctMatch = job.progresso?.match(/^(\d+)%/);
+  const progressNum = pctMatch ? parseInt(pctMatch[1], 10) : (job.status === 'concluido' ? 100 : 0);
+
+  return c.json({
+    success: true,
+    job: {
+      id: job.id,
+      tipo: job.tipo,
+      status: job.status,
+      progresso: job.progresso,
+      parametros: job.parametros,
+      resultado: job.resultado,
+      erro: job.erro,
+      criado_em: job.criado_em,
+      atualizado_em: job.atualizado_em,
+    },
+    job_id: job.id,
+    tipo: job.tipo,
+    status:
+      job.status === 'concluido'
+        ? 'completed'
+        : job.status === 'erro'
+          ? 'failed'
+          : job.status === 'cancelado'
+            ? 'cancelled'
+            : 'processing',
+    progress: progressNum,
+    step_message: job.progresso,
+    result: job.resultado,
+    error: job.erro,
+    criado_em: job.criado_em,
+    atualizado_em: job.atualizado_em,
+  });
+});
+
+aiRouter.post('/jobs/:id/cancel', professorAuth, async (c) => {
+  const id = c.req.param('id') || '';
+  const cancelled = cancelJob(id);
+  return c.json({ success: true, cancelled });
 });
 
 export { aiRouter };

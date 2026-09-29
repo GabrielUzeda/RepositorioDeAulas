@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue';
+import { ref, watch, nextTick, onBeforeUnmount, onMounted, computed } from 'vue';
 import { useToast } from '@/shared/composables/useToast';
+import { useAutoSave } from '@/shared/composables/useAutoSave';
+import { useAiJob } from '@/shared/composables/useAiJob';
 import { apiClient } from '@/shared/api/client';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import { THEME_LABELS, NEXT_THEME, normalizeTheme, MERMAID_THEME_VARIABLES, type ThemeKey, THEME_KEYS } from '@/shared/marpTheme';
@@ -81,45 +83,111 @@ const showAiPanel = ref(false);
 const aiTema = ref('');
 const aiObservacoes = ref('');
 const aiAulasContextoIds = ref<number[]>([]);
-const isGeneratingAula = ref(false);
 
 const { error: toastError, success: toastSuccess } = useToast();
 
+const aiJob = useAiJob<{
+  success: boolean;
+  conteudo_md: string;
+  titulo_sugerido: string;
+  modelo_utilizado: string;
+}>();
+
+interface MarpEditorDraft extends Record<string, unknown> {
+  titulo?: string;
+  descricao?: string;
+  markdown?: string;
+  aiTema?: string;
+  aiObservacoes?: string;
+  aiAulasContextoIds?: number[];
+  theme?: ThemeKey;
+}
+
+const autoSaveKey = computed(() => `autosave:marp_editor:disciplina_${props.disciplinaId ?? 'global'}`);
+
+const {
+  scheduleAutoSave: triggerAutoSave,
+  restoreDraft: restoreMarpDraft,
+  clearDraft: clearMarpDraft,
+} = useAutoSave<MarpEditorDraft>({
+  key: autoSaveKey,
+  debounceMs: 400,
+});
+
+function persistCurrentState() {
+  triggerAutoSave({
+    titulo: titleInput.value,
+    descricao: descInput.value,
+    markdown: markdownInput.value,
+    aiTema: aiTema.value,
+    aiObservacoes: aiObservacoes.value,
+    aiAulasContextoIds: aiAulasContextoIds.value,
+    theme: currentTheme.value,
+  });
+}
+
+watch(
+  [titleInput, descInput, markdownInput, aiTema, aiObservacoes, currentTheme],
+  () => {
+    persistCurrentState();
+  }
+);
+
+watch(
+  aiAulasContextoIds,
+  () => {
+    persistCurrentState();
+  },
+  { deep: true }
+);
+
 async function handleGenerateAulaIA() {
-  if (isGeneratingAula.value) return;
+  if (aiJob.isRunning.value) return;
   if (!aiTema.value.trim() && aiAulasContextoIds.value.length === 0) {
     toastError('Informe um tema ou selecione aulas de referência antes de gerar.');
     return;
   }
-  isGeneratingAula.value = true;
+
   try {
-    const payload: Record<string, any> = {
+    const payload: Record<string, unknown> = {
       tema: aiTema.value.trim(),
       aulas_contexto_ids: aiAulasContextoIds.value,
       observacoes: aiObservacoes.value.trim(),
+      async: true,
     };
     if (props.disciplinaId) payload.disciplina_id = props.disciplinaId;
 
-    const res = await apiClient.post<{ success: boolean; conteudo_md: string; titulo_sugerido: string; modelo_utilizado: string }>('/ai/generate-aula', payload);
-    if (!res.success || !res.data?.conteudo_md) {
-      toastError(res.error || 'Resposta inválida da IA.');
+    const data = await aiJob.startJob('/ai/generate-aula', payload);
+    if (!data || !data.conteudo_md) {
+      if (aiJob.error.value) {
+        toastError(aiJob.error.value);
+      }
       return;
     }
-    const data = res.data;
     markdownInput.value = data.conteudo_md;
     if (data.titulo_sugerido && !titleInput.value) {
       titleInput.value = data.titulo_sugerido;
     }
     showAiPanel.value = false;
-    toastSuccess(`Aula gerada com sucesso (${data.modelo_utilizado})!`);
+    toastSuccess(`Aula gerada com sucesso (${data.modelo_utilizado || 'IA'})!`);
     await nextTick();
     renderSlides(data.conteudo_md);
-  } catch (e: any) {
-    toastError(e.message || 'Falha ao conectar ao serviço de IA.');
-  } finally {
-    isGeneratingAula.value = false;
+  } catch (e: unknown) {
+    const errMessage = e instanceof Error ? e.message : 'Falha ao conectar ao serviço de IA.';
+    toastError(errMessage);
   }
 }
+
+watch(
+  [() => aiJob.isRunning.value, () => aiJob.stepMessage.value, () => aiJob.progress.value],
+  ([isRunning, msg, prog]) => {
+    if (isRunning && statusBarRef.value) {
+      statusBarRef.value.textContent = `[IA] ${msg || 'Gerando aula...'} (${prog}%)`;
+    } else if (!isRunning && statusBarRef.value) {
+      statusBarRef.value.textContent = `${currentSlide.value + 1} / ${totalSlides.value}`;
+    }
+  }
+);
 
 function toggleAulaContexto(aulaId: number) {
   const idx = aiAulasContextoIds.value.indexOf(aulaId);
@@ -1408,6 +1476,7 @@ const isSaving = ref(false);
 function handleSave() {
   if (isSaving.value || props.loading) return;
   isSaving.value = true;
+  clearMarpDraft();
   emit('save', {
     titulo: titleInput.value.trim(),
     descricao: descInput.value.trim(),
@@ -1422,8 +1491,24 @@ watch(
     if (!show) return;
     titleInput.value = props.titulo ?? '';
     descInput.value = props.descricao ?? '';
-    const draft = window.localStorage?.getItem('marp-next-content') ?? '';
-    markdownInput.value = props.markdown ?? (draft.trim() ? draft : DEFAULT_MD);
+    if (!props.markdown) {
+      const draft = restoreMarpDraft();
+      if (draft && (draft.markdown || draft.titulo || draft.aiTema)) {
+        if (!titleInput.value && draft.titulo) titleInput.value = draft.titulo;
+        if (!descInput.value && draft.descricao) descInput.value = draft.descricao;
+        if (draft.aiTema) aiTema.value = draft.aiTema;
+        if (draft.aiObservacoes) aiObservacoes.value = draft.aiObservacoes;
+        if (Array.isArray(draft.aiAulasContextoIds)) aiAulasContextoIds.value = draft.aiAulasContextoIds;
+        if (draft.theme) currentTheme.value = draft.theme;
+        markdownInput.value = draft.markdown ?? DEFAULT_MD;
+        toastSuccess('Rascunho do editor recuperado.');
+      } else {
+        const legacyDraft = window.localStorage?.getItem('marp-next-content') ?? '';
+        markdownInput.value = legacyDraft.trim() ? legacyDraft : DEFAULT_MD;
+      }
+    } else {
+      markdownInput.value = props.markdown;
+    }
     currentSlideNum = 0;
     currentSlide.value = 0;
     nextTick(() => {
@@ -1710,7 +1795,7 @@ onBeforeUnmount(() => {
               v-model="aiTema"
               class="ai-input"
               placeholder="Ex: Introdução à Lógica de Programação"
-              :disabled="isGeneratingAula"
+              :disabled="aiJob.isRunning.value"
             />
           </div>
 
@@ -1721,7 +1806,7 @@ onBeforeUnmount(() => {
               v-model="aiObservacoes"
               class="ai-textarea"
               placeholder="Detalhes, requisitos específicos ou preferências para a geração (ex: use exemplos ligados ao dia a dia da turma, aprofunde um tópico específico, inclua uma atividade prática)."
-              :disabled="isGeneratingAula"
+              :disabled="aiJob.isRunning.value"
               rows="3"
             ></textarea>
           </div>
@@ -1743,7 +1828,7 @@ onBeforeUnmount(() => {
                   :value="aula.id"
                   :checked="aiAulasContextoIds.includes(aula.id)"
                   @change="toggleAulaContexto(aula.id)"
-                  :disabled="isGeneratingAula"
+                  :disabled="aiJob.isRunning.value"
                   class="sr-only"
                 />
                 <span class="material-icons ai-check-icon">{{ aiAulasContextoIds.includes(aula.id) ? 'check_box' : 'check_box_outline_blank' }}</span>
@@ -1752,19 +1837,54 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
+          <!-- Reconnection & Progress Alerts -->
+          <div v-if="aiJob.isReconnecting.value" class="p-2.5 rounded-card bg-surface-alt border border-line text-secondary text-xs flex items-center space-x-2">
+            <span class="material-icons animate-spin text-sm text-accent">sync</span>
+            <span>{{ aiJob.stepMessage.value || 'Aguardando conexão de rede para continuar a geração...' }}</span>
+          </div>
+          <div v-else-if="aiJob.isRunning.value" class="p-3 rounded-card bg-surface-alt border border-line text-xs space-y-2">
+            <div class="flex items-center justify-between font-semibold text-primary">
+              <span class="flex items-center space-x-1.5">
+                <span class="material-icons animate-spin text-sm text-accent">auto_awesome</span>
+                <span>Geração Encadeada em 2 Etapas</span>
+              </span>
+              <span class="font-mono text-accent">{{ aiJob.progress.value }}%</span>
+            </div>
+            
+            <div class="space-y-1 text-secondary">
+              <div class="flex items-center space-x-2" :class="{ 'text-accent font-semibold': aiJob.progress.value <= 35, 'text-primary': aiJob.progress.value > 35 }">
+                <span class="material-icons text-sm">{{ aiJob.progress.value > 35 ? 'check_circle' : 'radio_button_checked' }}</span>
+                <span>1. Planejamento da estrutura e tópicos</span>
+              </div>
+              <div class="flex items-center space-x-2" :class="{ 'text-accent font-semibold': aiJob.progress.value > 35 && aiJob.progress.value <= 85, 'text-primary': aiJob.progress.value > 85, 'text-muted': aiJob.progress.value <= 35 }">
+                <span class="material-icons text-sm">{{ aiJob.progress.value > 85 ? 'check_circle' : (aiJob.progress.value > 35 ? 'radio_button_checked' : 'radio_button_unchecked') }}</span>
+                <span>2. Expansão dos slides e diagramas Marp</span>
+              </div>
+              <div class="flex items-center space-x-2" :class="{ 'text-accent font-semibold': aiJob.progress.value > 85, 'text-muted': aiJob.progress.value <= 85 }">
+                <span class="material-icons text-sm">{{ aiJob.progress.value >= 100 ? 'check_circle' : 'radio_button_unchecked' }}</span>
+                <span>3. Validação e formatação</span>
+              </div>
+            </div>
+
+            <div class="text-xs text-muted italic pt-1">
+              {{ aiJob.stepMessage.value || 'Processando pipeline de IA...' }}
+            </div>
+          </div>
+
           <!-- Generate button -->
           <div class="ai-panel-actions">
             <BaseButton
               variant="primary"
               size="sm"
-              :loading="isGeneratingAula"
-              :disabled="isGeneratingAula || (!aiTema.trim() && aiAulasContextoIds.length === 0)"
+              :loading="aiJob.isRunning.value"
+              :disabled="aiJob.isRunning.value || (!aiTema.trim() && aiAulasContextoIds.length === 0)"
               @click="handleGenerateAulaIA"
             >
-              <span v-if="!isGeneratingAula" class="material-icons" style="font-size:15px;vertical-align:middle;margin-right:3px;">bolt</span>
-              {{ isGeneratingAula ? 'Gerando aula...' : 'Gerar Aula' }}
+              <span v-if="!aiJob.isRunning.value" class="material-icons" style="font-size:15px;vertical-align:middle;margin-right:3px;">bolt</span>
+              {{ aiJob.isReconnecting.value ? 'Reconectando...' : (aiJob.isRunning.value ? 'Gerando aula...' : 'Gerar Aula') }}
             </BaseButton>
-            <BaseButton variant="ghost" size="sm" :disabled="isGeneratingAula" @click="showAiPanel = false">Cancelar</BaseButton>
+            <BaseButton v-if="aiJob.isRunning.value" variant="danger" size="sm" @click="aiJob.cancelJob()">Cancelar</BaseButton>
+            <BaseButton v-else variant="ghost" size="sm" :disabled="aiJob.isRunning.value" @click="showAiPanel = false">Fechar</BaseButton>
           </div>
         </div>
       </div>

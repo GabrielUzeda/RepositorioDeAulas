@@ -178,18 +178,32 @@ CREATE TABLE IF NOT EXISTS rascunhos_editor (
   criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
+
+CREATE TABLE IF NOT EXISTS ai_jobs (
+  id TEXT PRIMARY KEY,
+  tipo TEXT NOT NULL,
+  status TEXT NOT NULL,
+  progresso TEXT,
+  parametros TEXT,
+  resultado TEXT,
+  erro TEXT,
+  criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  atualizado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
 `);
 
 // Migrações defensivas para colunas adicionadas e relacionamentos N:N
 try {
   db.run('ALTER TABLE atividades ADD COLUMN aula_id INTEGER REFERENCES aulas(id) ON DELETE SET NULL');
-} catch {}
+} catch (_e) {
+  // Ignora se a coluna já existir
+}
 
-try { db.run("ALTER TABLE cursos ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
-try { db.run("ALTER TABLE disciplinas ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
-try { db.run("ALTER TABLE atividades ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch {}
-try { db.run("ALTER TABLE atividades ADD COLUMN data_limite TEXT"); } catch {}
-try { db.run("ALTER TABLE respostas_alunos ADD COLUMN entregue_com_atraso INTEGER DEFAULT 0"); } catch {}
+try { db.run("ALTER TABLE cursos ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch (_e) { /* coluna já existe */ }
+try { db.run("ALTER TABLE disciplinas ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch (_e) { /* coluna já existe */ }
+try { db.run("ALTER TABLE atividades ADD COLUMN status TEXT DEFAULT 'ativo'"); } catch (_e) { /* coluna já existe */ }
+try { db.run("ALTER TABLE atividades ADD COLUMN data_limite TEXT"); } catch (_e) { /* coluna já existe */ }
+try { db.run("ALTER TABLE respostas_alunos ADD COLUMN entregue_com_atraso INTEGER DEFAULT 0"); } catch (_e) { /* coluna já existe */ }
 
 try {
   db.run(`
@@ -206,7 +220,9 @@ try {
     INSERT OR IGNORE INTO aula_atividades (aula_id, atividade_id)
     SELECT aula_id, id FROM atividades WHERE aula_id IS NOT NULL
   `);
-} catch {}
+} catch (_e) {
+  // Tabela/relacionamento já migrado
+}
 
 try {
   db.run(`
@@ -222,7 +238,9 @@ try {
       criado_em TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     )
   `);
-} catch {}
+} catch (_e) {
+  // Tabela já existente
+}
 
 try {
   db.run(`
@@ -246,7 +264,9 @@ try {
       conteudo
     );
   `);
-} catch {}
+} catch (_e) {
+  // Tabelas/FTS já existentes
+}
 
 // [2] Índices para alta performance
 db.run(`
@@ -262,6 +282,8 @@ CREATE INDEX IF NOT EXISTS idx_disciplinas_curso ON disciplinas(curso_id);
 CREATE INDEX IF NOT EXISTS idx_disciplina_feedbacks_disc ON disciplina_feedbacks(disciplina_id);
 CREATE INDEX IF NOT EXISTS idx_curso_professores_professor ON curso_professores(professor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_criado_em ON audit_logs(criado_em);
+CREATE INDEX IF NOT EXISTS idx_ai_jobs_status ON ai_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_ai_jobs_criado_em ON ai_jobs(criado_em);
 CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_professor ON rascunhos_editor(professor_id);
 CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_expira_em ON rascunhos_editor(expira_em);
 CREATE INDEX IF NOT EXISTS idx_atividades_aula ON atividades(aula_id);
@@ -462,9 +484,35 @@ export function purgeOldRanking(days: number = 30): number {
   }
 }
 
+// [4.1] Expurgo de jobs de IA antigos (Gatilho automático de 7 dias)
+export function purgeOldAiJobs(days: number = 7): number {
+  const rawAiJobsDays = Number(process.env.AI_JOBS_RETENTION_DAYS);
+  const targetDays = Number.isInteger(rawAiJobsDays) && rawAiJobsDays > 0 ? rawAiJobsDays : days;
+  try {
+    const cutoffRow = db
+      .query(`SELECT strftime('%Y-%m-%dT%H:%M:%SZ','now', ?) AS c`)
+      .get(`-${targetDays} days`) as { c: string };
+    const cutoff = cutoffRow?.c;
+    if (!cutoff) return 0;
+
+    let totalDeleted = 0;
+    while (true) {
+      const res = db
+        .query(`DELETE FROM ai_jobs WHERE id IN (SELECT id FROM ai_jobs WHERE criado_em < ? LIMIT 500)`)
+        .run(cutoff);
+      totalDeleted += res.changes;
+      if (res.changes < 500) break;
+    }
+    return totalDeleted;
+  } catch (e) {
+    console.error('Erro ao expurgar jobs de IA antigos:', e);
+    return 0;
+  }
+}
+
 // [5] Retenção LGPD (Art. 15/16): purga de dados pessoais antigos e ranking (30 dias).
-export function runDataRetentionPurge(): { respostas: number; ranking: number } {
-  const result = { respostas: 0, ranking: 0 };
+export function runDataRetentionPurge(): { respostas: number; ranking: number; ai_jobs: number } {
+  const result = { respostas: 0, ranking: 0, ai_jobs: 0 };
   const raw = Number(process.env.RETENTION_DAYS);
   const days = Number.isInteger(raw) && raw > 0 ? raw : 365;
 
@@ -499,6 +547,7 @@ export function runDataRetentionPurge(): { respostas: number; ranking: number } 
     }
 
     result.ranking = purgeOldRanking(30);
+    result.ai_jobs = purgeOldAiJobs(7);
     return result;
   } catch (e) {
     console.error('Erro no expurgo LGPD:', e);
