@@ -26,7 +26,18 @@ const TITULO_DOC_CURSO = 'Doc Curso RAG XYZ';
 const MODELO_MOCK = 'modelo-mock-rag';
 
 const RESPOSTA_QUESTOES = JSON.stringify({
-  questions: [{ enunciado: 'Questao mock?', tipo: 'discursiva' }],
+  questions: [
+    {
+      title: 'Conceito mock de RAG',
+      content: 'Explique o conceito mock de RAG aplicado ao contexto.',
+      resposta_esperada:
+        'O aluno deve mencionar o conceito mock e relaciona-lo ao contexto apresentado.',
+      rubrica: [
+        { criterio: 'Menciona o conceito mock', peso: 60 },
+        { criterio: 'Relaciona ao contexto', peso: 40 },
+      ],
+    },
+  ],
 });
 const RESPOSTA_AULA = '# Aula Mock\n\n---\n\n## Slide 1\n\nConteudo da aula mock.';
 

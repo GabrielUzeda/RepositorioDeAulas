@@ -40,6 +40,7 @@ const aiJob = useAiJob<{
   pontos_fortes?: string[];
   pontos_atencao?: string[];
   alunos_sintese?: Array<{ aluno_email: string; feedback_individual: string }>;
+  falhas?: Array<{ id: string; erro: string }>;
 }>();
 
 interface FeedbackConsolidadoDraft extends Record<string, unknown> {
