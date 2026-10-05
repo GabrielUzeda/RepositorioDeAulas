@@ -56,7 +56,7 @@ export function fatiarEmSecoes(texto: string, tituloDoc: string): { titulo: stri
   }
 
   const lines = texto.split('\n');
-  const sections: { titulo: string; lines: string[] }[] = [];
+  const sections: { titulo: string; conteudo: string }[] = [];
   let currentTitle = tituloDoc;
   let currentLines: string[] = [];
 
@@ -263,7 +263,9 @@ export function buscarTrechosDocumento(opts: {
           trechos.push({ titulo_secao: r.titulo_secao, conteudo: r.conteudo });
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error(`[documentIndexer] Falha ao obter contexto de documentos sob demanda: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   return trechos;
@@ -356,7 +358,9 @@ export function obterContextoDocumentosSobDemanda(opts: {
     try {
       const disc = db.query('SELECT curso_id FROM disciplinas WHERE id = ?').get(opts.disciplinaId) as any;
       if (disc?.curso_id) resolvedCursoId = disc.curso_id;
-    } catch {}
+    } catch (e) {
+      console.error(`[documentIndexer] Falha ao obter contexto de documentos sob demanda: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   const mapa = obterMapaDocumentos({ disciplinaId: opts.disciplinaId, cursoId: resolvedCursoId });

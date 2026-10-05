@@ -109,11 +109,9 @@ ${instrucaoSeveridadeAvaliacao(severidade)}${
   const discursivas = questions.filter((q: any) => !Array.isArray(q?.options) || q.options.length === 0);
 
   const corObjetivas = corrigirObjetivas(atividade.json_data, respostasMap);
-  const totalObjetivas = objetivas.length;
-  const notaObjetivasTotal = totalObjetivas > 0 ? (corObjetivas.acertos / totalObjetivas) * 100 : 0;
-
+  const totalQuestions = questions.length;
   const detalhesQuestoes: Array<{ ref: string; nota: number; feedback: string }> = [];
-  let somaNotasDiscursivas = 0;
+  let somaNotas = 0;
 
   for (let idx = 0; idx < questions.length; idx++) {
     const q = questions[idx];
@@ -128,6 +126,7 @@ ${instrucaoSeveridadeAvaliacao(severidade)}${
         nota: acertou ? 100 : 0,
         feedback: acertou ? 'Resposta correta!' : 'Resposta incorreta.',
       });
+      somaNotas += acertou ? 100 : 0;
     } else {
       const respAluno = resolverRespostaDaQuestao(respostasMap, q, idx);
       if (!respAluno || respAluno.trim() === '') {
@@ -136,7 +135,7 @@ ${instrucaoSeveridadeAvaliacao(severidade)}${
           nota: 0,
           feedback: 'Questão não respondida.',
         });
-        somaNotasDiscursivas += 0;
+        somaNotas += 0;
       } else {
         const sanitizada = sanitizarEntradaAluno(respAluno);
         const rubrica = q.rubrica || q.resposta_esperada || 'Avalie rigorosamente com base no enunciado.';
@@ -194,20 +193,18 @@ Instruções:
         }
 
         detalhesQuestoes.push({ ref, nota: notaDisc, feedback: feedDisc });
-        somaNotasDiscursivas += notaDisc;
+        somaNotas += notaDisc;
       }
     }
   }
 
-  const totalQuestions = questions.length;
   let notaFinal = 0;
   if (totalQuestions > 0) {
-    const somaTotal = (totalObjetivas > 0 ? notaObjetivasTotal : 0) + somaNotasDiscursivas;
-    notaFinal = Math.round(somaTotal / totalQuestions);
+    notaFinal = Math.round(somaNotas / totalQuestions);
   }
 
   const feedbackGeral = detalhesQuestoes.map((d) => `Q(${d.ref}): [Nota ${d.nota}] ${d.feedback}`).join('\n');
-  const justificativa = `Avaliação concluída para ${totalQuestions} questões (${totalObjetivas} objetivas, ${discursivas.length} discursivas).`;
+  const justificativa = `Avaliação concluída para ${totalQuestions} questões (${objetivas.length} objetivas, ${discursivas.length} discursivas).`;
 
   return {
     nota: notaFinal,

@@ -42,6 +42,25 @@ describe('AI Avaliação e Sanitização (MT-04)', () => {
     expect(res.detalhes_questoes[0].feedback).toBe('Questão não respondida.');
   });
 
+  it('avaliarAlunoAtividade pondera cada objetiva individualmente na nota final (regressao da formula)', async () => {
+    const atividade = {
+      id: 3,
+      titulo: 'Atividade Objetivas',
+      json_data: {
+        questions: [
+          { id: 'o1', content: '2+2?', options: [{ text: '3' }, { text: '4', correct: true }] },
+          { id: 'o2', content: '3+3?', options: [{ text: '6', correct: true }, { text: '7' }] },
+          { id: 'o3', content: '5+5?', options: [{ text: '10', correct: true }, { text: '11' }] },
+        ],
+      },
+    };
+    const res = await avaliarAlunoAtividade({
+      atividade,
+      respostasRaw: JSON.stringify({ o1: '4', o2: '7', o3: '10' }),
+    });
+    expect(res.nota).toBe(67);
+  });
+
   it('prompt injection simulado dentro de resposta_aluno não afeta avaliação estruturada', async () => {
     const atividade = {
       id: 2,
