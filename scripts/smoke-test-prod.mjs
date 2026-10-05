@@ -7,15 +7,42 @@
  *      SMOKE_SKIP_EMAIL=true (validação local: não dispara e-mails reais).
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+
+function resolveAdminPassword() {
+  if (process.env.ADMIN_PASSWORD) return process.env.ADMIN_PASSWORD;
+  if (process.env.PROFESSOR_PASSWORD) return process.env.PROFESSOR_PASSWORD;
+  const envPaths = [path.resolve(process.cwd(), '.env'), path.resolve(process.cwd(), '..', '.env')];
+  for (const p of envPaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const content = fs.readFileSync(p, 'utf-8');
+        const matchAdmin = content.match(/^ADMIN_PASSWORD=(.*)$/m);
+        if (matchAdmin?.[1]?.trim()) return matchAdmin[1].trim().replace(/^['"]|['"]$/g, '');
+        const matchProf = content.match(/^PROFESSOR_PASSWORD=(.*)$/m);
+        if (matchProf?.[1]?.trim()) return matchProf[1].trim().replace(/^['"]|['"]$/g, '');
+      } catch {}
+    }
+  }
+  return '';
+}
+
 const BASE = process.env.PROD_API_URL || 'https://aulas.uzedasolucoes.com.br/api';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@escola.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ProfessorUzeda!';
+const ADMIN_PASSWORD = resolveAdminPassword();
+if (!ADMIN_PASSWORD) {
+  console.error(
+    '[Smoke Test Prod] ERRO: ADMIN_PASSWORD ou PROFESSOR_PASSWORD nao informado no ambiente nem no .env.'
+  );
+  process.exit(1);
+}
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'uzeda.dev@gmail.com';
 const SKIP_EMAIL = process.env.SMOKE_SKIP_EMAIL === 'true';
 
 async function main() {
   console.log(
-    `\n[Smoke Test Prod] Iniciando validação em: ${BASE}${SKIP_EMAIL ? ' (SMOKE_SKIP_EMAIL=true: nenhum e-mail será enviado)' : ''}`
+    `\n[Smoke Test Prod] Iniciando validacao em: ${BASE}${SKIP_EMAIL ? ' (SMOKE_SKIP_EMAIL=true: nenhum e-mail sera enviado)' : ''}`
   );
 
   let adminToken = '';
@@ -28,14 +55,14 @@ async function main() {
 
   try {
     // 1. Healthcheck
-    console.log('1️⃣  Checando Healthcheck (/health)...');
+    console.log('[1/12] Checando Healthcheck (/health)...');
     const healthRes = await fetch(`${BASE}/health`);
     if (!healthRes.ok) throw new Error(`Healthcheck falhou com status ${healthRes.status}`);
     const healthData = await healthRes.json();
-    console.log('   ✅ Healthcheck OK:', healthData);
+    console.log('   [OK] Healthcheck OK:', healthData);
 
     // 2. Login Admin
-    console.log('2️⃣  Autenticando Administrador...');
+    console.log('[2/12] Autenticando Administrador...');
     const adminLoginRes = await fetch(`${BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -44,10 +71,10 @@ async function main() {
     if (!adminLoginRes.ok) throw new Error(`Login admin falhou com status ${adminLoginRes.status}`);
     const adminLoginData = await adminLoginRes.json();
     adminToken = adminLoginData.token;
-    console.log('   ✅ Admin autenticado com sucesso.');
+    console.log('   [OK] Admin autenticado com sucesso.');
 
     // 3. Criar Professor Temporário
-    console.log('3️⃣  Criando Professor Temporário...');
+    console.log('[3/12] Criando Professor Temporario...');
     const timestamp = Date.now();
     const profEmail = `smoke_prof_${timestamp}@uzedasolucoes.com.br`;
     const profSenha = `SmokePass_${timestamp}!`;
@@ -60,10 +87,10 @@ async function main() {
     if (!profRes.ok) throw new Error(`Falha ao criar professor: ${profRes.status}`);
     const profData = await profRes.json();
     profId = profData.id;
-    console.log(`   ✅ Professor criado com ID ${profId} (${profEmail})`);
+    console.log(`   [OK] Professor criado com ID ${profId} (${profEmail})`);
 
     // 4. Criar Curso Temporário
-    console.log('4️⃣  Criando Curso Temporário...');
+    console.log('[4/12] Criando Curso Temporario...');
     const cursoNome = `Curso Smoke Test ${timestamp}`;
     const cursoRes = await fetch(`${BASE}/cursos`, {
       method: 'POST',
@@ -76,20 +103,20 @@ async function main() {
     if (!cursoRes.ok) throw new Error(`Falha ao criar curso: ${cursoRes.status}`);
     const cursoData = await cursoRes.json();
     cursoId = cursoData.id;
-    console.log(`   ✅ Curso criado com ID ${cursoId}`);
+    console.log(`   [OK] Curso criado com ID ${cursoId}`);
 
     // 5. Vincular Professor ao Curso
-    console.log('5️⃣  Vinculando Professor ao Curso...');
+    console.log('[5/12] Vinculando Professor ao Curso...');
     const vincRes = await fetch(`${BASE}/cursos/${cursoId}/professores`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({ professor_ids: [profId] }),
     });
     if (!vincRes.ok) throw new Error(`Falha ao vincular professor: ${vincRes.status}`);
-    console.log('   ✅ Professor vinculado com sucesso.');
+    console.log('   [OK] Professor vinculado com sucesso.');
 
     // 6. Login com o Professor Criado
-    console.log('6️⃣  Autenticando Professor...');
+    console.log('[6/12] Autenticando Professor...');
     const profLoginRes = await fetch(`${BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -98,10 +125,10 @@ async function main() {
     if (!profLoginRes.ok) throw new Error(`Login do professor falhou: ${profLoginRes.status}`);
     const profLoginData = await profLoginRes.json();
     const profToken = profLoginData.token;
-    console.log('   ✅ Professor autenticado.');
+    console.log('   [OK] Professor autenticado.');
 
     // 7. Criar Disciplina com o Professor
-    console.log('7️⃣  Criando Disciplina...');
+    console.log('[7/12] Criando Disciplina...');
     const discRes = await fetch(`${BASE}/disciplinas`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${profToken}` },
@@ -116,10 +143,10 @@ async function main() {
     if (!discRes.ok) throw new Error(`Falha ao criar disciplina: ${discRes.status}`);
     const discData = await discRes.json();
     disciplinaId = discData.id;
-    console.log(`   ✅ Disciplina criada com ID ${disciplinaId}`);
+    console.log(`   [OK] Disciplina criada com ID ${disciplinaId}`);
 
     // 8. Criar Aula Marp
-    console.log('8️⃣  Criando Aula (Marp)...');
+    console.log('[8/12] Criando Aula (Marp)...');
     const aulaRes = await fetch(`${BASE}/aulas`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${profToken}` },
@@ -135,7 +162,7 @@ async function main() {
     if (!aulaRes.ok) throw new Error(`Falha ao criar aula: ${aulaRes.status}`);
     const aulaData = await aulaRes.json();
     aulaId = aulaData.id;
-    console.log(`   ✅ Aula criada com ID ${aulaData.id}`);
+    console.log(`   [OK] Aula criada com ID ${aulaData.id}`);
 
     // 9. Criar Atividade Interativa (roleta, com o gabarito FORA da 1ª posição)
     console.log('9. Criando Atividades Interativas...');
@@ -284,10 +311,10 @@ async function main() {
       console.log(`   OK Código de rascunho enviado para ${NOTIFY_EMAIL}`);
     }
 
-    console.log('\nTODOS OS TESTES EM PRODUÇÃO FORAM CONCLUÍDOS COM SUCESSO!');
+    console.log('\nTODOS OS TESTES EM PRODUCAO FORAM CONCLUIDOS COM SUCESSO!');
   } finally {
     // Limpeza (Cleanup) em Produção
-    console.log('\n🧹 [Cleanup] Iniciando limpeza dos dados de teste criados em produção...');
+    console.log('\n[Cleanup] Iniciando limpeza dos dados de teste criados em producao...');
     if (!adminToken) {
       try {
         const loginRes = await fetch(`${BASE}/auth/login`, {
@@ -300,7 +327,7 @@ async function main() {
           adminToken = data.token;
         }
       } catch (e) {
-        console.warn('   ⚠️ Não foi possível obter token admin para cleanup:', e.message);
+        console.warn('   [AVISO] Nao foi possivel obter token admin para cleanup:', e.message);
       }
     }
 
@@ -326,7 +353,7 @@ async function main() {
             }
           }
         } catch (e) {
-          console.warn('   Aviso: erro ao remover aulas do curso', idCurso, '-', e.message);
+          console.warn('   [AVISO] Erro ao remover aulas do curso', idCurso, '-', e.message);
         }
       }
 
@@ -336,10 +363,13 @@ async function main() {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${adminToken}` },
           });
-          if (res.ok) console.log(`   🗑️  Resposta ID ${respostaId} excluída.`);
-          else console.warn(`   ⚠️ Falha ao excluir resposta ${respostaId}: status ${res.status}`);
+          if (res.ok) console.log(`   [CLEANUP] Resposta ID ${respostaId} excluida.`);
+          else
+            console.warn(
+              `   [AVISO] Falha ao excluir resposta ${respostaId}: status ${res.status}`
+            );
         } catch (e) {
-          console.warn('   ⚠️ Erro ao excluir resposta:', e.message);
+          console.warn('   [AVISO] Erro ao excluir resposta:', e.message);
         }
       }
 
@@ -349,10 +379,10 @@ async function main() {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${adminToken}` },
           });
-          if (res.ok) console.log(`   Aula ID ${aulaId} e arquivos .md/.html removidos.`);
-          else console.warn(`   Falha ao excluir aula ${aulaId}: status ${res.status}`);
+          if (res.ok) console.log(`   [CLEANUP] Aula ID ${aulaId} e arquivos .md/.html removidos.`);
+          else console.warn(`   [AVISO] Falha ao excluir aula ${aulaId}: status ${res.status}`);
         } catch (e) {
-          console.warn('   Erro ao excluir aula:', e.message);
+          console.warn('   [AVISO] Erro ao excluir aula:', e.message);
         }
       }
 
@@ -365,11 +395,11 @@ async function main() {
           });
           if (res.ok)
             console.log(
-              `   🗑️  Curso ID ${cursoId} (e disciplinas/aulas/atividades vinculadas) excluído.`
+              `   [CLEANUP] Curso ID ${cursoId} (e disciplinas/aulas/atividades vinculadas) excluido.`
             );
-          else console.warn(`   ⚠️ Falha ao excluir curso ${cursoId}: status ${res.status}`);
+          else console.warn(`   [AVISO] Falha ao excluir curso ${cursoId}: status ${res.status}`);
         } catch (e) {
-          console.warn('   ⚠️ Erro ao excluir curso:', e.message);
+          console.warn('   [AVISO] Erro ao excluir curso:', e.message);
         }
       }
 
@@ -379,10 +409,11 @@ async function main() {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${adminToken}` },
           });
-          if (res.ok) console.log(`   🗑️  Professor ID ${profId} excluído.`);
-          else console.warn(`   ⚠️ Falha ao excluir professor ${profId}: status ${res.status}`);
+          if (res.ok) console.log(`   [CLEANUP] Professor ID ${profId} excluido.`);
+          else
+            console.warn(`   [AVISO] Falha ao excluir professor ${profId}: status ${res.status}`);
         } catch (e) {
-          console.warn('   ⚠️ Erro ao excluir professor:', e.message);
+          console.warn('   [AVISO] Erro ao excluir professor:', e.message);
         }
       }
 
@@ -394,13 +425,13 @@ async function main() {
         if (cursosRes.ok) {
           const cursos = await cursosRes.json();
           for (const c of cursos) {
-            if (c.nome && c.nome.startsWith('Curso Smoke Test')) {
+            if (c.nome?.startsWith('Curso Smoke Test')) {
               await removerAulasDoCurso(c.id);
               await fetch(`${BASE}/cursos/${c.id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${adminToken}` },
               });
-              console.log(`   🗑️  Curso residual ${c.nome} (ID ${c.id}) removido.`);
+              console.log(`   [CLEANUP] Curso residual ${c.nome} (ID ${c.id}) removido.`);
             }
           }
         }
@@ -411,24 +442,24 @@ async function main() {
         if (profsRes.ok) {
           const profs = await profsRes.json();
           for (const p of profs) {
-            if (p.email && p.email.startsWith('smoke_prof_')) {
+            if (p.email?.startsWith('smoke_prof_')) {
               await fetch(`${BASE}/professores/${p.id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${adminToken}` },
               });
-              console.log(`   🗑️  Professor residual ${p.nome} (ID ${p.id}) removido.`);
+              console.log(`   [CLEANUP] Professor residual ${p.nome} (ID ${p.id}) removido.`);
             }
           }
         }
       } catch (e) {
-        console.warn('   ⚠️ Erro na varredura de resíduos:', e.message);
+        console.warn('   [AVISO] Erro na varredura de residuos:', e.message);
       }
     }
-    console.log('✨ [Cleanup] Ambiente de produção limpo com sucesso!\n');
+    console.log('[Cleanup] Ambiente de producao limpo com sucesso!\n');
   }
 }
 
 main().catch((err) => {
-  console.error('\n❌ ERRO NO SMOKE TEST DE PRODUÇÃO:', err);
+  console.error('\n[ERRO] ERRO NO SMOKE TEST DE PRODUCAO:', err);
   process.exit(1);
 });

@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useCursoStore } from '@/shared/stores/curso';
 import { apiClient } from '@/shared/api/client';
-import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
+import { secureGet, secureSet, secureRemove, clearAllAlunoSession } from '@/shared/utils/storage';
 import CursoCard from '@/aluno/components/CursoCard.vue';
 import DisciplinaCard from '@/aluno/components/DisciplinaCard.vue';
 import AulaCard from '@/aluno/components/AulaCard.vue';
@@ -20,7 +20,7 @@ import type { Curso, Disciplina, Aula, Atividade, Question } from '@/shared/type
 import { useToast } from '@/shared/composables/useToast';
 
 const cursoStore = useCursoStore();
-const { error } = useToast();
+const { error, success } = useToast();
 
 const activeView = ref<'cursos' | 'disciplinas' | 'content'>('cursos');
 const activeTab = ref<'aulas' | 'atividades'>('aulas');
@@ -190,6 +190,16 @@ function goBack() {
     selectedCurso.value = null;
   }
 }
+
+async function handleLimparSessao() {
+  await clearAllAlunoSession();
+  cursoSenha.value = '';
+  atividadeSenha.value = '';
+  selectedCurso.value = null;
+  selectedDisciplina.value = null;
+  activeView.value = 'cursos';
+  success('Sessão e dados deste computador foram limpos com sucesso!');
+}
 </script>
 
 <template>
@@ -240,6 +250,15 @@ function goBack() {
 
         <!-- Actions -->
         <div class="flex items-center gap-2 flex-shrink-0">
+          <button
+            type="button"
+            @click="handleLimparSessao"
+            class="inline-flex items-center gap-1.5 rounded-sm border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-secondary hover:border-danger/40 hover:text-danger transition-all duration-base cursor-pointer"
+            title="Limpar todos os dados, senhas de curso e respostas deste computador"
+          >
+            <span class="material-icons text-[14px]">delete_sweep</span>
+            <span class="hidden md:inline">Limpar Sessão</span>
+          </button>
           <ThemeToggle />
           <router-link
             to="/login"

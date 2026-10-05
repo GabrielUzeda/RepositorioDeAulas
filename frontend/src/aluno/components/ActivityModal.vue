@@ -28,6 +28,7 @@ const emit = defineEmits<{
 
 const alunoNome = ref('');
 const alunoEmail = ref('');
+const lembrarDados = ref(true);
 const rascunhoCodigo = ref('');
 const respostasMap = ref<Record<string, string>>({});
 const questionsList = ref<Question[]>([]);
@@ -121,9 +122,23 @@ function getQuestionKey(q: Question, idx: number): string {
 function handleSaveDraft() {
   if (props.atividade) {
     secureSet(`draft_${props.atividade.id}`, JSON.stringify(respostasMap.value));
-    secureSet('alunoNome', alunoNome.value);
-    secureSet('alunoEmail', alunoEmail.value);
+    if (lembrarDados.value) {
+      secureSet('alunoNome', alunoNome.value);
+      secureSet('alunoEmail', alunoEmail.value);
+    }
   }
+}
+
+async function handleClearSavedIdentity() {
+  alunoNome.value = '';
+  alunoEmail.value = '';
+  await secureRemove('alunoNome');
+  await secureRemove('alunoEmail');
+  if (props.atividade) {
+    await secureRemove(`draft_${props.atividade.id}`);
+  }
+  respostasMap.value = {};
+  success('Identificação e rascunho limpos deste computador!');
 }
 
 const isRestoringDraft = ref(false);
@@ -299,6 +314,13 @@ async function handleSubmit() {
     if (res.success) {
       submitSuccess.value = true;
       secureRemove(`draft_${props.atividade!.id}`);
+      if (lembrarDados.value) {
+        await secureSet('alunoNome', alunoNome.value);
+        await secureSet('alunoEmail', alunoEmail.value);
+      } else {
+        await secureRemove('alunoNome');
+        await secureRemove('alunoEmail');
+      }
       if (res.data?.consulta_token) {
         secureSet(`consulta_token_${props.atividade!.id}`, String(res.data.consulta_token));
       }
@@ -409,6 +431,30 @@ async function handleSubmit() {
             <span class="material-icons text-amber-500 text-sm mt-0.5 shrink-0">info</span>
             <span>{{ emailValidation.warning }}</span>
           </div>
+        </div>
+        
+        <div class="flex items-center justify-between gap-2 pt-1 pb-1">
+          <div class="flex items-center gap-2">
+            <input
+              id="lembrarDadosCheckbox"
+              v-model="lembrarDados"
+              type="checkbox"
+              class="w-4 h-4 text-accent border-line rounded focus:ring-accent accent-accent cursor-pointer"
+            />
+            <label for="lembrarDadosCheckbox" class="text-xs font-medium text-secondary cursor-pointer select-none">
+              Lembrar meus dados durante esta aula (expira em 4h)
+            </label>
+          </div>
+          <button
+            v-if="alunoNome || alunoEmail"
+            type="button"
+            @click="handleClearSavedIdentity"
+            class="text-xs text-secondary hover:text-danger flex items-center gap-1 transition-colors duration-base cursor-pointer"
+            title="Limpa seus dados e rascunho deste computador"
+          >
+            <span class="material-icons text-xs">delete_sweep</span>
+            <span>Limpar dados</span>
+          </button>
         </div>
         
         <div class="flex items-center gap-2 pt-1">

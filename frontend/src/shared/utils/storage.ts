@@ -1,7 +1,19 @@
 const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 1 mês (default)
-const FOUR_HOURS_MS = 4 * 60 * 60 * 1000; // 4 horas (senhas de aluno)
+export const FOUR_HOURS_MS = 4 * 60 * 60 * 1000; // 4 horas (senhas de aluno, nome/email e dados de sessão)
 const KEY_STORAGE_PREFIX = 'enc_key_v1';
 const PREFIX = 'enc:';
+
+export function isAlunoSessionKey(key: string): boolean {
+  return (
+    key.startsWith('curso_senha_') ||
+    key.startsWith('curso_access_') ||
+    key.startsWith('draft_') ||
+    key.startsWith('consulta_token_') ||
+    key === 'alunoNome' ||
+    key === 'alunoEmail' ||
+    key.startsWith('aluno_')
+  );
+}
 
 let cachedKey: CryptoKey | null = null;
 let cachedKeyPromise: Promise<CryptoKey | null> | null = null;
@@ -71,7 +83,7 @@ interface StoredValue {
 
 export async function secureSet(key: string, value: string, customExpiryMs?: number): Promise<void> {
   const effectiveExpiryMs = customExpiryMs ?? (
-    key.startsWith('curso_senha_') || key.startsWith('curso_access_') ? FOUR_HOURS_MS : EXPIRY_MS
+    isAlunoSessionKey(key) ? FOUR_HOURS_MS : EXPIRY_MS
   );
   const cryptoKey = await getCryptoKey();
   if (!cryptoKey) {
@@ -107,12 +119,17 @@ export async function secureGet(key: string): Promise<string | null> {
     return null;
   }
   if (parsed?.p === 'plain') {
-    const parsedPlain = JSON.parse(String(parsed.data)) as StoredValue;
-    if (typeof parsedPlain.exp !== 'number' || Date.now() > parsedPlain.exp) {
+    try {
+      const parsedPlain = JSON.parse(String(parsed.data)) as StoredValue;
+      if (typeof parsedPlain.exp !== 'number' || Date.now() > parsedPlain.exp) {
+        localStorage.removeItem(key);
+        return null;
+      }
+      return parsedPlain.v;
+    } catch {
       localStorage.removeItem(key);
       return null;
     }
-    return parsedPlain.v;
   }
   if (parsed?.p !== PREFIX) return null;
 
@@ -142,4 +159,21 @@ export async function secureGet(key: string): Promise<string | null> {
 
 export async function secureRemove(key: string): Promise<void> {
   localStorage.removeItem(key);
+}
+
+export async function clearAllAlunoSession(): Promise<void> {
+  const keysToRemove: string[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && isAlunoSessionKey(k)) {
+        keysToRemove.push(k);
+      }
+    }
+    for (const k of keysToRemove) {
+      localStorage.removeItem(k);
+    }
+  } catch (err) {
+    console.error('[secure-storage] Erro ao limpar sessao do aluno:', err);
+  }
 }
