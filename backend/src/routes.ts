@@ -5,6 +5,7 @@ import { existsSync, rmdirSync, statSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { db, purgeOldRanking } from './db';
 import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail, hashSenhaCurso, parseJsonOrNull } from './utils';
+import { escapeHtml, removerTagsHtml, renderEmailHtmlContent } from './htmlEmail';
 import {
   corrigirObjetivas,
   ajustarEstatisticas,
@@ -232,38 +233,6 @@ function normalizeJsonData(value: any): string | null {
   if (value == null) return null;
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
-}
-
-// [SEG] Escapa valor para inserção segura em contexto HTML (e-mails, atributos).
-// Previne HTML injection / stored XSS a partir de dados de alunos/professores.
-function escapeHtml(value: any): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function removerTagsHtml(valor: unknown): string {
-  return String(valor ?? '')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function renderEmailHtmlContent(text: string): string {
-  if (!text) return '';
-  if (/<[a-z][\s\S]*>/i.test(text)) {
-    return text
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-      .replace(/\son\w+="[^"]*"/gi, '')
-      .replace(/\son\w+='[^']*'/gi, '')
-      .replace(/javascript:/gi, '');
-  }
-  return escapeHtml(text).replace(/\n/g, '<br/>');
 }
 
 // [2.6] Leitura única e coesa da "senha" de acesso do aluno ao curso.

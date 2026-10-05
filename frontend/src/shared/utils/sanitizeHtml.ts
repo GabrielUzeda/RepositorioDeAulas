@@ -1,7 +1,7 @@
 export const TAGS_PERMITIDAS = new Set([
   'HTML', 'HEAD', 'BODY',
   'P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'H2', 'H3', 'H4',
-  'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'SPAN'
+  'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'SPAN', 'DIV'
 ]);
 
 const ATRIBUTOS_PERMITIDOS: Record<string, Set<string>> = {
@@ -88,7 +88,7 @@ export function htmlParaTexto(html: string | null | undefined): string {
 
 export function contemHtml(texto: string | null | undefined): boolean {
   if (!texto) return false;
-  return /<\/?(p|br|strong|b|em|i|u|s|h[2-4]|ul|ol|li|blockquote|pre|code|span)\b[^>]*>/i.test(texto);
+  return /<\/?(p|br|strong|b|em|i|u|s|h[2-4]|ul|ol|li|blockquote|pre|code|span|div)\b[^>]*>/i.test(texto);
 }
 
 export function escaparHtml(texto: string): string {

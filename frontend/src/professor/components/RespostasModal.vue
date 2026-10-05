@@ -14,6 +14,7 @@ import BaseBadge from '../../shared/components/BaseBadge.vue';
 import BaseSpinner from '../../shared/components/BaseSpinner.vue';
 import ConfirmDialog from '../../shared/components/ConfirmDialog.vue';
 import EmptyState from '../../shared/components/EmptyState.vue';
+import { sanitizarHtml, contemHtml, escaparHtml } from '@/shared/utils/sanitizeHtml';
 
 const props = defineProps<{
   show: boolean;
@@ -126,11 +127,6 @@ watch(editingFeedback, () => {
   syncCurrentResposta();
 });
 
-const ALLOWED_TAGS = new Set([
-  'P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'H2', 'H3', 'H4',
-  'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'SPAN', 'A', 'DIV'
-]);
-
 function decodeHtmlEntities(str: string): string {
   if (!str) return '';
   let current = str;
@@ -148,37 +144,11 @@ function decodeHtmlEntities(str: string): string {
 
 function sanitizeRichText(html: string): string {
   if (!html) return '<span class="text-secondary opacity-60">(Sem resposta)</span>';
-  let decoded = decodeHtmlEntities(html);
-  if (!/<[a-z][\s\S]*>/i.test(decoded)) {
-    return decoded.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+  const decoded = decodeHtmlEntities(html);
+  if (!contemHtml(decoded)) {
+    return escaparHtml(decoded).replace(/\n/g, '<br/>');
   }
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(decoded, 'text/html');
-    const sanitizeNode = (node: Node) => {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const el = node as HTMLElement;
-        if (!ALLOWED_TAGS.has(el.tagName.toUpperCase())) {
-          const parent = el.parentNode;
-          while (el.firstChild) parent?.insertBefore(el.firstChild, el);
-          parent?.removeChild(el);
-          return;
-        }
-        Array.from(el.attributes).forEach((attr) => {
-          const name = attr.name.toLowerCase();
-          const val = attr.value;
-          if (name.startsWith('on') || val.replace(/\s+/g, '').toLowerCase().includes('javascript:')) {
-            el.removeAttribute(attr.name);
-          }
-        });
-      }
-      Array.from(node.childNodes).forEach(sanitizeNode);
-    };
-    sanitizeNode(doc.body);
-    return doc.body.innerHTML;
-  } catch {
-    return decoded.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+  return sanitizarHtml(decoded);
 }
 
 function parseRespostas(raw: any): { label: string; value: string }[] {

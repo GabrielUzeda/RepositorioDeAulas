@@ -378,4 +378,69 @@ describe('Rotas que disparam e-mail', () => {
       .get(respostaId) as any;
     expect(naoMarcada.enviado_em).toBeNull();
   });
+
+  test('comprovante de resposta: HTML do aluno é sanitizado e o título da questão sai sem tags', async () => {
+    const atvComprovante = await createAtividade(dono.token, discId, {
+      tipo: 'roleta',
+      json_data: roletaJson([
+        {
+          id: 'q1',
+          content: '<p>Analise o <strong>código</strong>:</p>',
+          options: [
+            { text: '4', correct: true },
+            { text: '5', correct: false },
+          ],
+        },
+      ]),
+    });
+    expect([200, 201]).toContain(atvComprovante.res.status);
+    const atvIdComprovante = atvComprovante.id;
+
+    const respostaMaliciosa =
+      '<p>Resposta do aluno</p><script>alert("xss")</script>' +
+      '<img src=x onerror="alert(1)">' +
+      '<pre><code>if (a &lt; b) { console.log("ok"); }</code></pre>';
+
+    const antes = fake.sessions.length;
+    const submissao = await app.request(`/atividades/${atvIdComprovante}/respostas`, {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify({
+        aluno_nome: 'Aluno Comprovante',
+        aluno_email: 'aluno.comprovante@example.com',
+        enviar_email: true,
+        respostas: { q1: respostaMaliciosa },
+      }),
+    });
+    expect(submissao.status).toBe(201);
+
+    const esperarSessao = async () => {
+      for (let i = 0; i < 100 && fake.sessions.length === antes; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return fake.sessions.length > antes;
+    };
+    expect(await esperarSessao()).toBe(true);
+
+    const corpo = fake.ultima().data.replace(/=\r\n/g, '');
+    expect(fake.ultima().to).toContain('aluno.comprovante@example.com');
+
+    expect(corpo).not.toContain('<script');
+    expect(corpo).not.toContain('onerror');
+    expect(corpo).not.toContain('alert');
+
+    // Título da questão (content com HTML, sem title) sai como texto, sem tags escapadas
+    expect(corpo).toContain('Analise o c');
+    expect(corpo).not.toContain('&lt;p&gt;Analise');
+    expect(corpo).not.toContain('&lt;strong&gt;');
+
+    // Bloco de código preservado, com entidades escapadas uma única vez
+    expect(corpo).toContain('if (a &lt; b)');
+    expect(corpo).not.toContain('&amp;lt; b');
+
+    const respostaPersistida = db
+      .query('SELECT respostas FROM respostas_alunos WHERE atividade_id = ?')
+      .get(atvIdComprovante) as any;
+    expect(respostaPersistida.respostas).toBeTruthy();
+  });
 });
