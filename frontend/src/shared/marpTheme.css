@@ -352,7 +352,7 @@
 .diagram-wrapper svg {
   overflow: visible !important;
   max-width: 100% !important;
-  max-height: 55vh;
+  max-height: 42vh;
   height: auto;
   font-family: inherit;
   transform: scale(var(--font-scale, 1));
