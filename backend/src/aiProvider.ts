@@ -1,3 +1,5 @@
+import { registrarTelemetriaAi } from './aiTelemetria';
+
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -658,6 +660,7 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
   const baseRetryMs = options.retryBaseMs ?? envNumber(process.env.AI_RETRY_BASE_MS, 1000);
   const maxRepairs = options.maxRepairs ?? 1;
   let lastError = 'falha desconhecida';
+  const inicioTotal = performance.now();
 
   for (const model of models) {
     const callMaxTokens = options.maxTokens ?? config.maxTokens;
@@ -747,6 +750,16 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
               console.log(
                 `[AI-Provider] Sucesso | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | tokens_prompt: ${usage.prompt_tokens} | tokens_completion: ${usage.completion_tokens} | tokens_reasoning: ${usage.reasoning_tokens} | finish_reason: ${finishReason} | content_chars: ${contentChars} | repaired: ${repairCount}`
               );
+              registrarTelemetriaAi({
+                tarefa: options.task || 'default',
+                modelo: model,
+                prompt_chars: workingMessages.reduce((acc, m) => acc + (m.content?.length || 0), 0),
+                tokens_prompt: usage.prompt_tokens || undefined,
+                tokens_completion: usage.completion_tokens || undefined,
+                duracao_ms: Math.round(performance.now() - inicioTotal),
+                valido: true,
+                reparos: repairCount,
+              });
               return { content, modelUsed: model, repaired: repairCount };
             }
             if (options.validate && !options.validate(content)) {
@@ -759,6 +772,16 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
             console.log(
               `[AI-Provider] Sucesso | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | tokens_prompt: ${usage.prompt_tokens} | tokens_completion: ${usage.completion_tokens} | tokens_reasoning: ${usage.reasoning_tokens} | finish_reason: ${finishReason} | content_chars: ${contentChars}`
             );
+            registrarTelemetriaAi({
+              tarefa: options.task || 'default',
+              modelo: model,
+              prompt_chars: workingMessages.reduce((acc, m) => acc + (m.content?.length || 0), 0),
+              tokens_prompt: usage.prompt_tokens || undefined,
+              tokens_completion: usage.completion_tokens || undefined,
+              duracao_ms: Math.round(performance.now() - inicioTotal),
+              valido: true,
+              reparos: 0,
+            });
             return { content, modelUsed: model };
           }
 
@@ -808,5 +831,13 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
     }
   }
 
+  registrarTelemetriaAi({
+    tarefa: options.task || 'default',
+    modelo: config.model,
+    prompt_chars: options.messages.reduce((acc, m) => acc + (m.content?.length || 0), 0),
+    duracao_ms: Math.round(performance.now() - inicioTotal),
+    valido: false,
+    reparos: 0,
+  });
   throw new Error(`Falha na IA (${config.provider}/${config.model}): ${lastError}`);
 }

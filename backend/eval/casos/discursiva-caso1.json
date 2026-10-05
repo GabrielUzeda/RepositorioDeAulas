@@ -1,0 +1,14 @@
+{
+  "caso": "discursiva-com-rubrica-1",
+  "tarefa": "questoes",
+  "tipo": "normal",
+  "quantidade": 2,
+  "tema": "Estruturas de repeticao em Python",
+  "observacoes": "Questoes dissertativas com resposta esperada e rubrica avaliavel.",
+  "expectativa": {
+    "quantidade": 2,
+    "resposta_esperada_min_chars": 15,
+    "rubrica_min_criterios": 2,
+    "rubrica_pesos_100": true
+  }
+}

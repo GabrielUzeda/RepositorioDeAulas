@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "eval:ai": "bun run eval/runEval.ts"
   },
   "dependencies": {
     "@marp-team/marp-cli": "^4.0.4",

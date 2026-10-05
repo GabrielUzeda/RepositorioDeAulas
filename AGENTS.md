@@ -416,5 +416,13 @@ Itens reconhecidos e **não** implementados, com o motivo e o ponto de entrada p
 
 > Referência de armadilhas relacionadas: §10 itens 13–16 (correção objetiva não persistida, estatísticas agregadas, ranking com senha e compose dev × e2e).
 
-## 14. Backlog e Pendências de IA
-- **Validação semântica de integridade do Markdown de IA**: Implementar checagem estrutural no output gerado pela IA (fechamento correto de blocos ```, tags HTML balanceadas e presença obrigatória do slide de encerramento/fixação), disparando mecanismo de auto-retry ou fallback automático caso o modelo interrompa o texto prematuramente.
+## 14. Pipeline de qualidade de IA (implementado)
+
+> Módulos em `backend/src`: `aiProvider.ts` (reparo dirigido com `diagnose`/`maxRepairs` + modelos por tarefa `AI_MODEL_AULA|QUESTOES|AVALIACAO|SINTESE`), `aiContexto.ts` (limpeza/orçamento de Markdown para contexto), `aiQuestoes.ts` (diagnóstico de itens, normalização de rubrica e prompts de qualidade), `aiAvaliacao.ts` (correção determinística de objetivas + discursivas com anti-prompt-injection e sanitização `<resposta_aluno>`), `aiSintese.ts` (map-reduce por lotes de 8 alunos, concorrência 3, pseudonimização `A01..` e remapeamento com supressão de `Axx` no texto final), `aiAula.ts` (outline estruturado + `validarAulaMarp` por slide) e `aiTelemetria.ts` (tabela `ai_geracoes` sem PII, expurgo em `runDataRetentionPurge`).
+
+- **Pseudonimização (LGPD)**: `/ai/synthesize-class-feedback` aceita `disciplina_id` e monta os dados no backend (`relatorioTurma.obterDadosRelatorioDisciplina`); nenhum nome/e-mail de aluno vai ao prompt; o payload legado `alunos_detalhes` ainda funciona com pseudonimização no backend.
+- **Rubrica discursiva**: questões podem carregar `resposta_esperada` e `rubrica` (pesos somando 100, normalizados no backend); `stripGabarito` remove esses campos de **todos** os tipos e o `correct` apenas em normal/prova (reforço/roleta/minigame preservam `correct` para o feedback imediato do cliente).
+- **Suite de eval offline** (usa rede e custa tokens — FORA do `bun test`): `cd backend && bun run eval:ai` roda `eval/runEval.ts` contra os casos de `eval/casos/*.json`, aplicando `diagnosticarQuestoes`/`normalizarQuestoesComRubrica`/`diagnosticarOutline`/`validarAulaMarp` na saída real do provider e saindo com código 0 quando todos passam.
+
+## 15. Backlog e Pendências de IA
+- **Validação semântica de integridade do Markdown de IA**: além da checagem estrutural por slide já implementada em `aiAula.ts` (fences, `$$`, tags HTML e tipos Mermaid balanceados por slide, com reparo dirigido no `callAi`), falta detectar conteúdo truncado/sem slide de fixação no caminho por seção e plugar `validarAulaMarp` no save (`POST /marp/render`) como barreira preventiva.

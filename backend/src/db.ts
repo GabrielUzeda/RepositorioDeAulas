@@ -285,6 +285,20 @@ CREATE INDEX IF NOT EXISTS idx_curso_professores_professor ON curso_professores(
 CREATE INDEX IF NOT EXISTS idx_audit_logs_criado_em ON audit_logs(criado_em);
 CREATE INDEX IF NOT EXISTS idx_ai_jobs_status ON ai_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_ai_jobs_criado_em ON ai_jobs(criado_em);
+
+CREATE TABLE IF NOT EXISTS ai_geracoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tarefa TEXT NOT NULL,
+  modelo TEXT NOT NULL,
+  prompt_chars INTEGER NOT NULL DEFAULT 0,
+  tokens_prompt INTEGER,
+  tokens_completion INTEGER,
+  duracao_ms INTEGER NOT NULL DEFAULT 0,
+  valido INTEGER NOT NULL DEFAULT 1,
+  reparos INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ai_geracoes_tarefa_criado ON ai_geracoes(tarefa, criado_em);
 CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_professor ON rascunhos_editor(professor_id);
 CREATE INDEX IF NOT EXISTS idx_rascunhos_editor_expira_em ON rascunhos_editor(expira_em);
 CREATE INDEX IF NOT EXISTS idx_atividades_aula ON atividades(aula_id);
@@ -511,8 +525,31 @@ export function purgeOldAiJobs(days: number = 7): number {
   }
 }
 
-export async function runDataRetentionPurge(): Promise<{ respostas: number; ranking: number; ai_jobs: number }> {
-  const result = { respostas: 0, ranking: 0, ai_jobs: 0 };
+function purgeOldAiGeracoes(days: number): number {
+  try {
+    const cutoffRow = db
+      .query(`SELECT strftime('%Y-%m-%dT%H:%M:%SZ','now', ?) AS c`)
+      .get(`-${days} days`) as { c: string };
+    const cutoff = cutoffRow?.c;
+    if (!cutoff) return 0;
+
+    let totalDeleted = 0;
+    while (true) {
+      const res = db
+        .query(`DELETE FROM ai_geracoes WHERE id IN (SELECT id FROM ai_geracoes WHERE criado_em < ? LIMIT 500)`)
+        .run(cutoff);
+      totalDeleted += res.changes;
+      if (res.changes < 500) break;
+    }
+    return totalDeleted;
+  } catch (e) {
+    console.error('Erro ao expurgar telemetria de IA antiga:', e);
+    return 0;
+  }
+}
+
+export async function runDataRetentionPurge(): Promise<{ respostas: number; ranking: number; ai_jobs: number; ai_geracoes: number }> {
+  const result = { respostas: 0, ranking: 0, ai_jobs: 0, ai_geracoes: 0 };
   const raw = Number(process.env.RETENTION_DAYS);
   const days = Number.isInteger(raw) && raw > 0 ? raw : 365;
 
@@ -565,6 +602,7 @@ export async function runDataRetentionPurge(): Promise<{ respostas: number; rank
 
     result.ranking = purgeOldRanking(30);
     result.ai_jobs = purgeOldAiJobs(7);
+    result.ai_geracoes = purgeOldAiGeracoes(30);
     return result;
   } catch (e) {
     console.error('Erro no expurgo LGPD:', e);

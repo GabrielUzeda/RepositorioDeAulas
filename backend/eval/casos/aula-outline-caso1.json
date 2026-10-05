@@ -1,0 +1,10 @@
+{
+  "caso": "aula-outline-1",
+  "tarefa": "aula",
+  "tema": "Condicionais em JavaScript",
+  "observacoes": "Aula introdutoria para alunos do primeiro modulo.",
+  "expectativa": {
+    "outline_valido": true,
+    "fixacao_min": 3
+  }
+}

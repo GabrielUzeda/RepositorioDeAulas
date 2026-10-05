@@ -1,0 +1,14 @@
+{
+  "caso": "objetiva-conceitos-basicos-1",
+  "tarefa": "questoes",
+  "tipo": "normal",
+  "quantidade": 3,
+  "tema": "Variaveis e tipos de dados em Python",
+  "observacoes": "Questoes para alunos do primeiro modulo. Use um conceito por item.",
+  "expectativa": {
+    "quantidade": 3,
+    "alternativas": 4,
+    "correta_unica": true,
+    "titulos_nao_genericos": true
+  }
+}
