@@ -12,15 +12,19 @@ interface Props {
   id?: string;
   required?: boolean;
   minHeight?: string;
+  externalFullscreen?: boolean;
+  fullscreenActive?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: '',
   minHeight: '180px',
   disabled: false,
+  externalFullscreen: false,
+  fullscreenActive: false,
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'toggle-fullscreen']);
 
 const editor = ref<HTMLElement | null>(null);
 const isFullscreen = ref(false);
@@ -99,6 +103,22 @@ const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value;
 };
 
+const fullscreenIcon = computed(() =>
+  (props.externalFullscreen ? props.fullscreenActive : isFullscreen.value) ? 'fullscreen_exit' : 'fullscreen'
+);
+
+const fullscreenTitle = computed(() =>
+  (props.externalFullscreen ? props.fullscreenActive : isFullscreen.value) ? 'Sair' : 'Expandir'
+);
+
+const handleFullscreenToggle = () => {
+  if (props.externalFullscreen) {
+    emit('toggle-fullscreen');
+    return;
+  }
+  toggleFullscreen();
+};
+
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Tab') {
     e.preventDefault();
@@ -141,7 +161,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 </script>
 
 <template>
-  <div :class="['w-full', isFullscreen ? 'fixed inset-0 z-[9999] bg-surface p-4' : '']">
+  <div :class="['w-full', !props.externalFullscreen && isFullscreen ? 'fixed inset-0 z-[9999] bg-surface p-4' : '']">
     <label v-if="label" :for="editorId" class="block text-sm font-medium text-secondary mb-1">
       {{ label }} <span v-if="required" class="text-danger">*</span>
     </label>
@@ -158,8 +178,8 @@ const handleKeydown = (e: KeyboardEvent) => {
         <button type="button" @mousedown.prevent="insertCodeBlock" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Bloco de Código"><i class="material-icons text-base leading-none">code</i></button>
         <button type="button" @mousedown.prevent="exec('removeFormat')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Limpar"><i class="material-icons text-base leading-none">format_clear</i></button>
         <div class="ml-auto flex items-center">
-          <button type="button" @mousedown.prevent="toggleFullscreen" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" :title="isFullscreen ? 'Sair' : 'Expandir'">
-            <i class="material-icons text-base leading-none">{{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</i>
+          <button type="button" @mousedown.prevent="handleFullscreenToggle" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" :title="fullscreenTitle">
+            <i class="material-icons text-base leading-none">{{ fullscreenIcon }}</i>
           </button>
         </div>
       </div>
@@ -173,7 +193,7 @@ const handleKeydown = (e: KeyboardEvent) => {
         @keydown="handleKeydown"
         @focus="handleFocus"
         @blur="handleBlur"
-        :style="{ minHeight: isFullscreen ? '90vh' : minHeight }"
+        :style="{ minHeight: !props.externalFullscreen && isFullscreen ? '90vh' : minHeight }"
         class="p-4 outline-none text-primary bg-transparent rich-text-content"
         :class="[disabled ? 'opacity-50 cursor-not-allowed' : '']"
         :placeholder="placeholder"

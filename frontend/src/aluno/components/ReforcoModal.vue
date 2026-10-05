@@ -112,7 +112,8 @@ function prevQuestion() {
 <template>
   <BaseModal
     :model-value="props.show"
-    max-width="max-w-2xl"
+    max-width="max-w-5xl"
+    allow-fullscreen
     @close="emit('close')"
   >
     <template #header>
@@ -169,70 +170,75 @@ function prevQuestion() {
         </div>
       </div>
 
-      <!-- Question Body -->
-      <div v-if="currentQuestion" class="space-y-4 pt-1">
-        <h4 v-if="currentQuestion.title" class="text-base font-semibold text-accent">{{ currentQuestion.title }}</h4>
-        <RichContent :conteudo="currentQuestion.content" tag="p" class="text-primary text-base font-medium leading-relaxed" />
-
-        <!-- Option Buttons -->
-        <div class="space-y-3 pt-2">
-          <button
-            v-for="(opt, idx) in currentQuestion.options"
-            :key="idx"
-            @click="selectOption(idx)"
-            type="button"
-            :class="[
-              'w-full text-left p-4 rounded-xl border transition-all flex items-start space-x-3 text-sm font-medium',
-              currentSelectedOptionIndex === idx
-                ? isOptCorrect(opt)
-                  ? 'bg-success-light border-success text-success-text shadow-sm ring-1 ring-success'
-                  : 'bg-danger-light border-danger text-danger-text shadow-sm ring-1 ring-danger'
-                : 'bg-surface-alt border-line text-primary hover:bg-surface hover:border-line-strong'
-            ]"
-          >
-            <!-- Letter / Circle Icon -->
-            <span
-              :class="[
-                'w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 transition-colors',
-                currentSelectedOptionIndex === idx
-                  ? isOptCorrect(opt)
-                    ? 'border-success bg-success text-white'
-                    : 'border-danger bg-danger text-white'
-                  : 'border-line text-secondary'
-              ]"
-            >
-              <span v-if="currentSelectedOptionIndex === idx" class="material-icons text-[14px]">
-                {{ isOptCorrect(opt) ? 'check' : 'close' }}
-              </span>
-              <span v-else>{{ String.fromCharCode(65 + idx) }}</span>
-            </span>
-
-            <span class="flex-1 leading-relaxed">{{ opt.text }}</span>
-          </button>
+      <!-- Question Body (enunciado à esquerda, alternativas à direita) -->
+      <div v-if="currentQuestion" class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pt-1">
+        <div class="space-y-3 lg:sticky lg:top-0">
+          <h4 v-if="currentQuestion.title" class="text-base font-semibold text-accent">{{ currentQuestion.title }}</h4>
+          <RichContent :conteudo="currentQuestion.content" tag="p" class="text-primary text-base font-medium leading-relaxed" />
         </div>
 
-        <!-- Instant Feedback Box for Selected Option -->
-        <div v-if="currentSelectedOption" class="pt-2">
-          <!-- Correct Feedback -->
-          <div
-            v-if="isOptCorrect(currentSelectedOption)"
-            class="p-4 bg-success-light border-l-4 border-success text-success-text rounded-r-xl text-sm font-semibold flex items-center gap-3 animate-fade-in"
-          >
-            <span class="material-icons text-xl">check_circle</span>
-            <span>Resposta Correta!</span>
+        <div class="space-y-3">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-cat-reforco">Sua resposta</p>
+          <!-- Option Buttons -->
+          <div class="space-y-3">
+            <button
+              v-for="(opt, idx) in currentQuestion.options"
+              :key="idx"
+              @click="selectOption(idx)"
+              type="button"
+              :class="[
+                'w-full text-left p-4 rounded-xl border transition-all flex items-start space-x-3 text-sm font-medium',
+                currentSelectedOptionIndex === idx
+                  ? isOptCorrect(opt)
+                    ? 'bg-success-light border-success text-success-text shadow-sm ring-1 ring-success'
+                    : 'bg-danger-light border-danger text-danger-text shadow-sm ring-1 ring-danger'
+                  : 'bg-surface-alt border-line text-primary hover:bg-surface hover:border-line-strong'
+              ]"
+            >
+              <!-- Letter / Circle Icon -->
+              <span
+                :class="[
+                  'w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 transition-colors',
+                  currentSelectedOptionIndex === idx
+                    ? isOptCorrect(opt)
+                      ? 'border-success bg-success text-white'
+                      : 'border-danger bg-danger text-white'
+                    : 'border-line text-secondary'
+                ]"
+              >
+                <span v-if="currentSelectedOptionIndex === idx" class="material-icons text-[14px]">
+                  {{ isOptCorrect(opt) ? 'check' : 'close' }}
+                </span>
+                <span v-else>{{ String.fromCharCode(65 + idx) }}</span>
+              </span>
+
+              <span class="flex-1 leading-relaxed">{{ opt.text }}</span>
+            </button>
           </div>
 
-          <!-- Incorrect Feedback with Explanation -->
-          <div
-            v-else
-            class="p-4 bg-danger-light border-l-4 border-danger text-danger-text rounded-r-xl text-sm flex items-start gap-3 animate-fade-in"
-          >
-            <span class="material-icons text-xl mt-0.5 shrink-0">error_outline</span>
-            <div class="space-y-1">
-              <h5 class="font-bold text-xs uppercase tracking-wide">Resposta Incorreta</h5>
-              <p class="leading-relaxed text-xs">
-                {{ getOptionFeedback(currentSelectedOption, currentQuestion) }}
-              </p>
+          <!-- Instant Feedback Box for Selected Option -->
+          <div v-if="currentSelectedOption">
+            <!-- Correct Feedback -->
+            <div
+              v-if="isOptCorrect(currentSelectedOption)"
+              class="p-4 bg-success-light border-l-4 border-success text-success-text rounded-r-xl text-sm font-semibold flex items-center gap-3 animate-fade-in"
+            >
+              <span class="material-icons text-xl">check_circle</span>
+              <span>Resposta Correta!</span>
+            </div>
+
+            <!-- Incorrect Feedback with Explanation -->
+            <div
+              v-else
+              class="p-4 bg-danger-light border-l-4 border-danger text-danger-text rounded-r-xl text-sm flex items-start gap-3 animate-fade-in"
+            >
+              <span class="material-icons text-xl mt-0.5 shrink-0">error_outline</span>
+              <div class="space-y-1">
+                <h5 class="font-bold text-xs uppercase tracking-wide">Resposta Incorreta</h5>
+                <p class="leading-relaxed text-xs">
+                  {{ getOptionFeedback(currentSelectedOption, currentQuestion) }}
+                </p>
+              </div>
             </div>
           </div>
         </div>

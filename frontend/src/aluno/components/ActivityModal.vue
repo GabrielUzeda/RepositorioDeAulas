@@ -42,6 +42,11 @@ const { success } = useToast();
 const totalSteps = computed(() => questionsList.value.length + 2); // 0 (ID), 1..N (Perguntas), N+1 (Revisão)
 const progress = computed(() => ((currentStep.value) / (totalSteps.value - 1)) * 100);
 
+const isQuestionStep = computed(() => currentStep.value >= 1 && currentStep.value <= questionsList.value.length);
+const modalMaxWidth = computed(() => (isQuestionStep.value ? 'max-w-6xl' : 'max-w-4xl'));
+const modalFullscreen = ref(false);
+
+
 const deadlineInfo = computed(() => {
   if (!props.atividade?.data_limite) return null;
   const deadlineDate = new Date(props.atividade.data_limite);
@@ -351,8 +356,10 @@ async function handleSubmit() {
 
 <template>
   <BaseModal
+    v-model:fullscreen="modalFullscreen"
     :model-value="props.show && !!props.atividade"
-    max-width="max-w-4xl"
+    :max-width="modalMaxWidth"
+    allow-fullscreen
     @close="emit('close')"
   >
     <template #header>
@@ -479,10 +486,11 @@ async function handleSubmit() {
         </div>
       </div>
 
-      <div v-else-if="currentStep <= questionsList.length" class="space-y-4">
+      <div v-else-if="currentStep <= questionsList.length">
         <template v-for="(q, idx) in questionsList" :key="idx">
-          <div v-if="currentStep === idx + 1" class="space-y-4">
-            <div class="space-y-1.5">
+          <div v-if="currentStep === idx + 1" class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <!-- Enunciado (esquerda) -->
+            <div class="space-y-3 lg:sticky lg:top-0">
               <h3 class="font-bold text-base text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</h3>
               <RichContent
                 v-if="q.content && q.content !== q.title"
@@ -497,24 +505,31 @@ async function handleSubmit() {
                 class="text-sm text-secondary leading-relaxed"
               />
             </div>
-            
-            <div v-if="q.options && q.options.length > 0" class="grid gap-2">
-              <button
-                v-for="opt in q.options" :key="opt.text"
-                type="button"
-                @click="selectOption(getQuestionKey(q, idx), opt.text)"
-                :class="['w-full text-left px-4 py-3 rounded-xl border', respostasMap[getQuestionKey(q, idx)] === opt.text ? 'border-accent bg-surface-alt' : 'border-line']"
-              >
-                {{ opt.text }}
-              </button>
+
+            <!-- Resposta (direita) -->
+            <div class="space-y-3">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-accent">Sua resposta</p>
+
+              <div v-if="q.options && q.options.length > 0" class="grid gap-2">
+                <button
+                  v-for="opt in q.options" :key="opt.text"
+                  type="button"
+                  @click="selectOption(getQuestionKey(q, idx), opt.text)"
+                  :class="['w-full text-left px-4 py-3 rounded-xl border transition-colors', respostasMap[getQuestionKey(q, idx)] === opt.text ? 'border-accent bg-surface-alt ring-1 ring-accent' : 'border-line hover:bg-surface-alt']"
+                >
+                  {{ opt.text }}
+                </button>
+              </div>
+
+              <RichTextEditor
+                v-else
+                v-model="respostasMap[getQuestionKey(q, idx)]"
+                external-fullscreen
+                :fullscreen-active="modalFullscreen"
+                @update:model-value="handleSaveDraft"
+                @toggle-fullscreen="modalFullscreen = !modalFullscreen"
+              />
             </div>
-            
-            <RichTextEditor
-              v-else
-              v-model="respostasMap[getQuestionKey(q, idx)]"
-              @update:model-value="handleSaveDraft"
-              label="Sua resposta:"
-            />
           </div>
         </template>
       </div>
@@ -535,11 +550,11 @@ async function handleSubmit() {
               </div>
               <BaseButton size="sm" variant="ghost" @click="currentStep = idx + 1">Editar</BaseButton>
             </div>
-            <div
+            <RichContent
               v-if="respostasMap[getQuestionKey(q, idx)]"
-              class="text-sm text-secondary bg-surface p-3 rounded-lg border border-line prose prose-sm max-w-none dark:prose-invert"
-              v-html="respostasMap[getQuestionKey(q, idx)]"
-            ></div>
+              :conteudo="respostasMap[getQuestionKey(q, idx)]"
+              class="text-sm text-secondary bg-surface p-3 rounded-lg border border-line"
+            />
             <p v-else class="text-sm text-muted italic">Não respondida</p>
           </div>
         </div>

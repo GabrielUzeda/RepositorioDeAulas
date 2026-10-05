@@ -174,7 +174,7 @@ test.describe('Sanitização de conteúdo não confiável no navegador (allowlis
     await expect(page.getByText(/Total de Envios: \d+/)).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Respostas Submetidas:')).toBeVisible({ timeout: 10000 });
 
-    const respostaRenderizada = modalRespostas.locator('[class*="[&_pre]"]').first();
+    const respostaRenderizada = modalRespostas.locator('[data-testid="resposta-aluno"]').first();
     await expect(respostaRenderizada).toContainText('Resposta do aluno com');
     await expect(respostaRenderizada.locator('strong')).toHaveText('negrito');
     await expect(respostaRenderizada.locator('pre code')).toContainText('while (x > 0)');

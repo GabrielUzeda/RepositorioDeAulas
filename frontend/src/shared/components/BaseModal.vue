@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -8,27 +8,36 @@ const props = withDefaults(
     maxWidth?: string
     noPadding?: boolean
     allowFullscreen?: boolean
+    fullscreen?: boolean
   }>(),
   {
     maxWidth: 'max-w-2xl',
     noPadding: false,
     allowFullscreen: false,
+    fullscreen: undefined,
   }
 )
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
+  'update:fullscreen': [value: boolean]
   'close': []
 }>()
 
-const isFullscreen = ref(false)
+const internalFullscreen = ref(false)
+const isFullscreen = computed(() => props.fullscreen ?? internalFullscreen.value)
+
+function setFullscreen(value: boolean) {
+  internalFullscreen.value = value
+  emit('update:fullscreen', value)
+}
 
 function toggleFullscreen() {
-  isFullscreen.value = !isFullscreen.value
+  setFullscreen(!isFullscreen.value)
 }
 
 function fechar() {
-  isFullscreen.value = false
+  setFullscreen(false)
   emit('update:modelValue', false)
   emit('close')
 }
@@ -39,6 +48,13 @@ function onKeydown(event: KeyboardEvent) {
 
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+watch(
+  () => props.modelValue,
+  (val) => {
+    if (!val && isFullscreen.value) setFullscreen(false)
+  }
+)
 </script>
 
 <template>

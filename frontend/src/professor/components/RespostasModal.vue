@@ -362,12 +362,15 @@ function scoreColor(nota: number | null | undefined) {
   if (nota >= 50) return 'text-accent';
   return 'text-danger';
 }
+
+const richAnswerClass =
+  'text-sm text-primary leading-relaxed max-w-none [&_h2]:text-lg [&_h2]:font-bold [&_h2]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-accent [&_blockquote]:pl-3 [&_blockquote]:italic [&_pre]:bg-surface-alt [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:font-mono [&_pre]:text-xs [&_pre]:border [&_pre]:border-line [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_p]:mb-2.5 [&_p:last-child]:mb-0';
 </script>
 
 <template>
   <BaseModal
     :model-value="props.show"
-    max-width="max-w-6xl"
+    max-width="max-w-7xl"
     allow-fullscreen
     no-padding
     @close="emit('close')"
@@ -594,7 +597,7 @@ function scoreColor(nota: number | null | undefined) {
               </div>
             </div>
 
-            <!-- Respostas por pergunta -->
+            <!-- Respostas por pergunta (enunciado à esquerda, resposta à direita) -->
             <div class="px-5 py-4 space-y-3">
               <h5 class="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
                 <span class="material-icons text-sm text-accent">forum</span>
@@ -608,12 +611,17 @@ function scoreColor(nota: number | null | undefined) {
               >
                 <div class="flex items-center gap-2 px-4 py-2 bg-surface-alt border-b border-line">
                   <span class="px-2 py-0.5 bg-accent/15 text-accent rounded-md text-xs font-bold shrink-0">Q{{ idx + 1 }}</span>
-                  <span class="text-xs font-medium text-primary leading-snug">{{ item.label }}</span>
                 </div>
-                <div
-                   class="px-4 py-3 bg-surface text-sm text-primary leading-relaxed border-t border-line/40 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-accent [&_blockquote]:pl-3 [&_blockquote]:italic [&_pre]:bg-surface-alt [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:font-mono [&_pre]:text-xs [&_pre]:border [&_pre]:border-line [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_p]:mb-2.5 [&_p:last-child]:mb-0 max-w-none"
-                  v-html="sanitizeRichText(item.value)"
-                ></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-line">
+                  <div class="px-4 py-3 bg-surface-alt/60">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-secondary mb-2">Pergunta</p>
+                    <div :class="richAnswerClass" v-html="sanitizeRichText(item.label)"></div>
+                  </div>
+                  <div class="px-4 py-3 bg-surface">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-accent mb-2">Resposta do aluno</p>
+                    <div data-testid="resposta-aluno" :class="richAnswerClass" v-html="sanitizeRichText(item.value)"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
