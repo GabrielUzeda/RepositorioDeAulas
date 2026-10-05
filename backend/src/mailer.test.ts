@@ -331,7 +331,10 @@ describe('Rotas que disparam e-mail', () => {
     const avaliacao = await app.request(`/respostas/${respostaId}/avaliacao`, {
       method: 'PUT',
       headers: jsonHeaders(dono.token),
-      body: JSON.stringify({ nota: 90, feedback: 'Bom trabalho' }),
+      body: JSON.stringify({
+        nota: 90,
+        feedback: '<b>Bom</b> trabalho<script>alert("feedback-xss")</script><img src=x onerror="alert(1)">',
+      }),
     });
     expect(avaliacao.status).toBe(200);
 
@@ -346,6 +349,13 @@ describe('Rotas que disparam e-mail', () => {
     expect(comSmtpBody.enviados).toBe(1);
     expect(fake.sessions.length).toBe(antes + 1);
     expect(fake.ultima().to).toContain('aluno.email@example.com');
+
+    const corpoFeedback = fake.ultima().data.replace(/=\r\n/g, '');
+    expect(corpoFeedback).toContain('Bom');
+    expect(corpoFeedback).toContain('trabalho');
+    expect(corpoFeedback).not.toContain('<script');
+    expect(corpoFeedback).not.toContain('onerror');
+    expect(corpoFeedback).not.toContain('feedback-xss');
 
     const marcada = db
       .query('SELECT enviado_em FROM respostas_alunos WHERE id = ?')

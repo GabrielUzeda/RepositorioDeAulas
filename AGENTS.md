@@ -267,7 +267,7 @@ O sistema suporta 4 tipos principais de atividades interativas (armazenadas na c
 ## 9. Testes E2E (Playwright via Docker — caminho oficial)
 
 ### Escopo
-Há 18 specs em `e2e/tests/` (45 testes). Status verificados (todos 100% passando).
+Há 19 specs em `e2e/tests/` (47 testes). Status verificados (todos 100% passando).
 
 > **Revisão de seletores (2026-09-23):** a suíte estava com 3 falhas por rótulos desatualizados (não por bug de produto). Corrigido em `melhorias-recentes.spec.ts` e `fluxo-completo.spec.ts`: título do editor é **'Nova Atividade Interativa'** (não "Editor de Atividade Interativa"), botão de questão é **'Adicionar Pergunta'**, modo split é **'Lado a Lado'**, botão do RAG é **'Anexar Documento Geral do Curso'/'Anexar Documento da Disciplina'**, o campo de enunciado usa `placeholder="Digite o enunciado completo da questão para o aluno..."`, a aba do aluno é `role="tab"` (**não** button), a média aparece como **'Média da Disciplina: N/100'** ("N/100" sozinho casa 2 elementos → use o texto com prefixo) e o clique na disciplina deve mirar o `h3` **pelo nome** (`.first()` corre corrida com o card do curso). Fechar o modal RAG: `getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true })`.
 
@@ -282,6 +282,7 @@ Há 18 specs em `e2e/tests/` (45 testes). Status verificados (todos 100% passand
 | `aluno-lgpd.spec.ts` | ✅ atual | Direito de consulta e exclusão de dados do aluno conforme LGPD |
 | `atividade-conteudo.spec.ts` | ✅ atual | Descrição da atividade, título e descrições individuais de cada pergunta |
 | `atividade-conteudo-rico.spec.ts` | ✅ **novo** | Enunciado com formatação rica: código em `<pre><code>` renderizado para o aluno (sem tags literais) e restaurado no `RichTextEditor`/prévia do professor |
+| `sanitizacao-conteudo.spec.ts` | ✅ **novo** | Allowlist real no navegador: `<script>`, `<img onerror>` e `href="javascript:"` neutralizados no enunciado (aluno) e na resposta do aluno vista no `RespostasModal`, com a formatação permitida preservada e nenhum `alert()` disparado |
 | `gestao-avancada-e-estatisticas.spec.ts` | ✅ atual | Estatísticas agregadas da turma, alternância de status de disciplina/atividade, rascunhos no aluno, prova que não vaza gabarito no endpoint público, senha de curso e LGPD por submissão |
 | `atividade-fluxo.spec.ts` | ✅ atual | Fluxo de rascunhos do professor no editor e resolução do aluno |
 | `atividade-ia.spec.ts` | ✅ **atualizado** | Painel do gerador de atividades por IA integrado na aba Geral |
