@@ -7,7 +7,11 @@ process.env.FRONTEND_STATIC_DIR = testStatic;
 mkdirSync(testStatic, { recursive: true });
 
 const testDb = process.env.DATABASE_PATH || './data/test.db';
-const pareceBancoDeTeste = path.basename(testDb).toLowerCase().includes('test');
+const pareceBancoDeTeste =
+  path.basename(testDb).toLowerCase().includes('test') ||
+  testDb.startsWith('/tmp/') ||
+  testDb.startsWith(os.tmpdir()) ||
+  testDb.toLowerCase().includes('test');
 
 if (!pareceBancoDeTeste && process.env.ALLOW_TEST_DB_RESET !== 'true') {
   console.error(

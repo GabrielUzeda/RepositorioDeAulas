@@ -191,9 +191,12 @@ function normalizeQuestion(q: any): Question {
   }
   if (q?.type === 'text') options = undefined;
   return {
+    ...(q?.id !== undefined ? { id: q.id } : {}),
     title: String(q?.title ?? ''),
     content: String(q?.content ?? ''),
-    ...(options ? { options } : {})
+    ...(options ? { options } : {}),
+    ...(typeof q?.resposta_esperada === 'string' ? { resposta_esperada: q.resposta_esperada } : {}),
+    ...(Array.isArray(q?.rubrica) ? { rubrica: q.rubrica } : {})
   };
 }
 
@@ -409,6 +412,16 @@ function removeOption(qIndex: number, oIndex: number) {
 function setCorrectOption(qIndex: number, oIndex: number) {
   const opts = questions.value[qIndex].options;
   if (opts) opts.forEach((o, idx) => { o.correct = idx === oIndex; });
+}
+
+function addRubricaCriterio(qIndex: number) {
+  const q = questions.value[qIndex];
+  if (!q.rubrica) q.rubrica = [];
+  q.rubrica.push({ criterio: '', peso: 1, descricao: '' });
+}
+
+function removeRubricaCriterio(qIndex: number, rIndex: number) {
+  questions.value[qIndex].rubrica?.splice(rIndex, 1);
 }
 
 async function handleClearAll() {
@@ -964,6 +977,65 @@ async function handleDeleteDraft(draftId: number) {
                     >
                       <span class="material-icons text-sm">close</span>
                     </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Seção para questões sem opções (discursivas, normal/prova sem alternativas) -->
+              <div v-if="!usesOptions" class="space-y-4 pt-4 border-t border-line">
+                <div class="flex flex-col gap-1.5">
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-secondary">Resposta Esperada / Gabarito Discursivo</label>
+                  <BaseTextarea
+                    v-model="activeQuestion.resposta_esperada"
+                    :rows="4"
+                    class="w-full font-sans text-sm leading-relaxed"
+                    placeholder="Digite a resposta esperada ou gabarito de referência para correção..."
+                  />
+                </div>
+
+                <div class="space-y-3">
+                  <div class="flex justify-between items-center">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-secondary">Critérios de Rubrica (Correção)</label>
+                    <BaseButton variant="ghost" size="sm" @click="addRubricaCriterio(activeQIndex)">
+                      <span class="material-icons text-xs mr-1">add</span> + Adicionar Critério
+                    </BaseButton>
+                  </div>
+
+                  <div class="space-y-2">
+                    <div
+                      v-for="(rub, rIndex) in activeQuestion.rubrica"
+                      :key="rIndex"
+                      class="flex items-start gap-3 p-3 rounded-lg border border-line bg-surface"
+                    >
+                      <div class="flex-1 min-w-0 space-y-2">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <input
+                            v-model="rub.criterio"
+                            placeholder="Nome do critério (ex: Clareza)"
+                            class="sm:col-span-2 bg-surface-alt px-3.5 py-2 rounded-md border border-line text-primary text-xs outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                          />
+                          <input
+                            type="number"
+                            v-model.number="rub.peso"
+                            placeholder="Peso"
+                            class="bg-surface-alt px-3.5 py-2 rounded-md border border-line text-primary text-xs outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                          />
+                        </div>
+                        <input
+                          v-model="rub.descricao"
+                          placeholder="Descrição detalhada do nível de atendimento do critério..."
+                          class="w-full bg-surface-alt px-3.5 py-1.5 rounded-md border border-line text-secondary text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        class="p-1 text-secondary hover:text-danger rounded hover:bg-surface-alt transition-colors shrink-0 mt-1"
+                        title="Remover critério"
+                        @click="removeRubricaCriterio(activeQIndex, rIndex)"
+                      >
+                        <span class="material-icons text-sm">close</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

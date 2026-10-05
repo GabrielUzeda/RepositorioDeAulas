@@ -182,25 +182,31 @@ function mapAtividade(row: any) {
   return out;
 }
 
-function stripGabarito(row: any): any {
+export function stripGabarito(row: any): any {
   if (row == null) return row;
   const out = { ...row };
   delete out.senha;
   if (out.json_data == null) return out;
   try {
-    const parsed = typeof out.json_data === 'string' ? JSON.parse(out.json_data) : out.json_data;
+    const rawParsed = typeof out.json_data === 'string' ? JSON.parse(out.json_data) : out.json_data;
+    const parsed = JSON.parse(JSON.stringify(rawParsed));
     const type = row.tipo || parsed?.meta?.type || parsed?.type;
-    if (type === 'reforco' || type === 'roleta' || type === 'minigame') return out;
+    const preservaGabarito = type === 'reforco' || type === 'roleta' || type === 'minigame';
     if (parsed && Array.isArray(parsed.questions)) {
       for (const q of parsed.questions) {
-        if (q && Array.isArray(q.options)) {
-          for (const opt of q.options) {
-            if (opt && typeof opt === 'object') delete opt.correct;
+        if (q && typeof q === 'object') {
+          delete q.resposta_esperada;
+          delete q.rubrica;
+          if (!preservaGabarito && Array.isArray(q.options)) {
+            for (const opt of q.options) {
+              if (opt && typeof opt === 'object') delete opt.correct;
+            }
           }
         }
       }
-      out.json_data = JSON.stringify(parsed);
     }
+    out.json_data = JSON.stringify(parsed);
+    if (preservaGabarito) return out;
   } catch {
     return out;
   }

@@ -4,7 +4,14 @@ import { db } from './db';
 import { decryptData, parseJsonOrNull } from './utils';
 import { callAi, resolveConfig, resolveProvider, modelsUrl, type AiMessage } from './aiProvider';
 import { obterContextoDocumentosSobDemanda } from './documentIndexer';
+import { markdownParaContexto, distribuirOrcamentoContexto } from './aiContexto';
+import {
+  diagnosticarQuestoes,
+  normalizarQuestoesComRubrica,
+  montarPromptQuestoes,
+} from './aiQuestoes';
 import { getJob, cancelJob, createJob, registerJobProcessor, type JobCheckpointFn } from './aiJobs';
+import { executarAvaliacaoEmLote } from './aiAvaliacao';
 
 const aiRouter = new Hono();
 
@@ -142,6 +149,10 @@ aiRouter.get('/models', professorAuth, async (c) => {
 
 function extractQuestions(parsed: any): any[] {
   if (Array.isArray(parsed?.questions)) return parsed.questions;
+  if (Array.isArray(parsed?.perguntas)) return parsed.perguntas;
+  if (Array.isArray(parsed?.questoes)) return parsed.questoes;
+  if (Array.isArray(parsed?.itens)) return parsed.itens;
+  if (Array.isArray(parsed?.data)) return parsed.data;
   if (Array.isArray(parsed)) return parsed;
   return [];
 }
@@ -237,12 +248,7 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     }
 
     if (aulas.length > 0) {
-      aulasContexto = aulas
-        .map(
-          (a, idx) =>
-            `--- AULA ${idx + 1}: ${a.titulo} ---\n${(a.conteudo_md || '').slice(0, 15000)}`
-        )
-        .join('\n\n');
+      aulasContexto = distribuirOrcamentoContexto(aulas, 30000);
     }
   }
 
@@ -272,102 +278,16 @@ aiRouter.post('/generate-activity', professorAuth, async (c) => {
     });
   }
 
-  const isDiscursive = tipo === 'normal' || tipo === 'prova';
-
-  const tipoInstrucao: Record<string, string> = {
-    normal:
-      'Atividade Discursiva (Normal): Crie questões abertas e dissertativas. NÃO gere alternativas. Cada questão deve ter apenas um enunciado claro que o aluno responderá com texto livre.',
-    prova:
-      'Prova Discursiva: Crie questões dissertativas formais e rigorosas, sem alternativas. Cada questão deve exigir uma resposta elaborada e contextualizada do aluno.',
-    minigame:
-      'Minigame de Naves: Questões com enunciado direto e objetivo, com 4 alternativas curtas. NÃO inclua feedbacks nas alternativas (apenas text e correct).',
-    roleta:
-      'Roleta do Conhecimento: Perguntas instigantes e dinâmicas de múltipla escolha com 4 alternativas e feedback explicativo.',
-    reforco:
-      'Reforço Pedagógico: Questões formativas com 4 alternativas, onde cada alternativa incorreta explica claramente o equívoco no feedback pedagógico para auxiliar a fixação.',
-  };
-
-  const selectedTipoInstrucao = tipoInstrucao[tipo] || tipoInstrucao.normal;
-
-  const formatoJson = isDiscursive
-    ? `{
-  "questions": [
-    {
-      "title": "Conceito Central / Tópico Abordado",
-      "content": "Enunciado claro e detalhado da questão dissertativa aqui..."
-    }
-  ]
-}`
-    : tipo === 'minigame'
-      ? `{
-  "questions": [
-    {
-      "title": "Conceito Central / Tópico Abordado",
-      "content": "Enunciado direto e objetivo da questão aqui...",
-      "options": [
-        { "text": "Alternativa A", "correct": false },
-        { "text": "Alternativa B", "correct": false },
-        { "text": "Alternativa C", "correct": true },
-        { "text": "Alternativa D", "correct": false }
-      ]
-    }
-  ]
-}`
-      : `{
-  "questions": [
-    {
-      "title": "Conceito Central / Tópico Abordado",
-      "content": "Enunciado claro e detalhado da questão aqui...",
-      "options": [
-        { "text": "Texto da alternativa A", "correct": false, "feedback": "Justificativa pedagógica" },
-        { "text": "Texto da alternativa B", "correct": true, "feedback": "Justificativa pedagógica" },
-        { "text": "Texto da alternativa C", "correct": false, "feedback": "Justificativa pedagógica" },
-        { "text": "Texto da alternativa D", "correct": false, "feedback": "Justificativa pedagógica" }
-      ]
-    }
-  ]
-}`;
-
-  const systemPrompt = `Você é um assistente pedagógico de elite para professores do ensino técnico e superior.
-Sua missão é gerar atividades avaliativas interativas de alta qualidade com base no conteúdo das aulas ministradas pelo professor.
-
-DIRETRIZES FUNDAMENTAIS:
-1. Mantenha todas as questões estritamente alinhadas ao conteúdo, conceitos, nomenclaturas e exemplos fornecidos no contexto das aulas.
-2. Não invente conceitos fora do escopo do material didático fornecido.
-3. Se observações específicas do professor forem passadas, siga-as com prioridade.
-4. Tipo de Atividade solicitada: "${tipo}" (${selectedTipoInstrucao}).
-5. Crie exatamente ${quantidade} questões.
-6. A resposta DEVE ser estritamente um objeto JSON válido no formato especificado, sem blocos de código Markdown ao redor, sem texto antes ou depois.
-7. DIRETRIZ OBRIGATÓRIA DE NOMENCLATURA: O campo "title" de cada questão DEVE conter o TEMA ou CONCEITO ESPECÍFICO avaliado (ex: "Declaração de Variáveis e Tipagem", "Recursão e Pilha de Chamadas", "Tratamento de Exceções em Python"). NUNCA use "Questão 1", "Questão 2", "Pergunta 1" ou títulos genéricos vazios.
-${isDiscursive ? '8. IMPORTANTE: questões discursivas NÃO possuem alternativas. Gere apenas "title" e "content" por questão.' : ''}
-
-FORMATO JSON OBRIGATÓRIO:
-${formatoJson}`;
-
-  let userPrompt = `TEMA PRINCIPAL: ${tema || titulo || 'Conteúdo das aulas fornecidas'}\n`;
-  if (titulo) userPrompt += `TÍTULO DA ATIVIDADE: ${titulo}\n`;
-  if (observacoes) userPrompt += `OBSERVAÇÕES DO PROFESSOR: ${observacoes}\n`;
-  userPrompt += `QUANTIDADE DE QUESTÕES: ${quantidade}\n`;
-
-  if (aulasContexto) {
-    userPrompt += `\nCONTEÚDO DAS AULAS VINCULADAS:\n${aulasContexto}\n`;
-  } else {
-    userPrompt += `\n(Gere as questões com base no tema informado, mantendo rigor técnico e pedagógico.)\n`;
-  }
-
-  if (docsContexto) {
-    userPrompt += `\nDOCUMENTOS ORIENTADORES DA DISCIPLINA (EMENTA / PLANO DE ENSINO / DIRETRIZES):\n${docsContexto}\n`;
-  }
-
-  if (Array.isArray(questoes_existentes) && questoes_existentes.length > 0) {
-    userPrompt += `\nQUESTÕES JÁ EXISTENTES NESTA ATIVIDADE (É EXPRESSAMENTE PROIBIDO REPETIR ESTES ENUNCIADOS OU CONCEITOS):\n`;
-    questoes_existentes.forEach((q: { title?: string; content?: string }, i: number) => {
-      userPrompt += `${i + 1}. [${q.title || ''}] ${q.content || ''}\n`;
-    });
-    userPrompt += `\nGere ${quantidade} novas questões INÉDITAS, que complementem o aprendizado sem sobrepor o que já foi perguntado acima.\n`;
-  }
-
-  userPrompt += `\nGere as ${quantidade} questões no formato JSON especificado.`;
+  const { systemPrompt, userPrompt } = montarPromptQuestoes({
+    tipo,
+    titulo,
+    tema,
+    observacoes,
+    quantidade,
+    aulasContexto,
+    docsContexto,
+    questoes_existentes,
+  });
 
   let content = '';
   let modeloUtilizado = '';
@@ -380,7 +300,10 @@ ${formatoJson}`;
       messages,
       temperature: 0.3,
       timeoutMs: 180000,
-      validate: (content) => parseActivityQuestions(content).length > 0,
+      validate: (content) => {
+        const q = parseActivityQuestions(content);
+        return q.length > 0 && diagnosticarQuestoes(q, { qtdSolicitada: quantidade, tipo }).length === 0;
+      },
     });
     content = result.content;
     modeloUtilizado = result.modelUsed;
@@ -400,36 +323,7 @@ ${formatoJson}`;
     return c.json({ success: false, error: 'A IA respondeu sem o formato JSON esperado' }, 502);
   }
 
-  const normalizedQuestions = parsedQuestions.map((q: any, index: number) => {
-    const result: any = {
-      title: String(q.title || `Questão ${index + 1}`),
-      content: String(q.content || q.enunciado || q.pergunta || '').trim(),
-    };
-
-    if (!isDiscursive) {
-      const rawOptions = Array.isArray(q.options)
-        ? q.options
-        : Array.isArray(q.alternativas)
-          ? q.alternativas
-          : [];
-      const options = rawOptions.map((opt: any) => ({
-        text: String(opt.text || opt.label || opt.opcao || '').trim(),
-        correct: Boolean(opt.correct || opt.isCorrect || opt.correta),
-        feedback: tipo === 'minigame' ? '' : String(opt.feedback || opt.justificativa || '').trim(),
-      }));
-
-      const hasCorrect = options.some((o: any) => o.correct);
-      if (!hasCorrect && options.length > 0) {
-        options[0].correct = true;
-      }
-
-      if (options.length > 0) {
-        result.options = options;
-      }
-    }
-
-    return result;
-  });
+  const normalizedQuestions = normalizarQuestoesComRubrica(parsedQuestions, tipo);
 
   return c.json({
     success: true,
@@ -439,11 +333,40 @@ ${formatoJson}`;
   });
 });
 
-function normalizeMarpMarkdown(content: string): string {
-  return content
+export function repairRawHtmlBlocks(content: string): string {
+  const tagPatterns: Array<{ open: RegExp; close: RegExp; tag: string }> = [
+    { open: /<style\b[^>]*>/gi, close: /<\/style>/gi, tag: 'style' },
+    { open: /<script\b[^>]*>/gi, close: /<\/script>/gi, tag: 'script' },
+    { open: /<template\b[^>]*>/gi, close: /<\/template>/gi, tag: 'template' },
+    { open: /<textarea\b[^>]*>/gi, close: /<\/textarea>/gi, tag: 'textarea' },
+  ];
+  let result = content;
+  for (const { open, close, tag } of tagPatterns) {
+    const openCount = (result.match(open) || []).length;
+    const closeCount = (result.match(close) || []).length;
+    if (openCount > closeCount) {
+      result += `\n</${tag}>\n`;
+    }
+  }
+  return result;
+}
+
+export function repairUnclosedCodeBlocks(content: string): string {
+  const matches = content.match(/```/g);
+  if (matches && matches.length % 2 !== 0) {
+    return `${content}\n\`\`\`\n`;
+  }
+  return content;
+}
+
+export function normalizeMarpMarkdown(content: string): string {
+  let cleaned = content
     .replace(/^```(?:markdown|md)?\s*/i, '')
     .replace(/\s*```\s*$/, '')
     .trim();
+  cleaned = repairUnclosedCodeBlocks(cleaned);
+  cleaned = repairRawHtmlBlocks(cleaned);
+  return cleaned;
 }
 
 export async function generateAulaOutlineAndContent(options: {
@@ -596,7 +519,7 @@ Responda em formato estruturado (JSON ou Markdown claro detalhando o outline).`;
     });
     outlineResult = pRes.content;
     modeloUtilizado = pRes.modelUsed;
-  } catch (e: any) {
+  } catch (_e: any) {
     outlineResult = tema || 'Outline gerado automaticamente';
   }
 
@@ -908,125 +831,11 @@ export async function handleEvaluateActivityResponses(c: Context, forcedAtividad
     if (!hasPerm) return c.text('Access denied', 403);
   }
 
-  const rows = db
-    .query(
-      'SELECT id, respostas, nota, feedback FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em ASC'
-    )
-    .all(atividade_id) as any[];
-
-  if (rows.length === 0) {
-    return c.json({
-      success: true,
-      total: 0,
-      avaliados: 0,
-      falhas_count: 0,
-      sucessos: [],
-      falhas: [],
-      avaliacoes: [],
-    });
-  }
-
-  let questions: any[] = [];
-  if (atv.json_data) {
-    try {
-      const data = typeof atv.json_data === 'string' ? JSON.parse(atv.json_data) : atv.json_data;
-      questions = data.questions || [];
-    } catch {
-      questions = [];
-    }
-  }
-
+  const escopo = body.escopo === 'todas' ? 'todas' : 'pendentes';
   const observacoes = typeof body.observacoes === 'string' ? body.observacoes.trim() : undefined;
   const severidade = typeof body.severidade === 'string' ? body.severidade.trim() : 'moderado';
 
-  const sucessos: any[] = [];
-  const falhas: any[] = [];
-
-  const CONCURRENCY = 3;
-  for (let i = 0; i < rows.length; i += CONCURRENCY) {
-    const chunk = rows.slice(i, i + CONCURRENCY);
-    await Promise.all(
-      chunk.map(async (row) => {
-        try {
-          const decryptedRespostas = await decryptData(row.respostas);
-
-          let mapObj: Record<string, unknown> | null = null;
-          if (typeof decryptedRespostas === 'string') {
-            try {
-              const parsed = JSON.parse(decryptedRespostas);
-              if (typeof parsed === 'object' && parsed !== null) mapObj = parsed;
-            } catch {
-              mapObj = null;
-            }
-          } else if (typeof decryptedRespostas === 'object' && decryptedRespostas !== null) {
-            mapObj = decryptedRespostas;
-          }
-
-          let questoesTexto = '';
-          let respostasTexto = '';
-
-          if (mapObj) {
-            const entries = Object.entries(mapObj);
-            questoesTexto = entries
-              .map(([key]) => {
-                const qIdx = Number(key);
-                const q = !isNaN(qIdx) ? questions[qIdx] : null;
-                return `Questão ${isNaN(qIdx) ? key : qIdx + 1}: ${q?.content || q?.title || `Questão ${isNaN(qIdx) ? key : qIdx + 1}`}`;
-              })
-              .join('\n\n');
-            respostasTexto = entries
-              .map(([_key, val], idx) => `Resposta ${idx + 1}: ${String(val)}`)
-              .join('\n\n');
-          } else {
-            questoesTexto = atv.titulo + (atv.descricao ? `\n${atv.descricao}` : '');
-            respostasTexto = String(decryptedRespostas || '');
-          }
-
-          const evalRes = await evaluateStudentResponse({
-            questao_enunciado: questoesTexto || atv.titulo || 'Atividade',
-            resposta_aluno: respostasTexto || '(Sem resposta)',
-            criterios: atv.descricao || undefined,
-            observacoes,
-            severidade,
-          });
-
-          db.query('UPDATE respostas_alunos SET nota = ?, feedback = ? WHERE id = ?').run(
-            evalRes.nota_sugerida,
-            evalRes.feedback,
-            row.id
-          );
-
-          sucessos.push({
-            id: row.id,
-            nota: evalRes.nota_sugerida,
-            feedback: evalRes.feedback,
-            justificativa: evalRes.justificativa,
-          });
-        } catch (err: any) {
-          falhas.push({
-            id: row.id,
-            erro: err.message || 'Erro ao avaliar resposta',
-          });
-        }
-      })
-    );
-  }
-
-  const updatedRows = db
-    .query(
-      'SELECT id, nota, feedback FROM respostas_alunos WHERE atividade_id = ? ORDER BY criado_em DESC'
-    )
-    .all(atividade_id) as any[];
-
-  return c.json({
-    success: true,
-    total: rows.length,
-    avaliados: sucessos.length,
-    falhas_count: falhas.length,
-    sucessos,
-    falhas,
-    avaliacoes: updatedRows,
-  });
+  return executarAvaliacaoEmLote(c, atividade_id, { escopo, observacoes, severidade });
 }
 
 aiRouter.post('/evaluate-activity-responses', professorAuth, async (c) => {

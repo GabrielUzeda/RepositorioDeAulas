@@ -1,8 +1,35 @@
 import { describe, expect, test } from 'bun:test';
 import { signJwt } from './auth';
 import app from './routes';
+import { repairRawHtmlBlocks, repairUnclosedCodeBlocks, normalizeMarpMarkdown } from './ai';
 
 describe('AI Module & 9router Integration', () => {
+  test('repairRawHtmlBlocks repara tags HTML sem fechamento (style, script, template, textarea)', () => {
+    const broken = '# Slide 1\n<style>\n.custom { color: red; }\n\n---\n# Slide 2';
+    const repaired = repairRawHtmlBlocks(broken);
+    expect(repaired).toContain('</style>');
+
+    const brokenScript = '# Slide 1\n<script>\nconsole.log(1);\n\n---\n# Slide 2';
+    const repairedScript = repairRawHtmlBlocks(brokenScript);
+    expect(repairedScript).toContain('</script>');
+  });
+
+  test('repairUnclosedCodeBlocks fecha blocos de código com número ímpar de fences', () => {
+    const unclosed = '# Slide 1\n```python\nprint("Hello")\n\n---\n# Slide 2';
+    const fixed = repairUnclosedCodeBlocks(unclosed);
+    expect(fixed.endsWith('\n```\n')).toBe(true);
+
+    const closed = '# Slide 1\n```python\nprint("Hello")\n```\n\n---\n# Slide 2';
+    const unchanged = repairUnclosedCodeBlocks(closed);
+    expect(unchanged).toBe(closed);
+  });
+
+  test('normalizeMarpMarkdown limpa markdown fences externos e aplica reparos', () => {
+    const raw = '```markdown\n---\ntitle: Teste\n---\n# Slide 1\n<style>\n.x { color: blue }\n```';
+    const normalized = normalizeMarpMarkdown(raw);
+    expect(normalized).toContain('title: Teste');
+    expect(normalized).toContain('</style>');
+  });
   test('GET /ai/health returns status', async () => {
     const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
     const res = await app.request('/ai/health', {

@@ -56,11 +56,19 @@ export interface QuestionOption {
 
 export type Option = QuestionOption;
 
+export interface RubricaCriterio {
+  criterio: string;
+  peso: number;
+  descricao: string;
+}
+
 export interface Question {
   id?: string | number;
   title?: string;
   content: string;
   options?: QuestionOption[];
+  resposta_esperada?: string;
+  rubrica?: RubricaCriterio[];
 }
 
 export interface Atividade {

@@ -27,6 +27,7 @@ const ENV_KEYS = [
   'AI_API_KEY',
   'AI_MAX_TOKENS',
   'AI_ANTHROPIC_VERSION',
+  'AI_MODEL_AULA',
 ] as const;
 
 const originalEnv = new Map<string, string | undefined>();
@@ -466,5 +467,138 @@ describe('AI Provider Abstraction', () => {
     expect(res.modelUsed).toBe('modelo-retry');
     expect(attemptCount).toBe(2);
     expect(requests).toHaveLength(2);
+  });
+
+  test('diagnose reprovado repara no mesmo modelo e retorna repaired', async () => {
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'modelo-primario',
+      AI_FALLBACK_MODEL: '',
+    });
+
+    let callCount = 0;
+    mockHandler = () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return jsonResponse(200, { choices: [{ message: { content: 'invalido' } }] });
+      }
+      return jsonResponse(200, { choices: [{ message: { content: '{"ok":true}' } }] });
+    };
+
+    const result = await callAi({
+      messages: [{ role: 'user', content: 'gere' }],
+      maxRepairs: 1,
+      diagnose: (content) => (content === '{"ok":true}' ? [] : ['faltou o campo questoes']),
+    });
+
+    expect(result).toEqual({ content: '{"ok":true}', modelUsed: 'modelo-primario', repaired: 1 });
+    expect(requests).toHaveLength(2);
+    const secondBody = asRecord(requests[1].body);
+    expect(secondBody?.model).toBe('modelo-primario');
+    const messages = secondBody?.messages;
+    expect(Array.isArray(messages)).toBe(true);
+    if (!Array.isArray(messages)) throw new Error('messages ausente');
+    expect(messages).toHaveLength(3);
+    expect(asRecord(messages[1])?.role).toBe('assistant');
+    expect(asRecord(messages[1])?.content).toBe('invalido');
+    expect(asRecord(messages[2])?.role).toBe('user');
+    expect(String(asRecord(messages[2])?.content)).toContain('Corrija os seguintes problemas');
+    expect(String(asRecord(messages[2])?.content)).toContain('faltou o campo questoes');
+  });
+
+  test('reparos esgotados acionam o fallback com as mensagens originais', async () => {
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'modelo-primario',
+      AI_FALLBACK_MODEL: 'modelo-reserva',
+    });
+
+    mockHandler = (request) => {
+      const body = asRecord(request.body);
+      if (body?.model === 'modelo-reserva') {
+        return jsonResponse(200, { choices: [{ message: { content: '{"ok":true}' } }] });
+      }
+      return jsonResponse(200, { choices: [{ message: { content: 'invalido' } }] });
+    };
+
+    const result = await callAi({
+      messages: [{ role: 'user', content: 'gere' }],
+      maxRepairs: 1,
+      diagnose: (content) => (content === '{"ok":true}' ? [] : ['formato invalido']),
+    });
+
+    expect(result).toEqual({ content: '{"ok":true}', modelUsed: 'modelo-reserva', repaired: 0 });
+    expect(requests).toHaveLength(3);
+    expect(asRecord(requests[0].body)?.model).toBe('modelo-primario');
+    expect(asRecord(requests[1].body)?.model).toBe('modelo-primario');
+    expect(asRecord(requests[2].body)?.model).toBe('modelo-reserva');
+
+    const fallbackMessages = asRecord(requests[2].body)?.messages;
+    expect(Array.isArray(fallbackMessages)).toBe(true);
+    if (!Array.isArray(fallbackMessages)) throw new Error('messages ausente');
+    expect(fallbackMessages).toHaveLength(1);
+    expect(asRecord(fallbackMessages[0])?.role).toBe('user');
+    expect(asRecord(fallbackMessages[0])?.content).toBe('gere');
+  });
+
+  test('reparos esgotados sem fallback lancam erro de falha apos reparo', async () => {
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'modelo-primario',
+      AI_FALLBACK_MODEL: '',
+    });
+
+    mockHandler = () =>
+      jsonResponse(200, { choices: [{ message: { content: 'sempre invalido' } }] });
+
+    await expect(
+      callAi({
+        messages: [{ role: 'user', content: 'gere' }],
+        maxRepairs: 1,
+        diagnose: () => ['estrutura ausente'],
+      })
+    ).rejects.toThrow(/falha apos reparo: estrutura ausente/);
+    expect(requests).toHaveLength(2);
+  });
+
+  test('resolveConfig e callAi selecionam o modelo por tarefa via AI_MODEL_<TASK>', async () => {
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'modelo-base',
+      AI_MODEL_AULA: 'modelo-aula',
+    });
+
+    expect(resolveConfig().model).toBe('modelo-base');
+    expect(resolveConfig('aula').model).toBe('modelo-aula');
+
+    mockHandler = openAiSuccess;
+    const result = await callAi({
+      messages: [{ role: 'user', content: 'oi' }],
+      task: 'aula',
+    });
+
+    expect(result).toEqual({ content: 'resposta openai', modelUsed: 'modelo-aula' });
+    expect(requests).toHaveLength(1);
+    expect(asRecord(requests[0].body)?.model).toBe('modelo-aula');
+  });
+
+  test('task sem AI_MODEL_<TASK> configurado cai para o modelo padrao', () => {
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'modelo-base',
+    });
+
+    expect(resolveConfig('questoes').model).toBe('modelo-base');
+    expect(resolveConfig('default').model).toBe('modelo-base');
   });
 });

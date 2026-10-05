@@ -52,6 +52,19 @@ export function refDaQuestao(questao: any, idx: number): string {
   return questao && questao.id !== undefined ? String(questao.id) : String(idx);
 }
 
+export function resolverRespostaDaQuestao(
+  respostasMap: Record<string, any>,
+  q: any,
+  idx: number
+): string | null {
+  const keyId = refDaQuestao(q, idx);
+  const keyTitle = typeof q?.title === 'string' ? q.title : '';
+  const keyContent = typeof q?.content === 'string' ? q.content : '';
+  const val = respostasMap[keyId] ?? respostasMap[String(idx)] ?? respostasMap[keyTitle] ?? respostasMap[keyContent];
+  if (val === undefined || val === null) return null;
+  return String(val);
+}
+
 export function corrigirObjetivas(jsonDataStr: string | null | undefined, respostasInput: any): CorrecaoResultado {
   const questions = extrairQuestoes(jsonDataStr);
   if (questions.length === 0) return { acertos: 0, total: 0, pontuacao: 0, porQuestao: [] };
@@ -77,10 +90,8 @@ export function corrigirObjetivas(jsonDataStr: string | null | undefined, respos
     if (Array.isArray(q?.options) && q.options.length > 0) {
       totalObjetivas++;
       const keyId = refDaQuestao(q, idx);
-      const keyTitle = typeof q.title === 'string' ? q.title : '';
-      const keyContent = typeof q.content === 'string' ? q.content : '';
       const correta = q.options.find((opt: any) => opt && opt.correct === true);
-      const respAluno = respostasMap[keyId] ?? respostasMap[String(idx)] ?? respostasMap[keyTitle] ?? respostasMap[keyContent];
+      const respAluno = resolverRespostaDaQuestao(respostasMap, q, idx);
 
       const acertou =
         Boolean(correta) &&

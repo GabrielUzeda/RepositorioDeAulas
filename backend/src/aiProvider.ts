@@ -32,6 +32,8 @@ export interface AiProvider {
   isTruncated?(data: unknown, rawText?: string): boolean;
 }
 
+export type AiTask = 'aula' | 'questoes' | 'avaliacao' | 'sintese' | 'default';
+
 export interface AiChatOptions {
   messages: AiMessage[];
   temperature?: number;
@@ -40,11 +42,15 @@ export interface AiChatOptions {
   maxRetries?: number;
   retryBaseMs?: number;
   validate?: (content: string) => boolean;
+  diagnose?: (content: string) => string[];
+  maxRepairs?: number;
+  task?: AiTask;
 }
 
 export interface AiChatResult {
   content: string;
   modelUsed: string;
+  repaired?: number;
 }
 
 const VALID_PROVIDERS = ['opencode', '9router', 'openai', 'anthropic'];
@@ -233,7 +239,7 @@ export function isResponseTruncated(raw: string, data?: unknown): boolean {
   return false;
 }
 
-export function resolveConfig(): AiConfig {
+export function resolveConfig(task?: AiTask): AiConfig {
   const provider = trimmed(process.env.AI_PROVIDER) || 'opencode';
   const explicitBaseUrl = trimmed(process.env.AI_BASE_URL);
   const explicitApiKey = trimmed(process.env.AI_API_KEY);
@@ -269,6 +275,11 @@ export function resolveConfig(): AiConfig {
     throw new Error(
       `Provider de IA desconhecido: ${provider}. Validos: ${VALID_PROVIDERS.join(', ')}`
     );
+  }
+
+  if (task && task !== 'default') {
+    const taskModel = trimmed(process.env[`AI_MODEL_${task.toUpperCase()}`]);
+    if (taskModel) model = taskModel;
   }
 
   return {
@@ -632,7 +643,7 @@ export function calculateBackoffWithJitter(
 }
 
 export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
-  const config = resolveConfig();
+  const config = resolveConfig(options.task);
   if (!config.apiKey) {
     throw new Error(`AI_API_KEY nao configurada para o provider ${config.provider}`);
   }
@@ -645,13 +656,17 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
   const attemptTimeoutMs = options.timeoutMs ?? config.timeoutMs;
   const maxRetries = options.maxRetries ?? envNumber(process.env.AI_MAX_RETRIES, 3);
   const baseRetryMs = options.retryBaseMs ?? envNumber(process.env.AI_RETRY_BASE_MS, 1000);
+  const maxRepairs = options.maxRepairs ?? 1;
   let lastError = 'falha desconhecida';
 
   for (const model of models) {
     const callMaxTokens = options.maxTokens ?? config.maxTokens;
-    const promptChars = options.messages.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+    let workingMessages = options.messages.slice();
+    let repairCount = 0;
+    let retryAttempt = 0;
+    const promptChars = workingMessages.reduce((acc, m) => acc + (m.content?.length || 0), 0);
 
-    for (let retryAttempt = 0; retryAttempt <= maxRetries; retryAttempt++) {
+    while (true) {
       if (retryAttempt > 0) {
         const delay = calculateBackoffWithJitter(retryAttempt - 1, baseRetryMs);
         console.log(
@@ -662,11 +677,11 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
 
       const startTime = performance.now();
       console.log(
-        `[AI-Provider] Início da chamada | provider: ${config.provider} | model: ${model} | tentativa: ${retryAttempt + 1}/${maxRetries + 1} | mensagens: ${options.messages.length} | prompt_chars: ${promptChars} | timeout_ms: ${attemptTimeoutMs} | max_tokens: ${callMaxTokens}`
+        `[AI-Provider] Início da chamada | provider: ${config.provider} | model: ${model} | tentativa: ${retryAttempt + 1}/${maxRetries + 1} | reparo: ${repairCount}/${maxRepairs} | mensagens: ${workingMessages.length} | prompt_chars: ${promptChars} | timeout_ms: ${attemptTimeoutMs} | max_tokens: ${callMaxTokens}`
       );
 
       const body = JSON.stringify(
-        provider.buildBody(model, options.messages, options.temperature ?? 0.3, callMaxTokens)
+        provider.buildBody(model, workingMessages, options.temperature ?? 0.3, callMaxTokens)
       );
       const headers = provider.buildHeaders(config.apiKey);
       try {
@@ -704,6 +719,36 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
           const finishReason = extractFinishReason(parsedJson, raw) || 'stop';
 
           if (content) {
+            if (options.diagnose) {
+              const errors = options.diagnose(content);
+              if (errors.length > 0) {
+                if (repairCount < maxRepairs) {
+                  repairCount += 1;
+                  workingMessages = [
+                    ...workingMessages,
+                    { role: 'assistant', content },
+                    {
+                      role: 'user',
+                      content: `Corrija os seguintes problemas e devolva o formato estruturado completo:\n- ${errors.join('\n- ')}`,
+                    },
+                  ];
+                  retryAttempt = 0;
+                  console.log(
+                    `[AI-Provider] ALERTA: Reparo ${repairCount}/${maxRepairs} | model: ${model} | tempo_s: ${elapsedSec} | erros: ${errors.join('; ')}`
+                  );
+                  continue;
+                }
+                lastError = `[${model}] falha apos reparo: ${errors.join('; ')}`;
+                console.log(
+                  `[AI-Provider] ALERTA: Reparos esgotados | model: ${model} | tempo_s: ${elapsedSec} | erros: ${errors.join('; ')}`
+                );
+                break;
+              }
+              console.log(
+                `[AI-Provider] Sucesso | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | tokens_prompt: ${usage.prompt_tokens} | tokens_completion: ${usage.completion_tokens} | tokens_reasoning: ${usage.reasoning_tokens} | finish_reason: ${finishReason} | content_chars: ${contentChars} | repaired: ${repairCount}`
+              );
+              return { content, modelUsed: model, repaired: repairCount };
+            }
             if (options.validate && !options.validate(content)) {
               console.log(
                 `[AI-Provider] ALERTA: Validação reprovada | model: ${model} | tempo_s: ${elapsedSec} | content_chars: ${contentChars}`
@@ -739,6 +784,7 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
           console.log(
             `[AI-Provider] Erro transitório HTTP ${response.status} detectado. Programando retry...`
           );
+          retryAttempt += 1;
           continue;
         }
         break;
@@ -754,6 +800,7 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
           console.log(
             `[AI-Provider] Exceção de rede transitória detectada (${message}). Programando retry...`
           );
+          retryAttempt += 1;
           continue;
         }
         break;
