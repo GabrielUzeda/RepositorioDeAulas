@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, defineAsyncComponent } from 'vue';
 import { apiClient } from '@/shared/api/client';
 import { secureGet, secureSet, secureRemove } from '@/shared/utils/storage';
 import { shuffleQuestionOptions } from '@/shared/utils/shuffle';
@@ -9,8 +9,24 @@ import type { Atividade, Question } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
+import BaseSelect from '@/shared/components/BaseSelect.vue';
 import RichTextEditor from '@/shared/components/RichTextEditor.vue';
 import RichContent from '@/shared/components/RichContent.vue';
+import BaseSpinner from '@/shared/components/BaseSpinner.vue';
+import { htmlParaTexto } from '@/shared/utils/sanitizeHtml';
+import {
+  LINGUAGENS_CODIGO,
+  codigoParaHtml,
+  ehRespostaEmCodigo,
+  extrairCodigoDoHtml,
+  normalizarLinguagem,
+} from '@/shared/utils/codeAnswer';
+
+const CodeEditorField = defineAsyncComponent({
+  loader: () => import('@/shared/components/CodeEditorField.vue'),
+  loadingComponent: BaseSpinner,
+  delay: 0,
+});
 
 const props = withDefaults(defineProps<{
   show: boolean;
@@ -46,6 +62,53 @@ const isQuestionStep = computed(() => currentStep.value >= 1 && currentStep.valu
 const modalMaxWidth = computed(() => (isQuestionStep.value ? 'max-w-6xl' : 'max-w-4xl'));
 const modalFullscreen = ref(false);
 
+const codeMode = ref<Record<string, boolean>>({});
+const linguagemCodigo = ref<Record<string, string>>({});
+
+const opcoesLinguagem = LINGUAGENS_CODIGO.map((item) => ({ label: item.label, value: item.id }));
+
+function modoCodigoAtivo(q: Question, idx: number): boolean {
+  const key = getQuestionKey(q, idx);
+  if (codeMode.value[key] !== undefined) return codeMode.value[key];
+  return ehRespostaEmCodigo(respostasMap.value[key]);
+}
+
+function linguagemDaQuestao(q: Question, idx: number): string {
+  const key = getQuestionKey(q, idx);
+  if (linguagemCodigo.value[key]) return linguagemCodigo.value[key];
+  return extrairCodigoDoHtml(respostasMap.value[key])?.linguagem ?? 'texto';
+}
+
+function codigoTexto(q: Question, idx: number): string {
+  const bruto = respostasMap.value[getQuestionKey(q, idx)] ?? '';
+  const extraido = extrairCodigoDoHtml(bruto);
+  if (extraido) return extraido.codigo;
+  return bruto ? htmlParaTexto(bruto) : '';
+}
+
+function definirCodigo(q: Question, idx: number, valor: string) {
+  respostasMap.value[getQuestionKey(q, idx)] = codigoParaHtml(valor, linguagemDaQuestao(q, idx));
+  handleSaveDraft();
+}
+
+function definirLinguagem(q: Question, idx: number, valor: string) {
+  const key = getQuestionKey(q, idx);
+  const linguagem = normalizarLinguagem(valor);
+  linguagemCodigo.value[key] = linguagem;
+  respostasMap.value[key] = codigoParaHtml(codigoTexto(q, idx), linguagem);
+  handleSaveDraft();
+}
+
+function alternarModoCodigo(q: Question, idx: number) {
+  const key = getQuestionKey(q, idx);
+  const ativo = modoCodigoAtivo(q, idx);
+  const texto = codigoTexto(q, idx);
+  const linguagem = linguagemDaQuestao(q, idx);
+  linguagemCodigo.value[key] = linguagem;
+  respostasMap.value[key] = texto ? codigoParaHtml(texto, linguagem) : '';
+  codeMode.value[key] = !ativo;
+  handleSaveDraft();
+}
 
 const deadlineInfo = computed(() => {
   if (!props.atividade?.data_limite) return null;
@@ -67,6 +130,8 @@ watch(
       errorMessage.value = '';
       respostasMap.value = {};
       rascunhoCodigo.value = '';
+      codeMode.value = {};
+      linguagemCodigo.value = {};
 
       Promise.all([
         secureGet('alunoNome'),
@@ -508,7 +573,28 @@ async function handleSubmit() {
 
             <!-- Resposta (direita) -->
             <div class="space-y-3">
-              <p class="text-[10px] font-bold uppercase tracking-wider text-accent">Sua resposta</p>
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-accent">Sua resposta</p>
+                <div v-if="!q.options || q.options.length === 0" class="flex items-center gap-2">
+                  <BaseSelect
+                    v-if="modoCodigoAtivo(q, idx)"
+                    class="w-44"
+                    aria-label="Linguagem do código"
+                    :model-value="linguagemDaQuestao(q, idx)"
+                    :options="opcoesLinguagem"
+                    @update:model-value="(valor) => definirLinguagem(q, idx, String(valor))"
+                  />
+                  <button
+                    type="button"
+                    class="text-xs font-semibold flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer"
+                    :title="modoCodigoAtivo(q, idx) ? 'Voltar para o editor de texto com formatação' : 'Ativar modo código (IDE) nesta resposta'"
+                    @click="alternarModoCodigo(q, idx)"
+                  >
+                    <span class="material-icons text-sm">{{ modoCodigoAtivo(q, idx) ? 'edit_note' : 'code' }}</span>
+                    <span>{{ modoCodigoAtivo(q, idx) ? 'Modo texto' : 'Modo código' }}</span>
+                  </button>
+                </div>
+              </div>
 
               <div v-if="q.options && q.options.length > 0" class="grid gap-2">
                 <button
@@ -520,6 +606,14 @@ async function handleSubmit() {
                   {{ opt.text }}
                 </button>
               </div>
+
+              <CodeEditorField
+                v-else-if="modoCodigoAtivo(q, idx)"
+                :model-value="codigoTexto(q, idx)"
+                :linguagem="linguagemDaQuestao(q, idx)"
+                placeholder="Escreva seu código aqui..."
+                @update:model-value="(valor) => definirCodigo(q, idx, valor)"
+              />
 
               <RichTextEditor
                 v-else

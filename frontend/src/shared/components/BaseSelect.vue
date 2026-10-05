@@ -11,6 +11,7 @@ const props = withDefaults(
     disabled?: boolean;
     id?: string;
     required?: boolean;
+    ariaLabel?: string;
   }>(),
   {
     label: '',
@@ -21,6 +22,7 @@ const props = withDefaults(
     disabled: false,
     id: '',
     required: false,
+    ariaLabel: '',
   }
 );
 
@@ -43,6 +45,7 @@ const inputId = computed(
         :id="inputId"
         v-model="model"
         :disabled="disabled"
+        :aria-label="props.ariaLabel || undefined"
         class="w-full appearance-none rounded-sm border bg-surface-alt px-3 py-2 pr-8 text-sm text-primary transition-all duration-base focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 focus:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-surface"
         :class="error ? 'border-danger focus:ring-danger' : 'border-line hover:border-line-strong'"
       >
