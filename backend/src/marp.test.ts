@@ -83,4 +83,57 @@ flowchart TD
     expect(htmlDark).toContain('data-theme="dark"');
     expect(htmlDark).toContain('mermaidThemeVars');
   });
+
+  const mdInterativo = `---
+theme: default
+title: Aula Hash
+---
+
+# Slide 1
+:lucide-book-open: Conteúdo copiável do slide
+
+---
+
+# Slide 2
+`;
+
+  test('Marp Standalone HTML: deep-link por hash em cada slide', () => {
+    const html = generateMarpNextStandaloneHtml('Aula Hash', mdInterativo);
+    expect(html).toContain('id="slide-1"');
+    expect(html).toContain('id="slide-2"');
+    expect(html).toContain('slideIndexFromHash');
+    expect(html).toContain('syncHashWithSlide');
+    expect(html).toContain("addEventListener('hashchange'");
+    expect(html).toContain('#slide-');
+  });
+
+  test('Marp Standalone HTML: permite selecionar e copiar o texto', () => {
+    const html = generateMarpNextStandaloneHtml('Aula Hash', mdInterativo);
+    expect(html).toContain('user-select: text');
+    expect(html).toContain('-webkit-user-select: text');
+  });
+
+  test('Marp Standalone HTML: ícones Lucide', () => {
+    const html = generateMarpNextStandaloneHtml('Aula Hash', mdInterativo);
+    expect(html).toContain('lucide.min.js');
+    expect(html).toContain('data-lucide="book-open"');
+    expect(html).toContain('createIcons');
+  });
+
+  test('Marp Standalone HTML: zoom com clamp e foco incremental', () => {
+    const html = generateMarpNextStandaloneHtml('Aula Hash', mdInterativo);
+    expect(html).toContain('clampPan');
+    expect(html).toContain('getZoomCenter');
+    expect(html).toContain('touch-action: none');
+    expect(html).toContain('(fx - cx) - (fx - cx - panX) * factor');
+    expect(html).toContain('scheduleNav');
+    expect(html).toContain('cancelPendingNav');
+    expect(html).not.toContain('originX');
+    expect(html).not.toContain('originY');
+
+    const allScripts = Array.from(html.matchAll(/<script(?![^>]*src=)>([\s\S]*?)<\/script>/g));
+    for (const match of allScripts) {
+      expect(() => new Function(match[1])).not.toThrow();
+    }
+  });
 });
