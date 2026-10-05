@@ -331,6 +331,22 @@ function triggerZoomPill() {
   }, 1200);
 }
 
+function clampPan() {
+  const activeSlide = previewPaneRef.value?.querySelector('.slide.active') as HTMLElement | null;
+  if (!activeSlide) return;
+  const maxX = Math.max(0, ((currentZoom.value - 1) / 2) * activeSlide.offsetWidth);
+  const maxY = Math.max(0, ((currentZoom.value - 1) / 2) * activeSlide.offsetHeight);
+  panX = Math.min(maxX, Math.max(-maxX, panX));
+  panY = Math.min(maxY, Math.max(-maxY, panY));
+}
+
+function getZoomCenter() {
+  const activeSlide = previewPaneRef.value?.querySelector('.slide.active') as HTMLElement | null;
+  if (!activeSlide) return { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
+  const rect = activeSlide.getBoundingClientRect();
+  return { cx: rect.left + rect.width / 2 - panX, cy: rect.top + rect.height / 2 - panY };
+}
+
 function applySlideZoom() {
   const activeSlide = previewPaneRef.value?.querySelector('.slide.active') as HTMLElement | null;
   if (!activeSlide) return;
@@ -343,6 +359,7 @@ function applySlideZoom() {
     if (previewPaneRef.value) previewPaneRef.value.style.cursor = '';
   } else {
     activeSlide.style.transformOrigin = 'center center';
+    clampPan();
     activeSlide.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${currentZoom.value})`;
     if (previewPaneRef.value) previewPaneRef.value.style.cursor = isMousePanning ? 'grabbing' : 'grab';
   }
@@ -356,6 +373,11 @@ function resetZoom() {
   initialPinchDistance = 0;
   isPanning = false;
   isMousePanning = false;
+  showZoomPillActive.value = false;
+  if (zoomPillTimer) {
+    clearTimeout(zoomPillTimer);
+    zoomPillTimer = null;
+  }
   if (previewPaneRef.value) {
     previewPaneRef.value.style.cursor = '';
     previewPaneRef.value.querySelectorAll('.slide').forEach((s) => {
@@ -371,8 +393,7 @@ function toggleZoom(focalX?: number, focalY?: number) {
     focalY = lastMouseY;
   }
 
-  const cx = window.innerWidth / 2;
-  const cy = window.innerHeight / 2;
+  const { cx, cy } = getZoomCenter();
   const fx = (focalX !== undefined && !isNaN(focalX)) ? focalX : cx;
   const fy = (focalY !== undefined && !isNaN(focalY)) ? focalY : cy;
 
@@ -388,8 +409,9 @@ function toggleZoom(focalX?: number, focalY?: number) {
     return;
   }
 
-  panX = (cx - fx) * (nextZoom - 1);
-  panY = (cy - fy) * (nextZoom - 1);
+  const factor = nextZoom / currentZoom.value;
+  panX = (fx - cx) - (fx - cx - panX) * factor;
+  panY = (fy - cy) - (fy - cy - panY) * factor;
   currentZoom.value = nextZoom;
   applySlideZoom();
 }
@@ -401,7 +423,26 @@ let startTime = 0;
 let lastNavTime = 0;
 const NAV_COOLDOWN_MS = 200;
 
+let pendingNavTimer: any = null;
+const NAV_DELAY_MS = 320;
+
+function cancelPendingNav() {
+  if (pendingNavTimer !== null) {
+    clearTimeout(pendingNavTimer);
+    pendingNavTimer = null;
+  }
+}
+
+function scheduleNav(delta: number) {
+  cancelPendingNav();
+  pendingNavTimer = setTimeout(() => {
+    pendingNavTimer = null;
+    safeNavigate(delta);
+  }, NAV_DELAY_MS);
+}
+
 function safeNavigate(delta: number) {
+  cancelPendingNav();
   const now = Date.now();
   if (now - lastNavTime < NAV_COOLDOWN_MS) return;
   lastNavTime = now;
@@ -452,8 +493,7 @@ function handleTouchMove(e: TouchEvent) {
     if (e.cancelable) e.preventDefault();
     const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
     const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
+    const { cx, cy } = getZoomCenter();
     const currentDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
@@ -529,6 +569,7 @@ function handleTouchEnd(e: TouchEvent) {
     const now = Date.now();
     // Duplo toque para alternar zoom na posição focal
     if (now - lastTapTime < 320) {
+      cancelPendingNav();
       toggleZoom(endX, endY);
       lastTapTime = 0;
       return;
@@ -537,9 +578,9 @@ function handleTouchEnd(e: TouchEvent) {
 
     const vw = window.innerWidth;
     if (startX < vw * 0.25) {
-      safeNavigate(-1);
+      scheduleNav(-1);
     } else if (startX > vw * 0.75) {
-      safeNavigate(1);
+      scheduleNav(1);
     } else {
       toggleControlsBar();
     }
@@ -1638,6 +1679,7 @@ function handleDblClick(e: MouseEvent) {
   if (!isPresentMode.value) return;
   const target = e.target as HTMLElement;
   if (isInteractiveElement(target)) return;
+  cancelPendingNav();
   toggleZoom(e.clientX, e.clientY);
 }
 
@@ -1645,8 +1687,7 @@ function handleWheel(e: WheelEvent) {
   if (!isPresentMode.value) return;
   if (e.ctrlKey) {
     if (e.cancelable) e.preventDefault();
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
+    const { cx, cy } = getZoomCenter();
     const fx = e.clientX;
     const fy = e.clientY;
     const delta = -e.deltaY * 0.01;
@@ -2353,6 +2394,7 @@ onBeforeUnmount(() => {
   width: 100vw !important;
   height: 100vh !important;
   overflow: hidden !important;
+  touch-action: none;
   user-select: text;
   -webkit-user-select: text;
 }
@@ -2372,14 +2414,14 @@ onBeforeUnmount(() => {
   margin: 0 !important;
   opacity: 0 !important;
   pointer-events: none !important;
-  transform: scale(1) !important;
+  transform: scale(1);
   transition: opacity 0.4s ease !important;
   font-size: calc(1rem * var(--font-scale, 1));
 }
 .present-mode :deep(.slide.active) {
   opacity: 1 !important;
   pointer-events: auto !important;
-  transform: scale(1) !important;
+  transform: scale(1);
 }
 
 @media (max-width: 768px) {

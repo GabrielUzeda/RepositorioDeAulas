@@ -152,7 +152,7 @@ html, body {
   height: 100vh;
   position: relative;
   overflow: hidden;
-  touch-action: pan-y;
+  touch-action: none;
 }
 
 .slide {
@@ -694,8 +694,6 @@ document.addEventListener('mousemove', (e) => {
 let currentZoom = 1.0;
 let panX = 0;
 let panY = 0;
-let originX = 50;
-let originY = 50;
 let initialPinchDistance = 0;
 let initialZoom = 1.0;
 let isPanning = false;
@@ -724,6 +722,22 @@ function updateZoomUI() {
   showZoomPill(levelStr);
 }
 
+function clampPan() {
+  const activeSlide = document.querySelector('.slide.active');
+  if (!activeSlide) return;
+  const maxX = Math.max(0, ((currentZoom - 1) / 2) * activeSlide.offsetWidth);
+  const maxY = Math.max(0, ((currentZoom - 1) / 2) * activeSlide.offsetHeight);
+  panX = Math.min(maxX, Math.max(-maxX, panX));
+  panY = Math.min(maxY, Math.max(-maxY, panY));
+}
+
+function getZoomCenter() {
+  const activeSlide = document.querySelector('.slide.active');
+  if (!activeSlide) return { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
+  const rect = activeSlide.getBoundingClientRect();
+  return { cx: rect.left + rect.width / 2 - panX, cy: rect.top + rect.height / 2 - panY };
+}
+
 function applySlideZoom() {
   const activeSlide = document.querySelector('.slide.active');
   if (!activeSlide) return;
@@ -736,6 +750,7 @@ function applySlideZoom() {
     if (slidesContainer) slidesContainer.style.cursor = '';
   } else {
     activeSlide.style.transformOrigin = 'center center';
+    clampPan();
     activeSlide.style.transform = \`translate3d(\${panX}px, \${panY}px, 0) scale(\${currentZoom})\`;
     if (slidesContainer) slidesContainer.style.cursor = isMousePanning ? 'grabbing' : 'grab';
   }
@@ -756,6 +771,9 @@ function resetZoom() {
   if (slidesContainer) slidesContainer.style.cursor = '';
   const zoomText = document.getElementById('zoom-text');
   if (zoomText) zoomText.textContent = '1x';
+  const pill = document.getElementById('zoom-indicator-pill');
+  if (pill) pill.classList.remove('show');
+  clearTimeout(zoomPillTimer);
 }
 
 function toggleZoom(focalX, focalY) {
@@ -764,8 +782,7 @@ function toggleZoom(focalX, focalY) {
     focalY = lastMouseY;
   }
 
-  const cx = window.innerWidth / 2;
-  const cy = window.innerHeight / 2;
+  const { cx, cy } = getZoomCenter();
   const fx = (focalX !== undefined && !isNaN(focalX)) ? focalX : cx;
   const fy = (focalY !== undefined && !isNaN(focalY)) ? focalY : cy;
 
@@ -781,8 +798,9 @@ function toggleZoom(focalX, focalY) {
     return;
   }
 
-  panX = (cx - fx) * (nextZoom - 1);
-  panY = (cy - fy) * (nextZoom - 1);
+  const factor = nextZoom / currentZoom;
+  panX = (fx - cx) - (fx - cx - panX) * factor;
+  panY = (fy - cy) - (fy - cy - panY) * factor;
   currentZoom = nextZoom;
   applySlideZoom();
 }
@@ -827,7 +845,26 @@ let startTime = 0;
 let lastNavTime = 0;
 const NAV_COOLDOWN_MS = 200;
 
+let pendingNavTimer = null;
+const NAV_DELAY_MS = 320;
+
+function cancelPendingNav() {
+  if (pendingNavTimer !== null) {
+    clearTimeout(pendingNavTimer);
+    pendingNavTimer = null;
+  }
+}
+
+function scheduleNav(delta) {
+  cancelPendingNav();
+  pendingNavTimer = setTimeout(() => {
+    pendingNavTimer = null;
+    safeNavigate(delta);
+  }, NAV_DELAY_MS);
+}
+
 function safeNavigate(delta) {
+  cancelPendingNav();
   const now = Date.now();
   if (now - lastNavTime < NAV_COOLDOWN_MS) return;
   lastNavTime = now;
@@ -880,9 +917,9 @@ function handlePointerEnd(e) {
 
     const vw = window.innerWidth;
     if (startX < vw * 0.25) {
-      safeNavigate(-1); // Clique na lateral esquerda -> slide anterior
+      scheduleNav(-1); // Clique na lateral esquerda -> slide anterior
     } else if (startX > vw * 0.75) {
-      safeNavigate(1);  // Clique na lateral direita -> próximo slide
+      scheduleNav(1);  // Clique na lateral direita -> próximo slide
     } else {
       toggleControlsBar(); // Clique ao centro -> oculta/exibe barra de controles
     }
@@ -906,8 +943,6 @@ function handleTouchStart(e) {
     isPanning = false;
     const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
     const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    originX = Math.round((midX / window.innerWidth) * 100);
-    originY = Math.round((midY / window.innerHeight) * 100);
     initialPinchDistance = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
@@ -939,8 +974,7 @@ function handleTouchMove(e) {
     if (e.cancelable) e.preventDefault();
     const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
     const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
+    const { cx, cy } = getZoomCenter();
     const currentDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
@@ -1016,6 +1050,7 @@ function handleTouchEnd(e) {
     const now = Date.now();
     // Duplo toque para alternar zoom na posição tocada (ponto focal)
     if (now - lastTapTime < 320) {
+      cancelPendingNav();
       toggleZoom(endX, endY);
       lastTapTime = 0;
       return;
@@ -1024,9 +1059,9 @@ function handleTouchEnd(e) {
 
     const vw = window.innerWidth;
     if (startX < vw * 0.25) {
-      safeNavigate(-1);
+      scheduleNav(-1);
     } else if (startX > vw * 0.75) {
-      safeNavigate(1);
+      scheduleNav(1);
     } else {
       toggleControlsBar(); // Clique/toque ao centro -> oculta/exibe controles
     }
@@ -1041,14 +1076,14 @@ window.addEventListener('touchcancel', handlePointerCancel, { passive: true });
 
 slidesContainer.addEventListener('dblclick', (e) => {
   if (isInteractiveElement(e.target)) return;
+  cancelPendingNav();
   toggleZoom(e.clientX, e.clientY);
 });
 
 window.addEventListener('wheel', (e) => {
   if (e.ctrlKey) {
     if (e.cancelable) e.preventDefault();
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
+    const { cx, cy } = getZoomCenter();
     const fx = e.clientX;
     const fy = e.clientY;
     const delta = -e.deltaY * 0.01;
