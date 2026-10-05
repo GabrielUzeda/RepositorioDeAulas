@@ -759,6 +759,8 @@ function renderSlides(source: string) {
       return `<i class="fa ${prefix} fa-${name}"></i>`;
     });
     html = html.replace(/:fa-([a-z0-9-]+):/gi, '<i class="fa fa-solid fa-$1"></i>');
+    // Suporte a ícones Lucide :lucide-name:
+    html = html.replace(/:lucide-([a-z0-9-]+):/gi, '<i data-lucide="$1"></i>');
     el.innerHTML = `
       <span class="slide-number">${i + 1}/${totalSlidesNum}</span>
       <div class="slide-content">${html}</div>
@@ -768,6 +770,9 @@ function renderSlides(source: string) {
     executeSlideScripts(el);
     renderAllCodeHighlight(el);
   });
+
+  const wLucide = window as any;
+  if (wLucide.lucide && typeof wLucide.lucide.createIcons === 'function') wLucide.lucide.createIcons();
 
   activateSlide(Math.min(currentSlideNum, totalSlidesNum - 1));
   requestAnimationFrame(() => renderAllMermaid());

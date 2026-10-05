@@ -325,6 +325,17 @@
   margin: 1rem 0;
 }
 
+/* ===== Ícones Lucide ===== */
+.slide-content svg.lucide,
+.slide-content > .lucide,
+.slide-content [data-lucide] {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  stroke-width: 2;
+}
+
 /* ===== Mermaid Diagramas ===== */
 .mermaid-block,
 .diagram-wrapper {

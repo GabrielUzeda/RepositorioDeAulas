@@ -288,6 +288,7 @@ Regras:
 8. Fonte de verdade: o contexto fornecido. Não invente conceitos ausentes nele.
 9. Não use placeholders de imagem.
 10. Considere dark mode ao embutir HTML/CSS: use pares contrastantes ou variáveis de tema (var(--text-primary), var(--slide-bg), var(--border)).
+11. Ícones: quando um ícone ajudar a ilustrar o conteúdo, use Lucide no formato <i data-lucide="nome-do-icone"></i> (kebab-case, ex.: <i data-lucide="book-open"></i>, <i data-lucide="lightbulb"></i>, <i data-lucide="triangle-alert"></i>), sempre acompanhado de texto e no máximo um por item/bloco. NÃO use emojis.
 
 Responda somente com os slides.`;
 

@@ -70,6 +70,8 @@ function renderMarkdown(mdText: string): string {
     return `<i class="fa ${prefix} fa-${name}"></i>`;
   });
   html = html.replace(/:fa-([a-z0-9-]+):/gi, '<i class="fa fa-solid fa-$1"></i>');
+  // Suporte a ícones Lucide :lucide-name: (renderizados por lucide.createIcons no cliente)
+  html = html.replace(/:lucide-([a-z0-9-]+):/gi, '<i data-lucide="$1"></i>');
   return html;
 }
 
@@ -115,6 +117,7 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.475.0/dist/umd/lucide.min.js"></script>
 <style>
 ${MARP_THEME_CSS}
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1142,6 +1145,7 @@ renderAllCodeHighlight();
 updateThemeUI('${initialTheme}');
 initMermaid('${initialTheme}');
 renderAllMermaid();
+if (window.lucide) window.lucide.createIcons();
 </script>
 </body>
 </html>`;
