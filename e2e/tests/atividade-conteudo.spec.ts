@@ -104,12 +104,12 @@ test.describe('Atividade — descrição, título e descrição de cada pergunta
     // Pergunta 1 (sidebar → painel ativo)
     await page.getByText(q1.content).first().click();
     await expect(page.getByPlaceholder('Título/Tema da Questão (Ex: Questão 1)')).toHaveValue(q1.title);
-    await expect(page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...')).toHaveValue(q1.content);
+    await expect(page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...')).toHaveText(q1.content);
 
     // Pergunta 2
     await page.getByText(q2.content).first().click();
     await expect(page.getByPlaceholder('Título/Tema da Questão (Ex: Questão 1)')).toHaveValue(q2.title);
-    await expect(page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...')).toHaveValue(q2.content);
+    await expect(page.getByPlaceholder('Digite o enunciado completo da questão para o aluno...')).toHaveText(q2.content);
 
     await page.getByRole('button', { name: 'Cancelar' }).click();
   });

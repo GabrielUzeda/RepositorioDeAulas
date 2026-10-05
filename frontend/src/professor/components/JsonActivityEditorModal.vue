@@ -10,6 +10,9 @@ import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseTextarea from '@/shared/components/BaseTextarea.vue';
+import RichTextEditor from '@/shared/components/RichTextEditor.vue';
+import RichContent from '@/shared/components/RichContent.vue';
+import { htmlParaTexto } from '@/shared/utils/sanitizeHtml';
 import BaseSelect from '@/shared/components/BaseSelect.vue';
 import BaseBadge from '@/shared/components/BaseBadge.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
@@ -620,7 +623,7 @@ async function handleDeleteDraft(draftId: number) {
               >
                 {{ idx + 1 }}
               </span>
-              <p class="text-xs text-primary leading-snug line-clamp-2 flex-1">{{ q.content || q.title || 'Sem enunciado' }}</p>
+              <p class="text-xs text-primary leading-snug line-clamp-2 flex-1">{{ htmlParaTexto(q.content) || q.title || 'Sem enunciado' }}</p>
             </div>
           </div>
         </div>
@@ -921,11 +924,11 @@ async function handleDeleteDraft(draftId: number) {
                     <span>{{ expandedEnunciado ? 'Reduzir altura' : 'Expandir área de texto' }}</span>
                   </button>
                 </div>
-                <BaseTextarea
+                <RichTextEditor
                   v-model="activeQuestion.content"
-                  :rows="expandedEnunciado ? 14 : 6"
-                  class="w-full font-mono text-sm leading-relaxed"
+                  :min-height="expandedEnunciado ? '320px' : '160px'"
                   placeholder="Digite o enunciado completo da questão para o aluno..."
+                  hint="Use o botão de código para inserir blocos de código formatados."
                 />
               </div>
 
@@ -1058,12 +1061,11 @@ async function handleDeleteDraft(draftId: number) {
                 <h4 v-if="activeQuestion.title" class="font-bold text-primary text-sm">
                   {{ activeQuestion.title }}
                 </h4>
-                <div
+                <RichContent
                   v-if="activeQuestion.content"
-                  class="text-primary text-sm leading-relaxed whitespace-pre-wrap font-sans p-3 bg-surface rounded-lg border border-line/60 shadow-xs"
-                >
-                  {{ activeQuestion.content }}
-                </div>
+                  :conteudo="activeQuestion.content"
+                  class="text-primary text-sm leading-relaxed p-3 bg-surface rounded-lg border border-line/60 shadow-xs"
+                />
                 <div v-else class="text-xs text-secondary italic p-3 bg-surface rounded-lg border border-dashed border-line">
                   Nenhum enunciado digitado ainda. Digite no editor ao lado para visualizar a prévia em tempo real.
                 </div>

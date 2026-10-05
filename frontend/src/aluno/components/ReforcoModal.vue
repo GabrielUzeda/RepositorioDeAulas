@@ -6,6 +6,7 @@ import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseBadge from '@/shared/components/BaseBadge.vue';
 import { shuffleQuestionOptions } from '@/shared/utils/shuffle';
+import RichContent from '@/shared/components/RichContent.vue';
 
 const props = withDefaults(defineProps<{
   show: boolean;
@@ -171,7 +172,7 @@ function prevQuestion() {
       <!-- Question Body -->
       <div v-if="currentQuestion" class="space-y-4 pt-1">
         <h4 v-if="currentQuestion.title" class="text-base font-semibold text-accent">{{ currentQuestion.title }}</h4>
-        <p class="text-primary text-base font-medium leading-relaxed whitespace-pre-wrap">{{ currentQuestion.content }}</p>
+        <RichContent :conteudo="currentQuestion.content" tag="p" class="text-primary text-base font-medium leading-relaxed" />
 
         <!-- Option Buttons -->
         <div class="space-y-3 pt-2">

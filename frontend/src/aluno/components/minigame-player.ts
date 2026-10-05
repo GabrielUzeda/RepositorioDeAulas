@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import { shuffleArray, isOrderSensitiveOption } from '@/shared/utils/shuffle';
+import { sanitizarHtml, contemHtml } from '@/shared/utils/sanitizeHtml';
 
 export class MinigamePlayer {
   constructor(activityData, onComplete, senhaCurso = '', senhaAtividade = '') {
@@ -459,7 +460,12 @@ export class MinigamePlayer {
     const q = this.availableQuestions.pop();
     if (!q) return;
 
-    document.getElementById('mg-q-text').innerText = q.enunciado;
+    const alvoEnunciado = document.getElementById('mg-q-text');
+    if (contemHtml(q.enunciado)) {
+      alvoEnunciado.innerHTML = sanitizarHtml(q.enunciado);
+    } else {
+      alvoEnunciado.innerText = q.enunciado;
+    }
     const area = document.getElementById('mg-options-area');
     area.innerHTML = '';
 

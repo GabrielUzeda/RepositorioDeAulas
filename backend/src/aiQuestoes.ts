@@ -29,6 +29,10 @@ export function diagnosticarQuestoes(
 
     if (!q.content || typeof q.content !== 'string' || q.content.trim().length < 10) {
       erros.push(`${prefix}: Enunciado muito curto ou vazio`);
+    } else {
+      for (const erroHtml of validarHtmlEnunciado(q.content)) {
+        erros.push(`${prefix}: ${erroHtml}`);
+      }
     }
 
     const tipo = (params.tipo || '').toLowerCase();
@@ -85,12 +89,50 @@ export function diagnosticarQuestoes(
   return erros;
 }
 
+export function converterMarkdownParaHtmlPermitido(conteudo: string): string {
+  if (!conteudo || !conteudo.includes('```')) return conteudo;
+
+  return conteudo.replace(/```([a-zA-Z0-9+#-]*)\n?([\s\S]*?)```/g, (_m, lang, codigo) => {
+    const classe = lang ? ` class="language-${lang}"` : '';
+    const escapado = codigo
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return `<pre><code${classe}>${escapado.replace(/\n$/, '')}</code></pre>`;
+  });
+}
+
+const TAGS_QUE_EXIGEM_FECHAMENTO = ['p', 'strong', 'b', 'em', 'i', 'u', 's', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span'];
+
+export function validarHtmlEnunciado(conteudo: string): string[] {
+  const erros: string[] = [];
+  if (!conteudo) return erros;
+
+  if (/<\s*\/(script|iframe|object|embed|style|form|img|svg|video|audio|template)\b|<(script|iframe|object|embed|style|form|img|svg|video|audio|template)\b|on[a-z]+\s*=/i.test(conteudo)) {
+    erros.push('O enunciado contém tags ou atributos não permitidos (use apenas p, strong, em, u, s, h2-h4, ul, ol, li, blockquote, pre e code).');
+  }
+
+  for (const tag of TAGS_QUE_EXIGEM_FECHAMENTO) {
+    const aberturas = (conteudo.match(new RegExp(`<${tag}(\\s[^>]*)?>`, 'gi')) || []).length;
+    const fechamentos = (conteudo.match(new RegExp(`</${tag}>`, 'gi')) || []).length;
+    if (aberturas !== fechamentos) {
+      erros.push(`Tag <${tag}> aberta ${aberturas} vez(es) e fechada ${fechamentos} vez(es) no enunciado.`);
+    }
+  }
+
+  return erros;
+}
+
 export function normalizarQuestoesComRubrica(questoes: any[], tipo: string): any[] {
   if (!Array.isArray(questoes)) return [];
 
   return questoes.map((q) => {
     if (!q || typeof q !== 'object') return q;
     const copia = { ...q };
+
+    if (typeof copia.content === 'string') {
+      copia.content = converterMarkdownParaHtmlPermitido(copia.content);
+    }
 
     const isDiscursiva = tipo === 'normal' || tipo === 'prova' || (!copia.options && !Array.isArray(copia.options));
 
@@ -156,12 +198,18 @@ ${
     : '6. Para questões objetivas, forneça exatamente 4 alternativas, sendo exatamente 1 correta (correct: true).'
 }
 
+Formatação do campo "content" (enunciado):
+- Use APENAS estas tags HTML: <p>, <strong>, <em>, <u>, <s>, <h2>-<h4>, <ul>, <ol>, <li>, <blockquote>, <pre> e <code>.
+- Para trechos de código (ex.: JavaScript, Python, SQL), SEMPRE envolva o código em <pre><code class="language-linguagem">...código escapado...</code></pre> (escape <, > e & dentro do código; NUNCA use <script>).
+- Destaque termos-chave com <strong>. Use listas <ul>/<ol> quando o enunciado tiver múltiplos passos ou itens.
+- Todas as tags abertas devem ser fechadas; não use tags fora da lista (nada de <img>, <script>, <style> ou atributos).
+
 Retorne ESTRITAMENTE um array JSON puro (sem markdown extra, sem comentários) contendo os objetos de questão.
 Exemplo de formato para objetiva:
 [
   {
     "title": "Conceito X",
-    "content": "Enunciado claro e contextualizado da questão?",
+    "content": "<p>Analise o código a seguir:</p><pre><code class=\"language-javascript\">let x = 10;\nconsole.log(x + 5);</code></pre><p>Qual o valor exibido no console?</p>",
     "options": [
       { "text": "Alternativa A incorreta com distrator conceitual.", "correct": false, "feedback": "Explicação do erro A." },
       { "text": "Alternativa B correta.", "correct": true },

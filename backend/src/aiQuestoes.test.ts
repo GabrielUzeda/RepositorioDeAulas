@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, test } from 'bun:test';
 import {
   diagnosticarQuestoes,
   normalizarQuestoesComRubrica,
   montarPromptQuestoes,
+  converterMarkdownParaHtmlPermitido,
+  validarHtmlEnunciado,
 } from './aiQuestoes';
 
 describe('aiQuestoes', () => {
@@ -92,5 +94,49 @@ describe('aiQuestoes', () => {
 
     expect(prompts.systemPrompt).toContain('objetiva');
     expect(prompts.userPrompt).toContain('Matemática');
+  });
+});
+
+describe('formatacao rica do enunciado (HTML permitido)', () => {
+  test('converterMarkdownParaHtmlPermitido converte fences em pre/code escapado', () => {
+    const md = 'Analise:\n```javascript\nif (a < b && c > d) { alert("&"); }\n```';
+    const html = converterMarkdownParaHtmlPermitido(md);
+    expect(html).toContain('<pre><code class="language-javascript">');
+    expect(html).toContain('if (a &lt; b &amp;&amp; c &gt; d)');
+    expect(html).not.toContain('<b'); // nada de tag crua dentro do código
+  });
+
+  test('converterMarkdownParaHtmlPermitido mantém texto sem fences intacto', () => {
+    expect(converterMarkdownParaHtmlPermitido('Questão simples sem código.')).toBe(
+      'Questão simples sem código.'
+    );
+  });
+
+  test('validarHtmlEnunciado aprova subconjunto permitido e recusa tags perigosas e desbalanceadas', () => {
+    const ok = '<p>Analise <strong>este código</strong>:</p><pre><code>x = 1;</code></pre>';
+    expect(validarHtmlEnunciado(ok)).toEqual([]);
+
+    const comScript = '<p>Veja</p><script>alert(1)</script>';
+    expect(validarHtmlEnunciado(comScript).some((e) => e.includes('não permitidos'))).toBe(true);
+
+    const desbalanceada = '<p>Texto em <strong>negrito</p>';
+    expect(validarHtmlEnunciado(desbalanceada).some((e) => e.includes('<strong>'))).toBe(true);
+  });
+
+  test('diagnosticarQuestoes acusa enunciado com HTML inválido', () => {
+    const questoes = [
+      {
+        title: 'Conceito de closures',
+        content: '<p>Texto</p><script>fetch("/x")</script>',
+        options: [
+          { text: 'A', correct: true },
+          { text: 'B', correct: false },
+          { text: 'C', correct: false },
+          { text: 'D', correct: false },
+        ],
+      },
+    ];
+    const erros = diagnosticarQuestoes(questoes, { qtdSolicitada: 1, tipo: 'normal' });
+    expect(erros.some((e) => e.includes('não permitidos'))).toBe(true);
   });
 });

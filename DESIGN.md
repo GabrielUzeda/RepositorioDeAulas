@@ -132,7 +132,8 @@ Configurada em `theme.extend.fontSize`. Fonte base: **Inter** (via Google Fonts 
 | `BaseSelect.vue` | `v-model` · `label` · `options` · `hint` · `error` · `placeholder` · `required` | ✅ em uso | Seleções |
 | `BaseCard.vue` | `title` · `padded` · `shadow` · `hoverable` + slots `header/footer` | ✅ disponível | Containers |
 | `BaseContentCard.vue` | `title` · `description` · `icon` · `color` · `badgeText` · `meta` · `actionText` + slots | ✅ em uso | Cards padronizados |
-| `RichTextEditor.vue` | `modelValue` · `label` · `placeholder` · `error` · `minHeight` | ✅ em uso | Editor rico anti-XSS |
+| `RichTextEditor.vue` | `modelValue` · `label` · `placeholder` · `error` · `minHeight` | ✅ em uso | Editor rico anti-XSS (enunciado de questão no editor do professor, resposta discursiva do aluno) |
+| `RichContent.vue` | `conteudo` · `tag` | ✅ em uso | Renderiza o enunciado (HTML permitido já sanitizado ou texto puro) para o aluno e no preview |
 | `BaseModal.vue` | `v-model` · `title` · `maxWidth` · `noPadding` + slots `header/footer` | ✅ em uso | Diálogos |
 | `BaseBadge.vue` | `variant: accent\|success\|danger\|warning\|secondary\|neutral` · `dot` | ✅ em uso | Status, categorias |
 | `BaseSpinner.vue` | `size: sm\|md\|lg` · `label` + `role="status"` | ✅ em uso | Loading states |

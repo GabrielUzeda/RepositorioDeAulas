@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
+import { sanitizarHtml, escaparHtml } from '@/shared/utils/sanitizeHtml';
 
 interface Props {
   modelValue?: string;
@@ -41,81 +42,13 @@ const exec = (command: string, value: string | null = null) => {
   updateValue();
 };
 
-// Função para sanitizar HTML prevenindo XSS via allowlist estrita de tags e atributos permitidos
-const ALLOWED_TAGS = new Set([
-  'HTML', 'HEAD', 'BODY',
-  'P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'H2', 'H3', 'H4',
-  'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'SPAN'
-]);
-
-const ALLOWED_ATTRS: Record<string, Set<string>> = {
-  PRE: new Set(['class']),
-  CODE: new Set(['class']),
-  SPAN: new Set(['class'])
-};
-
-const sanitizeHTML = (html: string): string => {
-  if (!html) return '';
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-
-  // 1. Remover completamente tags perigosas ou atípicas (scripts, iframes, svgs, math, templates, etc.)
-  const dangerousTags = doc.querySelectorAll('script, iframe, object, embed, form, input, button, select, textarea, svg, math, template, noscript, style, link, meta, base, applet, audio, video');
-  for (const el of Array.from(dangerousTags)) {
-    el.remove();
-  }
-
-  // 2. Processar recursivamente todos os elementos aplicando allowlist estrita
-  const sanitizeNode = (node: Node) => {
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const el = node as HTMLElement;
-      const tagName = el.tagName.toUpperCase();
-
-      if (!ALLOWED_TAGS.has(tagName)) {
-        // Tag não permitida: desempacota o conteúdo (ou remove se for elemento vazio)
-        const parent = el.parentNode;
-        while (el.firstChild) {
-          parent?.insertBefore(el.firstChild, el);
-        }
-        parent?.removeChild(el);
-        return;
-      }
-
-      // Filtrar atributos
-      const allowedAttrsForTag = ALLOWED_ATTRS[tagName] || new Set();
-      const attrs = Array.from(el.attributes);
-      for (const attr of attrs) {
-        const attrName = attr.name.toLowerCase();
-        const attrValue = attr.value.trim().toLowerCase();
-
-        // Bloquear inline event handlers e protocolos inseguros
-        if (
-          attrName.startsWith('on') ||
-          attrValue.startsWith('javascript:') ||
-          attrValue.startsWith('data:') ||
-          attrValue.startsWith('vbscript:') ||
-          !allowedAttrsForTag.has(attrName)
-        ) {
-          el.removeAttribute(attr.name);
-        }
-      }
-    }
-
-    // Processar nós filhos
-    const children = Array.from(node.childNodes);
-    for (const child of children) {
-      sanitizeNode(child);
-    }
-  };
-
-  sanitizeNode(doc.body);
-  return doc.body.innerHTML;
-};
+const sanitizeHTML = (html: string): string => sanitizarHtml(html);
 
 const insertCodeBlock = () => {
   const selection = window.getSelection();
   const selectedText = selection ? selection.toString() : '';
-  const codeHTML = `<pre class="bg-surface p-3 rounded-lg border border-line font-mono text-xs overflow-x-auto text-primary my-2"><code>${selectedText || '// Insira seu código aqui...'}</code></pre><p><br></p>`;
+  const conteudo = escaparHtml(selectedText || '// Insira seu código aqui...');
+  const codeHTML = `<pre class="bg-surface p-3 rounded-lg border border-line font-mono text-xs overflow-x-auto text-primary my-2"><code>${conteudo}</code></pre><p><br></p>`;
   exec('insertHTML', codeHTML);
 };
 

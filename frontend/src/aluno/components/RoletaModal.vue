@@ -4,6 +4,7 @@ import { useToast } from '@/shared/composables/useToast';
 import type { Question, Option, Atividade } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
+import RichContent from '@/shared/components/RichContent.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import BaseBadge from '@/shared/components/BaseBadge.vue';
 import { shuffleQuestionOptions } from '@/shared/utils/shuffle';
@@ -232,9 +233,10 @@ function handleNextQuestion() {
             </h4>
           </div>
 
-          <div class="text-base font-semibold text-primary leading-relaxed whitespace-pre-wrap">
-            {{ currentQuestion.content }}
-          </div>
+          <RichContent
+            :conteudo="currentQuestion.content"
+            class="text-base font-semibold text-primary leading-relaxed"
+          />
 
           <!-- Options -->
           <div class="space-y-2.5">

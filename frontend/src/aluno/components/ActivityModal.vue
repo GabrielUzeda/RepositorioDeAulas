@@ -10,6 +10,7 @@ import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import RichTextEditor from '@/shared/components/RichTextEditor.vue';
+import RichContent from '@/shared/components/RichContent.vue';
 
 const props = withDefaults(defineProps<{
   show: boolean;
@@ -483,12 +484,18 @@ async function handleSubmit() {
           <div v-if="currentStep === idx + 1" class="space-y-4">
             <div class="space-y-1.5">
               <h3 class="font-bold text-base text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</h3>
-              <p v-if="q.content && q.content !== q.title" class="text-sm text-secondary whitespace-pre-wrap leading-relaxed bg-surface-alt/50 p-3 rounded-lg border border-line">
-                {{ q.content }}
-              </p>
-              <p v-else-if="q.content && !q.title" class="text-sm text-secondary whitespace-pre-wrap leading-relaxed">
-                {{ q.content }}
-              </p>
+              <RichContent
+                v-if="q.content && q.content !== q.title"
+                :conteudo="q.content"
+                tag="p"
+                class="text-sm text-secondary leading-relaxed bg-surface-alt/50 p-3 rounded-lg border border-line"
+              />
+              <RichContent
+                v-else-if="q.content && !q.title"
+                :conteudo="q.content"
+                tag="p"
+                class="text-sm text-secondary leading-relaxed"
+              />
             </div>
             
             <div v-if="q.options && q.options.length > 0" class="grid gap-2">
@@ -519,9 +526,12 @@ async function handleSubmit() {
             <div class="flex justify-between items-start mb-1">
               <div class="space-y-0.5">
                 <p class="text-sm font-semibold text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</p>
-                <p v-if="q.content" class="text-xs text-secondary whitespace-pre-wrap">
-                  {{ q.content }}
-                </p>
+                <RichContent
+                  v-if="q.content"
+                  :conteudo="q.content"
+                  tag="p"
+                  class="text-xs text-secondary"
+                />
               </div>
               <BaseButton size="sm" variant="ghost" @click="currentStep = idx + 1">Editar</BaseButton>
             </div>
