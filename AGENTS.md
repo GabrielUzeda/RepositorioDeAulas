@@ -27,6 +27,7 @@ RepositorioDeAulas_new/
 │   ├── src/utils.ts            # sanitizeSlug, encryptData/decryptData, hashEmail
 │   ├── src/estatisticas.ts     # correção objetiva + contadores agregados por questão
 │   ├── src/fila.ts             # serializa tarefas pela mesma chave (submissões concorrentes)
+│   ├── src/htmlEmail.ts        # escapeHtml/removerTagsHtml/sanitizarHtmlEmail (allowlist p/ e-mails)
 │   └── src/templates/          # Templates de e-mail (envio_atividades.html)
 ├── frontend/                   # Vue 3 + Vite + Tailwind
 │   ├── src/admin/              # AdminView + modais (CRUD professor/curso)
@@ -103,6 +104,7 @@ docker compose -f docker-compose.e2e.yml up -d  # e2e manual
 
 ### Backend
 - **Hono** (framework) + **SQLite** via `dbq` (wrapper síncrono — `dbq(sql).get(...).run(...)`).
+- **HTML não confiável em e-mail**: todo conteúdo de aluno/professor interpolado em HTML de e-mail passa por `renderEmailHtmlContent()` de `backend/src/htmlEmail.ts` (tokenizador com allowlist, sem DOM: remove blocos perigosos com conteúdo, descarta tags/atributos fora da allowlist e só aceita `href` http/https/mailto). **Nunca** interpole `respostas`/`feedback` cru no template — `escapeHtml()` do mesmo módulo é o escape de texto puro. Espelho do lado do cliente: `frontend/src/shared/utils/sanitizeHtml.ts`.
 - **DB path**: `db.ts` usa `process.env.DATABASE_PATH || './data/app.db'` (relativo ao working_dir; no container `/app/data/app.db`). **`DB_PATH` não é lido** — só `DATABASE_PATH`.
 - **Criptografia/LGPD**: `encryptData/decryptData` (AES-GCM, prefixo `enc:v1:`), `hashEmail` (HMAC SHA-256 b64url; NÃO existe `hashData`). Respostas de alunos são criptografadas; e-mail é hasheado.
 - **Seed** (`db.ts`): cria admin com `process.env.PROFESSOR_EMAIL||'admin@escola.com'` e `PROFESSOR_PASSWORD||'MudeEstaSenha!'`, curso demo `demo-course` (senha `asdf1234`), disciplina e aulas demo.
