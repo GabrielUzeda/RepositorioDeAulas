@@ -476,7 +476,7 @@
   background: transparent;
   border: 1px solid transparent;
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 20px;
@@ -515,7 +515,7 @@
 #controls-bar #zoom-level,
 #controls-bar .zoom-indicator {
   font-weight: 600;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-family: var(--font-mono);
 }
 
@@ -541,7 +541,7 @@
 }
 
 #controls-bar .clock-display {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-family: var(--font-mono);
   font-weight: 600;
   letter-spacing: 0.5px;
@@ -581,7 +581,7 @@
   position: absolute;
   bottom: 20px;
   right: 24px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-weight: 600;
@@ -632,13 +632,13 @@
   animation: rotateHint 2.5s infinite ease-in-out;
 }
 .landscape-modal-card h3 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 700;
   margin-bottom: 8px;
   color: var(--text-primary, #f8fafc);
 }
 .landscape-modal-card p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
   color: var(--text-secondary, #94a3b8);
   margin-bottom: 22px;
@@ -650,7 +650,7 @@
   color: #ffffff;
   border: none;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -685,7 +685,7 @@
   padding: 6px 14px;
   border-radius: 20px;
   font-family: var(--font-mono, monospace);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   pointer-events: none;
   opacity: 0;

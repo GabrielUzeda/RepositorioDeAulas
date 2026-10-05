@@ -305,7 +305,7 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
 .mermaid-block svg {
   overflow: visible !important;
   max-width: 100%;
-  max-height: 45vh;
+  max-height: 42vh;
   height: auto;
   transform: scale(var(--font-scale, 1));
   transform-origin: center center;

@@ -73,6 +73,7 @@ flowchart TD
     expect(htmlDefault).toContain('rx: 6px');
     expect(htmlDefault).toContain('mermaid-error');
     expect(htmlDefault).toContain('error-box');
+    expect(htmlDefault).toContain('"fontSize":"16px"');
 
     const htmlLight = generateMarpNextStandaloneHtml('Aula Mermaid Light', mdMermaid.replace('theme: default', 'theme: light'));
     expect(htmlLight).toContain('data-theme="light"');

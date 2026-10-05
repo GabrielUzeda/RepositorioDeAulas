@@ -60,7 +60,7 @@ describe('themes and marp theme utilities', () => {
     test('preserva propriedades essenciais de contraste e estilo em todos os temas', () => {
       for (const key of THEME_KEYS) {
         const vars = MERMAID_THEME_VARIABLES[key];
-        expect(vars.fontSize).toBe('14px');
+        expect(vars.fontSize).toBe('16px');
         expect(vars.primaryColor).toBeDefined();
         expect(vars.primaryTextColor).toBeDefined();
         expect(vars.pie1).toBeDefined();

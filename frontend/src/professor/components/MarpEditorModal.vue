@@ -2265,7 +2265,7 @@ onBeforeUnmount(() => {
 
 /* MERMAID STYLING */
 :deep(.mermaid-block), :deep(.diagram-wrapper) { display: flex; justify-content: center; align-items: center; overflow-x: auto; overflow-y: visible !important; padding: 8px 0; }
-:deep(.mermaid-block svg), :deep(.diagram-wrapper svg) { overflow: visible !important; max-width: 100% !important; max-height: 55vh; height: auto; font-family: inherit; transform: scale(var(--font-scale, 1)); transform-origin: center center; }
+:deep(.mermaid-block svg), :deep(.diagram-wrapper svg) { overflow: visible !important; max-width: 100% !important; max-height: 42vh; height: auto; font-family: inherit; transform: scale(var(--font-scale, 1)); transform-origin: center center; }
 :deep(.mermaid-error), :deep(.error-box) { color: #dc2626; background-color: #fee2e2; border: 1px solid #f87171; border-radius: 8px; padding: 0.875rem 1rem; font-size: 0.875rem; font-family: var(--font-mono, monospace); white-space: pre-wrap; width: 100%; box-sizing: border-box; }
 .marpnext-modal-root[data-theme="dark"] :deep(.mermaid-error),
 .marpnext-modal-root[data-theme="dark"] :deep(.error-box) { background-color: #450a0a; color: #fca5a5; border-color: #991b1b; }

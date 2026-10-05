@@ -75,7 +75,7 @@ export interface MermaidThemeVariables {
 export const MERMAID_THEME_VARIABLES: Record<ThemeKey, MermaidThemeVariables> = {
   default: {
     fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-    fontSize: '14px',
+    fontSize: '16px',
     primaryColor: '#ffffff',
     primaryBorderColor: '#1a3a6e',
     primaryTextColor: '#1a3a6e',
@@ -129,7 +129,7 @@ export const MERMAID_THEME_VARIABLES: Record<ThemeKey, MermaidThemeVariables> = 
   },
   light: {
     fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-    fontSize: '14px',
+    fontSize: '16px',
     primaryColor: '#ffffff',
     primaryBorderColor: '#cbd5e1',
     primaryTextColor: '#0f172a',
@@ -183,7 +183,7 @@ export const MERMAID_THEME_VARIABLES: Record<ThemeKey, MermaidThemeVariables> = 
   },
   dark: {
     fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-    fontSize: '14px',
+    fontSize: '16px',
     primaryColor: '#1e293b',
     primaryBorderColor: '#475569',
     primaryTextColor: '#f8fafc',
