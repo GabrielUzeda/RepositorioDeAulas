@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { professorAuth } from './auth';
 import { db } from './db';
-import { decryptData, parseJsonOrNull } from './utils';
+import { parseJsonOrNull } from './utils';
 import { callAi, resolveConfig, resolveProvider, modelsUrl, type AiMessage } from './aiProvider';
 import { obterContextoDocumentosSobDemanda } from './documentIndexer';
 import { markdownParaContexto, distribuirOrcamentoContexto } from './aiContexto';
@@ -12,6 +12,21 @@ import {
 } from './aiQuestoes';
 import { getJob, cancelJob, createJob, registerJobProcessor, type JobCheckpointFn } from './aiJobs';
 import { executarAvaliacaoEmLote } from './aiAvaliacao';
+import { sintetizarFeedbackTurma } from './aiSintese';
+import {
+  SLIDES_TOTAIS_MIN,
+  SLIDES_TOTAIS_MAX,
+  FIXACAO_MIN,
+  FIXACAO_MAX,
+  diagnosticarOutline,
+  gerarFrontMatterEPrimeiroSlide,
+  parseOutline,
+  promptSecaoAula,
+  removerFrontMatterRestante,
+  validarAulaMarp,
+  validarSlideMarp,
+  type AulaOutline,
+} from './aiAula';
 
 const aiRouter = new Hono();
 
@@ -451,13 +466,7 @@ export async function generateAulaOutlineAndContent(options: {
     }
 
     if (aulas.length > 0) {
-      aulasContexto = aulas
-        .map((a, idx) => {
-          const conteudo = a.conteudo_md || '';
-          const textoFinal = conteudo.length > 16000 ? conteudo.slice(0, 16000) : conteudo;
-          return `--- AULA DE REFERÊNCIA ${idx + 1}: ${a.titulo} ---\n${textoFinal}`;
-        })
-        .join('\n\n');
+      aulasContexto = distribuirOrcamentoContexto(aulas, 30000);
     }
   }
 
@@ -489,15 +498,33 @@ export async function generateAulaOutlineAndContent(options: {
 
   if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
 
-  // FASE 1: Agente Planejador / Outline
-  const plannerSystemPrompt = `Você é um coordenador pedagógico e designer instrucional sênior. Sua tarefa é planejar a estrutura detalhada (outline) de uma aula completa de 12 a 16 slides sobre o tema fornecido.
-Defina:
-1. Título principal e subtítulo contextual.
-2. Objetivos de aprendizagem práticos.
-3. Checagem de pré-requisitos e abertura freiriana.
-4. Lista slide a slide dos tópicos de desenvolvimento (mínimo 10 slides de desenvolvimento, com conceitos progressivos, exemplos, diagramas planejados e reflexões).
-5. Aplicação prática, reflexão e perguntas de fixação.
-Responda em formato estruturado (JSON ou Markdown claro detalhando o outline).`;
+  // FASE 1: Agente Planejador / Outline estruturado
+  const plannerSystemPrompt = `Você é um coordenador pedagógico e designer instrucional sênior. Sua tarefa é planejar a estrutura detalhada (outline) de uma aula completa de ${SLIDES_TOTAIS_MIN} a ${SLIDES_TOTAIS_MAX} slides sobre o tema fornecido.
+
+Retorne ESTRITAMENTE um objeto JSON no formato:
+{
+  "titulo": "Título principal da aula",
+  "subtitulo": "Subtítulo contextual",
+  "objetivos": ["Objetivo de aprendizagem..."],
+  "prerequisitos": ["Pré-requisito..."],
+  "secoes": [
+    {
+      "titulo": "Título da seção",
+      "slides": [
+        { "titulo": "Título do slide", "objetivo": "Objetivo pedagógico do slide", "conceitos_novos": ["Conceito apresentado neste slide"], "recurso": "texto|codigo|tabela|mermaid|katex" }
+      ]
+    }
+  ],
+  "fixacao": ["Pergunta reflexiva 1", "Pergunta reflexiva 2", "Pergunta reflexiva 3"]
+}
+
+Regras:
+1. Total de ${SLIDES_TOTAIS_MIN} a ${SLIDES_TOTAIS_MAX} slides somando todas as seções (excluindo capa e fixação).
+2. Progressão pedagógica: do concreto ao abstrato; cada slide cobre um conceito novo (conceitos_novos nunca repete conceito de outro slide).
+3. Abertura com checagem de pré-requisitos e chamada freiriana.
+4. ${FIXACAO_MIN} a ${FIXACAO_MAX} perguntas de fixação.
+5. Fundamente nos documentos e aulas de referência; se não cobrirem o tema, não invente conceitos.
+6. Responda apenas com o JSON puro, sem formatação markdown.`;
 
   let plannerUserPrompt = `TEMA: ${tema || 'Conteúdo geral'}\n`;
   if (observacoes) plannerUserPrompt += `OBSERVAÇÕES: ${observacoes}\n`;
@@ -505,8 +532,11 @@ Responda em formato estruturado (JSON ou Markdown claro detalhando o outline).`;
   if (docsContexto) plannerUserPrompt += `\nDOCUMENTOS ORIENTADORES:\n${docsContexto}\n`;
   plannerUserPrompt += `Gere o outline pedagógico estruturado para esta aula.`;
 
+  let outline: AulaOutline | null = null;
   let outlineResult = '';
   let modeloUtilizado = '';
+  const avisos: string[] = [];
+
   try {
     const plannerMessages: AiMessage[] = [
       { role: 'system', content: plannerSystemPrompt },
@@ -516,11 +546,27 @@ Responda em formato estruturado (JSON ou Markdown claro detalhando o outline).`;
       messages: plannerMessages,
       temperature: 0.4,
       timeoutMs: 120000,
+      task: 'aula',
+      maxRepairs: 1,
+      diagnose: (conteudoPlanner) => {
+        const parsed = parseOutline(conteudoPlanner);
+        if (!parsed) return ['A resposta não contém o objeto JSON do outline esperado.'];
+        return diagnosticarOutline(parsed);
+      },
     });
-    outlineResult = pRes.content;
+    outline = parseOutline(pRes.content);
     modeloUtilizado = pRes.modelUsed;
   } catch (_e: any) {
+    outline = null;
+  }
+
+  if (outline) {
+    outlineResult = JSON.stringify(outline);
+  } else {
     outlineResult = tema || 'Outline gerado automaticamente';
+    avisos.push(
+      'Falha ao planejar o outline estruturado; a aula foi gerada em chamada única a partir do tema.'
+    );
   }
 
   if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
@@ -529,7 +575,84 @@ Responda em formato estruturado (JSON ou Markdown claro detalhando o outline).`;
 
   if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
 
-  // FASE 2: Agente Redator / Expansão Marp
+  let content = '';
+
+  if (outline && Array.isArray(outline.secoes) && outline.secoes.length > 0) {
+    // FASE 2A: Redação por seção (D3-B)
+    let autor = '';
+    if (professorId) {
+      const profRow = db.query('SELECT nome FROM professores WHERE id = ?').get(professorId) as
+        | { nome: string }
+        | undefined;
+      autor = profRow?.nome || '';
+    }
+    const capa = gerarFrontMatterEPrimeiroSlide(outline, autor);
+    const conceitosJaCobertos: string[] = [];
+    const titulosSlidesAnteriores: string[] = [];
+    const secoesMd: string[] = [];
+    const totalSecoes = outline.secoes.length;
+
+    for (let i = 0; i < totalSecoes; i++) {
+      if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+      const secao = outline.secoes[i];
+      const pctSecao = 35 + Math.round((i / totalSecoes) * 45);
+      await checkpoint?.(
+        `${pctSecao}% - Redigindo seção ${i + 1} de ${totalSecoes}: ${secao.titulo}...`,
+        { fase: 'secoes', secao: i + 1, total: totalSecoes }
+      );
+
+      const { systemPrompt: secSys, userPrompt: secUser } = promptSecaoAula({
+        outline,
+        indiceSecao: i,
+        conceitosJaCobertos,
+        titulosSlidesAnteriores,
+        contextoLimpo: aulasContexto,
+      });
+
+      try {
+        const resSecao = await callAi({
+          messages: [
+            { role: 'system', content: secSys },
+            { role: 'user', content: secUser },
+          ],
+          temperature: 0.45,
+          timeoutMs: 180000,
+          task: 'aula',
+          maxRepairs: 1,
+          diagnose: (conteudoSecao) => validarSlideMarp(conteudoSecao),
+        });
+        modeloUtilizado = resSecao.modelUsed || modeloUtilizado;
+        const secaoLimpa = removerFrontMatterRestante(resSecao.content);
+
+        const errosValidacao = validarAulaMarp(secaoLimpa);
+        if (!errosValidacao.valido) {
+          avisos.push(`Seção ${i + 1} (${secao.titulo}): ${errosValidacao.erros.join(' ')}`);
+        }
+
+        secoesMd.push(secaoLimpa);
+        for (const linha of secaoLimpa.split('\n')) {
+          const mTitulo = linha.match(/^#{1,2}\s+(.*)/);
+          if (mTitulo) titulosSlidesAnteriores.push(mTitulo[1].trim());
+        }
+        for (const slide of secao.slides || []) {
+          conceitosJaCobertos.push(...(slide.conceitos_novos || []).filter(Boolean));
+        }
+      } catch (e: any) {
+        throw new Error(
+          `Falha ao redigir a seção ${i + 1} (${secao.titulo}) com IA: ${e.message || 'Erro de conexão/timeout'}`
+        );
+      }
+    }
+
+    if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+
+    const fixacaoItens = (outline.fixacao || []).map((q) => `- ${q}`).join('\n');
+    const blocoFixacao = fixacaoItens
+      ? `\n\n---\n\n## Verifique o que você aprendeu\n\n${fixacaoItens}\n`
+      : '';
+    content = [capa, secoesMd.join('\n\n---\n\n')].join('\n\n---\n\n') + blocoFixacao;
+  } else {
+    // FASE 2B: Redação em chamada única (fallback, sem outline estruturado)
   const MARP_SYSTEM_PROMPT = `<INSTRUCOES>
 Você é um especialista em didática, design instrucional e metodologias de ensino inclusivo para adolescentes e adultos.
 Você é ótimo combinando clareza formal com narrativas, analogias e educação preventiva.
@@ -572,7 +695,6 @@ Responda somente com a aula gerada.
   if (docsContexto) writerUserPrompt += `DOCUMENTOS ORIENTADORES:\n\n${docsContexto}\n\n`;
   writerUserPrompt += 'Gere a aula completa no formato Marp Next Markdown seguindo rigorosamente o outline e as instruções. Responda APENAS com o markdown da aula, sem nenhum texto introdutório ou explicativo.';
 
-  let content = '';
   try {
     const messages: AiMessage[] = [
       { role: 'system', content: MARP_SYSTEM_PROMPT },
@@ -582,12 +704,14 @@ Responda somente com a aula gerada.
       messages,
       temperature: 0.55,
       timeoutMs: 180000,
-      validate: (content) => normalizeMarpMarkdown(content).includes('---'),
+      task: 'aula',
+      validate: (conteudoUnico) => normalizeMarpMarkdown(conteudoUnico).includes('---'),
     });
     content = result.content;
     modeloUtilizado = result.modelUsed || modeloUtilizado;
   } catch (e: any) {
     throw new Error(`Falha na expansão de slides com IA: ${e.message || 'Erro de conexão/timeout'}`);
+  }
   }
 
   if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
@@ -603,10 +727,9 @@ Responda somente com a aula gerada.
     throw new Error('A IA não retornou Markdown Marp válido');
   }
 
-  const titleMatch = cleaned.match(/^---[\s\S]*?title:\s*(.+)/m);
-  const titulo_sugerido = titleMatch
-    ? titleMatch[1].trim().replace(/^['"]|['"]$/g, '')
-    : tema || 'Nova Aula';
+  const titulo_sugerido = outline
+    ? outline.titulo.trim()
+    : (cleaned.match(/^---[\s\S]*?title:\s*(.+)/m)?.[1]?.trim().replace(/^['"]|['"]$/g, '') || tema || 'Nova Aula');
 
   return {
     success: true,
@@ -614,6 +737,7 @@ Responda somente com a aula gerada.
     titulo_sugerido,
     modelo_utilizado: modeloUtilizado,
     outline: outlineResult,
+    ...(avisos.length > 0 ? { avisos } : {}),
   };
 }
 
@@ -842,35 +966,10 @@ aiRouter.post('/evaluate-activity-responses', professorAuth, async (c) => {
   return handleEvaluateActivityResponses(c);
 });
 
-function parseSynthesis(content: string): any | null {
-  try {
-    const cleaned = content
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim();
-    const parsed = JSON.parse(cleaned);
-    if (!parsed.feedback_geral) return null;
-    return {
-      feedback_geral: String(parsed.feedback_geral).trim(),
-      pontos_fortes: Array.isArray(parsed.pontos_fortes) ? parsed.pontos_fortes : [],
-      pontos_atencao: Array.isArray(parsed.pontos_atencao) ? parsed.pontos_atencao : [],
-      alunos_sintese: Array.isArray(parsed.alunos_sintese)
-        ? parsed.alunos_sintese.map((s: any) => ({
-            aluno_email: String(s.aluno_email || '')
-              .trim()
-              .toLowerCase(),
-            feedback_individual: String(s.feedback_individual || '').trim(),
-          }))
-        : [],
-    };
-  } catch {
-    return null;
-  }
-}
-
 aiRouter.post('/synthesize-class-feedback', professorAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const {
+    disciplina_id,
     disciplina_nome,
     total_envios,
     respostas_resumo,
@@ -883,139 +982,57 @@ aiRouter.post('/synthesize-class-feedback', professorAuth, async (c) => {
     typeof observacoes === 'string' ? observacoes.trim().slice(0, 2000) : undefined;
   const severidadeSafe = typeof severidade === 'string' ? severidade.trim() : 'moderado';
 
-  let severidadeInstrucao = '';
-  switch (severidadeSafe) {
-    case 'brando':
-      severidadeInstrucao =
-        'Nível de severidade: BRANDO. Seja acolhedor e encorajador, valorizando o esforço e a participação dos alunos.';
-      break;
-    case 'rigoroso':
-      severidadeInstrucao =
-        'Nível de severidade: RIGOROSO. Seja criterioso e exigente, destacando omissões conceituais, atividades pendentes e necessidade de maior comprometimento.';
-      break;
-    case 'sistematico':
-      severidadeInstrucao =
-        'Nível de severidade: SISTEMÁTICO. Analise detalhadamente com método pragmático, objetivo e estruturado item a item.';
-      break;
-    default:
-      severidadeInstrucao =
-        'Nível de severidade: MODERADO. Mantenha equilíbrio justo entre rigor pedagógico e acolhimento construtivo.';
-      break;
-  }
+  const targetDisciplinaId = disciplina_id ? Number(disciplina_id) : null;
+  const professorId = Number(c.get('professorId'));
+  const professorRole = c.get('professorRole') || 'professor';
 
-  let systemPrompt = `Você é um coordenador pedagógico sênior especializado em síntese avaliativa e devolutiva formativa.
-Sua missão é analisar o conjunto de desempenhos, notas e todos os N feedbacks individuais que cada aluno recebeu nas atividades ao longo da disciplina e produzir:
-1. Um parecer consolidado para a turma ("feedback_geral", "pontos_fortes", "pontos_atencao").
-2. Uma síntese individual e longitudinal para CADA aluno informado ("alunos_sintese"), consolidando os N feedbacks que ele recebeu nas atividades da disciplina para orientar sua evolução pedagógica.
-
-${severidadeInstrucao}
-
-Retorne ESTRITAMENTE um objeto JSON no formato:
-{
-  "feedback_geral": "Texto fluido e encorajador para ser compartilhado com toda a turma...",
-  "pontos_fortes": ["Ponto forte 1", "Ponto forte 2"],
-  "pontos_atencao": ["Tópico onde a turma apresentou dúvidas..."],
-  "alunos_sintese": [
-    {
-      "aluno_email": "email@do.aluno",
-      "feedback_individual": "Síntese individual personalizada para o aluno, destacando sua progressão através das atividades e sugestões de aprimoramento..."
+  if (targetDisciplinaId) {
+    if (!Number.isInteger(targetDisciplinaId)) {
+      return c.json({ success: false, error: 'disciplina_id inválido.' }, 400);
     }
-  ]
-}
-
-Regras:
-1. O texto geral e os individuais devem ser motivadores, claros e pedagógicos.
-2. Na lista "alunos_sintese", gere uma entrada para cada aluno informado com seu respectivo email e feedback_individual sintetizado a partir de seus desempenhos nas atividades.
-3. Importante sobre a média e atividades pendentes: a média geral da disciplina considera nota 0 para atividades que a turma realizou mas o aluno NÃO entregou. Se o aluno possuir atividades pendentes/não entregues, mencione isso construtivamente em sua devolutiva individual, incentivando-o a regularizar suas pendências.
-4. Responda apenas com o JSON puro sem formatação markdown.`;
-
-  if (observacoesLimpo) {
-    systemPrompt += `\n\nOBSERVAÇÕES E DIRETRIZES DO PROFESSOR (DEVEM SER ESTRITAMENTE RESPEITADAS):\n${observacoesLimpo}`;
-  }
-
-  let userPrompt = `DISCIPLINA: ${disciplina_nome || 'Geral'}\nTOTAL DE ALUNOS/ENVIOS: ${total_envios || 0}\n`;
-  if (observacoesLimpo) {
-    userPrompt += `ORIENTAÇÕES DO PROFESSOR: ${observacoesLimpo}\n`;
-  }
-  userPrompt += `\n`;
-
-  const alunosLista =
-    Array.isArray(alunos_detalhes) && alunos_detalhes.length > 0
-      ? alunos_detalhes
-      : Array.isArray(respostas_resumo)
-        ? respostas_resumo
-        : [];
-
-  if (alunosLista.length > 0) {
-    userPrompt += `HISTÓRICO DE ATIVIDADES E FEEDBACKS POR ALUNO:\n`;
-    alunosLista.slice(0, 30).forEach((item: any, idx: number) => {
-      const nome = item.aluno_nome || item.aluno || 'Anônimo';
-      const email = item.aluno_email || '';
-      const emailInfo = email ? ` (${email})` : '';
-      const mediaVal =
-        item.media_calculada !== undefined && item.media_calculada !== null
-          ? item.media_calculada
-          : item.media !== undefined && item.media !== null
-            ? item.media
-            : item.nota !== undefined
-              ? item.nota
-              : null;
-      const media = mediaVal !== null ? ` | Média Geral da Disciplina: ${mediaVal}/100` : '';
-      userPrompt += `\n[ALUNO ${idx + 1}] ${nome}${emailInfo}${media}:\n`;
-      if (Array.isArray(item.atividades) && item.atividades.length > 0) {
-        item.atividades.forEach((atv: any, atvIdx: number) => {
-          const notaStr =
-            atv.nota !== null && atv.nota !== undefined ? `Nota: ${atv.nota}/100` : 'Sem nota';
-          const feedStr = atv.feedback ? `Feedback: "${atv.feedback}"` : 'Sem comentários';
-          userPrompt += `  - Atividade entregue "${atv.atividade_titulo || `Atividade ${atvIdx + 1}`}": ${notaStr} | ${feedStr}\n`;
-        });
-      } else if (item.feedback || item.respostas_principais) {
-        userPrompt += `  - Feedbacks anteriores: ${item.feedback || item.respostas_principais}\n`;
-      } else {
-        userPrompt += `  - Nenhuma atividade entregue com feedbacks preliminares.\n`;
-      }
-
-      if (Array.isArray(item.atividades_pendentes) && item.atividades_pendentes.length > 0) {
-        userPrompt += `  - Atividades NÃO ENTREGUES nesta disciplina (contabilizadas com nota 0 na média geral):\n`;
-        item.atividades_pendentes.forEach((pend: any) => {
-          userPrompt += `    * "${pend.atividade_titulo || pend.titulo || 'Atividade pendente'}" (Pendente/Não entregue)\n`;
-        });
-      }
-    });
-  }
-
-  let synthesisResult: any = null;
-
-  try {
-    const messages: AiMessage[] = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ];
-    const result = await callAi({
-      messages,
-      temperature: 0.3,
-      timeoutMs: 60000,
-      validate: (content) => parseSynthesis(content) !== null,
-    });
-    const parsed = parseSynthesis(result.content);
-    if (parsed) {
-      synthesisResult = {
-        ...parsed,
-        modelo_utilizado: result.modelUsed,
-      };
+    if (professorRole !== 'admin') {
+      const d = db
+        .query('SELECT curso_id FROM disciplinas WHERE id = ?')
+        .get(targetDisciplinaId) as any;
+      if (!d) return c.text('Access denied', 403);
+      const hasPerm = db
+        .query('SELECT 1 FROM curso_professores WHERE curso_id = ? AND professor_id = ?')
+        .get(d.curso_id, professorId);
+      if (!hasPerm) return c.text('Access denied', 403);
     }
-  } catch {
-    synthesisResult = null;
   }
 
-  if (!synthesisResult) {
+  if (!targetDisciplinaId && !Array.isArray(alunos_detalhes) && !Array.isArray(respostas_resumo)) {
     return c.json(
-      { success: false, error: 'Falha na síntese por IA: resposta sem formato JSON esperado' },
-      502
+      { success: false, error: 'Informe disciplina_id ou a lista de alunos para a síntese.' },
+      400
     );
   }
 
-  return c.json({ success: true, ...synthesisResult });
+  try {
+    const resultado = await sintetizarFeedbackTurma({
+      disciplina_id: targetDisciplinaId,
+      alunos_detalhes: Array.isArray(alunos_detalhes)
+        ? alunos_detalhes
+        : Array.isArray(respostas_resumo)
+          ? respostas_resumo
+          : undefined,
+      observacoes: observacoesLimpo,
+      severidade: severidadeSafe,
+      disciplina_nome: typeof disciplina_nome === 'string' ? disciplina_nome : '',
+    });
+
+    return c.json({
+      success: true,
+      ...resultado,
+      total_envios: targetDisciplinaId ? undefined : total_envios || 0,
+    });
+  } catch (e: any) {
+    return c.json(
+      { success: false, error: e?.message || 'Falha na síntese por IA' },
+      502
+    );
+  }
 });
 
 aiRouter.post('/jobs', professorAuth, async (c) => {

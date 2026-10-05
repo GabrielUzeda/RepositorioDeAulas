@@ -148,26 +148,10 @@ async function handleGenerateAiSynthesis() {
   if (!props.disciplinaId || aiJob.isRunning.value || alunos.value.length === 0) return;
 
   try {
-    const alunosDetalhes = alunos.value.map(a => {
-      return {
-        aluno_nome: a.aluno_nome,
-        aluno_email: a.aluno_email,
-        media_calculada: a.media_calculada,
-        atividades: a.atividades.map(atv => ({
-          atividade_titulo: atv.atividade_titulo,
-          nota: atv.nota,
-          feedback: atv.feedback || null
-        })),
-        atividades_pendentes: a.atividades_pendentes || []
-      };
-    });
-
     const res = await aiJob.startJob('/ai/synthesize-class-feedback', {
-      disciplina_nome: props.disciplinaNome || 'Disciplina',
-      total_envios: alunos.value.length,
+      disciplina_id: props.disciplinaId,
       severidade: aiSeveridade.value,
-      observacoes: aiObservacoes.value.trim() || undefined,
-      alunos_detalhes: alunosDetalhes
+      observacoes: aiObservacoes.value.trim() || undefined
     });
 
     if (res) {
@@ -190,6 +174,10 @@ async function handleGenerateAiSynthesis() {
             aluno.feedback_geral = individual;
           }
         }
+      }
+
+      if (Array.isArray(res.falhas) && res.falhas.length > 0) {
+        useToast().warning(`${res.falhas.length} aluno(s) não puderam ser sintetizados. Tente novamente mais tarde.`);
       }
 
       useToast().success('Síntese pedagógica da turma e feedbacks individuais sintetizados com sucesso!');
