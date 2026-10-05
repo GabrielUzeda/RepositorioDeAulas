@@ -2348,7 +2348,8 @@ onBeforeUnmount(() => {
   width: 100vw !important;
   height: 100vh !important;
   overflow: hidden !important;
-  user-select: none;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .present-mode :deep(.slide) {
   position: absolute !important;

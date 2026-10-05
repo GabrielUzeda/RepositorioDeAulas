@@ -131,8 +131,17 @@ html, body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   overflow: hidden;
-  user-select: none;
+  user-select: text;
+  -webkit-user-select: text;
   touch-action: pan-y;
+}
+
+#controls-bar,
+.slide-number,
+#landscape-modal,
+#zoom-indicator-pill {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 #slides-container {
