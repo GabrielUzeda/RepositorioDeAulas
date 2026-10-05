@@ -95,7 +95,7 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
     const rawHtml = renderMarkdown(slide.content);
 
     slidesHtml += `
-    <section class="${cls}" data-slide="${i}" ${animAttr} ${staggerAttr} ${styleAttr}>
+    <section class="${cls}" id="slide-${i + 1}" data-slide="${i}" ${animAttr} ${staggerAttr} ${styleAttr}>
       <span class="slide-number">${i + 1}/${slides.length}</span>
       <div class="slide-content">${rawHtml}</div>
     </section>`;
@@ -466,6 +466,25 @@ function activateSlide(idx) {
   });
   document.getElementById('counter').textContent = (currentSlide + 1) + '/' + totalSlides;
   document.getElementById('progress-bar').style.width = (((currentSlide + 1) / totalSlides) * 100) + '%';
+  syncHashWithSlide();
+}
+
+function slideIndexFromHash() {
+  const m = (window.location.hash || '').match(/^#slide-(\d+)$/);
+  if (!m) return 0;
+  const n = parseInt(m[1], 10);
+  if (!isFinite(n) || n < 1) return 0;
+  return Math.min(n - 1, totalSlides - 1);
+}
+
+function syncHashWithSlide() {
+  const desired = '#slide-' + (currentSlide + 1);
+  if (window.location.hash === desired) return;
+  try {
+    window.history.replaceState(null, '', desired);
+  } catch (e) {
+    window.location.hash = desired;
+  }
 }
 
 function decodeHtmlEntities(str) {
@@ -1104,7 +1123,11 @@ function renderAllKaTeX() {
   });
 }
 
-activateSlide(0);
+activateSlide(slideIndexFromHash());
+window.addEventListener('hashchange', () => {
+  const target = slideIndexFromHash();
+  if (target !== currentSlide) activateSlide(target);
+});
 renderAllKaTeX();
 renderAllCodeHighlight();
 updateThemeUI('${initialTheme}');
