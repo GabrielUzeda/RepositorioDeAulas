@@ -245,6 +245,14 @@ function escapeHtml(value: any): string {
     .replace(/'/g, '&#039;');
 }
 
+function removerTagsHtml(valor: unknown): string {
+  return String(valor ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function renderEmailHtmlContent(text: string): string {
   if (!text) return '';
   if (/<[a-z][\s\S]*>/i.test(text)) {
@@ -1550,7 +1558,9 @@ async function handleSubmeterResposta(c: any, overrideAtividadeId?: number) {
             const qId = q.id !== undefined ? String(q.id) : String(idx);
             const resp = mapRespostas[qId] ?? mapRespostas[idx] ?? mapRespostas[`q_${idx}`] ?? mapRespostas[`q_${qId}`] ?? 'Não respondida';
             const respText = typeof resp === 'object' ? JSON.stringify(resp) : String(resp);
-            const tituloQuestao = escapeHtml(q.title || q.titulo || q.statement || q.content || `Questão ${idx + 1}`);
+            const tituloQuestao = escapeHtml(
+            removerTagsHtml(q.title || q.titulo || q.statement || q.content) || `Questão ${idx + 1}`
+          );
             return `<div style="margin-bottom: 12px; padding: 10px; background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
               <strong style="color: #1e293b;">Questão ${idx + 1}: ${tituloQuestao}</strong><br/>
               <div style="color: #0284c7; margin-top: 4px;">${renderEmailHtmlContent(respText)}</div>
