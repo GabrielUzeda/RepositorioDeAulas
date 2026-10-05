@@ -1203,14 +1203,14 @@ export function processMarpContent(
 
   try {
     writeFileSync(mdPath, mdContent);
-  } catch (err) {
+  } catch {
     return { error: 'Falha ao salvar o arquivo da aula no servidor.' };
   }
 
   try {
     const standaloneHtml = generateMarpNextStandaloneHtml(titulo, mdContent);
     writeFileSync(htmlPath, standaloneHtml);
-  } catch (err) {
+  } catch {
     return { error: 'Falha ao gerar o HTML da aula.' };
   }
 
