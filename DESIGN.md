@@ -129,12 +129,13 @@ Configurada em `theme.extend.fontSize`. Fonte base: **Inter** (via Google Fonts 
 | `BaseButton.vue` | `variant: primary\|secondary\|danger\|success\|ghost` · `size: xs\|sm\|md\|lg` · `loading` · `block` · `disabled` | ✅ em uso | Todas as ações |
 | `BaseInput.vue` | `v-model` · `label` · `type` · `icon` · `hint` · `error` · `required` · `disabled` | ✅ em uso | Formulários |
 | `BaseTextarea.vue` | `v-model` · `label` · `hint` · `error` · `rows` · `required` | ✅ em uso | Campos longos |
-| `BaseSelect.vue` | `v-model` · `label` · `options` · `hint` · `error` · `placeholder` · `required` | ✅ em uso | Seleções |
+| `BaseSelect.vue` | `v-model` · `label` · `options` · `hint` · `error` · `placeholder` · `required` · `ariaLabel` | ✅ em uso | Seleções |
 | `BaseCard.vue` | `title` · `padded` · `shadow` · `hoverable` + slots `header/footer` | ✅ disponível | Containers |
 | `BaseContentCard.vue` | `title` · `description` · `icon` · `color` · `badgeText` · `meta` · `actionText` + slots | ✅ em uso | Cards padronizados |
-| `RichTextEditor.vue` | `modelValue` · `label` · `placeholder` · `error` · `minHeight` | ✅ em uso | Editor rico anti-XSS (enunciado de questão no editor do professor, resposta discursiva do aluno) |
+| `RichTextEditor.vue` | `modelValue` · `label` · `placeholder` · `error` · `minHeight` · `externalFullscreen` · `fullscreenActive` | ✅ em uso | Editor rico anti-XSS (enunciado de questão no editor do professor, resposta discursiva do aluno). Com `externalFullscreen`, o botão de expandir emite `toggle-fullscreen` em vez de isolar o editor |
+| `CodeEditorField.vue` | `modelValue` (texto puro) · `linguagem` · `placeholder` · `minHeight` · `maxHeight` · `readonly` · `ariaLabel` | ✅ em uso | Editor de código CodeMirror 6 (modo código da resposta discursiva do aluno). Realce, números de linha, Tab/indentação, auto-fechamento de pares, busca; linguagens carregadas sob demanda |
 | `RichContent.vue` | `conteudo` · `tag` | ✅ em uso | Renderiza o enunciado (HTML permitido já sanitizado ou texto puro) para o aluno e no preview |
-| `BaseModal.vue` | `v-model` · `title` · `maxWidth` · `noPadding` + slots `header/footer` | ✅ em uso | Diálogos |
+| `BaseModal.vue` | `v-model` · `title` · `maxWidth` · `noPadding` · `allowFullscreen` · `fullscreen` (`v-model:fullscreen`) + slots `header/footer` | ✅ em uso | Diálogos; `fullscreen` permite controlar a tela cheia de fora (usado para o modo código expandir o modal inteiro) |
 | `BaseBadge.vue` | `variant: accent\|success\|danger\|warning\|secondary\|neutral` · `dot` | ✅ em uso | Status, categorias |
 | `BaseSpinner.vue` | `size: sm\|md\|lg` · `label` + `role="status"` | ✅ em uso | Loading states |
 | `EmptyState.vue` | `icon` · `title` · `message` · `size` + slot `action` | ✅ em uso | Estados vazios |
