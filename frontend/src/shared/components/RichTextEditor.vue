@@ -14,6 +14,8 @@ interface Props {
   minHeight?: string;
   externalFullscreen?: boolean;
   fullscreenActive?: boolean;
+  codeToggleVisible?: boolean;
+  codeToggleActive?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -22,14 +24,18 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   externalFullscreen: false,
   fullscreenActive: false,
+  codeToggleVisible: false,
+  codeToggleActive: false,
 });
 
-const emit = defineEmits(['update:modelValue', 'toggle-fullscreen']);
+const emit = defineEmits(['update:modelValue', 'toggle-fullscreen', 'toggle-code-mode']);
 
 const editor = ref<HTMLElement | null>(null);
 const isFullscreen = ref(false);
 const isFocused = ref(false);
 const editorId = props.id || `rte-${Math.random().toString(36).substr(2, 9)}`;
+
+const expandido = computed(() => props.externalFullscreen && props.fullscreenActive);
 
 const charCount = computed(() => {
   return editor.value ? editor.value.innerText.length : 0;
@@ -161,12 +167,12 @@ const handleKeydown = (e: KeyboardEvent) => {
 </script>
 
 <template>
-  <div :class="['w-full', !props.externalFullscreen && isFullscreen ? 'fixed inset-0 z-[9999] bg-surface p-4' : '']">
+  <div :class="['w-full', !props.externalFullscreen && isFullscreen ? 'fixed inset-0 z-[9999] bg-surface p-4' : '', expandido ? 'flex-1 flex flex-col min-h-0' : '']">
     <label v-if="label" :for="editorId" class="block text-sm font-medium text-secondary mb-1">
       {{ label }} <span v-if="required" class="text-danger">*</span>
     </label>
 
-    <div :class="['border rounded-md overflow-hidden bg-surface-alt transition-all', error ? 'border-danger' : 'border-line focus-within:ring-2 ring-accent']">
+    <div :class="['border rounded-md overflow-hidden bg-surface-alt transition-all', error ? 'border-danger' : 'border-line focus-within:ring-2 ring-accent', expandido ? 'flex-1 flex flex-col min-h-0' : '']">
       <!-- Toolbar -->
       <div class="flex flex-wrap items-center gap-1 p-2 border-b border-line bg-surface select-none">
         <button type="button" @mousedown.prevent="exec('bold')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Negrito"><i class="material-icons text-base leading-none">format_bold</i></button>
@@ -178,7 +184,19 @@ const handleKeydown = (e: KeyboardEvent) => {
         <button type="button" @mousedown.prevent="insertCodeBlock" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Bloco de Código"><i class="material-icons text-base leading-none">code</i></button>
         <button type="button" @mousedown.prevent="exec('removeFormat')" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" title="Limpar"><i class="material-icons text-base leading-none">format_clear</i></button>
         <div class="ml-auto flex items-center">
-          <button type="button" @mousedown.prevent="handleFullscreenToggle" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" :title="fullscreenTitle">
+          <button
+            v-if="props.externalFullscreen && props.codeToggleVisible"
+            type="button"
+            @click="$emit('toggle-code-mode')"
+            class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors"
+            :class="props.codeToggleActive ? 'bg-accent/15 text-accent ring-1 ring-accent' : ''"
+            :title="props.codeToggleActive ? 'Voltar para o editor de texto com formatação' : 'Ativar modo código (IDE) nesta resposta'"
+            :aria-label="props.codeToggleActive ? 'Modo texto' : 'Modo código'"
+            :aria-pressed="props.codeToggleActive"
+          >
+            <i class="material-icons text-base leading-none">{{ props.codeToggleActive ? 'edit_note' : 'code' }}</i>
+          </button>
+          <button v-else-if="!props.externalFullscreen" type="button" @mousedown.prevent="handleFullscreenToggle" class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors" :title="fullscreenTitle">
             <i class="material-icons text-base leading-none">{{ fullscreenIcon }}</i>
           </button>
         </div>
@@ -195,7 +213,7 @@ const handleKeydown = (e: KeyboardEvent) => {
         @blur="handleBlur"
         :style="{ minHeight: !props.externalFullscreen && isFullscreen ? '90vh' : minHeight }"
         class="p-4 outline-none text-primary bg-transparent rich-text-content"
-        :class="[disabled ? 'opacity-50 cursor-not-allowed' : '']"
+        :class="[disabled ? 'opacity-50 cursor-not-allowed' : '', expandido ? 'flex-1' : '']"
         :placeholder="placeholder"
       ></div>
       

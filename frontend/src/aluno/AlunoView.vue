@@ -13,6 +13,7 @@ import ReforcoModal from '@/aluno/components/ReforcoModal.vue';
 import RoletaModal from '@/aluno/components/RoletaModal.vue';
 import MinigameModal from '@/aluno/components/MinigameModal.vue';
 import ThemeToggle from '@/shared/components/ThemeToggle.vue';
+import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
 import BaseSkeleton from '@/shared/components/BaseSkeleton.vue';
 import BackButton from '@/shared/components/BackButton.vue';
@@ -35,6 +36,7 @@ const showActivityModal = ref(false);
 const showReforcoModal = ref(false);
 const showRoletaModal = ref(false);
 const showMinigameModal = ref(false);
+const showConfirmLimparSessao = ref(false);
 
 const activeActivity = ref<Atividade | null>(null);
 const parsedQuestions = ref<Question[]>([]);
@@ -252,7 +254,7 @@ async function handleLimparSessao() {
         <div class="flex items-center gap-2 flex-shrink-0">
           <button
             type="button"
-            @click="handleLimparSessao"
+            @click="showConfirmLimparSessao = true"
             class="inline-flex items-center gap-1.5 rounded-sm border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-secondary hover:border-danger/40 hover:text-danger transition-all duration-base cursor-pointer"
             title="Limpar todos os dados, senhas de curso e respostas deste computador"
           >
@@ -562,6 +564,16 @@ async function handleLimparSessao() {
       :senha-curso="cursoSenha"
       :senha-atividade="atividadeSenha"
       @close="showMinigameModal = false"
+    />
+
+    <ConfirmDialog
+      v-model="showConfirmLimparSessao"
+      title="Limpar sessão deste computador?"
+      message="Isso vai apagar agora o seu nome, o seu e-mail, as senhas de curso e os rascunhos de respostas salvos neste navegador. Mesmo sem limpar, esses dados são apagados automaticamente após 4 horas. As respostas que você já enviou ao professor não serão apagadas. Deseja continuar?"
+      confirm-text="Limpar sessão"
+      cancel-text="Manter dados"
+      danger
+      @confirm="handleLimparSessao"
     />
   </div>
 </template>

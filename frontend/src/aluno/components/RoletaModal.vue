@@ -226,7 +226,7 @@ function handleNextQuestion() {
 
       <!-- Question Modal Popup Overlay -->
       <div v-if="showQuestionModal && currentQuestion" class="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-        <div class="bg-surface-alt border border-line rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto space-y-5 shadow-modal text-primary">
+        <div class="bg-surface-alt border border-line rounded-2xl p-6 max-w-5xl w-full max-h-[calc(100dvh-2rem)] overflow-y-auto space-y-5 shadow-modal text-primary">
           <div class="flex justify-between items-center border-b border-line pb-3">
             <h4 class="text-base font-bold text-cat-roleta flex items-center gap-2">
               <span class="material-icons text-lg">quiz</span>

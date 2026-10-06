@@ -9,12 +9,14 @@ const props = withDefaults(
     noPadding?: boolean
     allowFullscreen?: boolean
     fullscreen?: boolean
+    actionsOverlay?: boolean
   }>(),
   {
     maxWidth: 'max-w-2xl',
     noPadding: false,
     allowFullscreen: false,
     fullscreen: undefined,
+    actionsOverlay: false,
   }
 )
 
@@ -80,37 +82,47 @@ watch(
           class="relative z-10 w-full flex flex-col bg-surface-alt border border-line shadow-modal transition-all duration-200"
           :class="[
             isFullscreen
-              ? 'fixed inset-0 h-full max-h-full rounded-none border-none'
+              ? 'fixed inset-0 h-[100dvh] max-h-[100dvh] max-w-none rounded-none border-none'
               : `rounded-2xl max-h-[90vh] ${props.maxWidth || 'max-w-2xl'}`
           ]"
         >
           <!-- Header -->
-          <div class="shrink-0 flex items-center justify-between gap-4 px-6 pt-5 pb-4 border-b border-line">
-            <slot name="header">
-              <h2
-                v-if="title"
-                id="modal-title"
-                class="text-h3 font-semibold text-primary leading-snug"
-              >{{ title }}</h2>
-            </slot>
+          <div
+            class="shrink-0 gap-4"
+            :class="props.actionsOverlay
+              ? 'relative px-6 pt-5'
+              : 'flex items-start justify-between px-6 pt-5 pb-4 border-b border-line'"
+          >
+            <div :class="props.actionsOverlay ? '' : 'flex-1 min-w-0'">
+              <slot name="header">
+                <h2
+                  v-if="title"
+                  id="modal-title"
+                  class="text-h3 font-semibold text-primary leading-snug"
+                >{{ title }}</h2>
+              </slot>
+            </div>
 
-            <div class="ml-auto flex items-center gap-1 shrink-0 -mt-0.5">
+            <div
+              class="flex items-center gap-1 shrink-0"
+              :class="props.actionsOverlay ? 'absolute top-5 right-6 h-9' : 'ml-auto -mt-0.5'"
+            >
               <button
                 v-if="props.allowFullscreen"
-                class="p-1.5 rounded-md text-muted hover:text-primary hover:bg-surface transition-colors duration-base"
+                class="p-1.5 rounded-md text-muted hover:text-primary hover:bg-surface transition-colors duration-base flex items-center justify-center"
                 :title="isFullscreen ? 'Restaurar tamanho' : 'Modo tela cheia'"
                 :aria-label="isFullscreen ? 'Restaurar tamanho' : 'Modo tela cheia'"
                 @click="toggleFullscreen"
               >
-                <span class="material-icons text-[20px]">{{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</span>
+                <span class="material-icons text-[20px] leading-none">{{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</span>
               </button>
 
               <button
-                class="p-1.5 rounded-md text-muted hover:text-primary hover:bg-surface transition-colors duration-base"
+                class="p-1.5 rounded-md text-muted hover:text-primary hover:bg-surface transition-colors duration-base flex items-center justify-center"
                 @click="fechar"
                 aria-label="Fechar modal"
               >
-                <span class="material-icons text-[20px]">close</span>
+                <span class="material-icons text-[20px] leading-none">close</span>
               </button>
             </div>
           </div>
@@ -118,7 +130,7 @@ watch(
           <!-- Body -->
           <div
             class="flex-1 min-h-0 overflow-y-auto"
-            :class="noPadding ? '' : 'px-6 py-5'"
+            :class="[noPadding ? '' : (isFullscreen ? 'px-4 py-4 md:px-10 md:py-6' : 'px-6 py-5'), isFullscreen ? 'max-h-[calc(100dvh-130px)] flex flex-col' : '']"
           >
             <slot />
           </div>

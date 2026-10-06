@@ -17,6 +17,7 @@ const props = withDefaults(defineProps<{
   maxHeight?: string;
   readonly?: boolean;
   ariaLabel?: string;
+  stretch?: boolean;
 }>(), {
   linguagem: 'texto',
   placeholder: '',
@@ -24,6 +25,7 @@ const props = withDefaults(defineProps<{
   maxHeight: '55vh',
   readonly: false,
   ariaLabel: 'Editor de código',
+  stretch: false,
 });
 
 const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
@@ -219,18 +221,35 @@ const idiomaExibido = computed(() => normalizarLinguagem(props.linguagem));
 </script>
 
 <template>
-  <div class="w-full">
+  <div
+    class="w-full border border-line rounded-md overflow-hidden bg-surface-alt transition-shadow"
+    :class="[readonly ? 'opacity-80' : 'focus-within:ring-2 focus-within:ring-accent', stretch ? 'flex-1 flex flex-col min-h-0' : '']"
+  >
+    <div v-if="$slots.toolbar" class="flex flex-wrap items-center gap-1 p-2 border-b border-line bg-surface select-none">
+      <slot name="toolbar" />
+    </div>
+
     <div
       ref="host"
-      class="rounded-lg border border-line overflow-hidden bg-surface transition-shadow"
-      :class="readonly ? 'opacity-80' : 'focus-within:ring-2 focus-within:ring-accent'"
+      class="bg-surface"
+      :class="stretch ? 'cm-stretch flex-1 min-h-0' : ''"
       :aria-label="props.ariaLabel"
       role="group"
     ></div>
 
-    <div class="flex items-center justify-between gap-2 mt-1 text-[11px] text-secondary">
+    <div class="flex items-center justify-between gap-2 px-4 py-2 border-t border-line text-[11px] text-secondary bg-surface">
       <span>Tab indenta; Enter mantém a indentação; o texto é preservado exatamente como digitado.</span>
       <span class="shrink-0 tabular-nums">{{ caracteres }} caractere{{ caracteres === 1 ? '' : 's' }}<template v-if="idiomaExibido !== 'texto'"> · {{ idiomaExibido }}</template></span>
     </div>
   </div>
 </template>
+
+<style scoped>
+.cm-stretch {
+  display: flex;
+  flex-direction: column;
+}
+.cm-stretch :deep(.cm-editor) {
+  flex: 1;
+}
+</style>

@@ -8,6 +8,7 @@ import { validateEmailWithTypo } from '@/shared/utils/emailValidator';
 import type { Atividade, Question } from '@/shared/types';
 import BaseModal from '@/shared/components/BaseModal.vue';
 import BaseButton from '@/shared/components/BaseButton.vue';
+import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
 import BaseInput from '@/shared/components/BaseInput.vue';
 import BaseSelect from '@/shared/components/BaseSelect.vue';
 import RichTextEditor from '@/shared/components/RichTextEditor.vue';
@@ -45,7 +46,6 @@ const emit = defineEmits<{
 
 const alunoNome = ref('');
 const alunoEmail = ref('');
-const lembrarDados = ref(true);
 const rascunhoCodigo = ref('');
 const respostasMap = ref<Record<string, string>>({});
 const questionsList = ref<Question[]>([]);
@@ -193,10 +193,8 @@ function getQuestionKey(q: Question, idx: number): string {
 function handleSaveDraft() {
   if (props.atividade) {
     secureSet(`draft_${props.atividade.id}`, JSON.stringify(respostasMap.value));
-    if (lembrarDados.value) {
-      secureSet('alunoNome', alunoNome.value);
-      secureSet('alunoEmail', alunoEmail.value);
-    }
+    secureSet('alunoNome', alunoNome.value);
+    secureSet('alunoEmail', alunoEmail.value);
   }
 }
 
@@ -214,6 +212,7 @@ async function handleClearSavedIdentity() {
 
 const isRestoringDraft = ref(false);
 const isSavingDraft = ref(false);
+const showConfirmLimpar = ref(false);
 
 async function handleRestoreDraft() {
   if (!rascunhoCodigo.value || isRestoringDraft.value) return;
@@ -385,13 +384,8 @@ async function handleSubmit() {
     if (res.success) {
       submitSuccess.value = true;
       secureRemove(`draft_${props.atividade!.id}`);
-      if (lembrarDados.value) {
-        await secureSet('alunoNome', alunoNome.value);
-        await secureSet('alunoEmail', alunoEmail.value);
-      } else {
-        await secureRemove('alunoNome');
-        await secureRemove('alunoEmail');
-      }
+      await secureSet('alunoNome', alunoNome.value);
+      await secureSet('alunoEmail', alunoEmail.value);
       if (res.data?.consulta_token) {
         secureSet(`consulta_token_${props.atividade!.id}`, String(res.data.consulta_token));
       }
@@ -425,11 +419,12 @@ async function handleSubmit() {
     :model-value="props.show && !!props.atividade"
     :max-width="modalMaxWidth"
     allow-fullscreen
+    actions-overlay
     @close="emit('close')"
   >
     <template #header>
       <div class="flex-1">
-        <div class="flex items-center gap-3 mb-2">
+        <div class="flex items-center gap-3 mb-2 pr-20">
           <div class="w-9 h-9 bg-cat-default text-white rounded-md flex items-center justify-center shadow-xs">
             <span class="material-icons text-[18px]">{{ props.atividade?.tipo === 'prova' ? 'quiz' : 'edit_note' }}</span>
           </div>
@@ -442,8 +437,16 @@ async function handleSubmit() {
       </div>
     </template>
 
-    <div v-if="props.atividade" class="space-y-6">
-      <div v-if="currentStep === 0" class="space-y-4">
+    <div
+      v-if="props.atividade"
+      class="space-y-6"
+      :class="modalFullscreen ? 'flex-1 flex flex-col' : ''"
+    >
+      <div
+        v-if="currentStep === 0"
+        class="space-y-4"
+        :class="modalFullscreen ? 'flex-1' : ''"
+      >
         <!-- Prazo de Entrega -->
         <div v-if="deadlineInfo" :class="['p-3.5 rounded-xl border flex items-center gap-2.5 text-xs font-medium', deadlineInfo.isPast ? 'bg-danger/10 border-danger/30 text-danger-text' : 'bg-accent/10 border-accent/30 text-primary']">
           <span class="material-icons text-base">{{ deadlineInfo.isPast ? 'timer_off' : 'schedule' }}</span>
@@ -470,7 +473,22 @@ async function handleSubmit() {
           </div>
         </div>
 
-        <BaseInput v-model="alunoNome" label="Seu Nome *" placeholder="Nome Completo" />
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between gap-2">
+            <label for="alunoNomeInput" class="text-sm font-medium text-primary">Seu Nome *</label>
+            <button
+              v-if="alunoNome || alunoEmail"
+              type="button"
+              @click="showConfirmLimpar = true"
+              class="text-xs text-secondary hover:text-danger flex items-center gap-1 transition-colors duration-base cursor-pointer shrink-0"
+              title="Limpa seus dados e rascunho deste computador"
+            >
+              <span class="material-icons text-xs">delete_sweep</span>
+              <span>Limpar dados</span>
+            </button>
+          </div>
+          <BaseInput id="alunoNomeInput" v-model="alunoNome" placeholder="Nome Completo" />
+        </div>
         <div class="space-y-1.5">
           <BaseInput
             v-model="alunoEmail"
@@ -506,30 +524,6 @@ async function handleSubmit() {
           </div>
         </div>
         
-        <div class="flex items-center justify-between gap-2 pt-1 pb-1">
-          <div class="flex items-center gap-2">
-            <input
-              id="lembrarDadosCheckbox"
-              v-model="lembrarDados"
-              type="checkbox"
-              class="w-4 h-4 text-accent border-line rounded focus:ring-accent accent-accent cursor-pointer"
-            />
-            <label for="lembrarDadosCheckbox" class="text-xs font-medium text-secondary cursor-pointer select-none">
-              Lembrar meus dados durante esta aula (expira em 4h)
-            </label>
-          </div>
-          <button
-            v-if="alunoNome || alunoEmail"
-            type="button"
-            @click="handleClearSavedIdentity"
-            class="text-xs text-secondary hover:text-danger flex items-center gap-1 transition-colors duration-base cursor-pointer"
-            title="Limpa seus dados e rascunho deste computador"
-          >
-            <span class="material-icons text-xs">delete_sweep</span>
-            <span>Limpar dados</span>
-          </button>
-        </div>
-        
         <div class="flex items-center gap-2 pt-1">
           <input
             id="enviarEmailCheckbox"
@@ -551,11 +545,21 @@ async function handleSubmit() {
         </div>
       </div>
 
-      <div v-else-if="currentStep <= questionsList.length">
+      <div
+        v-else-if="currentStep <= questionsList.length"
+        :class="modalFullscreen ? 'flex-1 flex flex-col' : ''"
+      >
         <template v-for="(q, idx) in questionsList" :key="idx">
-          <div v-if="currentStep === idx + 1" class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div
+            v-if="currentStep === idx + 1"
+            class="grid grid-cols-1 gap-6 items-start"
+            :class="modalFullscreen ? 'lg:grid-cols-[1fr_1.4fr] lg:gap-10 lg:flex-1 lg:items-stretch' : 'lg:grid-cols-2'"
+          >
             <!-- Enunciado (esquerda) -->
-            <div class="space-y-3 lg:sticky lg:top-0">
+            <div
+              class="space-y-3 lg:sticky lg:top-0"
+              :class="modalFullscreen ? 'lg:max-h-[calc(100dvh-240px)] lg:overflow-y-auto lg:pr-2' : ''"
+            >
               <h3 class="font-bold text-base text-primary">{{ idx + 1 }}. {{ q.title || `Questão ${idx + 1}` }}</h3>
               <RichContent
                 v-if="q.content && q.content !== q.title"
@@ -572,30 +576,7 @@ async function handleSubmit() {
             </div>
 
             <!-- Resposta (direita) -->
-            <div class="space-y-3">
-              <div class="flex items-center justify-between gap-3 flex-wrap">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-accent">Sua resposta</p>
-                <div v-if="!q.options || q.options.length === 0" class="flex items-center gap-2">
-                  <BaseSelect
-                    v-if="modoCodigoAtivo(q, idx)"
-                    class="w-44"
-                    aria-label="Linguagem do código"
-                    :model-value="linguagemDaQuestao(q, idx)"
-                    :options="opcoesLinguagem"
-                    @update:model-value="(valor) => definirLinguagem(q, idx, String(valor))"
-                  />
-                  <button
-                    type="button"
-                    class="text-xs font-semibold flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer"
-                    :title="modoCodigoAtivo(q, idx) ? 'Voltar para o editor de texto com formatação' : 'Ativar modo código (IDE) nesta resposta'"
-                    @click="alternarModoCodigo(q, idx)"
-                  >
-                    <span class="material-icons text-sm">{{ modoCodigoAtivo(q, idx) ? 'edit_note' : 'code' }}</span>
-                    <span>{{ modoCodigoAtivo(q, idx) ? 'Modo texto' : 'Modo código' }}</span>
-                  </button>
-                </div>
-              </div>
-
+            <div class="space-y-3" :class="modalFullscreen ? 'flex flex-col min-h-0 lg:flex-1' : ''">
               <div v-if="q.options && q.options.length > 0" class="grid gap-2">
                 <button
                   v-for="opt in q.options" :key="opt.text"
@@ -609,28 +590,65 @@ async function handleSubmit() {
 
               <CodeEditorField
                 v-else-if="modoCodigoAtivo(q, idx)"
+                :key="`code-${getQuestionKey(q, idx)}-${modalFullscreen ? 'fs' : 'normal'}`"
                 :model-value="codigoTexto(q, idx)"
                 :linguagem="linguagemDaQuestao(q, idx)"
+                :min-height="modalFullscreen ? '55vh' : '220px'"
+                :max-height="modalFullscreen ? 'calc(100dvh - 320px)' : '55vh'"
+                :stretch="modalFullscreen"
                 placeholder="Escreva seu código aqui..."
                 @update:model-value="(valor) => definirCodigo(q, idx, valor)"
-              />
+              >
+                <template #toolbar>
+                  <BaseSelect
+                    class="w-44"
+                    size="sm"
+                    aria-label="Linguagem do código"
+                    :model-value="linguagemDaQuestao(q, idx)"
+                    :options="opcoesLinguagem"
+                    @update:model-value="(valor) => definirLinguagem(q, idx, String(valor))"
+                  />
+                  <div class="ml-auto flex items-center">
+                    <button
+                      type="button"
+                      class="w-7 h-7 flex items-center justify-center hover:bg-surface-alt rounded text-primary transition-colors bg-accent/15 text-accent ring-1 ring-accent"
+                      title="Voltar para o editor de texto com formatação"
+                      aria-label="Modo texto"
+                      :aria-pressed="true"
+                      @click="alternarModoCodigo(q, idx)"
+                    >
+                      <i class="material-icons text-base leading-none">edit_note</i>
+                    </button>
+                  </div>
+                </template>
+              </CodeEditorField>
 
               <RichTextEditor
                 v-else
                 v-model="respostasMap[getQuestionKey(q, idx)]"
                 external-fullscreen
                 :fullscreen-active="modalFullscreen"
+                :min-height="modalFullscreen ? '55vh' : '180px'"
+                :code-toggle-visible="!q.options || q.options.length === 0"
+                :code-toggle-active="false"
                 @update:model-value="handleSaveDraft"
-                @toggle-fullscreen="modalFullscreen = !modalFullscreen"
+                @toggle-code-mode="alternarModoCodigo(q, idx)"
               />
             </div>
           </div>
         </template>
       </div>
 
-      <div v-else class="space-y-4">
+      <div
+        v-else
+        class="space-y-4"
+        :class="modalFullscreen ? 'flex-1 flex flex-col' : ''"
+      >
         <h3 class="font-bold text-primary">Revisão das Respostas</h3>
-        <div class="bg-surface-alt p-4 rounded-xl space-y-4 max-h-[60vh] overflow-y-auto">
+        <div
+          class="bg-surface-alt p-4 rounded-xl space-y-4 overflow-y-auto"
+          :class="modalFullscreen ? 'max-h-[calc(100dvh-300px)]' : 'max-h-[60vh]'"
+        >
           <div v-for="(q, idx) in questionsList" :key="idx" class="border-b border-line pb-3">
             <div class="flex justify-between items-start mb-1">
               <div class="space-y-0.5">
@@ -653,7 +671,7 @@ async function handleSubmit() {
           </div>
         </div>
 
-        <div class="flex items-center gap-2 pt-2 bg-surface p-3 border border-line rounded-xl">
+        <div class="flex items-center gap-2 bg-surface p-3 border border-line rounded-xl">
           <input
             id="enviarEmailCheckboxRev"
             v-model="enviarEmail"
@@ -679,7 +697,7 @@ async function handleSubmit() {
 
       <div v-if="errorMessage" class="p-3 bg-danger text-white text-sm rounded-xl">{{ errorMessage }}</div>
 
-      <div class="flex justify-between pt-4 border-t border-line">
+      <div class="flex justify-between pt-4 border-t border-line shrink-0">
         <BaseButton variant="secondary" :disabled="currentStep === 0" @click="prevStep">Anterior</BaseButton>
         <div class="flex gap-2">
             <BaseButton v-if="currentStep > 0" variant="ghost" :loading="isSavingDraft" :disabled="isSavingDraft" @click="handleSaveDraftToServer">Salvar Rascunho</BaseButton>
@@ -689,6 +707,17 @@ async function handleSubmit() {
       </div>
     </div>
   </BaseModal>
+
+  <!-- Confirmação de limpeza dos dados locais -->
+  <ConfirmDialog
+    v-model="showConfirmLimpar"
+    title="Limpar dados deste computador?"
+    message="Isso vai apagar agora o seu nome, o seu e-mail e o rascunho das respostas desta atividade salvos neste navegador. Mesmo sem limpar, esses dados são apagados automaticamente após 4 horas. As respostas que você já enviou ao professor não serão apagadas. Deseja continuar?"
+    confirm-text="Limpar dados"
+    cancel-text="Manter dados"
+    danger
+    @confirm="handleClearSavedIdentity"
+  />
 
   <!-- Modal de Exibição do Código de Rascunho -->
   <BaseModal
