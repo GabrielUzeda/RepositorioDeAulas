@@ -599,8 +599,16 @@ describe('Auth Module & Multi-Professor System', () => {
     const correctSenhaRes = await app.request(`/${aula.caminho}?senha=asdf1234`, {
       method: 'GET',
     });
-    expect(correctSenhaRes.status).toBe(200);
-    const correctHtml = await correctSenhaRes.text();
+    expect(correctSenhaRes.status).toBe(302);
+    expect(correctSenhaRes.headers.get('location')).toBe(`/${aula.caminho}`);
+    const setCookie = correctSenhaRes.headers.get('set-cookie') || '';
+    expect(setCookie).toContain('HttpOnly');
+    const cookieRes = await app.request(`/${aula.caminho}`, {
+      method: 'GET',
+      headers: { cookie: setCookie.split(';')[0] },
+    });
+    expect(cookieRes.status).toBe(200);
+    const correctHtml = await cookieRes.text();
     expect(correctHtml).toContain('Slide Protegido');
 
     // Limpeza

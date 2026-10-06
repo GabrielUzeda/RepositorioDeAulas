@@ -482,7 +482,7 @@ function activateSlide(idx) {
 }
 
 function slideIndexFromHash() {
-  const m = (window.location.hash || '').match(/^#slide-(\d+)$/);
+  const m = (window.location.hash || '').match(/^#slide-(\\d+)$/);
   if (!m) return 0;
   const n = parseInt(m[1], 10);
   if (!isFinite(n) || n < 1) return 0;

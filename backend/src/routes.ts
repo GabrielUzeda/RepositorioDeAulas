@@ -2693,6 +2693,9 @@ function renderSlidePasswordPromptHtml(hasError: boolean): string {
       <span>Voltar para o Início</span>
     </a>
   </div>
+  <script>
+    document.querySelector('form').setAttribute('action', location.pathname + location.hash);
+  </script>
 </body>
 </html>`;
 }
@@ -2739,6 +2742,16 @@ async function serveStaticDisciplinaContent(c: any) {
   const served = serveFileWithCsp(abs, undefined, c.req.header('accept-encoding'));
   if (!served) return c.text('Not found', 404);
   const senha = readCursoSenha(c);
+  const senhaNaUrl = c.req.query('senha');
+  if (senha && senhaNaUrl && safe.endsWith('.html')) {
+    const isSecure = process.env.NODE_ENV === 'production';
+    const params = new URL(c.req.url).searchParams;
+    params.delete('senha');
+    const qs = params.toString();
+    c.header('Set-Cookie', `curso_senha=${encodeURIComponent(senha)}; Path=/; Max-Age=14400; SameSite=Lax; HttpOnly${isSecure ? '; Secure' : ''}`);
+    c.header('Cache-Control', 'no-store');
+    return c.redirect(c.req.path + (qs ? `?${qs}` : ''), 302);
+  }
   if (senha) {
     const isSecure = process.env.NODE_ENV === 'production';
     c.header('Set-Cookie', `curso_senha=${encodeURIComponent(senha)}; Path=/; Max-Age=14400; SameSite=Lax; HttpOnly${isSecure ? '; Secure' : ''}`);
