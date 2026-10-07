@@ -1892,7 +1892,7 @@ onBeforeUnmount(() => {
             <div class="flex items-center justify-between font-semibold text-primary">
               <span class="flex items-center space-x-1.5">
                 <span class="material-icons animate-spin text-sm text-accent">auto_awesome</span>
-                <span>Geração Encadeada em 2 Etapas</span>
+                <span>Geração em duas etapas</span>
               </span>
               <span class="font-mono text-accent">{{ aiJob.progress.value }}%</span>
             </div>
@@ -1904,11 +1904,11 @@ onBeforeUnmount(() => {
               </div>
               <div class="flex items-center space-x-2" :class="{ 'text-accent font-semibold': aiJob.progress.value > 35 && aiJob.progress.value <= 85, 'text-primary': aiJob.progress.value > 85, 'text-muted': aiJob.progress.value <= 35 }">
                 <span class="material-icons text-sm">{{ aiJob.progress.value > 85 ? 'check_circle' : (aiJob.progress.value > 35 ? 'radio_button_checked' : 'radio_button_unchecked') }}</span>
-                <span>2. Expansão dos slides e diagramas Marp</span>
+                <span>2. Redação das seções e exemplos</span>
               </div>
               <div class="flex items-center space-x-2" :class="{ 'text-accent font-semibold': aiJob.progress.value > 85, 'text-muted': aiJob.progress.value <= 85 }">
                 <span class="material-icons text-sm">{{ aiJob.progress.value >= 100 ? 'check_circle' : 'radio_button_unchecked' }}</span>
-                <span>3. Validação e formatação</span>
+                <span>3. Síntese, fixação e validação</span>
               </div>
             </div>
 

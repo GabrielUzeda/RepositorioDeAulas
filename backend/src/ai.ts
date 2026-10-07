@@ -14,17 +14,19 @@ import { getJob, cancelJob, createJob, registerJobProcessor, type JobCheckpointF
 import { executarAvaliacaoEmLote } from './aiAvaliacao';
 import { sintetizarFeedbackTurma } from './aiSintese';
 import {
-  SLIDES_TOTAIS_MIN,
   SLIDES_TOTAIS_MAX,
-  FIXACAO_MIN,
-  FIXACAO_MAX,
+  SLIDES_SECAO_MAX,
   diagnosticarOutline,
+  dividirEmSlides,
   gerarFrontMatterEPrimeiroSlide,
   parseOutline,
+  promptPlanejadorAula,
   promptSecaoAula,
+  renderBlocoFechamento,
+  repararSlidesDoConteudo,
   removerFrontMatterRestante,
   validarAulaMarp,
-  validarSlideMarp,
+  validarSecaoMarp,
   type AulaOutline,
 } from './aiAula';
 
@@ -498,39 +500,12 @@ export async function generateAulaOutlineAndContent(options: {
 
   if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
 
-  // FASE 1: Agente Planejador / Outline estruturado
-  const plannerSystemPrompt = `Você é um coordenador pedagógico e designer instrucional sênior. Sua tarefa é planejar a estrutura detalhada (outline) de uma aula completa de ${SLIDES_TOTAIS_MIN} a ${SLIDES_TOTAIS_MAX} slides sobre o tema fornecido.
-
-Retorne ESTRITAMENTE um objeto JSON no formato:
-{
-  "titulo": "Título principal da aula",
-  "subtitulo": "Subtítulo contextual",
-  "objetivos": ["Objetivo de aprendizagem..."],
-  "prerequisitos": ["Pré-requisito..."],
-  "secoes": [
-    {
-      "titulo": "Título da seção",
-      "slides": [
-        { "titulo": "Título do slide", "objetivo": "Objetivo pedagógico do slide", "conceitos_novos": ["Conceito apresentado neste slide"], "recurso": "texto|codigo|tabela|mermaid|katex" }
-      ]
-    }
-  ],
-  "fixacao": ["Pergunta reflexiva 1", "Pergunta reflexiva 2", "Pergunta reflexiva 3"]
-}
-
-Regras:
-1. Total de ${SLIDES_TOTAIS_MIN} a ${SLIDES_TOTAIS_MAX} slides somando todas as seções (excluindo capa e fixação).
-2. Progressão pedagógica: do concreto ao abstrato; cada slide cobre um conceito novo (conceitos_novos nunca repete conceito de outro slide).
-3. Abertura com checagem de pré-requisitos e chamada freiriana.
-4. ${FIXACAO_MIN} a ${FIXACAO_MAX} perguntas de fixação.
-5. Fundamente nos documentos e aulas de referência; se não cobrirem o tema, não invente conceitos.
-6. Responda apenas com o JSON puro, sem formatação markdown.`;
-
-  let plannerUserPrompt = `TEMA: ${tema || 'Conteúdo geral'}\n`;
-  if (observacoes) plannerUserPrompt += `OBSERVAÇÕES: ${observacoes}\n`;
-  if (aulasContexto) plannerUserPrompt += `\nAULAS DE REFERÊNCIA:\n${aulasContexto}\n`;
-  if (docsContexto) plannerUserPrompt += `\nDOCUMENTOS ORIENTADORES:\n${docsContexto}\n`;
-  plannerUserPrompt += `Gere o outline pedagógico estruturado para esta aula.`;
+  const { systemPrompt: plannerSystemPrompt, userPrompt: plannerUserPrompt } = promptPlanejadorAula({
+    tema,
+    observacoes,
+    aulasContexto,
+    docsContexto,
+  });
 
   let outline: AulaOutline | null = null;
   let outlineResult = '';
@@ -547,7 +522,7 @@ Regras:
       temperature: 0.4,
       timeoutMs: 120000,
       task: 'aula',
-      maxRepairs: 1,
+      maxRepairs: 2,
       diagnose: (conteudoPlanner) => {
         const parsed = parseOutline(conteudoPlanner);
         if (!parsed) return ['A resposta não contém o objeto JSON do outline esperado.'];
@@ -556,18 +531,17 @@ Regras:
     });
     outline = parseOutline(pRes.content);
     modeloUtilizado = pRes.modelUsed;
-  } catch (_e: any) {
-    outline = null;
-  }
-
-  if (outline) {
-    outlineResult = JSON.stringify(outline);
-  } else {
-    outlineResult = tema || 'Outline gerado automaticamente';
-    avisos.push(
-      'Falha ao planejar o outline estruturado; a aula foi gerada em chamada única a partir do tema.'
+  } catch (e: any) {
+    throw new Error(
+      `Falha ao planejar a estrutura da aula com IA: ${e.message || 'Erro de conexão/timeout'}. Tente novamente.`
     );
   }
+
+  if (!outline) {
+    throw new Error('A IA não retornou um outline pedagógico válido. Tente novamente.');
+  }
+
+  outlineResult = JSON.stringify(outline);
 
   if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
 
@@ -575,167 +549,123 @@ Regras:
 
   if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
 
-  let content = '';
+  let autor = '';
+  if (professorId) {
+    const profRow = db.query('SELECT nome FROM professores WHERE id = ?').get(professorId) as
+      | { nome: string }
+      | undefined;
+    autor = profRow?.nome || '';
+  }
 
-  if (outline && Array.isArray(outline.secoes) && outline.secoes.length > 0) {
-    // FASE 2A: Redação por seção (D3-B)
-    let autor = '';
-    if (professorId) {
-      const profRow = db.query('SELECT nome FROM professores WHERE id = ?').get(professorId) as
-        | { nome: string }
-        | undefined;
-      autor = profRow?.nome || '';
-    }
-    const capa = gerarFrontMatterEPrimeiroSlide(outline, autor);
-    const conceitosJaCobertos: string[] = [];
-    const titulosSlidesAnteriores: string[] = [];
-    const secoesMd: string[] = [];
-    const totalSecoes = outline.secoes.length;
+  const capa = gerarFrontMatterEPrimeiroSlide(outline, autor);
+  const conceitosJaCobertos: string[] = [];
+  const titulosSlidesAnteriores: string[] = [];
+  const secoesMd: string[] = [];
+  const totalSecoes = outline.secoes.length;
 
-    for (let i = 0; i < totalSecoes; i++) {
-      if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
-      const secao = outline.secoes[i];
-      const pctSecao = 35 + Math.round((i / totalSecoes) * 45);
-      await checkpoint?.(
-        `${pctSecao}% - Redigindo seção ${i + 1} de ${totalSecoes}: ${secao.titulo}...`,
-        { fase: 'secoes', secao: i + 1, total: totalSecoes }
-      );
+  for (let i = 0; i < totalSecoes; i++) {
+    if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+    const secao = outline.secoes[i];
+    const pctSecao = 35 + Math.round((i / totalSecoes) * 45);
+    await checkpoint?.(`${pctSecao}% - Redigindo seção ${i + 1} de ${totalSecoes}: ${secao.titulo}...`, {
+      fase: 'secoes',
+      secao: i + 1,
+      total: totalSecoes,
+    });
 
-      const { systemPrompt: secSys, userPrompt: secUser } = promptSecaoAula({
-        outline,
-        indiceSecao: i,
-        conceitosJaCobertos,
-        titulosSlidesAnteriores,
-        contextoLimpo: aulasContexto,
-      });
+    const { systemPrompt: secSys, userPrompt: secUser } = promptSecaoAula({
+      outline,
+      indiceSecao: i,
+      conceitosJaCobertos,
+      titulosSlidesAnteriores,
+      contextoLimpo: aulasContexto,
+    });
 
+    let secaoLimpa = '';
+    let ultimosErros: string[] = [];
+
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      const correcao =
+        ultimosErros.length > 0
+          ? `\n\nCORRIJA OS PROBLEMAS DA TENTATIVA ANTERIOR, mantendo o conteúdo:\n- ${ultimosErros.join('\n- ')}`
+          : '';
       try {
         const resSecao = await callAi({
           messages: [
             { role: 'system', content: secSys },
-            { role: 'user', content: secUser },
+            { role: 'user', content: secUser + correcao },
           ],
           temperature: 0.45,
           timeoutMs: 180000,
           task: 'aula',
           maxRepairs: 1,
-          diagnose: (conteudoSecao) => validarSlideMarp(conteudoSecao),
+          diagnose: (conteudo) => validarSecaoMarp(removerFrontMatterRestante(conteudo)),
         });
         modeloUtilizado = resSecao.modelUsed || modeloUtilizado;
-        const secaoLimpa = removerFrontMatterRestante(resSecao.content);
-
-        const errosValidacao = validarAulaMarp(secaoLimpa);
-        if (!errosValidacao.valido) {
-          avisos.push(`Seção ${i + 1} (${secao.titulo}): ${errosValidacao.erros.join(' ')}`);
-        }
-
-        secoesMd.push(secaoLimpa);
-        for (const linha of secaoLimpa.split('\n')) {
-          const mTitulo = linha.match(/^#{1,2}\s+(.*)/);
-          if (mTitulo) titulosSlidesAnteriores.push(mTitulo[1].trim());
-        }
-        for (const slide of secao.slides || []) {
-          conceitosJaCobertos.push(...(slide.conceitos_novos || []).filter(Boolean));
-        }
+        secaoLimpa = repararSlidesDoConteudo(removerFrontMatterRestante(resSecao.content));
+        ultimosErros = validarSecaoMarp(secaoLimpa);
       } catch (e: any) {
-        throw new Error(
-          `Falha ao redigir a seção ${i + 1} (${secao.titulo}) com IA: ${e.message || 'Erro de conexão/timeout'}`
+        ultimosErros = [e.message || 'Erro de conexão/timeout ao redigir a seção.'];
+      }
+
+      const qtdSlides = dividirEmSlides(secaoLimpa).length;
+      if (ultimosErros.length === 0 && qtdSlides > SLIDES_SECAO_MAX) {
+        ultimosErros.push(
+          `A seção ficou com ${qtdSlides} slides; comprima para no máximo ${SLIDES_SECAO_MAX}, mantendo um conceito por slide.`
         );
       }
+      if (ultimosErros.length === 0) break;
     }
 
-    if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+    if (ultimosErros.length > 0) {
+      throw new Error(
+        `Não foi possível gerar a seção ${i + 1} (${secao.titulo}) sem problemas de estrutura: ${ultimosErros.join(' ')}`
+      );
+    }
 
-    const fixacaoItens = (outline.fixacao || []).map((q) => `- ${q}`).join('\n');
-    const blocoFixacao = fixacaoItens
-      ? `\n\n---\n\n## Verifique o que você aprendeu\n\n${fixacaoItens}\n`
-      : '';
-    content = [capa, secoesMd.join('\n\n---\n\n')].join('\n\n---\n\n') + blocoFixacao;
-  } else {
-    // FASE 2B: Redação em chamada única (fallback, sem outline estruturado)
-  const MARP_SYSTEM_PROMPT = `<INSTRUCOES>
-Você é um especialista em didática, design instrucional e metodologias de ensino inclusivo para adolescentes e adultos.
-Você é ótimo combinando clareza formal com narrativas, analogias e educação preventiva.
-Sua tarefa é gerar conteúdo didático no formato do motor Marp Next a partir de um tema e outline estruturado.
-Lembre-se: slides também são materiais de estudo, portanto podem conter explicações detalhadas, desde que com tom formal, clareza e organização.
-Responda somente com a aula gerada.
-</INSTRUCOES>
-
-<REGRAS>
-1. Formato obrigatório: Marp Next Markdown (front-matter YAML delimitado por ---).
-2. Todo slide começa com --- como separador (exceto o primeiro).
-3. Use diretivas de animação em comentários HTML <!-- animation: fade-up --> antes do conteúdo do slide quando pertinente.
-4. Não repita conteúdo já presente nas aulas de referência fornecidas.
-5. Mantenha progressão pedagógica: do concreto ao abstrato, do simples ao complexo. NUNCA mencione um termo técnico antes de tê-lo explicado; a aula é uma construção linear e acumulativa — cada slide apoia-se apenas no que já foi apresentado. Antes de construir o conteúdo, faça a checagem de pré-requisitos: identifique o que o aluno precisa já saber para entender esta aula, verifique se isso consta nas aulas anteriores fornecidas como contexto e, se constar, abra o desenvolvimento com uma recapitulação curta desse pré-requisito (sem repetir o conteúdo todo) para a nova aula se apoiar nela.
-6. Use KaTeX para fórmulas matemáticas quando necessário (delimitadores $...$ inline, $$...$$ bloco).
-7. Use blocos de código com linguagem especificada quando houver exemplos de código.
-8. Use tabelas Markdown para comparações e sínteses.
-9. Use Mermaid (blocos mermaid) para diagramas, fluxos e relações. Os slides são exibidos em paisagem (landscape), com espaço vertical limitado: tenha preferência por diagramas que ocupem mais largura do que altura, mantendo o fluxo achatado e horizontal (ex.: orientações LR/RL, sequências); evite gráficos altos que estourem a altura do slide. Escolha a orientação conforme a clareza, desde que respeite a limitação vertical.
-10. A última seção deve conter 3 a 5 perguntas reflexivas de fixação do conteúdo.
-11. Máximo de 10 frases por slide; controle rigoroso do volume de texto, priorizando visual limpo e legível.
-12. Use listas fragmentadas: listas com * ou 1. aparecem item a item ao avançar os slides (progressão gradual de ideias).
-13. Incorpore narrativas, analogias e prevenção de erros comuns de forma integrada e natural.
-14. Não infantilize o texto nem use termos demasiadamente lúdicos; mantenha tom formal e acessível.
-15. Em Material Complementar, cite livros comuns da área e links de documentação/sites de referência para aprofundamento no tema.
-16. Nunca use placeholders de imagem (ex.: [Image of ...]); só inclua imagem se houver URL/caminho real.
-17. NÃO rotule nada como nível de dificuldade (ex.: "Introdutório", "Intermediário", "Avançado", "para iniciantes") — etiquetas assim podem gerar desânimo; trate todos os estudantes como capazes.
-18. NÃO cite termos pedagógicos técnicos no texto dos slides (ex.: "Educação Preventiva", "Autoavaliação", "avaliação formativa", "zona de desenvolvimento proximal"); prefira a linguagem natural correspondente (ex.: "erros comuns", "fixação", "verifique o que você aprendeu").
-19. NUNCA comprima múltiplos conceitos distintos em um único slide; cada novo conceito, mecanismo ou variação ganha slide próprio — não apresse o raciocínio.
-20. Gere slides suficientes para cobrir o tema com profundidade real: o mínimo é 12 slides de conteúdo (excluindo título e fixação). Não resuma em poucos slides um assunto que merece ser construído passo a passo.
-21. NUNCA use títulos ou callouts chamativos do tipo "Regra de Ouro:", "Dica de Ouro:", "Segredo:", "Atenção:", "Importante:" — eles soam mecânicos e quebram a imersão. Prefira títulos descritivos do conteúdo (ex.: "O problema do trabalho repetitivo" em vez de "Regra de Ouro: automatize tarefas").
-22. Use o cabeçalho '#' (título) SOMENTE para marcar grandes blocos da aula: no slide de título da aula e ao iniciar uma nova seção/tema com troca drástica de conteúdo (marcação de novo bloco). Nos slides regulares do desenvolvimento, demarque o que se está vendo com o subtítulo '##' (ex.: '## Estrutura while em Python'), não com '#' — evite que cada slide vire um título. NUNCA escreva as palavras 'Subtítulo:' ou 'Título:' em texto corrido. Se a aula percorre várias estruturas/fenômenos (ex.: for, while, do-while), cada um recebe seu próprio slide/sequência demarcado com '##' que nomeie exatamente o elemento, para o aluno saber onde está e o que dominar a cada passo.
-23. Use negrito (**texto**) sempre que possível para demarcar as informações mais importantes de cada slide, destacando os pontos-chave que merecem atenção do aluno.
-24. Compatibilidade com Dark Mode em HTML/CSS: Os slides suportam alternância entre modo claro e modo escuro (dark mode), o que altera as cores do slide (fundo, textos e bordas). Ao gerar elementos em HTML/CSS customizados, considere sempre essas alterações de tema: defina pares contrastantes explícitos de fundo e texto ou use as variáveis de tema (como var(--text-primary), var(--text-secondary), var(--slide-bg), var(--border)) para garantir que o HTML interno não fique invisível nem sofra perda de contraste ao alternar para o dark mode.
-25. Ícones: quando um ícone realmente ajudar a ilustrar o conteúdo, use a biblioteca Lucide no formato <i data-lucide="nome-do-icone"></i> (nomes em kebab-case, ex.: <i data-lucide="book-open"></i>, <i data-lucide="lightbulb"></i>, <i data-lucide="triangle-alert"></i>, <i data-lucide="circle-check"></i>). Use no máximo um ícone por item/bloco e sempre acompanhado de texto — nunca deixe o ícone como única informação. Não use emojis.
-</REGRAS>`;
-
-  let writerUserPrompt = `TEMA / ASSUNTO DA AULA: ${tema}\n\n`;
-  if (outlineResult) writerUserPrompt += `OUTLINE ESTRUTURAL PLANEJADO:\n${outlineResult}\n\n`;
-  if (observacoes) writerUserPrompt += `OBSERVAÇÕES DO PROFESSOR: ${observacoes}\n\n`;
-  if (aulasContexto) writerUserPrompt += `AULAS ANTERIORES DE REFERÊNCIA:\n\n${aulasContexto}\n\n`;
-  if (docsContexto) writerUserPrompt += `DOCUMENTOS ORIENTADORES:\n\n${docsContexto}\n\n`;
-  writerUserPrompt += 'Gere a aula completa no formato Marp Next Markdown seguindo rigorosamente o outline e as instruções. Responda APENAS com o markdown da aula, sem nenhum texto introdutório ou explicativo.';
-
-  try {
-    const messages: AiMessage[] = [
-      { role: 'system', content: MARP_SYSTEM_PROMPT },
-      { role: 'user', content: writerUserPrompt },
-    ];
-    const result = await callAi({
-      messages,
-      temperature: 0.55,
-      timeoutMs: 180000,
-      task: 'aula',
-      validate: (conteudoUnico) => normalizeMarpMarkdown(conteudoUnico).includes('---'),
-    });
-    content = result.content;
-    modeloUtilizado = result.modelUsed || modeloUtilizado;
-  } catch (e: any) {
-    throw new Error(`Falha na expansão de slides com IA: ${e.message || 'Erro de conexão/timeout'}`);
-  }
+    secoesMd.push(secaoLimpa);
+    for (const linha of secaoLimpa.split('\n')) {
+      const mTitulo = linha.match(/^#{1,2}\s+(.*)/);
+      if (mTitulo) titulosSlidesAnteriores.push(mTitulo[1].trim());
+    }
+    conceitosJaCobertos.push(...secao.conceitos);
   }
 
   if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
 
-  await checkpoint?.('85% - Expandindo slides e diagramas Marp...', { fase: 'slides' });
+  const fechamento = renderBlocoFechamento(outline);
+  const content = [capa, ...secoesMd, fechamento].filter(Boolean).join('\n\n---\n\n');
 
   if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
 
-  // FASE 3: Validação & Limpeza
-  const cleaned = normalizeMarpMarkdown(content);
+  await checkpoint?.('85% - Validando e finalizando a aula...', { fase: 'validacao' });
+
+  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+
+  const cleaned = repararSlidesDoConteudo(normalizeMarpMarkdown(content));
 
   if (!cleaned || !cleaned.includes('---')) {
     throw new Error('A IA não retornou Markdown Marp válido');
   }
 
-  const titulo_sugerido = outline
-    ? outline.titulo.trim()
-    : (cleaned.match(/^---[\s\S]*?title:\s*(.+)/m)?.[1]?.trim().replace(/^['"]|['"]$/g, '') || tema || 'Nova Aula');
+  const validacaoFinal = validarAulaMarp(cleaned);
+  if (!validacaoFinal.valido) {
+    throw new Error(
+      `A aula gerada ficou com problemas de estrutura: ${validacaoFinal.erros.slice(0, 5).join(' ')}`
+    );
+  }
+
+  const totalSlides = dividirEmSlides(cleaned).length;
+  if (totalSlides > SLIDES_TOTAIS_MAX) {
+    avisos.push(
+      `A aula ficou com ${totalSlides} slides (acima de ${SLIDES_TOTAIS_MAX}); considere dividi-la em duas aulas.`
+    );
+  }
 
   return {
     success: true,
     conteudo_md: cleaned,
-    titulo_sugerido,
+    titulo_sugerido: outline.titulo.trim(),
     modelo_utilizado: modeloUtilizado,
     outline: outlineResult,
     ...(avisos.length > 0 ? { avisos } : {}),

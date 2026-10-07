@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll, afterAll, beforeEach } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { signJwt } from './auth';
 import app from './routes';
 import { generateAulaOutlineAndContent } from './ai';
@@ -6,14 +6,45 @@ import { createJob, dispatchJob, getJob, updateJobStatus } from './aiJobs';
 import { db } from './db';
 import { indexarDocumento } from './documentIndexer';
 
+const OUTLINE_MOCK = JSON.stringify({
+  titulo: 'Aula Chained Test',
+  subtitulo: 'Pipeline em duas fases',
+  objetivos: ['Compreender o pipeline', 'Validar a saida'],
+  prerequisitos: ['Nenhum'],
+  secoes: [
+    {
+      titulo: 'Planejamento',
+      proposito: 'Entender a primeira fase',
+      conceitos: ['outline'],
+      analogia: 'Um mapa antes da viagem',
+    },
+    {
+      titulo: 'Redacao',
+      proposito: 'Entender a segunda fase',
+      conceitos: ['secao'],
+    },
+    {
+      titulo: 'Validacao',
+      proposito: 'Garantir a estrutura',
+      conceitos: ['validacao'],
+    },
+  ],
+  sintese: [
+    { conceito: 'outline', resumo: 'Estrutura planejada antes da escrita.' },
+    { conceito: 'secao', resumo: 'Bloco conceitual redigido separadamente.' },
+    { conceito: 'validacao', resumo: 'Checagem estrutural antes de entregar.' },
+    { conceito: 'fechamento', resumo: 'Sintese, fixacao e referencias.' },
+  ],
+  fixacao: ['O que e um outline?', 'Por que validar?', 'O que entra no fechamento?'],
+  material_complementar: [
+    { titulo: 'Documentacao', detalhe: 'Referencia do tema.', url: 'https://example.org/docs' },
+    { titulo: 'Livro base', detalhe: 'Aprofundamento.' },
+    { titulo: 'Guia pratico', detalhe: 'Exercicios.' },
+  ],
+});
+
 describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
-  const ENV_KEYS = [
-    'AI_PROVIDER',
-    'AI_BASE_URL',
-    'AI_API_KEY',
-    'AI_MODEL',
-    'AI_FALLBACK_MODEL',
-  ] as const;
+  const ENV_KEYS = ['AI_PROVIDER', 'AI_BASE_URL', 'AI_API_KEY', 'AI_MODEL', 'AI_FALLBACK_MODEL'] as const;
 
   const originalEnv = new Map<string, string | undefined>();
   let server: ReturnType<typeof Bun.serve>;
@@ -27,18 +58,44 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
       hostname: '127.0.0.1',
       async fetch(request: Request): Promise<Response> {
         const bodyText = await request.text();
-        if (globalTestMode === 'fail_outline' && (bodyText.includes('planejar a estrutura') || bodyText.includes('outline pedagógico'))) {
+        const isPlanner = bodyText.includes('coordenador pedagógico e designer instrucional sênior');
+        const isSecao = bodyText.includes('Você redige os slides de UMA seção');
+
+        if (globalTestMode === 'fail_outline' && isPlanner) {
           return new Response('Internal Server Error', { status: 500 });
         }
-        if (globalTestMode === 'fail_slides' && bodyText.includes('Marp Next')) {
-          return new Response('Bad Request', { status: 400 });
+        if (globalTestMode === 'fail_slides' && isSecao) {
+          return new Response(
+            JSON.stringify({
+              choices: [{ message: { content: '## Secao invalida\n\n```mermaid\ngitGraph\nA\n```\n' } }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
         }
 
-        const isPlanner = bodyText.includes('planejar a estrutura') || bodyText.includes('outline pedagógico');
-        const content = isPlanner
-          ? 'Outline detalhado da aula planejado com sucesso.'
-          : '---\ntheme: default\ntitle: Aula Chained Test\n---\n\n# Titulo da Aula\n\n## Slide 1\n\nConteúdo gerado.';
-        return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+        if (isPlanner) {
+          return new Response(JSON.stringify({ choices: [{ message: { content: OUTLINE_MOCK } }] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        if (isSecao) {
+          const m = bodyText.match(/SEÇÃO ATUAL \((\d+) de (\d+)\)/);
+          const idx = m ? Number(m[1]) : 1;
+          return new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: `# Secao ${idx}\n\n## Conteudo\n\nTexto curto da secao ${idx}.\n`,
+                  },
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response(JSON.stringify({ choices: [{ message: { content: '' } }] }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -64,24 +121,22 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
     globalTestMode = '';
   });
 
-  test('generateAulaOutlineAndContent executa 2 etapas e invoca checkpoints', async () => {
+  test('generateAulaOutlineAndContent executa as fases e invoca checkpoints', async () => {
     const checkpoints: string[] = [];
-    const checkpointFn = async (prog: string) => {
-      checkpoints.push(prog);
-    };
-
     const res = await generateAulaOutlineAndContent({
       tema: 'Programacao Assincrona',
       observacoes: 'Focar em Promises e async/await',
-      checkpoint: checkpointFn,
+      checkpoint: async (prog: string) => {
+        checkpoints.push(prog);
+      },
     });
 
     expect(res.success).toBe(true);
     expect(res.conteudo_md).toContain('---');
     expect(res.titulo_sugerido).toBe('Aula Chained Test');
-    expect(checkpoints.length).toBeGreaterThan(0);
     expect(checkpoints.some((c) => c.includes('35%'))).toBe(true);
     expect(checkpoints.some((c) => c.includes('85%'))).toBe(true);
+    expect(res.conteudo_md).toContain('## Sintese do percurso');
   });
 
   test('generateAulaOutlineAndContent interrompe se isCancelled() retornar true', async () => {
@@ -135,15 +190,26 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
     expect(completedJob?.resultado.conteudo_md).toContain('---');
   });
 
-  // Novo Caso 1: RAG context e Aulas anteriores integrados na geração
-  test('Caso 1: RAG context e Aulas anteriores integrados na geração', async () => {
-    const cursoRes = db.query('INSERT INTO cursos (slug, nome, senha) VALUES (?, ?, NULL)').run('curso-rag-chained-new', 'Curso RAG Chained New');
+  test('Caso 1: RAG context e Aulas anteriores integrados na geracao', async () => {
+    const cursoRes = db
+      .query('INSERT INTO cursos (slug, nome, senha) VALUES (?, ?, NULL)')
+      .run('curso-rag-chained-new', 'Curso RAG Chained New');
     const cursoId = Number(cursoRes.lastInsertRowid);
-    const discRes = db.query('INSERT INTO disciplinas (curso_id, slug, nome) VALUES (?, ?, ?)').run(cursoId, 'disc-rag-chained-new', 'Disc RAG Chained New');
+    const discRes = db
+      .query('INSERT INTO disciplinas (curso_id, slug, nome) VALUES (?, ?, ?)')
+      .run(cursoId, 'disc-rag-chained-new', 'Disc RAG Chained New');
     const disciplinaId = Number(discRes.lastInsertRowid);
-    const aulaRes = db.query("INSERT INTO aulas (disciplina_id, titulo, caminho, descricao, ordem, conteudo_md) VALUES (?, ?, '', '', 1, ?)").run(disciplinaId, 'Aula Anterior RAG', '# Aula Anterior\n\nConceito base.');
+    const aulaRes = db
+      .query(
+        "INSERT INTO aulas (disciplina_id, titulo, caminho, descricao, ordem, conteudo_md) VALUES (?, ?, '', '', 1, ?)"
+      )
+      .run(disciplinaId, 'Aula Anterior RAG', '# Aula Anterior\n\nConceito base.');
     const aulaId = Number(aulaRes.lastInsertRowid);
-    const docRes = db.query('INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes) VALUES (NULL, ?, ?, ?, ?, ?, ?)').run(disciplinaId, 'Plano de Ensino RAG', 'plano.txt', 'plano_ensino', 'Conteúdo orientador para IA.', 100);
+    const docRes = db
+      .query(
+        'INSERT INTO documentos_orientadores (curso_id, disciplina_id, titulo, nome_arquivo, tipo, conteudo_texto, tamanho_bytes) VALUES (NULL, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(disciplinaId, 'Plano de Ensino RAG', 'plano.txt', 'plano_ensino', 'Conteúdo orientador para IA.', 100);
     const docId = Number(docRes.lastInsertRowid);
     indexarDocumento(docId, null, disciplinaId, 'Plano de Ensino RAG', 'Conteúdo orientador para IA.');
 
@@ -164,33 +230,30 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
     }
   });
 
-  // Novo Caso 2: Resiliência da Fase 1 (Fallback de Outline)
-  test('Caso 2: Resiliência da Fase 1 (Fallback de Outline)', async () => {
+  test('Caso 2: falha do planner aborta a geracao em vez de cair em chamada unica', async () => {
     globalTestMode = 'fail_outline';
-    const res = await generateAulaOutlineAndContent({
-      tema: 'Fallback Outline Test',
-    });
-    expect(res.success).toBe(true);
-    expect(res.conteudo_md).toContain('---');
-    expect(res.outline).toBe('Fallback Outline Test');
-  });
-
-  // Novo Caso 3: Tratamento de erro na Fase 2
-  test('Caso 3: Tratamento de erro na Fase 2', async () => {
-    globalTestMode = 'fail_slides';
     let errorThrown: any = null;
     try {
-      await generateAulaOutlineAndContent({
-        tema: 'Erro Fase 2 Test',
-      });
+      await generateAulaOutlineAndContent({ tema: 'Fallback Outline Test' });
     } catch (e) {
       errorThrown = e;
     }
     expect(errorThrown).not.toBeNull();
-    expect(errorThrown.message).toContain('Falha na expansão de slides com IA');
+    expect(errorThrown.message).toContain('Falha ao planejar a estrutura da aula');
   });
 
-  // Novo Caso 4: Parsing numérico de progresso no endpoint HTTP GET /ai/jobs/:id
+  test('Caso 3: secao invalida apos as tentativas bloqueia a geracao', async () => {
+    globalTestMode = 'fail_slides';
+    let errorThrown: any = null;
+    try {
+      await generateAulaOutlineAndContent({ tema: 'Erro Fase 2 Test' });
+    } catch (e) {
+      errorThrown = e;
+    }
+    expect(errorThrown).not.toBeNull();
+    expect(errorThrown.message).toContain('sem problemas de estrutura');
+  });
+
   test('Caso 4: Parsing numérico de progresso no endpoint HTTP GET /ai/jobs/:id', async () => {
     const job = createJob('aula', { tema: 'Job Progress HTTP Test' }, false);
     updateJobStatus(job.id, 'processando', { progresso: '35% - Planejando estrutura...' });
@@ -204,7 +267,6 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
     expect(data.step_message).toBe('35% - Planejando estrutura...');
   });
 
-  // Novo Caso 5: Cancelamento de job via endpoint HTTP POST /ai/jobs/:id/cancel
   test('Caso 5: Cancelamento de job via endpoint HTTP POST /ai/jobs/:id/cancel', async () => {
     const job = createJob('aula', { tema: 'Job Cancel HTTP Test' }, false);
     const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
@@ -219,7 +281,6 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
     expect(jobInDb?.status).toBe('cancelado');
   });
 
-  // Novo Caso 6: Validação de entradas no POST /ai/generate-aula
   test('Caso 6: Validação de entradas no POST /ai/generate-aula', async () => {
     const adminToken = await signJwt({ sub: '1', email: 'admin@escola.com', role: 'admin' });
     const res = await app.request('/ai/generate-aula', {

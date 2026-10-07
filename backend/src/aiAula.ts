@@ -1,3 +1,5 @@
+import { GUIA_DIDATICO, CONTRATO_RENDERER, ESTRUTURA_AULA } from './aiGuiaDidatica';
+
 export interface AulaOutlineSlide {
   titulo: string;
   objetivo: string;
@@ -7,7 +9,21 @@ export interface AulaOutlineSlide {
 
 export interface AulaOutlineSecao {
   titulo: string;
-  slides: AulaOutlineSlide[];
+  proposito: string;
+  conceitos: string[];
+  analogia?: string;
+  exemplo?: string;
+}
+
+export interface AulaOutlineSintese {
+  conceito: string;
+  resumo: string;
+}
+
+export interface AulaOutlineReferencia {
+  titulo: string;
+  detalhe: string;
+  url?: string;
 }
 
 export interface AulaOutline {
@@ -16,13 +32,24 @@ export interface AulaOutline {
   objetivos: string[];
   prerequisitos: string[];
   secoes: AulaOutlineSecao[];
+  sintese: AulaOutlineSintese[];
   fixacao: string[];
+  material_complementar: AulaOutlineReferencia[];
 }
 
-export const SLIDES_TOTAIS_MIN = 10;
-export const SLIDES_TOTAIS_MAX = 16;
+export const SECOES_MIN = 3;
+export const SECOES_MAX = 5;
 export const FIXACAO_MIN = 3;
 export const FIXACAO_MAX = 5;
+export const SINTESE_MIN = 4;
+export const SINTESE_MAX = 8;
+export const REFERENCIAS_MIN = 3;
+export const REFERENCIAS_MAX = 5;
+export const OBJETIVOS_MIN = 2;
+export const OBJETIVOS_MAX = 4;
+export const SLIDES_SECAO_MAX = 5;
+export const SLIDES_TOTAIS_MAX = 30;
+export const SLIDES_TOTAIS_MIN = 6;
 
 const MERMAID_TYPES = [
   'flowchart',
@@ -49,78 +76,118 @@ function extrairJsonObjeto(content: string): any | null {
   }
 }
 
+function texto(valor: unknown): string {
+  return typeof valor === 'string' ? valor.trim() : '';
+}
+
+function listaDeTextos(valor: unknown): string[] {
+  return Array.isArray(valor) ? valor.map(texto).filter(Boolean) : [];
+}
+
+export function normalizarOutline(raw: any): AulaOutline | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const titulo = texto(raw.titulo);
+  if (!titulo) return null;
+
+  const secoesRaw = Array.isArray(raw.secoes) ? raw.secoes : [];
+  const secoes: AulaOutlineSecao[] = secoesRaw
+    .map((s: any) => {
+      const slidesLegados = Array.isArray(s?.slides) ? s.slides : [];
+      const conceitosDeclarados = listaDeTextos(s?.conceitos);
+      const conceitosLegados = slidesLegados
+        .flatMap((sl: any) => listaDeTextos(sl?.conceitos_novos))
+        .filter(Boolean);
+      const proposito = texto(s?.proposito) || texto(slidesLegados[0]?.objetivo);
+      return {
+        titulo: texto(s?.titulo),
+        proposito,
+        conceitos: [...new Set(conceitosDeclarados.length > 0 ? conceitosDeclarados : conceitosLegados)],
+        analogia: texto(s?.analogia) || undefined,
+        exemplo: texto(s?.exemplo) || undefined,
+      };
+    })
+    .filter((s: AulaOutlineSecao) => s.titulo);
+
+  const sintese: AulaOutlineSintese[] = (Array.isArray(raw.sintese) ? raw.sintese : [])
+    .map((x: any) => ({ conceito: texto(x?.conceito), resumo: texto(x?.resumo) }))
+    .filter((x: AulaOutlineSintese) => x.conceito);
+
+  const material: AulaOutlineReferencia[] = (Array.isArray(raw.material_complementar) ? raw.material_complementar : [])
+    .map((x: any) => ({
+      titulo: texto(x?.titulo),
+      detalhe: texto(x?.detalhe),
+      url: texto(x?.url) || undefined,
+    }))
+    .filter((x: AulaOutlineReferencia) => x.titulo);
+
+  return {
+    titulo,
+    subtitulo: texto(raw.subtitulo),
+    objetivos: listaDeTextos(raw.objetivos),
+    prerequisitos: listaDeTextos(raw.prerequisitos),
+    secoes,
+    sintese,
+    fixacao: listaDeTextos(raw.fixacao),
+    material_complementar: material,
+  };
+}
+
 export function parseOutline(content: string): AulaOutline | null {
-  const parsed = extrairJsonObjeto(content);
-  if (!parsed || parsed === null || typeof parsed !== 'object') return null;
-  if (typeof parsed.titulo !== 'string' || parsed.titulo.trim() === '') return null;
-  return parsed as AulaOutline;
+  return normalizarOutline(extrairJsonObjeto(content));
 }
 
 export function diagnosticarOutline(outline: any): string[] {
   const erros: string[] = [];
-
-  if (!outline || typeof outline !== 'object') {
-    return ['O outline retornado não é um objeto válido.'];
+  if (!outline || typeof outline !== 'object' || Array.isArray(outline)) {
+    return ['Outline ausente ou invalido.'];
   }
 
-  if (!outline.titulo || String(outline.titulo).trim() === '') {
-    erros.push('Titulo ausente no outline.');
+  if (!texto(outline.titulo)) erros.push('Titulo da aula ausente.');
+  if (!texto(outline.subtitulo)) erros.push('Subtitulo da aula ausente.');
+
+  const objetivos = listaDeTextos(outline.objetivos);
+  if (objetivos.length < OBJETIVOS_MIN || objetivos.length > OBJETIVOS_MAX) {
+    erros.push(`Objetivos devem ter de ${OBJETIVOS_MIN} a ${OBJETIVOS_MAX} itens (recebidos: ${objetivos.length}).`);
   }
 
-  if (!Array.isArray(outline.secoes) || outline.secoes.length === 0) {
-    erros.push('Lista de secoes vazia.');
-    return erros;
-  }
-
-  let totalSlides = 0;
-  outline.secoes.forEach((secao: any, sIdx: number) => {
-    if (!secao || typeof secao !== 'object' || !secao.titulo || String(secao.titulo).trim() === '') {
-      erros.push(`Secao ${sIdx + 1}: titulo ausente.`);
-    }
-    if (!Array.isArray(secao.slides) || secao.slides.length === 0) {
-      erros.push(`Secao ${sIdx + 1}: nenhum slide planejado.`);
-      return;
-    }
-    secao.slides.forEach((slide: any, slIdx: number) => {
-      totalSlides++;
-      if (!slide?.titulo || String(slide.titulo).trim() === '') {
-        erros.push(`Secao ${sIdx + 1}, slide ${slIdx + 1}: titulo do slide ausente.`);
-      }
-    });
-  });
-
-  if (totalSlides < SLIDES_TOTAIS_MIN || totalSlides > SLIDES_TOTAIS_MAX) {
-    erros.push(
-      `Total de slides (${totalSlides}) fora da faixa esperada (${SLIDES_TOTAIS_MIN} a ${SLIDES_TOTAIS_MAX}).`
-    );
-  }
-
-  if (!Array.isArray(outline.fixacao) || outline.fixacao.length < FIXACAO_MIN) {
-    erros.push(`Fixacao deve ter no minimo ${FIXACAO_MIN} perguntas (recebidas: ${Array.isArray(outline.fixacao) ? outline.fixacao.length : 0}).`);
-  } else if (outline.fixacao.length > FIXACAO_MAX) {
-    erros.push(`Fixacao deve ter no maximo ${FIXACAO_MAX} perguntas (recebidas: ${outline.fixacao.length}).`);
+  const secoes = Array.isArray(outline.secoes) ? outline.secoes : [];
+  if (secoes.length < SECOES_MIN || secoes.length > SECOES_MAX) {
+    erros.push(`Secoes devem ser de ${SECOES_MIN} a ${SECOES_MAX} (recebidas: ${secoes.length}).`);
   }
 
   const conceitosVistos = new Map<string, string>();
-  outline.secoes?.forEach((secao: any, sIdx: number) => {
-    if (!Array.isArray(secao?.slides)) return;
-    secao.slides.forEach((slide: any, slIdx: number) => {
-      if (!Array.isArray(slide?.conceitos_novos)) return;
-      for (const conceito of slide.conceitos_novos) {
-        const chave = String(conceito || '')
-          .trim()
-          .toLowerCase();
-        if (!chave) continue;
-        if (conceitosVistos.has(chave)) {
-          erros.push(
-            `Conceito duplicado "${conceito}" nos slides ${conceitosVistos.get(chave)} e Secao ${sIdx + 1}, slide ${slIdx + 1}.`
-          );
-        } else {
-          conceitosVistos.set(chave, `Secao ${sIdx + 1}, slide ${slIdx + 1}`);
-        }
+  secoes.forEach((secao: any, sIdx: number) => {
+    const rotulo = `Secao ${sIdx + 1}`;
+    if (!texto(secao?.titulo)) erros.push(`${rotulo}: titulo ausente.`);
+    if (!texto(secao?.proposito)) erros.push(`${rotulo}: proposito ausente.`);
+    const conceitos = listaDeTextos(secao?.conceitos);
+    if (conceitos.length === 0) erros.push(`${rotulo}: nenhum conceito declarado.`);
+    for (const conceito of conceitos) {
+      const chave = conceito.toLowerCase();
+      if (conceitosVistos.has(chave)) {
+        erros.push(`Conceito duplicado "${conceito}" em ${conceitosVistos.get(chave)} e ${rotulo}.`);
+      } else {
+        conceitosVistos.set(chave, rotulo);
       }
-    });
+    }
   });
+
+  const sintese = Array.isArray(outline.sintese) ? outline.sintese : [];
+  if (sintese.length < SINTESE_MIN || sintese.length > SINTESE_MAX) {
+    erros.push(`Sintese deve ter de ${SINTESE_MIN} a ${SINTESE_MAX} linhas (recebidas: ${sintese.length}).`);
+  }
+
+  const fixacao = listaDeTextos(outline.fixacao);
+  if (fixacao.length < FIXACAO_MIN || fixacao.length > FIXACAO_MAX) {
+    erros.push(`Fixacao deve ter de ${FIXACAO_MIN} a ${FIXACAO_MAX} perguntas (recebidas: ${fixacao.length}).`);
+  }
+
+  const material = Array.isArray(outline.material_complementar) ? outline.material_complementar : [];
+  if (material.length < REFERENCIAS_MIN || material.length > REFERENCIAS_MAX) {
+    erros.push(
+      `Material complementar deve ter de ${REFERENCIAS_MIN} a ${REFERENCIAS_MAX} referencias (recebidas: ${material.length}).`
+    );
+  }
 
   return erros;
 }
@@ -171,6 +238,8 @@ export function dividirEmSlides(conteudoMd: string): string[] {
   return slides.filter((s) => s.trim() !== '');
 }
 
+const TAGS_BALANCEADAS = ['style', 'script', 'template', 'textarea', 'div', 'span', 'pre'];
+
 export function validarSlideMarp(slideMd: string): string[] {
   const erros: string[] = [];
 
@@ -184,8 +253,7 @@ export function validarSlideMarp(slideMd: string): string[] {
     erros.push('Bloco KaTeX ($$) aberto e nao fechado dentro do slide.');
   }
 
-  const tagsSimples = ['style', 'script', 'template', 'textarea', 'div'];
-  for (const tag of tagsSimples) {
+  for (const tag of TAGS_BALANCEADAS) {
     const abre = (slideMd.match(new RegExp(`<${tag}\\b[^>]*>`, 'gi')) || []).length;
     const fecha = (slideMd.match(new RegExp(`</${tag}\\s*>`, 'gi')) || []).length;
     if (abre !== fecha) {
@@ -201,21 +269,60 @@ export function validarSlideMarp(slideMd: string): string[] {
   return erros;
 }
 
-export function validarAulaMarp(conteudoMd: string): { valido: boolean; erros: string[] } {
+export function validarSecaoMarp(secaoMd: string): string[] {
+  if (!secaoMd || !secaoMd.trim()) return ['Secao vazia.'];
   const erros: string[] = [];
+  dividirEmSlides(secaoMd).forEach((slide, idx) => {
+    for (const erro of validarSlideMarp(slide)) {
+      erros.push(`Slide ${idx + 1}: ${erro}`);
+    }
+  });
+  return erros;
+}
 
+export function validarAulaMarp(conteudoMd: string): { valido: boolean; erros: string[] } {
   if (!conteudoMd || !conteudoMd.includes('---')) {
     return { valido: false, erros: ['Conteudo Marp ausente ou sem separador de slide (---).'] };
   }
 
-  const slides = dividirEmSlides(conteudoMd);
-  slides.forEach((slide, idx) => {
+  const erros: string[] = [];
+  dividirEmSlides(conteudoMd).forEach((slide, idx) => {
     for (const erro of validarSlideMarp(slide)) {
       erros.push(`Slide ${idx + 1}: ${erro}`);
     }
   });
 
   return { valido: erros.length === 0, erros };
+}
+
+export function repararSlideMarp(slideMd: string): string {
+  let texto = slideMd;
+
+  for (const tag of TAGS_BALANCEADAS) {
+    const abre = (texto.match(new RegExp(`<${tag}\\b[^>]*>`, 'gi')) || []).length;
+    const fecha = (texto.match(new RegExp(`</${tag}\\s*>`, 'gi')) || []).length;
+    if (abre > fecha) {
+      texto += `\n${`</${tag}>`.repeat(abre - fecha)}`;
+    }
+  }
+
+  const fences = (texto.match(/^[ \t]*```/gm) || []).length;
+  if (fences % 2 !== 0) {
+    texto += '\n```';
+  }
+
+  const dollares = (texto.match(/^\s*\$\$/gm) || []).length;
+  if (dollares % 2 !== 0) {
+    texto += '\n$$';
+  }
+
+  return texto;
+}
+
+export function repararSlidesDoConteudo(conteudoMd: string): string {
+  const slides = dividirEmSlides(conteudoMd);
+  if (slides.length === 0) return conteudoMd;
+  return slides.map(repararSlideMarp).join('\n\n---\n\n');
 }
 
 export function gerarFrontMatterEPrimeiroSlide(outline: AulaOutline, autor: string): string {
@@ -226,7 +333,6 @@ export function gerarFrontMatterEPrimeiroSlide(outline: AulaOutline, autor: stri
     '---',
     'marp: true',
     'theme: default',
-    'paginate: true',
     `title: ${titulo}`,
     ...(subtitulo ? [`description: ${subtitulo}`] : []),
     '---',
@@ -263,6 +369,88 @@ export function removerFrontMatterRestante(secaoMd: string): string {
   return linhas.join('\n');
 }
 
+export function renderBlocoFechamento(outline: AulaOutline): string {
+  const partes: string[] = [];
+
+  if (outline.sintese.length > 0) {
+    const linhas = outline.sintese.map((s) => `| **${s.conceito}** | ${s.resumo} |`);
+    partes.push(
+      ['## Sintese do percurso', '', '| Conceito | Em uma frase |', '| :--- | :--- |', ...linhas].join('\n')
+    );
+  }
+
+  if (outline.fixacao.length > 0) {
+    const itens = outline.fixacao.map((q, i) => `${i + 1}. ${q}`).join('\n');
+    partes.push(['## Verifique o que voce aprendeu', '', itens].join('\n'));
+  }
+
+  if (outline.material_complementar.length > 0) {
+    const itens = outline.material_complementar
+      .map((r) => (r.url ? `- **${r.titulo}** — ${r.detalhe} ${r.url}` : `- **${r.titulo}** — ${r.detalhe}`))
+      .join('\n');
+    partes.push(['## Material Complementar', '', itens].join('\n'));
+  }
+
+  return partes.join('\n\n---\n\n');
+}
+
+export function promptPlanejadorAula(params: {
+  tema: string;
+  observacoes?: string;
+  aulasContexto?: string;
+  docsContexto?: string;
+}): { systemPrompt: string; userPrompt: string } {
+  const { tema, observacoes = '', aulasContexto = '', docsContexto = '' } = params;
+
+  const systemPrompt = `Você é um coordenador pedagógico e designer instrucional sênior. Planeje a estrutura de UMA aula completa sobre o tema pedido, com começo, meio e fim.
+
+Não planeje uma quantidade fixa de slides. Planeje os blocos conceituais necessários para que o aluno construa o entendimento passo a passo.
+
+${GUIA_DIDATICO}
+
+${ESTRUTURA_AULA}
+
+${CONTRATO_RENDERER}
+
+Retorne ESTRITAMENTE um objeto JSON neste formato:
+{
+  "titulo": "Título principal da aula",
+  "subtitulo": "Subtítulo que situa o aluno",
+  "objetivos": ["O que o aluno será capaz de fazer ao final", "..."],
+  "prerequisitos": ["O que o aluno precisa já saber", "..."],
+  "secoes": [
+    {
+      "titulo": "Título do bloco conceitual",
+      "proposito": "O que o aluno deve compreender neste bloco",
+      "conceitos": ["Conceito-chave apresentado aqui", "..."],
+      "analogia": "Analogia concreta que conduz o bloco (opcional, mas recomendada)",
+      "exemplo": "Exemplo central simplificado do bloco (opcional, mas recomendado)"
+    }
+  ],
+  "sintese": [{ "conceito": "Conceito", "resumo": "Explicação em uma frase" }],
+  "fixacao": ["Pergunta de fixação", "..."],
+  "material_complementar": [{ "titulo": "Livro ou documentação", "detalhe": "Para que serve", "url": "https://..." }]
+}
+
+Regras:
+1. De ${SECOES_MIN} a ${SECOES_MAX} seções em progressão: a primeira contextualiza e retoma pré-requisitos; a última consolida.
+2. Cada seção declara de 1 a 3 conceitos-chave. Nenhum conceito pode se repetir entre seções.
+3. A aula precisa ter começo, meio e fim; não encha com seções genéricas.
+4. De ${FIXACAO_MIN} a ${FIXACAO_MAX} perguntas de fixação, uma por conceito central.
+5. De ${SINTESE_MIN} a ${SINTESE_MAX} linhas de síntese (conceito + resumo de uma frase).
+6. De ${REFERENCIAS_MIN} a ${REFERENCIAS_MAX} referências reais (livro, documentação ou site de referência) em material complementar. Não invente URLs.
+7. Fundamente-se nos documentos e aulas de referência. Se eles não cobrirem o tema, não invente conceitos.
+8. Responda apenas com o JSON puro, sem markdown.`;
+
+  let userPrompt = `TEMA: ${tema || 'Conteudo geral'}\n`;
+  if (observacoes) userPrompt += `OBSERVACOES DO PROFESSOR: ${observacoes}\n`;
+  if (aulasContexto) userPrompt += `\nAULAS DE REFERENCIA:\n${aulasContexto}\n`;
+  if (docsContexto) userPrompt += `\nDOCUMENTOS ORIENTADORES:\n${docsContexto}\n`;
+  userPrompt += 'Gere o outline pedagogico estruturado desta aula.';
+
+  return { systemPrompt, userPrompt };
+}
+
 export function promptSecaoAula(params: {
   outline: AulaOutline;
   indiceSecao: number;
@@ -272,29 +460,35 @@ export function promptSecaoAula(params: {
 }): { systemPrompt: string; userPrompt: string } {
   const { outline, indiceSecao, conceitosJaCobertos, titulosSlidesAnteriores, contextoLimpo } = params;
   const secao = outline.secoes[indiceSecao];
-  const slidesAnteriores = titulosSlidesAnteriores.slice(-8);
+  const slidesAnteriores = titulosSlidesAnteriores.slice(-10);
+  const primeiraSecao = indiceSecao === 0;
 
-  const systemPrompt = `Você é um especialista em didática, design instrucional e metodologias de ensino inclusivo.
-Sua tarefa é redigir em Marp Next Markdown APENAS os slides da seção "${secao.titulo}" de uma aula maior, a partir do outline estruturado.
+  const systemPrompt = `Você redige os slides de UMA seção de uma aula maior, em Marp Next Markdown.
 
-Regras:
-1. Responda APENAS com os slides Marp dessa seção (sem front-matter YAML, sem --- no início ou no fim).
-2. No PRIMEIRO slide da seção use um cabeçalho '#' com o título da seção; nos demais slides use '##' com o título do slide.
-3. Máximo de 10 frases por slide; use negrito para os pontos-chave.
-4. Use listas fragmentadas (* ou 1.) quando fizer sentido.
-5. NÃO repita conceitos já cobertos em outros slides/aulas (lista enviada). Construa a progressão do concreto ao abstrato.
-6. NÃO rotule nada como nível de dificuldade; NÃO use callouts do tipo "Regra de Ouro:", "Dica:", "Atenção:".
-7. Use KaTeX (fórmulas: $...$ inline, $$...$$ bloco), código com linguagem, tabelas e Mermaid (baixo/achatado, largura antes que altura) conforme o recurso planejado de cada slide.
-8. Fonte de verdade: o contexto fornecido. Não invente conceitos ausentes nele.
-9. Não use placeholders de imagem.
-10. Considere dark mode ao embutir HTML/CSS: use pares contrastantes ou variáveis de tema (var(--text-primary), var(--slide-bg), var(--border)).
-11. Ícones: quando um ícone ajudar a ilustrar o conteúdo, use Lucide no formato <i data-lucide="nome-do-icone"></i> (kebab-case, ex.: <i data-lucide="book-open"></i>, <i data-lucide="lightbulb"></i>, <i data-lucide="triangle-alert"></i>), sempre acompanhado de texto e no máximo um por item/bloco. NÃO use emojis.
+${GUIA_DIDATICO}
+
+${CONTRATO_RENDERER}
+
+REGRAS DA SUA TAREFA:
+1. Responda APENAS com os slides desta seção (sem front-matter YAML, sem --- no início ou no fim).
+2. Abra a seção com um slide de título usando '# <título da seção>'. Nos demais slides use '## <título do slide>'.
+3. Gere a quantidade de slides que a seção exigir para ensinar os conceitos sem pressa: um conceito por slide, sem slides de preenchimento. Se um slide passar de 8 frases, divida em dois.
+4. Use a analogia e o exemplo central fornecidos; não troque de analogia no meio da seção.
+5. Não repita conceitos já cobertos nem slides anteriores; encadeie com o que veio antes.
+6. PROIBIDO criar slides de "Reflexão", "Verifique o que você aprendeu", "Síntese", "Conclusão" ou "Material Complementar" — o sistema gera esses blocos.
+7. Sem placeholders de imagem e sem imagens se não houver URL real. Sem emojis.
 
 Responda somente com os slides.`;
 
   let userPrompt = `TÍTULO DA AULA: ${outline.titulo} — ${outline.subtitulo || ''}\n`;
   userPrompt += `SEÇÃO ATUAL (${indiceSecao + 1} de ${outline.secoes.length}): ${secao.titulo}\n`;
-  userPrompt += `SLIDES PLANEJADOS PARA ESTA SEÇÃO:\n${JSON.stringify(secao.slides, null, 2)}\n`;
+  userPrompt += `PROPÓSITO DA SEÇÃO: ${secao.proposito}\n`;
+  userPrompt += `CONCEITOS-CHAVE A ENSINAR:\n- ${secao.conceitos.join('\n- ')}\n`;
+  if (secao.analogia) userPrompt += `ANALOGIA CONDUTORA: ${secao.analogia}\n`;
+  if (secao.exemplo) userPrompt += `EXEMPLO CENTRAL: ${secao.exemplo}\n`;
+  if (primeiraSecao && outline.prerequisitos.length > 0) {
+    userPrompt += `PRÉ-REQUISITOS A RETOMAR EM UMA FRASE: ${outline.prerequisitos.join('; ')}\n`;
+  }
   if (conceitosJaCobertos.length > 0) {
     userPrompt += `CONCEITOS JÁ COBERTOS (não repetir):\n- ${conceitosJaCobertos.slice(-30).join('\n- ')}\n`;
   }

@@ -2,7 +2,14 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { callAi } from '../src/aiProvider';
 import { diagnosticarQuestoes, normalizarQuestoesComRubrica } from '../src/aiQuestoes';
-import { diagnosticarOutline, validarAulaMarp, type AulaOutline } from '../src/aiAula';
+import {
+  diagnosticarOutline,
+  parseOutline,
+  promptPlanejadorAula,
+  promptSecaoAula,
+  removerFrontMatterRestante,
+  validarAulaMarp,
+} from '../src/aiAula';
 
 interface Caso {
   caso: string;
@@ -71,42 +78,49 @@ Responda apenas com um array JSON de questões.`;
 async function rodarCasoAula(caso: Caso): Promise<falhaDeCaso> {
   const retornoDeCaso: string[] = [];
 
+  const planner = promptPlanejadorAula({ tema: caso.tema, observacoes: caso.observacoes });
   const plannerRes = await callAi({
     messages: [
-      {
-        role: 'system',
-        content:
-          'Você é um coordenador pedagógico sênior. Planeje o outline JSON de uma aula Marp com seções e slides. Responda apenas com o JSON.',
-      },
-      { role: 'user', content: `Tema: ${caso.tema}\nObservações: ${caso.observacoes || 'Nenhuma'}` },
+      { role: 'system', content: planner.systemPrompt },
+      { role: 'user', content: planner.userPrompt },
     ],
     temperature: 0.4,
     task: 'aula',
   });
 
-  const outline = parseJsonConteudo(plannerRes.content) as AulaOutline | null;
-  if (!outline || typeof outline !== 'object' || Array.isArray(outline)) {
-    return ['Outline retornado não é um objeto JSON.'];
-  }
-  const errosOutline = diagnosticarOutline(outline);
-  for (const erro of errosOutline) retornoDeCaso.push(`outline: ${erro}`);
+  const outline = parseOutline(plannerRes.content);
+  if (!outline) return ['Outline retornado não é um objeto JSON válido.'];
+  for (const erro of diagnosticarOutline(outline)) retornoDeCaso.push(`outline: ${erro}`);
 
-  const writerRes = await callAi({
-    messages: [
-      {
-        role: 'system',
-        content:
-          'Você escreve aulas em Marp Next Markdown (front-matter ---, separadores ---). Responda apenas com o markdown.',
-      },
-      {
-        role: 'user',
-        content: `Escreva uma aula Marp sobre ${caso.tema} seguindo este outline:\n${JSON.stringify(outline)}`,
-      },
-    ],
-    temperature: 0.45,
-    task: 'aula',
-  });
-  const valida = validarAulaMarp(writerRes.content);
+  const secoesMd: string[] = [];
+  const conceitosJaCobertos: string[] = [];
+  const titulos: string[] = [];
+  for (let i = 0; i < outline.secoes.length; i++) {
+    const { systemPrompt, userPrompt } = promptSecaoAula({
+      outline,
+      indiceSecao: i,
+      conceitosJaCobertos,
+      titulosSlidesAnteriores: titulos,
+      contextoLimpo: '',
+    });
+    const res = await callAi({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.45,
+      task: 'aula',
+    });
+    const secao = removerFrontMatterRestante(res.content);
+    secoesMd.push(secao);
+    for (const linha of secao.split('\n')) {
+      const m = linha.match(/^#{1,2}\s+(.*)/);
+      if (m) titulos.push(m[1].trim());
+    }
+    conceitosJaCobertos.push(...outline.secoes[i].conceitos);
+  }
+
+  const valida = validarAulaMarp(secoesMd.join('\n\n---\n\n'));
   if (!valida.valido) {
     for (const erro of valida.erros.slice(0, 10)) retornoDeCaso.push(`marp: ${erro}`);
   }

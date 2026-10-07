@@ -1,55 +1,58 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { generateAulaOutlineAndContent } from './ai';
 
-describe('aiAula: geracao por secoes (MT-10)', () => {
-  const ENV_KEYS = [
-    'AI_PROVIDER',
-    'AI_BASE_URL',
-    'AI_API_KEY',
-    'AI_MODEL',
-    'AI_FALLBACK_MODEL',
-  ] as const;
+const OUTLINE_MOCK = JSON.stringify({
+  titulo: 'Estruturas de repeticao em Python',
+  subtitulo: 'Do while ao for',
+  objetivos: ['Compreender iteracao', 'Escolher entre while e for'],
+  prerequisitos: ['Variaveis', 'Condicionais'],
+  secoes: [
+    {
+      titulo: 'Conceito de iteracao',
+      proposito: 'Entender por que repetir instrucoes',
+      conceitos: ['iteracao', 'while'],
+      analogia: 'Uma fila de banco',
+      exemplo: 'contador = 0',
+    },
+    {
+      titulo: 'Lacos contados',
+      proposito: 'Percorrer sequencias com for',
+      conceitos: ['for', 'range'],
+      analogia: 'Uma lista de chamada',
+    },
+    {
+      titulo: 'Erros comuns',
+      proposito: 'Evitar laco infinito',
+      conceitos: ['loop infinito'],
+    },
+  ],
+  sintese: [
+    { conceito: 'iteracao', resumo: 'Repetir instrucoes enquanto a condicao valer.' },
+    { conceito: 'while', resumo: 'Repete enquanto a condicao for verdadeira.' },
+    { conceito: 'for', resumo: 'Percorre uma sequencia conhecida.' },
+    { conceito: 'range', resumo: 'Gera a sequencia de numeros do laco.' },
+  ],
+  fixacao: [
+    'Explique a diferenca entre while e for.',
+    'Quando usar cada estrutura?',
+    'Como evitar um loop infinito?',
+  ],
+  material_complementar: [
+    { titulo: 'Python Tutorial', detalhe: 'Capitulo sobre estruturas de controle.', url: 'https://docs.python.org/3/tutorial/' },
+    { titulo: 'Pense em Python', detalhe: 'Capitulos sobre iteracao.' },
+    { titulo: 'PEP 8', detalhe: 'Convencoes de estilo.' },
+  ],
+});
+
+describe('aiAula: geracao por secoes', () => {
+  const ENV_KEYS = ['AI_PROVIDER', 'AI_BASE_URL', 'AI_API_KEY', 'AI_MODEL', 'AI_FALLBACK_MODEL'] as const;
 
   const originalEnv = new Map<string, string | undefined>();
   let server: ReturnType<typeof Bun.serve>;
-  const chamadas: { planner: string[]; secao: string[]; escritorUnico: string[] } = {
-    planner: [],
-    secao: [],
-    escritorUnico: [],
-  };
+  const chamadas: { planner: string[]; secao: string[] } = { planner: [], secao: [] };
 
-  const secaoMock = (prefixo: string) =>
-    `# ${prefixo} do conteudo\n\n## Abertura da secao\nTexto balanceado com *lista fragmentada*.\n\n---\n\n## Fechamento da secao\nOutro texto curto.\n`;
-
-  const outlineMock = JSON.stringify({
-    titulo: 'Estruturas de repeticao em Python',
-    subtitulo: 'Do while ao for',
-    objetivos: ['Compreender iteracao'],
-    prerequisitos: ['Variaveis'],
-    secoes: [
-      {
-        titulo: 'Conceito de iteracao',
-        slides: [
-          { titulo: 'O problema do trabalho repetitivo', objetivo: 'Motivar', conceitos_novos: ['iteracao'], recurso: 'texto' },
-          { titulo: 'Checando pre-requisitos', objetivo: 'Recapitular', conceitos_novos: [], recurso: 'texto' },
-          { titulo: 'A estrutura while', objetivo: 'Ensinar sintaxe', conceitos_novos: ['while'], recurso: 'codigo' },
-          { titulo: 'Condicao de parada', objetivo: 'Ensinar', conceitos_novos: ['condicao de parada'], recurso: 'texto' },
-          { titulo: 'While na pratica', objetivo: 'Exemplificar', conceitos_novos: [], recurso: 'codigo' },
-        ],
-      },
-      {
-        titulo: 'Lacos contados',
-        slides: [
-          { titulo: 'A estrutura for', objetivo: 'Ensinar sintaxe', conceitos_novos: ['for'], recurso: 'codigo' },
-          { titulo: 'A funcao range', objetivo: 'Ensinar', conceitos_novos: ['range'], recurso: 'codigo' },
-          { titulo: 'Percurso em sequencias', objetivo: 'Aplicar', conceitos_novos: ['percurso'], recurso: 'texto' },
-          { titulo: 'Comparando while e for', objetivo: 'Consolidar', conceitos_novos: [], recurso: 'tabela' },
-          { titulo: 'Erros comuns', objetivo: 'Prevencionar', conceitos_novos: ['loop infinito'], recurso: 'texto' },
-        ],
-      },
-    ],
-    fixacao: ['Explique a diferenca entre while e for.', 'Quando usar cada estrutura?', 'Como evitar um loop infinito?'],
-  });
+  const secaoMock = (indice: number) =>
+    `# Secao ${indice} do conteudo\n\n## Abertura da secao\n\nTexto curto com **destaque** e um exemplo:\n\n\`\`\`python\ncontador = 0\n\`\`\`\n\n---\n\n## Fechamento da secao\n\nOutro texto curto, sem repetir o que ja foi visto.\n`;
 
   beforeAll(() => {
     for (const key of ENV_KEYS) originalEnv.set(key, process.env[key]);
@@ -59,33 +62,31 @@ describe('aiAula: geracao por secoes (MT-10)', () => {
       hostname: '127.0.0.1',
       async fetch(request: Request): Promise<Response> {
         const raw = await request.text();
-        const decodificado = (JSON.parse(raw) as { messages?: Array<{ content?: string }> })
-          .messages?.map((m) => m.content || '')
-          .join('\n') || '';
+        const decodificado =
+          (JSON.parse(raw) as { messages?: Array<{ content?: string }> })
+            .messages?.map((m) => m.content || '')
+            .join('\n') || '';
 
-        if (decodificado.includes('planejar a estrutura')) {
+        if (decodificado.includes('coordenador pedagógico e designer instrucional sênior')) {
           chamadas.planner.push(decodificado);
-          return new Response(
-            JSON.stringify({ choices: [{ message: { content: outlineMock } }] }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          );
+          return new Response(JSON.stringify({ choices: [{ message: { content: OUTLINE_MOCK } }] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
         }
-        if (decodificado.includes('APENAS os slides da seção')) {
+        if (decodificado.includes('Você redige os slides de UMA seção')) {
           chamadas.secao.push(decodificado);
           const m = decodificado.match(/SEÇÃO ATUAL \((\d+) de (\d+)\)/);
           const idx = m ? Number(m[1]) : 1;
-          return new Response(
-            JSON.stringify({
-              choices: [{ message: { content: secaoMock(`Secao ${idx}`) } }],
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          );
+          return new Response(JSON.stringify({ choices: [{ message: { content: secaoMock(idx) } }] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
         }
-        chamadas.escritorUnico.push(decodificado);
-        return new Response(
-          JSON.stringify({ choices: [{ message: { content: '---\nmarp: true\n---\n# Unica\n' } }] }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ choices: [{ message: { content: '' } }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
       },
     });
 
@@ -104,7 +105,7 @@ describe('aiAula: geracao por secoes (MT-10)', () => {
     }
   });
 
-  test('gera capa, secoes encadeadas e fixacao com progresso incremental', async () => {
+  test('gera capa, secoes encadeadas e fechamento com progresso incremental', async () => {
     const checkpoints: string[] = [];
     const res = await generateAulaOutlineAndContent({
       tema: 'Estruturas de repeticao em Python',
@@ -115,16 +116,12 @@ describe('aiAula: geracao por secoes (MT-10)', () => {
 
     expect(res.success).toBe(true);
     expect(chamadas.planner.length).toBe(1);
-    expect(chamadas.secao.length).toBe(2);
-    expect(chamadas.escritorUnico.length).toBe(0);
-
-    expect(checkpoints.some((c) => c.includes('Redigindo seção 1 de 2'))).toBe(true);
-    expect(checkpoints.some((c) => c.includes('Redigindo seção 2 de 2'))).toBe(true);
-    expect(checkpoints.some((c) => c.startsWith('35%'))).toBe(true);
-    expect(checkpoints.some((c) => c.startsWith('58%'))).toBe(true);
-
-    expect(res.outline).toContain('Lacos contados');
+    expect(chamadas.secao.length).toBe(3);
     expect(res.avisos).toBeUndefined();
+
+    expect(checkpoints.some((c) => c.includes('Redigindo seção 1 de 3'))).toBe(true);
+    expect(checkpoints.some((c) => c.includes('Redigindo seção 3 de 3'))).toBe(true);
+    expect(checkpoints.some((c) => c.startsWith('35%'))).toBe(true);
 
     const md = res.conteudo_md;
     expect(md.startsWith('---\nmarp: true')).toBe(true);
@@ -132,18 +129,17 @@ describe('aiAula: geracao por secoes (MT-10)', () => {
     expect(md).toContain('# Estruturas de repeticao em Python');
     expect(md).toContain('# Secao 1 do conteudo');
     expect(md).toContain('# Secao 2 do conteudo');
-    expect(md).toContain('## Verifique o que você aprendeu');
-    expect(md).toContain('- Explique a diferenca entre while e for.');
-
-    const resumo = res as { titulo_sugerido?: string };
-    expect(resumo.titulo_sugerido).toBe('Estruturas de repeticao em Python');
+    expect(md).toContain('# Secao 3 do conteudo');
+    expect(md).toContain('## Sintese do percurso');
+    expect(md).toContain('## Verifique o que voce aprendeu');
+    expect(md).toContain('## Material Complementar');
+    expect(md).toContain('1. Explique a diferenca entre while e for.');
 
     const secoes = chamadas.secao;
-    expect(secoes[0]).toContain('SEÇÃO ATUAL (1 de 2): Conceito de iteracao');
-    expect(secoes[1]).toContain('SEÇÃO ATUAL (2 de 2): Lacos contados');
-    expect(secoes[1]).toContain('A estrutura for');
-    expect(secoes[1]).not.toContain('CONCEITOS JÁ COBERTOS (não repetir):\n- \n');
+    expect(secoes[0]).toContain('SEÇÃO ATUAL (1 de 3): Conceito de iteracao');
+    expect(secoes[1]).toContain('CONCEITOS JÁ COBERTOS (não repetir):');
     expect(secoes[1]).toContain('- iteracao');
+    expect(secoes[2]).toContain('- range');
   });
 
   test('isCancelled entre secoes interrompe a geracao', async () => {

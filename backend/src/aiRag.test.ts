@@ -39,7 +39,30 @@ const RESPOSTA_QUESTOES = JSON.stringify({
     },
   ],
 });
-const RESPOSTA_AULA = '# Aula Mock\n\n---\n\n## Slide 1\n\nConteudo da aula mock.';
+const RESPOSTA_SECAO = '# Aula Mock\n\n## Slide 1\n\nConteudo da aula mock.';
+const RESPOSTA_OUTLINE = JSON.stringify({
+  titulo: 'Aula RAG Mock',
+  subtitulo: 'Contexto de referencia',
+  objetivos: ['Compreender o contexto', 'Aplicar o conteudo'],
+  prerequisitos: ['Nenhum'],
+  secoes: [
+    { titulo: 'Contexto', proposito: 'Situar o aluno', conceitos: ['contexto'] },
+    { titulo: 'Conteudo', proposito: 'Ensinar o conteudo', conceitos: ['conteudo'] },
+    { titulo: 'Aplicacao', proposito: 'Aplicar o conteudo', conceitos: ['aplicacao'] },
+  ],
+  sintese: [
+    { conceito: 'contexto', resumo: 'Onde o conteudo se aplica.' },
+    { conceito: 'conteudo', resumo: 'O que foi ensinado.' },
+    { conceito: 'aplicacao', resumo: 'Como usar na pratica.' },
+    { conceito: 'revisao', resumo: 'O que revisar depois.' },
+  ],
+  fixacao: ['Pergunta 1?', 'Pergunta 2?', 'Pergunta 3?'],
+  material_complementar: [
+    { titulo: 'Documentacao', detalhe: 'Referencia.', url: 'https://example.org' },
+    { titulo: 'Livro', detalhe: 'Aprofundamento.' },
+    { titulo: 'Guia', detalhe: 'Exercicios.' },
+  ],
+});
 
 const originalEnv = new Map<string, string | undefined>();
 const capturados: string[] = [];
@@ -78,8 +101,9 @@ beforeAll(async () => {
     async fetch(request: Request): Promise<Response> {
       const raw = await request.text();
       capturados.push(raw);
-      const fluxoAula = raw.includes('Marp Next');
-      const conteudo = fluxoAula ? RESPOSTA_AULA : RESPOSTA_QUESTOES;
+      const ehPlanejador = raw.includes('coordenador pedagógico e designer instrucional sênior');
+      const ehSecao = raw.includes('Você redige os slides de UMA seção');
+      const conteudo = ehPlanejador ? RESPOSTA_OUTLINE : ehSecao ? RESPOSTA_SECAO : RESPOSTA_QUESTOES;
       return new Response(JSON.stringify({ choices: [{ message: { content: conteudo } }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
