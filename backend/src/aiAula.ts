@@ -436,11 +436,12 @@ Regras:
 1. De ${SECOES_MIN} a ${SECOES_MAX} seções em progressão: a primeira contextualiza e retoma pré-requisitos; a última consolida.
 2. Cada seção declara de 1 a 3 conceitos-chave. Nenhum conceito pode se repetir entre seções.
 3. A aula precisa ter começo, meio e fim; não encha com seções genéricas.
-4. De ${FIXACAO_MIN} a ${FIXACAO_MAX} perguntas de fixação, uma por conceito central.
-5. De ${SINTESE_MIN} a ${SINTESE_MAX} linhas de síntese (conceito + resumo de uma frase).
-6. De ${REFERENCIAS_MIN} a ${REFERENCIAS_MAX} referências reais (livro, documentação ou site de referência) em material complementar. Não invente URLs.
-7. Fundamente-se nos documentos e aulas de referência. Se eles não cobrirem o tema, não invente conceitos.
-8. Responda apenas com o JSON puro, sem markdown.`;
+4. De ${OBJETIVOS_MIN} a ${OBJETIVOS_MAX} objetivos de aprendizagem (o que o aluno será capaz de fazer ao final).
+5. De ${FIXACAO_MIN} a ${FIXACAO_MAX} perguntas de fixação, uma por conceito central.
+6. De ${SINTESE_MIN} a ${SINTESE_MAX} linhas de síntese (conceito + resumo de uma frase).
+7. De ${REFERENCIAS_MIN} a ${REFERENCIAS_MAX} referências reais (livro, documentação ou site de referência) em material complementar. Não invente URLs.
+8. Fundamente-se nos documentos e aulas de referência. Se eles não cobrirem o tema, não invente conceitos.
+9. Responda apenas com o JSON puro, sem markdown.`;
 
   let userPrompt = `TEMA: ${tema || 'Conteudo geral'}\n`;
   if (observacoes) userPrompt += `OBSERVACOES DO PROFESSOR: ${observacoes}\n`;
@@ -472,7 +473,7 @@ ${CONTRATO_RENDERER}
 REGRAS DA SUA TAREFA:
 1. Responda APENAS com os slides desta seção (sem front-matter YAML, sem --- no início ou no fim).
 2. Abra a seção com um slide de título usando '# <título da seção>'. Nos demais slides use '## <título do slide>'.
-3. Gere a quantidade de slides que a seção exigir para ensinar os conceitos sem pressa: um conceito por slide, sem slides de preenchimento. Se um slide passar de 8 frases, divida em dois.
+3. TETO RÍGIDO: gere entre 2 e no máximo ${SLIDES_SECAO_MAX} slides para esta seção (incluindo o slide de abertura '#'). NUNCA ultrapasse ${SLIDES_SECAO_MAX} slides. Um conceito por slide, sem slides de preenchimento.
 4. Use a analogia e o exemplo central fornecidos; não troque de analogia no meio da seção.
 5. Não repita conceitos já cobertos nem slides anteriores; encadeie com o que veio antes.
 6. PROIBIDO criar slides de "Reflexão", "Verifique o que você aprendeu", "Síntese", "Conclusão" ou "Material Complementar" — o sistema gera esses blocos.

@@ -1,0 +1,26 @@
+{
+  "caso": "avaliacao-discursiva-correta-1",
+  "tarefa": "avaliacao",
+  "tema": "Variáveis em Python",
+  "atividade": {
+    "id": 0,
+    "titulo": "Variáveis",
+    "json_data": {
+      "questions": [
+        {
+          "id": "q1",
+          "content": "Explique o que acontece ao executar x = 2 e, depois, x = x + 3 em Python.",
+          "resposta_esperada": "O nome x é associado ao valor 2. A expressão x + 3 produz 5 e a nova atribuição associa x a 5.",
+          "rubrica": [
+            { "criterio": "Explica a atribuição inicial", "peso": 40 },
+            { "criterio": "Explica a atualização e o resultado 5", "peso": 60 }
+          ]
+        }
+      ]
+    }
+  },
+  "respostas": {
+    "q1": "Na primeira linha, x recebe 2. Na segunda, Python calcula 2 + 3 e atribui o resultado a x. Ao final, x vale 5."
+  },
+  "expectativa": { "nota_min": 80, "nota_max": 100 }
+}

@@ -47,6 +47,11 @@ export interface AiChatOptions {
   diagnose?: (content: string) => string[];
   maxRepairs?: number;
   task?: AiTask;
+  config?: AiConfig;
+  signal?: AbortSignal;
+  allowFallback?: boolean;
+  recordTelemetry?: boolean;
+  onUsage?: (usage: { prompt_tokens?: number; completion_tokens?: number }) => void;
 }
 
 export interface AiChatResult {
@@ -96,19 +101,21 @@ function parseJson(raw: string): JsonValue | undefined {
   }
 }
 
-function extractUsage(parsed: unknown, raw: string): { prompt_tokens: number; completion_tokens: number; reasoning_tokens: number } {
-  let prompt_tokens = 0;
-  let completion_tokens = 0;
-  let reasoning_tokens = 0;
+function extractUsage(parsed: unknown, raw: string): { prompt_tokens?: number; completion_tokens?: number; reasoning_tokens?: number } {
+  let prompt_tokens: number | undefined;
+  let completion_tokens: number | undefined;
+  let reasoning_tokens: number | undefined;
+  const numero = (value: unknown): number | undefined =>
+    typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 
   const root = asRecord(parsed);
   if (root) {
-    const usage = asRecord(root.usage);
+    const usage = asRecord(root.usage) ?? asRecord(asRecord(root.message)?.usage);
     if (usage) {
-      prompt_tokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
-      completion_tokens = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
+      prompt_tokens = numero(usage.prompt_tokens ?? usage.input_tokens);
+      completion_tokens = numero(usage.completion_tokens ?? usage.output_tokens);
       const details = asRecord(usage.completion_tokens_details);
-      reasoning_tokens = Number(details?.reasoning_tokens ?? usage.reasoning_tokens ?? 0);
+      reasoning_tokens = numero(details?.reasoning_tokens ?? usage.reasoning_tokens);
     }
   }
 
@@ -121,12 +128,12 @@ function extractUsage(parsed: unknown, raw: string): { prompt_tokens: number; co
         const chunk = parseJson(payload);
         const chunkRoot = asRecord(chunk);
         if (chunkRoot) {
-          const usage = asRecord(chunkRoot.usage);
+          const usage = asRecord(chunkRoot.usage) ?? asRecord(asRecord(chunkRoot.message)?.usage);
           if (usage) {
-            prompt_tokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? prompt_tokens);
-            completion_tokens = Number(usage.completion_tokens ?? usage.output_tokens ?? completion_tokens);
+            prompt_tokens = numero(usage.prompt_tokens ?? usage.input_tokens) ?? prompt_tokens;
+            completion_tokens = numero(usage.completion_tokens ?? usage.output_tokens) ?? completion_tokens;
             const details = asRecord(usage.completion_tokens_details);
-            reasoning_tokens = Number(details?.reasoning_tokens ?? usage.reasoning_tokens ?? reasoning_tokens);
+            reasoning_tokens = numero(details?.reasoning_tokens ?? usage.reasoning_tokens) ?? reasoning_tokens;
           }
         }
       }
@@ -592,18 +599,23 @@ export function extractText(raw: string, provider: AiProvider): string {
 async function fetchNineRouter(
   url: string,
   init: RequestInit,
-  timeoutMs: number
+  timeoutMs: number,
+  allowFallback = true
 ): Promise<Response> {
+  const sinal = (limite: number) => init.signal
+    ? AbortSignal.any([init.signal, AbortSignal.timeout(limite)])
+    : AbortSignal.timeout(limite);
   const customUrl = trimmed(process.env.NINE_ROUTER_URL);
   const isDefaultLocal = !customUrl && url.includes('127.0.0.1:20128');
-  if (!isDefaultLocal) {
-    return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  if (!isDefaultLocal || !allowFallback) {
+    return fetch(url, { ...init, signal: sinal(timeoutMs) });
   }
   try {
-    return await fetch(url, { ...init, signal: AbortSignal.timeout(1500) });
+    return await fetch(url, { ...init, signal: sinal(1500) });
   } catch {
+    if (init.signal?.aborted) throw init.signal.reason;
     const fallbackUrl = url.replace('127.0.0.1:20128', 'host.docker.internal:20128');
-    return fetch(fallbackUrl, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    return fetch(fallbackUrl, { ...init, signal: sinal(timeoutMs) });
   }
 }
 
@@ -645,14 +657,17 @@ export function calculateBackoffWithJitter(
 }
 
 export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
-  const config = resolveConfig(options.task);
+  const config = options.config ?? resolveConfig(options.task);
+  const registrar = (dados: Parameters<typeof registrarTelemetriaAi>[0]) => {
+    if (options.recordTelemetry !== false) registrarTelemetriaAi(dados);
+  };
   if (!config.apiKey) {
     throw new Error(`AI_API_KEY nao configurada para o provider ${config.provider}`);
   }
 
   const provider = resolveProvider(config);
   const models: string[] = [config.model];
-  if (config.fallbackModel) models.push(config.fallbackModel);
+  if (config.fallbackModel && options.allowFallback !== false) models.push(config.fallbackModel);
 
   const endpoint = `${stripTrailingSlashes(config.baseUrl)}${provider.chatPath}`;
   const attemptTimeoutMs = options.timeoutMs ?? config.timeoutMs;
@@ -690,12 +705,14 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
       try {
         const response =
           provider.name === '9router'
-            ? await fetchNineRouter(endpoint, { method: 'POST', headers, body }, attemptTimeoutMs)
+            ? await fetchNineRouter(endpoint, { method: 'POST', headers, body, signal: options.signal }, attemptTimeoutMs, options.allowFallback)
             : await fetch(endpoint, {
                 method: 'POST',
                 headers,
                 body,
-                signal: AbortSignal.timeout(attemptTimeoutMs),
+                signal: options.signal
+                  ? AbortSignal.any([options.signal, AbortSignal.timeout(attemptTimeoutMs)])
+                  : AbortSignal.timeout(attemptTimeoutMs),
               });
 
         const elapsedSec = Number(((performance.now() - startTime) / 1000).toFixed(2));
@@ -703,6 +720,8 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
         if (response.ok) {
           const raw = await response.text();
           const parsedJson = parseJson(raw);
+          const usage = extractUsage(parsedJson, raw);
+          options.onUsage?.(usage);
           const truncated = provider.isTruncated
             ? provider.isTruncated(parsedJson, raw)
             : isResponseTruncated(raw, parsedJson);
@@ -718,7 +737,6 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
 
           const content = extractText(raw, provider);
           const contentChars = content.length;
-          const usage = extractUsage(parsedJson, raw);
           const finishReason = extractFinishReason(parsedJson, raw) || 'stop';
 
           if (content) {
@@ -750,12 +768,12 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
               console.log(
                 `[AI-Provider] Sucesso | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | tokens_prompt: ${usage.prompt_tokens} | tokens_completion: ${usage.completion_tokens} | tokens_reasoning: ${usage.reasoning_tokens} | finish_reason: ${finishReason} | content_chars: ${contentChars} | repaired: ${repairCount}`
               );
-              registrarTelemetriaAi({
+              registrar({
                 tarefa: options.task || 'default',
                 modelo: model,
                 prompt_chars: workingMessages.reduce((acc, m) => acc + (m.content?.length || 0), 0),
-                tokens_prompt: usage.prompt_tokens || undefined,
-                tokens_completion: usage.completion_tokens || undefined,
+                tokens_prompt: usage.prompt_tokens,
+                tokens_completion: usage.completion_tokens,
                 duracao_ms: Math.round(performance.now() - inicioTotal),
                 valido: true,
                 reparos: repairCount,
@@ -770,14 +788,14 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
               break;
             }
             console.log(
-              `[AI-Provider] Sucesso | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | tokens_prompt: ${usage.prompt_tokens} | tokens_completion: ${usage.completion_tokens} | tokens_reasoning: ${usage.reasoning_tokens} | finish_reason: ${finishReason} | content_chars: ${contentChars}`
+              `[AI-Provider] ${options.recordTelemetry === false ? 'Conteúdo recebido; validação externa pendente' : 'Sucesso'} | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | tokens_prompt: ${usage.prompt_tokens ?? 'unknown'} | tokens_completion: ${usage.completion_tokens ?? 'unknown'} | tokens_reasoning: ${usage.reasoning_tokens ?? 'unknown'} | finish_reason: ${finishReason} | content_chars: ${contentChars}`
             );
-            registrarTelemetriaAi({
+            registrar({
               tarefa: options.task || 'default',
               modelo: model,
               prompt_chars: workingMessages.reduce((acc, m) => acc + (m.content?.length || 0), 0),
-              tokens_prompt: usage.prompt_tokens || undefined,
-              tokens_completion: usage.completion_tokens || undefined,
+              tokens_prompt: usage.prompt_tokens,
+              tokens_completion: usage.completion_tokens,
               duracao_ms: Math.round(performance.now() - inicioTotal),
               valido: true,
               reparos: 0,
@@ -785,9 +803,9 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
             return { content, modelUsed: model };
           }
 
-          const bodyError = extractRawBodyError(raw, provider);
+          const bodyError = options.recordTelemetry === false ? '' : extractRawBodyError(raw, provider);
           console.log(
-            `[AI-Provider] ERRO: Resposta sem conteúdo | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | body_error: ${(bodyError || raw).slice(0, 100)}`
+            `[AI-Provider] ERRO: Resposta sem conteúdo | model: ${model} | tempo_s: ${elapsedSec} | status: ${response.status} | body_error: ${options.recordTelemetry === false ? 'conteudo omitido' : (bodyError || raw).slice(0, 100)}`
           );
           lastError = bodyError
             ? `[${model}] resposta sem conteudo: ${bodyError.slice(0, 200)}`
@@ -797,7 +815,7 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
 
         const detail = await response.text().catch(() => '');
         const extracted = provider.extractError(parseJson(detail));
-        const message = extracted || detail;
+        const message = options.recordTelemetry === false ? 'detalhes omitidos' : extracted || detail;
         console.log(
           `[AI-Provider] ERRO: HTTP ${response.status} | model: ${model} | tempo_s: ${elapsedSec} | mensagem: ${message.slice(0, 200)}`
         );
@@ -813,7 +831,7 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
         break;
       } catch (error) {
         const elapsedSec = Number(((performance.now() - startTime) / 1000).toFixed(2));
-        const message = error instanceof Error ? error.message : String(error);
+        const message = options.recordTelemetry === false ? 'erro de transporte' : error instanceof Error ? error.message : String(error);
         console.log(
           `[AI-Provider] ERRO: Exceção de rede | model: ${model} | tempo_s: ${elapsedSec} | mensagem: ${message}`
         );
@@ -831,7 +849,7 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
     }
   }
 
-  registrarTelemetriaAi({
+  registrar({
     tarefa: options.task || 'default',
     modelo: config.model,
     prompt_chars: options.messages.reduce((acc, m) => acc + (m.content?.length || 0), 0),

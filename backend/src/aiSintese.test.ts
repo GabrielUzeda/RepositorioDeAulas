@@ -3,6 +3,7 @@ import { signJwt } from './auth';
 import app from './routes';
 import { db } from './db';
 import { hashEmail, encryptData } from './utils';
+import { diagnosticarLoteSintese, diagnosticarParecerTurma } from './aiSintese';
 
 const ENV_KEYS = [
   'AI_PROVIDER',
@@ -39,6 +40,7 @@ let adminToken = '';
 let cursoId = 0;
 let disciplinaId = 0;
 let atividadeId = 0;
+let falharReduce = false;
 
 function limparResiduos(): void {
   db.query('DELETE FROM respostas_alunos WHERE atividade_id = ?').run(atividadeId);
@@ -60,7 +62,13 @@ beforeAll(async () => {
     async fetch(request: Request): Promise<Response> {
       const raw = await request.text();
       capturados.push(raw);
-      const conteudo = raw.includes('ALUNOS DO LOTE') ? RESPOSTA_LOTE : RESPOSTA_REDUCE;
+      const isLote = raw.includes('ALUNOS DO LOTE');
+      if (!isLote && falharReduce) return new Response('offline', { status: 503 });
+      const user = JSON.parse(raw).messages.find((message: any) => message.role === 'user').content as string;
+      const ids = [...user.matchAll(/"id": "(A\d+)"/g)].map((match) => match[1]);
+      const conteudo = isLote
+        ? JSON.stringify({ sinteses: JSON.parse(RESPOSTA_LOTE).sinteses.filter((sintese: any) => ids.includes(sintese.id)) })
+        : RESPOSTA_REDUCE;
       return new Response(JSON.stringify({ choices: [{ message: { content: conteudo } }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -143,6 +151,7 @@ function corpoCapturado(): string {
 
 beforeEach(() => {
   capturados.length = 0;
+  falharReduce = false;
 });
 
 describe('aiSintese: pseudonimizacao, remapeamento e sintese com disciplina_id', () => {
@@ -287,6 +296,26 @@ describe('aiSintese: pseudonimizacao, remapeamento e sintese com disciplina_id',
     expect(corpo).not.toContain('Maria Silva');
     expect(corpo).toContain('"A01"');
     expect(data.alunos_sintese[0].aluno_email).toBe('maria@teste.com');
+  });
+
+  test('diagnóstico rejeita IDs ausentes, duplicados, estranhos e arrays de parecer inválidos', () => {
+    expect(diagnosticarLoteSintese('{"sinteses":[]}', ['A01'])).not.toEqual([]);
+    expect(diagnosticarLoteSintese('{"sinteses":[{"id":"A01","feedback_individual":"bom"},{"id":"A01","feedback_individual":"bom"}]}', ['A01'])).not.toEqual([]);
+    expect(diagnosticarLoteSintese('{"sinteses":[{"id":"A02","feedback_individual":"bom"}]}', ['A01'])).not.toEqual([]);
+    expect(diagnosticarParecerTurma('{"feedback_geral":"bom","pontos_fortes":[42],"pontos_atencao":[]}')).not.toEqual([]);
+  });
+
+  test('falha do reduce aparece em falhas sem descartar sínteses individuais válidas', async () => {
+    falharReduce = true;
+    const res = await app.request('/ai/synthesize-class-feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ disciplina_id: disciplinaId }) });
+    const data = await res.json() as any;
+    expect(res.status).toBe(200);
+    expect(data.alunos_sintese).toHaveLength(2);
+    expect(data.feedback_geral).toBe('');
+    expect(data.falhas).toHaveLength(1);
+    expect(data.falhas[0].id).toBe('turma');
+    expect(data.execucao.estado).toBe('provider_failed');
+    expect(capturados).toHaveLength(2);
   });
 
   test('sem disciplina_id e sem alunos retorna 400', async () => {

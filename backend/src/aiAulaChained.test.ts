@@ -49,6 +49,7 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
   const originalEnv = new Map<string, string | undefined>();
   let server: ReturnType<typeof Bun.serve>;
   let globalTestMode = '';
+  let chamadas = 0;
 
   beforeAll(() => {
     for (const key of ENV_KEYS) originalEnv.set(key, process.env[key]);
@@ -58,13 +59,14 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
       hostname: '127.0.0.1',
       async fetch(request: Request): Promise<Response> {
         const bodyText = await request.text();
+        chamadas += 1;
         const isPlanner = bodyText.includes('coordenador pedagógico e designer instrucional sênior');
         const isSecao = bodyText.includes('Você redige os slides de UMA seção');
 
         if (globalTestMode === 'fail_outline' && isPlanner) {
           return new Response('Internal Server Error', { status: 500 });
         }
-        if (globalTestMode === 'fail_slides' && isSecao) {
+        if ((globalTestMode === 'fail_slides' || (globalTestMode === 'repair_each_section' && !bodyText.includes('Corrija somente'))) && isSecao) {
           return new Response(
             JSON.stringify({
               choices: [{ message: { content: '## Secao invalida\n\n```mermaid\ngitGraph\nA\n```\n' } }],
@@ -119,6 +121,7 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
 
   beforeEach(() => {
     globalTestMode = '';
+    chamadas = 0;
   });
 
   test('generateAulaOutlineAndContent executa as fases e invoca checkpoints', async () => {
@@ -137,6 +140,12 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
     expect(checkpoints.some((c) => c.includes('35%'))).toBe(true);
     expect(checkpoints.some((c) => c.includes('85%'))).toBe(true);
     expect(res.conteudo_md).toContain('## Sintese do percurso');
+  });
+
+  test('os dois reparos são compartilhados pela aula inteira, não por seção', async () => {
+    globalTestMode = 'repair_each_section';
+    await expect(generateAulaOutlineAndContent({ tema: 'Orçamento compartilhado' })).rejects.toThrow(/Orçamento global de reparos esgotado/);
+    expect(chamadas).toBe(6);
   });
 
   test('generateAulaOutlineAndContent interrompe se isCancelled() retornar true', async () => {

@@ -1,0 +1,24 @@
+{
+  "caso": "sintese-trajetorias-distintas-1",
+  "tarefa": "sintese",
+  "tema": "Introdução à programação",
+  "alunos_detalhes": [
+    {
+      "aluno_email": "a01@example.invalid",
+      "media_calculada": 90,
+      "atividades": [
+        { "titulo": "Variáveis", "nota": 90, "feedback": "Conceitos dominados e exemplo correto." }
+      ],
+      "atividades_pendentes": []
+    },
+    {
+      "aluno_email": "a02@example.invalid",
+      "media_calculada": 40,
+      "atividades": [
+        { "titulo": "Variáveis", "nota": 80, "feedback": "Boa explicação da atribuição." }
+      ],
+      "atividades_pendentes": [{ "titulo": "Condicionais" }]
+    }
+  ],
+  "expectativa": { "sinteses_completas": true, "parecer_valido": true }
+}
