@@ -95,6 +95,88 @@ describe('aiQuestoes', () => {
     expect(prompts.systemPrompt).toContain('objetiva');
     expect(prompts.userPrompt).toContain('Matemática');
   });
+
+  it('diagnosticarQuestoes reprova alternativa meta (todas/nenhuma das anteriores)', () => {
+    const base = {
+      title: 'Conceito',
+      content: '<p>Enunciado suficientemente longo para a validação.</p>',
+    };
+    const comMeta = [
+      {
+        ...base,
+        options: [
+          { text: 'Alternativa correta', correct: true },
+          { text: 'Errada B', correct: false },
+          { text: 'Errada C', correct: false },
+          { text: 'Todas as anteriores', correct: false },
+        ],
+      },
+    ];
+    const erros = diagnosticarQuestoes(comMeta, { qtdSolicitada: 1, tipo: 'roleta' });
+    expect(erros.some((e) => e.includes('meta proibida'))).toBe(true);
+
+    const semMeta = [
+      {
+        ...base,
+        options: [
+          { text: 'Alternativa correta', correct: true },
+          { text: 'Errada B', correct: false },
+          { text: 'Errada C', correct: false },
+          { text: 'Errada D', correct: false },
+        ],
+      },
+    ];
+    expect(diagnosticarQuestoes(semMeta, { qtdSolicitada: 1, tipo: 'roleta' })).toEqual([]);
+  });
+
+  it('diagnosticarQuestoes exige pesos da rubrica somando 100', () => {
+    const desalinhada = [
+      {
+        title: 'Análise do processo',
+        content: '<p>Explique o processo detalhadamente.</p>',
+        resposta_esperada: 'Resposta esperada com mais de quinze caracteres.',
+        rubrica: [
+          { criterio: 'Crit A', peso: 40 },
+          { criterio: 'Crit B', peso: 40 },
+        ],
+      },
+    ];
+    const erros = diagnosticarQuestoes(desalinhada, { qtdSolicitada: 1, tipo: 'normal' });
+    expect(erros.some((e) => e.includes('somar 100'))).toBe(true);
+
+    const alinhada = [{ ...desalinhada[0], rubrica: [{ criterio: 'Crit A', peso: 60 }, { criterio: 'Crit B', peso: 40 }] }];
+    expect(diagnosticarQuestoes(alinhada, { qtdSolicitada: 1, tipo: 'normal' })).toEqual([]);
+  });
+
+  it('prompt instrui feedback no reforço, título conceitual, tags proibidas e variação da correta', () => {
+    const { systemPrompt } = montarPromptQuestoes({
+      tipo: 'reforco',
+      titulo: 'Atividade',
+      tema: 'Redes',
+      observacoes: '',
+      quantidade: 2,
+      aulasContexto: '',
+      docsContexto: '',
+      questoes_existentes: [],
+    });
+    expect(systemPrompt).toContain('reforco');
+    expect(systemPrompt).toContain('feedback');
+    expect(systemPrompt).toContain('Títulos genéricos');
+    expect(systemPrompt).toContain('<table>');
+    expect(systemPrompt).toContain('a posição da correta DEVE variar');
+
+    const { systemPrompt: discursiva } = montarPromptQuestoes({
+      tipo: 'normal',
+      titulo: 'Atividade',
+      tema: 'Redes',
+      observacoes: '',
+      quantidade: 2,
+      aulasContexto: '',
+      docsContexto: '',
+      questoes_existentes: [],
+    });
+    expect(discursiva).toContain('somando exatamente 100');
+  });
 });
 
 describe('formatacao rica do enunciado (HTML permitido)', () => {
@@ -138,5 +220,20 @@ describe('formatacao rica do enunciado (HTML permitido)', () => {
     ];
     const erros = diagnosticarQuestoes(questoes, { qtdSolicitada: 1, tipo: 'normal' });
     expect(erros.some((e) => e.includes('não permitidos'))).toBe(true);
+  });
+
+  test('validarHtmlEnunciado reprova tags fora do contrato de renderização', () => {
+    expect(validarHtmlEnunciado('<p>ok</p><br><div>bloco</div><b>forte</b>')).toEqual([]);
+    expect(validarHtmlEnunciado('<table><tr><td>x</td></tr></table>').some((e) => e.includes('não permitidos'))).toBe(true);
+    expect(validarHtmlEnunciado('<a href="http://x">link</a>').some((e) => e.includes('não permitidos'))).toBe(true);
+    expect(validarHtmlEnunciado('<h1>Título</h1>').some((e) => e.includes('não permitidos'))).toBe(true);
+    expect(validarHtmlEnunciado('<table><tr><td>aberto').some((e) => e.includes('não permitidos'))).toBe(true);
+    expect(validarHtmlEnunciado('<p onclick="x()">a</p>').some((e) => e.includes('evento'))).toBe(true);
+  });
+
+  test('validarHtmlEnunciado não confunde comparação textual com tag', () => {
+    expect(validarHtmlEnunciado('Se x < 10 e y > 2, o laço executa.')).toEqual([]);
+    expect(validarHtmlEnunciado('Quando x<y e z>w o resultado muda.')).toEqual([]);
+    expect(validarHtmlEnunciado('Some a<b sem espaços.')).toEqual([]);
   });
 });

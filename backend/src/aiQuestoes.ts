@@ -1,3 +1,6 @@
+const META_OPTION_RE =
+  /^\s*(todas|todos|nenhuma|nenhum)\s+(as|os|das|dos)\s+(alternativas|opções|opcoes|anteriores|acima|abaixo)\s*\.?\s*$/i;
+
 export function diagnosticarQuestoes(
   questoes: any[],
   params: { qtdSolicitada: number; tipo: string }
@@ -50,6 +53,13 @@ export function diagnosticarQuestoes(
             erros.push(`${prefix}: critério de rubrica inválido (necessita 'criterio' e 'peso')`);
           }
         }
+        const somaPesos = q.rubrica.reduce(
+          (acc: number, crit: any) => acc + (crit && typeof crit.peso === 'number' ? crit.peso : 0),
+          0
+        );
+        if (Math.abs(somaPesos - 100) > 0.01) {
+          erros.push(`${prefix}: os pesos da rubrica devem somar 100 (somam ${somaPesos})`);
+        }
       }
     } else {
       if (!Array.isArray(q.options) || q.options.length !== 4) {
@@ -68,6 +78,11 @@ export function diagnosticarQuestoes(
             const normalizedText = opt.text.trim().toLowerCase();
             if (seenTexts.has(normalizedText)) {
               erros.push(`${prefix}: Alternativa duplicada encontrada`);
+            }
+            if (META_OPTION_RE.test(opt.text)) {
+              erros.push(
+                `${prefix}: Alternativa meta proibida ("todas/nenhuma das anteriores"); escreva uma alternativa conceitual concreta`
+              );
             }
             seenTexts.add(normalizedText);
           }
@@ -102,17 +117,52 @@ export function converterMarkdownParaHtmlPermitido(conteudo: string): string {
   });
 }
 
-const TAGS_QUE_EXIGEM_FECHAMENTO = ['p', 'strong', 'b', 'em', 'i', 'u', 's', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span'];
+const TAGS_ENUNCIADO_PERMITIDAS = new Set([
+  'p',
+  'br',
+  'strong',
+  'b',
+  'em',
+  'i',
+  'u',
+  's',
+  'h2',
+  'h3',
+  'h4',
+  'ul',
+  'ol',
+  'li',
+  'blockquote',
+  'pre',
+  'code',
+  'span',
+  'div',
+]);
+
+const TAGS_ENUNCIADO_SEM_FECHAMENTO = new Set(['br']);
 
 export function validarHtmlEnunciado(conteudo: string): string[] {
   const erros: string[] = [];
   if (!conteudo) return erros;
 
-  if (/<\s*\/(script|iframe|object|embed|style|form|img|svg|video|audio|template)\b|<(script|iframe|object|embed|style|form|img|svg|video|audio|template)\b|on[a-z]+\s*=/i.test(conteudo)) {
-    erros.push('O enunciado contém tags ou atributos não permitidos (use apenas p, strong, em, u, s, h2-h4, ul, ol, li, blockquote, pre e code).');
+  const foraDaLista = new Set<string>();
+  const tagRe = /<\/?([a-zA-Z][a-zA-Z0-9]*)(?:\s+[a-zA-Z-]+=(?:"[^"]*"|'[^']*'|[^\s>]+))*\s*\/?>/g;
+  for (const encontrada of conteudo.matchAll(tagRe)) {
+    const nome = encontrada[1].toLowerCase();
+    if (!TAGS_ENUNCIADO_PERMITIDAS.has(nome)) foraDaLista.add(nome);
+  }
+  if (foraDaLista.size > 0) {
+    const proibidas = [...foraDaLista].map((tag) => `<${tag}>`).join(', ');
+    const permitidas = [...TAGS_ENUNCIADO_PERMITIDAS].map((tag) => `<${tag}>`).join(', ');
+    erros.push(`O enunciado contém tags ou atributos não permitidos (${proibidas}). Use apenas ${permitidas}.`);
   }
 
-  for (const tag of TAGS_QUE_EXIGEM_FECHAMENTO) {
+  if (/on[a-z]+\s*=/i.test(conteudo)) {
+    erros.push('O enunciado contém atributos de evento (on*) não permitidos.');
+  }
+
+  for (const tag of TAGS_ENUNCIADO_PERMITIDAS) {
+    if (TAGS_ENUNCIADO_SEM_FECHAMENTO.has(tag)) continue;
     const aberturas = (conteudo.match(new RegExp(`<${tag}(\\s[^>]*)?>`, 'gi')) || []).length;
     const fechamentos = (conteudo.match(new RegExp(`</${tag}>`, 'gi')) || []).length;
     if (aberturas !== fechamentos) {
@@ -194,25 +244,41 @@ Diretrizes pedagógicas estritas:
 5. Posicione a alternativa correta aleatoriamente (em A, B, C ou D), sem padrão repetitivo.
 ${
   isDiscursiva
-    ? '6. Para questões discursivas, exija "resposta_esperada" detalhada (mínimo 15 caracteres) e "rubrica" com ao menos 2 critérios conceituais avaliáveis com pesos numéricos somando 100.'
+    ? '6. Para questões discursivas, exija "resposta_esperada" detalhada (mínimo 15 caracteres) e "rubrica" com ao menos 2 critérios conceituais avaliáveis com pesos numéricos somando exatamente 100.'
     : '6. Para questões objetivas, forneça exatamente 4 alternativas, sendo exatamente 1 correta (correct: true).'
 }
+7. O campo "title" nomeia o conceito avaliado (ex.: "Closures e escopo de variáveis"). Títulos genéricos como "Questão 1" ou "Pergunta 2" são reprovados na validação.
+8. Para o tipo "reforco", toda alternativa incorreta deve trazer "feedback" explicando o erro do aluno.
 
 Formatação do campo "content" (enunciado):
-- Use APENAS estas tags HTML: <p>, <strong>, <em>, <u>, <s>, <h2>-<h4>, <ul>, <ol>, <li>, <blockquote>, <pre> e <code>.
+- Use APENAS estas tags HTML: <p>, <br>, <strong>, <em>, <u>, <s>, <h2>-<h4>, <ul>, <ol>, <li>, <blockquote>, <pre> e <code>.
+- É PROIBIDO usar <table>, <a>, <img>, <h1>, <h5>, <h6>, <hr>, <iframe>, <style>, <script> ou qualquer atributo (só 'class' é aceito em <pre>, <code> e <span>). A validação reprova tags fora da lista.
 - Para trechos de código (ex.: JavaScript, Python, SQL), SEMPRE envolva o código em <pre><code class="language-linguagem">...código escapado...</code></pre> (escape <, > e & dentro do código; NUNCA use <script>).
 - Destaque termos-chave com <strong>. Use listas <ul>/<ol> quando o enunciado tiver múltiplos passos ou itens.
-- Todas as tags abertas devem ser fechadas; não use tags fora da lista (nada de <img>, <script>, <style> ou atributos).
+- Todas as tags abertas devem ser fechadas.
 
 Retorne ESTRITAMENTE um array JSON puro (sem markdown extra, sem comentários) contendo os objetos de questão.
-Exemplo de formato para objetiva:
+Exemplo de formato para objetiva (correta em C):
 [
   {
     "title": "Conceito X",
     "content": "<p>Analise o código a seguir:</p><pre><code class=\"language-javascript\">let x = 10;\nconsole.log(x + 5);</code></pre><p>Qual o valor exibido no console?</p>",
     "options": [
       { "text": "Alternativa A incorreta com distrator conceitual.", "correct": false, "feedback": "Explicação do erro A." },
-      { "text": "Alternativa B correta.", "correct": true },
+      { "text": "Alternativa B incorreta.", "correct": false, "feedback": "Explicação do erro B." },
+      { "text": "Alternativa C correta.", "correct": true },
+      { "text": "Alternativa D incorreta.", "correct": false, "feedback": "Explicação do erro D." }
+    ]
+  }
+]
+Exemplo de formato para objetiva (correta em A — a posição da correta DEVE variar entre A, B, C e D):
+[
+  {
+    "title": "Conceito Y",
+    "content": "<p>Qual afirmação descreve o comportamento observado?</p>",
+    "options": [
+      { "text": "Alternativa A correta.", "correct": true },
+      { "text": "Alternativa B incorreta.", "correct": false, "feedback": "Explicação do erro B." },
       { "text": "Alternativa C incorreta.", "correct": false, "feedback": "Explicação do erro C." },
       { "text": "Alternativa D incorreta.", "correct": false, "feedback": "Explicação do erro D." }
     ]
