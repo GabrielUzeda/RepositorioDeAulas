@@ -13,6 +13,14 @@ PROGRESSÃO (do concreto ao abstrato)
 - Encadeie: abra a aula retomando em uma frase o pré-requisito das aulas anteriores; cada bloco deve se apoiar explicitamente no anterior.
 - Nunca mencione um termo técnico antes de explicá-lo.
 
+DENSIDADE E LIMITE VERTICAL
+- O slide é paisagem e tem pouca altura útil. O que passa do rodapé é cortado na apresentação, sem aviso.
+- Cada slide tem um único foco visual e no máximo 8 linhas de texto visível (fora o título), 6 itens de lista e 4 linhas de tabela.
+- No máximo um bloco pesado por slide: um trecho de código, uma tabela ou um diagrama. Nunca dois deles no mesmo slide.
+- Blocos de código com no máximo 12 linhas; tabelas com no máximo 4 colunas.
+- Se o slide tem título, parágrafo, lista, código e tabela ao mesmo tempo, ele está cheio demais: divida em dois slides.
+- Na dúvida entre um slide denso e dois slides curtos, escolha dois slides curtos.
+
 NARRATIVA E ANALOGIA
 - Use uma analogia concreta e memorável como fio condutor de cada bloco (ex.: um formulário, um restaurante, uma biblioteca) e retome-a ao longo da explicação.
 - A analogia serve para traduzir o abstrato, não para decorar: depois de usá-la, formalize o conceito com o vocabulário correto.
@@ -45,6 +53,7 @@ export const CONTRATO_RENDERER = `RECURSOS DO MOTOR (Marp Next) - use apenas o q
 - Diagramas Mermaid em blocos \`\`\`mermaid. Tipos permitidos: flowchart, graph, sequenceDiagram, classDiagram, stateDiagram, erDiagram, pie, gantt, mindmap, timeline. O slide é paisagem e tem pouca altura: prefira diagramas largos e baixos (ex.: flowchart LR).
 - Ícones Lucide: <i data-lucide="nome-do-icone"></i> (kebab-case), no máximo um por item e sempre acompanhado de texto.
 - HTML cru com variáveis de tema: use var(--text-primary), var(--text-secondary), var(--slide-bg), var(--border) para funcionar no claro e no escuro. Feche todas as tags HTML dentro do mesmo slide.
+- Separe TODOS os slides com uma linha contendo apenas \`---\` (três hífens). Todo título de nível 1 ou 2 inicia um slide novo e exige o \`---\` na linha anterior. Sem esse separador, dois slides viram um só e o conteúdo estoura a altura do slide.
 - NÃO use: imagens de fundo ou redimensionadas (![bg], ![w:...]), listas com aparição item a item, front-matter por slide, bloco de estilo, nem recursos de outras versões do Marp. Não use emojis.`;
 
 export const ESTRUTURA_AULA = `ARCO DA AULA (início, meio e fim):

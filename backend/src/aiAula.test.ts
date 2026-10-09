@@ -3,6 +3,7 @@ import {
   diagnosticarOutline,
   dividirEmSlides,
   gerarFrontMatterEPrimeiroSlide,
+  inserirSeparadoresAusentes,
   normalizarOutline,
   parseOutline,
   promptPlanejadorAula,
@@ -12,6 +13,7 @@ import {
   repararSlideMarp,
   repararSlidesDoConteudo,
   validarAulaMarp,
+  validarDensidadeSlide,
   validarSecaoMarp,
   validarSlideMarp,
   type AulaOutline,
@@ -221,6 +223,49 @@ describe('aiAula: validacao de slides Marp', () => {
     expect(validarSlideMarp(slides[1])).toEqual([]);
     expect(slides[1]).not.toContain('</div>');
   });
+
+  test('validarDensidadeSlide acusa slide longo e aprova slide curto', () => {
+    const curto = ['## Titulo', '- item 1', '- item 2'].join('\n');
+    expect(validarDensidadeSlide(curto)).toEqual([]);
+    const longo = ['## Titulo', ...Array.from({ length: 40 }, (_, i) => `linha densa ${i}`)].join('\n');
+    expect(validarDensidadeSlide(longo).some((e) => e.includes('conteudo demais'))).toBe(true);
+  });
+
+  test('validarSecaoMarp inclui a checagem de densidade por slide', () => {
+    const densa = ['## Titulo', ...Array.from({ length: 40 }, (_, i) => `texto ${i}`)].join('\n');
+    expect(validarSecaoMarp(densa).some((e) => e.startsWith('Slide 1:') && e.includes('conteudo demais'))).toBe(true);
+  });
+
+  test('inserirSeparadoresAusentes separa titulos consecutivos sem tocar nos separadores existentes', () => {
+    const md = [
+      '# Secao',
+      '',
+      'Abertura.',
+      '',
+      '## Primeiro topico',
+      '',
+      'Texto.',
+      '',
+      '---',
+      '',
+      '## Segundo topico',
+      '',
+      'Texto.',
+      '',
+      '## Terceiro topico',
+    ].join('\n');
+    const corrigido = inserirSeparadoresAusentes(md);
+    const slides = dividirEmSlides(corrigido);
+    expect(slides.length).toBe(4);
+    expect(corrigido).not.toContain('---\n\n---');
+  });
+
+  test('inserirSeparadoresAusentes ignora titulos dentro de blocos de codigo', () => {
+    const md = ['# Secao', '', '```md', '# nao e slide', '## tambem nao', '```', '', '## Slide real'].join('\n');
+    const corrigido = inserirSeparadoresAusentes(md);
+    expect(dividirEmSlides(corrigido).length).toBe(2);
+    expect(corrigido).toContain('# nao e slide');
+  });
 });
 
 describe('aiAula: montagem e prompts', () => {
@@ -268,6 +313,8 @@ describe('aiAula: montagem e prompts', () => {
     });
     expect(systemPrompt).toContain('PRINCÍPIOS DIDÁTICOS');
     expect(systemPrompt).toContain('PROIBIDO criar slides de "Reflexão"');
+    expect(systemPrompt).toContain('SEPARADOR OBRIGATÓRIO');
+    expect(systemPrompt).toContain('LIMITE VERTICAL');
     expect(systemPrompt).not.toMatch(/Total de \d+ a \d+ slides/);
     expect(userPrompt).toContain('SEÇÃO ATUAL (1 de 3)');
     expect(userPrompt).toContain('ANALOGIA CONDUTORA');

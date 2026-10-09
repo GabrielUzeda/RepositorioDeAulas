@@ -15,6 +15,7 @@ import {
   diagnosticarOutline,
   dividirEmSlides,
   gerarFrontMatterEPrimeiroSlide,
+  inserirSeparadoresAusentes,
   parseOutline,
   promptPlanejadorAula,
   promptSecaoAula,
@@ -519,7 +520,7 @@ export async function generateAulaOutlineAndContent(options: {
         temperature: 0.45,
         timeoutMs: 180000,
         diagnose: (conteudo) => {
-          const secaoMd = removerFrontMatterRestante(conteudo);
+          const secaoMd = inserirSeparadoresAusentes(removerFrontMatterRestante(conteudo));
           const erros = validarSecaoMarp(secaoMd);
           const qtdSlides = dividirEmSlides(secaoMd).length;
           if (qtdSlides > SLIDES_SECAO_MAX) {
@@ -529,7 +530,7 @@ export async function generateAulaOutlineAndContent(options: {
         },
       });
       modeloUtilizado = resSecao.modelUsed;
-      secaoLimpa = repararSlidesDoConteudo(removerFrontMatterRestante(resSecao.content));
+      secaoLimpa = repararSlidesDoConteudo(inserirSeparadoresAusentes(removerFrontMatterRestante(resSecao.content)));
     } catch (e: any) {
       throw new Error(`Não foi possível gerar a seção ${i + 1} (${secao.titulo}) sem problemas de estrutura: ${e.message}`, { cause: e });
     }

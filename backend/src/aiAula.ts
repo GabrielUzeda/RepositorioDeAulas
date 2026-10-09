@@ -50,6 +50,8 @@ export const OBJETIVOS_MAX = 4;
 export const SLIDES_SECAO_MAX = 5;
 export const SLIDES_TOTAIS_MAX = 30;
 export const SLIDES_TOTAIS_MIN = 6;
+export const SLIDE_LINHAS_MAX = 24;
+export const SLIDE_CHARS_MAX = 1600;
 
 const MERMAID_TYPES = [
   'flowchart',
@@ -269,11 +271,26 @@ export function validarSlideMarp(slideMd: string): string[] {
   return erros;
 }
 
+export function validarDensidadeSlide(slideMd: string): string[] {
+  const erros: string[] = [];
+  const linhas = slideMd.split('\n').filter((linha) => linha.trim() !== '');
+  const caracteres = slideMd.replace(/\s+/g, ' ').trim().length;
+  if (linhas.length > SLIDE_LINHAS_MAX || caracteres > SLIDE_CHARS_MAX) {
+    erros.push(
+      `Slide com conteudo demais (${linhas.length} linhas, ${caracteres} caracteres); divida em dois slides ou corte o excesso (limite: ${SLIDE_LINHAS_MAX} linhas / ${SLIDE_CHARS_MAX} caracteres).`
+    );
+  }
+  return erros;
+}
+
 export function validarSecaoMarp(secaoMd: string): string[] {
   if (!secaoMd || !secaoMd.trim()) return ['Secao vazia.'];
   const erros: string[] = [];
   dividirEmSlides(secaoMd).forEach((slide, idx) => {
     for (const erro of validarSlideMarp(slide)) {
+      erros.push(`Slide ${idx + 1}: ${erro}`);
+    }
+    for (const erro of validarDensidadeSlide(slide)) {
       erros.push(`Slide ${idx + 1}: ${erro}`);
     }
   });
@@ -323,6 +340,40 @@ export function repararSlidesDoConteudo(conteudoMd: string): string {
   const slides = dividirEmSlides(conteudoMd);
   if (slides.length === 0) return conteudoMd;
   return slides.map(repararSlideMarp).join('\n\n---\n\n');
+}
+
+export function inserirSeparadoresAusentes(md: string): string {
+  const linhas = md.split('\n');
+  const saida: string[] = [];
+  let dentroDeFence = false;
+  let slideIniciado = false;
+
+  for (const linha of linhas) {
+    if (/^[ \t]*```/.test(linha)) {
+      dentroDeFence = !dentroDeFence;
+      saida.push(linha);
+      continue;
+    }
+
+    if (!dentroDeFence && linha.trim() === '---') {
+      slideIniciado = false;
+      saida.push(linha);
+      continue;
+    }
+
+    const abreSlide = !dentroDeFence && /^[ \t]{0,3}#{1,2}\s+\S/.test(linha);
+    if (abreSlide) {
+      if (slideIniciado) {
+        while (saida.length > 0 && saida[saida.length - 1].trim() === '') saida.pop();
+        saida.push('', '---', '');
+      }
+      slideIniciado = true;
+    }
+
+    saida.push(linha);
+  }
+
+  return saida.join('\n');
 }
 
 export function gerarFrontMatterEPrimeiroSlide(outline: AulaOutline, autor: string): string {
@@ -473,11 +524,13 @@ ${CONTRATO_RENDERER}
 REGRAS DA SUA TAREFA:
 1. Responda APENAS com os slides desta seção (sem front-matter YAML, sem --- no início ou no fim).
 2. Abra a seção com um slide de título usando '# <título da seção>'. Nos demais slides use '## <título do slide>'.
-3. TETO RÍGIDO: gere entre 2 e no máximo ${SLIDES_SECAO_MAX} slides para esta seção (incluindo o slide de abertura '#'). NUNCA ultrapasse ${SLIDES_SECAO_MAX} slides. Um conceito por slide, sem slides de preenchimento.
-4. Use a analogia e o exemplo central fornecidos; não troque de analogia no meio da seção.
-5. Não repita conceitos já cobertos nem slides anteriores; encadeie com o que veio antes.
-6. PROIBIDO criar slides de "Reflexão", "Verifique o que você aprendeu", "Síntese", "Conclusão" ou "Material Complementar" — o sistema gera esses blocos.
-7. Sem placeholders de imagem e sem imagens se não houver URL real. Sem emojis.
+3. SEPARADOR OBRIGATÓRIO: todo slide começa com seu título e é separado do slide anterior por uma linha contendo apenas '---'. Todo título '# ...' ou '## ...' inicia um slide novo e PRECISA de '---' antes dele (exceto o primeiro da seção). Sem o separador, dois slides viram um só e o texto é cortado pelo limite vertical.
+4. LIMITE VERTICAL: o slide tem pouca altura. No máximo 8 linhas de texto visível fora o título, 6 itens de lista e 4 linhas de tabela. No máximo um bloco pesado por slide (código, tabela ou diagrama). Bloco de código com no máximo 12 linhas. Se não couber, crie outro slide.
+5. TETO RÍGIDO: gere entre 2 e no máximo ${SLIDES_SECAO_MAX} slides para esta seção (incluindo o slide de abertura '#'). NUNCA ultrapasse ${SLIDES_SECAO_MAX} slides. Um conceito por slide, sem slides de preenchimento. Prefira mais slides curtos a menos slides densos.
+6. Use a analogia e o exemplo central fornecidos; não troque de analogia no meio da seção.
+7. Não repita conceitos já cobertos nem slides anteriores; encadeie com o que veio antes.
+8. PROIBIDO criar slides de "Reflexão", "Verifique o que você aprendeu", "Síntese", "Conclusão" ou "Material Complementar" — o sistema gera esses blocos.
+9. Sem placeholders de imagem e sem imagens se não houver URL real. Sem emojis.
 
 Responda somente com os slides.`;
 
