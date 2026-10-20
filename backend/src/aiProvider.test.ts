@@ -601,4 +601,26 @@ describe('AI Provider Abstraction', () => {
     expect(resolveConfig('questoes').model).toBe('modelo-base');
     expect(resolveConfig('default').model).toBe('modelo-base');
   });
+
+  test('resolveConfig e callAi aplicam reasoning_effort configurado', async () => {
+    applyEnv({
+      AI_PROVIDER: 'openai',
+      AI_BASE_URL: `${origin}/v1`,
+      AI_API_KEY: 'chave-teste',
+      AI_MODEL: 'modelo-base',
+      AI_REASONING_EFFORT: 'none',
+      AI_REASONING_AULA: 'low',
+    });
+
+    expect(resolveConfig().reasoningEffort).toBe('none');
+    expect(resolveConfig('aula').reasoningEffort).toBe('low');
+
+    mockHandler = openAiSuccess;
+    await callAi({
+      messages: [{ role: 'user', content: 'oi' }],
+      task: 'aula',
+    });
+
+    expect(asRecord(requests[0].body)?.reasoning_effort).toBe('low');
+  });
 });

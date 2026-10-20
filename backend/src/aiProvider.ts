@@ -5,6 +5,8 @@ export interface AiMessage {
   content: string;
 }
 
+export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high';
+
 export interface AiConfig {
   provider: string;
   model: string;
@@ -14,6 +16,7 @@ export interface AiConfig {
   timeoutMs: number;
   maxTokens: number;
   anthropicVersion: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
 type AiRequestBody = OpenAiChatBody | AnthropicChatBody;
@@ -27,7 +30,8 @@ export interface AiProvider {
     model: string,
     messages: AiMessage[],
     temperature: number,
-    maxTokens: number
+    maxTokens: number,
+    reasoningEffort?: ReasoningEffort
   ): AiRequestBody;
   extractContent(data: unknown): string;
   extractError(data: unknown): string;
@@ -41,6 +45,7 @@ export interface AiChatOptions {
   temperature?: number;
   timeoutMs?: number;
   maxTokens?: number;
+  reasoningEffort?: ReasoningEffort;
   maxRetries?: number;
   retryBaseMs?: number;
   validate?: (content: string) => boolean;
@@ -60,13 +65,11 @@ export interface AiChatResult {
   repaired?: number;
 }
 
-const VALID_PROVIDERS = ['opencode', '9router', 'openai', 'anthropic'];
+const VALID_PROVIDERS = ['opencode', 'openai', 'anthropic'];
 const DEFAULT_MODEL = 'deepseek-v4.1-flash';
 const DEFAULT_OPENCODE_BASE_URL = 'https://opencode.ai/zen/go/v1';
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
-const DEFAULT_NINE_ROUTER_URL = 'http://127.0.0.1:20128/v1';
-const DEFAULT_NINE_ROUTER_KEY = 'sk_local_9r';
 const DEFAULT_UA = 'opencode/1.18.30';
 
 function envNumber(value: string | undefined, fallback: number): number {
@@ -255,7 +258,7 @@ export function resolveConfig(task?: AiTask): AiConfig {
   const explicitModel = trimmed(process.env.AI_MODEL);
   const fallbackModel = trimmed(process.env.AI_FALLBACK_MODEL);
   const timeoutMs = envNumber(process.env.AI_TIMEOUT_MS, 180000);
-  const defaultMaxTokens = provider === 'opencode' || provider === '9router' ? 16384 : 8192;
+  const defaultMaxTokens = provider === 'opencode' ? 16384 : 8192;
   const maxTokens = envNumber(process.env.AI_MAX_TOKENS, defaultMaxTokens);
   const anthropicVersion = trimmed(process.env.AI_ANTHROPIC_VERSION) || '2023-06-01';
 
@@ -263,11 +266,7 @@ export function resolveConfig(task?: AiTask): AiConfig {
   let apiKey: string;
   let model: string;
 
-  if (provider === '9router') {
-    baseUrl = explicitBaseUrl || trimmed(process.env.NINE_ROUTER_URL) || DEFAULT_NINE_ROUTER_URL;
-    apiKey = explicitApiKey || trimmed(process.env.NINE_ROUTER_API_KEY) || DEFAULT_NINE_ROUTER_KEY;
-    model = explicitModel || DEFAULT_MODEL;
-  } else if (provider === 'openai') {
+  if (provider === 'openai') {
     baseUrl = explicitBaseUrl || DEFAULT_OPENAI_BASE_URL;
     apiKey = explicitApiKey;
     model = explicitModel || DEFAULT_MODEL;
@@ -291,6 +290,13 @@ export function resolveConfig(task?: AiTask): AiConfig {
     if (taskModel) model = taskModel;
   }
 
+  let reasoningEffort: ReasoningEffort | undefined;
+  const envEffort = (task && trimmed(process.env[`AI_REASONING_${task.toUpperCase()}`])) ||
+    trimmed(process.env.AI_REASONING_EFFORT);
+  if (envEffort === 'none' || envEffort === 'low' || envEffort === 'medium' || envEffort === 'high') {
+    reasoningEffort = envEffort;
+  }
+
   return {
     provider,
     model,
@@ -300,6 +306,7 @@ export function resolveConfig(task?: AiTask): AiConfig {
     timeoutMs,
     maxTokens,
     anthropicVersion,
+    reasoningEffort,
   };
 }
 
@@ -309,6 +316,7 @@ interface OpenAiChatBody {
   temperature: number;
   max_tokens: number;
   stream: boolean;
+  reasoning_effort?: ReasoningEffort;
 }
 
 interface AnthropicChatBody {
@@ -362,15 +370,20 @@ function createOpenAiProvider(name: string): AiProvider {
       model: string,
       messages: AiMessage[],
       temperature: number,
-      maxTokens: number
+      maxTokens: number,
+      reasoningEffort?: ReasoningEffort
     ): OpenAiChatBody {
-      return {
+      const body: OpenAiChatBody = {
         model,
         messages,
         temperature,
         max_tokens: maxTokens,
         stream: true,
       };
+      if (reasoningEffort) {
+        body.reasoning_effort = reasoningEffort;
+      }
+      return body;
     },
     extractContent(data: unknown): string {
       const root = asRecord(data);
@@ -448,7 +461,8 @@ function createAnthropicProvider(anthropicVersion: string): AiProvider {
       model: string,
       messages: AiMessage[],
       temperature: number,
-      maxTokens: number
+      maxTokens: number,
+      _reasoningEffort?: ReasoningEffort
     ): AnthropicChatBody {
       const systemParts: string[] = [];
       const rest: { role: AiMessage['role']; content: string }[] = [];
@@ -506,7 +520,6 @@ export function resolveProvider(config?: AiConfig): AiProvider {
   if (resolved.provider === 'anthropic') return createAnthropicProvider(resolved.anthropicVersion);
   if (
     resolved.provider === 'opencode' ||
-    resolved.provider === '9router' ||
     resolved.provider === 'openai'
   ) {
     return createOpenAiProvider(resolved.provider);
@@ -596,29 +609,6 @@ export function extractText(raw: string, provider: AiProvider): string {
   return '';
 }
 
-async function fetchNineRouter(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-  allowFallback = true
-): Promise<Response> {
-  const sinal = (limite: number) => init.signal
-    ? AbortSignal.any([init.signal, AbortSignal.timeout(limite)])
-    : AbortSignal.timeout(limite);
-  const customUrl = trimmed(process.env.NINE_ROUTER_URL);
-  const isDefaultLocal = !customUrl && url.includes('127.0.0.1:20128');
-  if (!isDefaultLocal || !allowFallback) {
-    return fetch(url, { ...init, signal: sinal(timeoutMs) });
-  }
-  try {
-    return await fetch(url, { ...init, signal: sinal(1500) });
-  } catch {
-    if (init.signal?.aborted) throw init.signal.reason;
-    const fallbackUrl = url.replace('127.0.0.1:20128', 'host.docker.internal:20128');
-    return fetch(fallbackUrl, { ...init, signal: sinal(timeoutMs) });
-  }
-}
-
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -698,22 +688,20 @@ export async function callAi(options: AiChatOptions): Promise<AiChatResult> {
         `[AI-Provider] Início da chamada | provider: ${config.provider} | model: ${model} | tentativa: ${retryAttempt + 1}/${maxRetries + 1} | reparo: ${repairCount}/${maxRepairs} | mensagens: ${workingMessages.length} | prompt_chars: ${promptChars} | timeout_ms: ${attemptTimeoutMs} | max_tokens: ${callMaxTokens}`
       );
 
+      const effort = options.reasoningEffort ?? config.reasoningEffort;
       const body = JSON.stringify(
-        provider.buildBody(model, workingMessages, options.temperature ?? 0.3, callMaxTokens)
+        provider.buildBody(model, workingMessages, options.temperature ?? 0.3, callMaxTokens, effort)
       );
       const headers = provider.buildHeaders(config.apiKey);
       try {
-        const response =
-          provider.name === '9router'
-            ? await fetchNineRouter(endpoint, { method: 'POST', headers, body, signal: options.signal }, attemptTimeoutMs, options.allowFallback)
-            : await fetch(endpoint, {
-                method: 'POST',
-                headers,
-                body,
-                signal: options.signal
-                  ? AbortSignal.any([options.signal, AbortSignal.timeout(attemptTimeoutMs)])
-                  : AbortSignal.timeout(attemptTimeoutMs),
-              });
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body,
+          signal: options.signal
+            ? AbortSignal.any([options.signal, AbortSignal.timeout(attemptTimeoutMs)])
+            : AbortSignal.timeout(attemptTimeoutMs),
+        });
 
         const elapsedSec = Number(((performance.now() - startTime) / 1000).toFixed(2));
 

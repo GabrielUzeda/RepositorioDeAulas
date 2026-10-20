@@ -17,7 +17,7 @@ async function profLogin(request: APIRequestContext, email: string, password: st
   return (await res.json()).token as string;
 }
 
-test.describe('Professor — Modal de Geração de Atividades por IA (9router)', () => {
+test.describe('Professor — Modal de Geração de Atividades por IA', () => {
   let adminToken: string;
   let profEmail: string;
   let profPassword: string;

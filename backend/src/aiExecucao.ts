@@ -22,7 +22,7 @@ export interface ResumoExecucaoAi {
   tokens_completion: number | null;
 }
 
-type EtapaAi = Pick<AiChatOptions, 'messages' | 'temperature' | 'maxTokens' | 'timeoutMs' | 'diagnose'>;
+type EtapaAi = Pick<AiChatOptions, 'messages' | 'temperature' | 'maxTokens' | 'timeoutMs' | 'diagnose' | 'reasoningEffort'>;
 
 export class ExecucaoAi {
   private readonly id = randomUUID();
@@ -140,6 +140,7 @@ export class ExecucaoAi {
           messages,
           temperature: options.temperature,
           maxTokens: options.maxTokens,
+          reasoningEffort: options.reasoningEffort,
           timeoutMs,
           task: this.tarefa,
           config: this.config,

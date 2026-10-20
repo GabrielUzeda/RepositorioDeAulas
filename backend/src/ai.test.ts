@@ -3,7 +3,7 @@ import { signJwt } from './auth';
 import app from './routes';
 import { repairRawHtmlBlocks, repairUnclosedCodeBlocks, normalizeMarpMarkdown } from './ai';
 
-describe('AI Module & 9router Integration', () => {
+describe('AI Module Integration', () => {
   test('repairRawHtmlBlocks repara tags HTML sem fechamento (style, script, template, textarea)', () => {
     const broken = '# Slide 1\n<style>\n.custom { color: red; }\n\n---\n# Slide 2';
     const repaired = repairRawHtmlBlocks(broken);
