@@ -135,11 +135,13 @@ describe('aiAula: geracao por secoes', () => {
     expect(md).toContain('## Material Complementar');
     expect(md).toContain('1. Explique a diferenca entre while e for.');
 
-    const secoes = chamadas.secao;
-    expect(secoes[0]).toContain('SEÇÃO ATUAL (1 de 3): Conceito de iteracao');
-    expect(secoes[1]).toContain('CONCEITOS JÁ COBERTOS (não repetir):');
-    expect(secoes[1]).toContain('- iteracao');
-    expect(secoes[2]).toContain('- range');
+    const porSecao = (n: number) => chamadas.secao.find((p) => p.includes(`SEÇÃO ATUAL (${n} de 3)`)) || '';
+    expect(porSecao(1)).toContain('SEÇÃO ATUAL (1 de 3): Conceito de iteracao');
+    expect(porSecao(2)).toContain('OUTRAS SEÇÕES DA AULA');
+    expect(porSecao(2)).toContain('Seção 1 (Conceito de iteracao): iteracao, while');
+    expect(porSecao(3)).toContain('Seção 2 (Lacos contados): for, range');
+    expect(md.indexOf('# Secao 1 do conteudo')).toBeLessThan(md.indexOf('# Secao 2 do conteudo'));
+    expect(md.indexOf('# Secao 2 do conteudo')).toBeLessThan(md.indexOf('# Secao 3 do conteudo'));
   });
 
   test('isCancelled entre secoes interrompe a geracao', async () => {

@@ -11,11 +11,12 @@ import { executarAvaliacaoEmLote, sanitizarEntradaAluno } from './aiAvaliacao';
 import { sintetizarFeedbackTurma } from './aiSintese';
 import {
   SLIDES_TOTAIS_MAX,
-  SLIDES_SECAO_MAX,
+  avisosDensidade,
   diagnosticarOutline,
   dividirEmSlides,
   gerarFrontMatterEPrimeiroSlide,
   inserirSeparadoresAusentes,
+  normalizarEspacamentoMd,
   parseOutline,
   promptPlanejadorAula,
   promptSecaoAula,
@@ -24,6 +25,7 @@ import {
   removerFrontMatterRestante,
   validarAulaMarp,
   validarSecaoMarp,
+  promptAulaDireta,
   type AulaOutline,
 } from './aiAula';
 
@@ -315,6 +317,60 @@ export function normalizeMarpMarkdown(content: string): string {
   return cleaned;
 }
 
+type AulaContexto = { id: number; titulo: string; conteudo_md: string; ordem: number };
+
+function carregarAulasContexto(ids: number[], professorId: number, professorRole: string): AulaContexto[] {
+  if (ids.length === 0) return [];
+  const idsJson = JSON.stringify(ids);
+  if (professorRole === 'admin') {
+    return db
+      .query(`SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a WHERE a.id IN (SELECT value FROM json_each(?)) ORDER BY a.ordem ASC`)
+      .all(idsJson) as AulaContexto[];
+  }
+  return db
+    .query(
+      `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a
+       JOIN disciplinas d ON a.disciplina_id = d.id
+       JOIN curso_professores cp ON d.curso_id = cp.curso_id
+       WHERE cp.professor_id = ? AND a.id IN (SELECT value FROM json_each(?))
+       ORDER BY a.ordem ASC`
+    )
+    .all(professorId, idsJson) as AulaContexto[];
+}
+
+function ultimaAulaDaDisciplina(disciplinaId: number, professorId: number, professorRole: string): number | null {
+  const row =
+    professorRole === 'admin'
+      ? db.query('SELECT a.id FROM aulas a WHERE a.disciplina_id = ? ORDER BY a.ordem DESC LIMIT 1').get(disciplinaId)
+      : db
+          .query(
+            `SELECT a.id FROM aulas a
+             JOIN disciplinas d ON a.disciplina_id = d.id
+             JOIN curso_professores cp ON d.curso_id = cp.curso_id
+             WHERE cp.professor_id = ? AND a.disciplina_id = ?
+             ORDER BY a.ordem DESC LIMIT 1`
+          )
+          .get(professorId, disciplinaId);
+  return (row as { id: number } | null)?.id ?? null;
+}
+
+const AULA_CONCORRENCIA = 5;
+const AULA_CONTEXTO_PLANEJADOR_CHARS = 16000;
+const AULA_CONTEXTO_SECAO_CHARS = 5000;
+
+async function executarComLimite<T>(tarefas: Array<() => Promise<T>>, limite: number): Promise<T[]> {
+  const resultados: T[] = new Array(tarefas.length);
+  let proximo = 0;
+  const trabalhador = async () => {
+    while (proximo < tarefas.length) {
+      const i = proximo++;
+      resultados[i] = await tarefas[i]();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limite, tarefas.length) }, trabalhador));
+  return resultados;
+}
+
 export async function generateAulaOutlineAndContent(options: {
   disciplina_id?: number;
   tema?: string;
@@ -323,6 +379,7 @@ export async function generateAulaOutlineAndContent(options: {
   observacoes?: string;
   professorId?: number;
   professorRole?: string;
+  modo?: 'decomposta' | 'direta';
   checkpoint?: JobCheckpointFn;
   isCancelled?: () => boolean;
 }) {
@@ -334,252 +391,207 @@ export async function generateAulaOutlineAndContent(options: {
     observacoes = '',
     professorId = 1,
     professorRole = 'admin',
+    modo = (process.env.AI_MODO_AULA === 'direta' ? 'direta' : 'decomposta'),
     checkpoint,
     isCancelled,
   } = options;
 
-  const targetAulasIds: number[] = Array.isArray(aulas_contexto_ids)
-    ? aulas_contexto_ids.map(Number).filter(Boolean)
-    : [];
+  const cancelar = () => {
+    if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+  };
 
+  const idsAulas: number[] = Array.isArray(aulas_contexto_ids) ? aulas_contexto_ids.map(Number).filter(Boolean) : [];
   if (continuar_sequencia && disciplina_id) {
-    let ultimaAula: { id: number } | undefined;
-    if (professorRole === 'admin') {
-      ultimaAula = db
-        .query(`SELECT a.id FROM aulas a WHERE a.disciplina_id = ? ORDER BY a.ordem DESC LIMIT 1`)
-        .get(disciplina_id) as { id: number } | undefined;
-    } else {
-      ultimaAula = db
-        .query(
-          `SELECT a.id FROM aulas a
-         JOIN disciplinas d ON a.disciplina_id = d.id
-         JOIN curso_professores cp ON d.curso_id = cp.curso_id
-         WHERE cp.professor_id = ? AND a.disciplina_id = ?
-         ORDER BY a.ordem DESC LIMIT 1`
-        )
-        .get(professorId, disciplina_id) as { id: number } | undefined;
-    }
-    if (ultimaAula && !targetAulasIds.includes(ultimaAula.id)) {
-      targetAulasIds.push(ultimaAula.id);
-    }
+    const ultima = ultimaAulaDaDisciplina(Number(disciplina_id), professorId, professorRole);
+    if (ultima && !idsAulas.includes(ultima)) idsAulas.push(ultima);
   }
 
-  if (!tema && targetAulasIds.length === 0) {
+  if (!tema && idsAulas.length === 0) {
     throw new Error('Informe um tema ou selecione aulas de referência para contextualizar a geração');
   }
 
-  let aulasContexto = '';
-  if (targetAulasIds.length > 0) {
-    const aulasIdsJson = JSON.stringify(targetAulasIds);
-    let aulas: { id: number; titulo: string; conteudo_md: string; ordem: number }[] = [];
+  const aulas = carregarAulasContexto(idsAulas, professorId, professorRole);
 
-    if (professorRole === 'admin') {
-      aulas = db
-        .query(
-          `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a WHERE a.id IN (SELECT value FROM json_each(?)) ORDER BY a.ordem ASC`
-        )
-        .all(aulasIdsJson) as { id: number; titulo: string; conteudo_md: string; ordem: number }[];
-    } else {
-      aulas = db
-        .query(
-          `SELECT a.id, a.titulo, a.conteudo_md, a.ordem FROM aulas a
-         JOIN disciplinas d ON a.disciplina_id = d.id
-         JOIN curso_professores cp ON d.curso_id = cp.curso_id
-         WHERE cp.professor_id = ? AND a.id IN (SELECT value FROM json_each(?))
-         ORDER BY a.ordem ASC`
-        )
-        .all(professorId, aulasIdsJson) as {
-        id: number;
-        titulo: string;
-        conteudo_md: string;
-        ordem: number;
-      }[];
-    }
-
-    if (aulas.length > 0) {
-      aulasContexto = distribuirOrcamentoContexto(aulas, 30000);
-    }
+  let disciplinaId = disciplina_id ? Number(disciplina_id) : null;
+  if (!disciplinaId && idsAulas.length > 0) {
+    const row = db.query('SELECT disciplina_id FROM aulas WHERE id = ?').get(idsAulas[0]) as any;
+    disciplinaId = row?.disciplina_id ?? null;
   }
+  const cursoId = disciplinaId
+    ? ((db.query('SELECT curso_id FROM disciplinas WHERE id = ?').get(disciplinaId) as any)?.curso_id ?? null)
+    : null;
 
-  let targetDisciplinaId = disciplina_id ? Number(disciplina_id) : null;
-  if (!targetDisciplinaId && targetAulasIds.length > 0) {
-    const row = db
-      .query('SELECT disciplina_id FROM aulas WHERE id = ?')
-      .get(targetAulasIds[0]) as any;
-    if (row?.disciplina_id) targetDisciplinaId = row.disciplina_id;
-  }
+  const docsContexto = disciplinaId
+    ? obterContextoDocumentosSobDemanda({
+        disciplinaId,
+        cursoId: cursoId ? Number(cursoId) : null,
+        temaOuAssunto: tema || 'Conteudo geral',
+        limiteTrechos: 4,
+      })
+    : '';
 
-  let targetCursoId: number | null = null;
-  if (targetDisciplinaId) {
-    const discRow = db
-      .query('SELECT curso_id FROM disciplinas WHERE id = ?')
-      .get(targetDisciplinaId) as any;
-    if (discRow?.curso_id) targetCursoId = Number(discRow.curso_id);
-  }
+  cancelar();
 
-  let docsContexto = '';
-  if (targetDisciplinaId) {
-    docsContexto = obterContextoDocumentosSobDemanda({
-      disciplinaId: targetDisciplinaId,
-      cursoId: targetCursoId,
-      temaOuAssunto: tema || 'Conteudo geral',
-      limiteTrechos: 4,
+  const execucao = new ExecucaoAi('aula', { maxChamadas: 10, isCancelled });
+  const avisos: string[] = [];
+  let modeloUtilizado = '';
+
+  if (modo === 'direta') {
+    await checkpoint?.('25% - Redigindo aula completa em chamada direta...', { fase: 'direta' });
+    const { systemPrompt, userPrompt } = promptAulaDireta({
+      tema,
+      observacoes,
+      aulasContexto: distribuirOrcamentoContexto(aulas, AULA_CONTEXTO_PLANEJADOR_CHARS),
+      docsContexto,
     });
+
+    const res = await execucao.executar({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.4,
+      timeoutMs: 180000,
+      maxTokens: 16384,
+      reasoningEffort: 'none',
+      diagnose: (conteudo) => {
+        const limpo = normalizarEspacamentoMd(repararSlidesDoConteudo(inserirSeparadoresAusentes(normalizeMarpMarkdown(conteudo))));
+        const v = validarAulaMarp(limpo);
+        return v.valido ? [] : v.erros;
+      },
+    });
+
+    cancelar();
+    await checkpoint?.('85% - Validando e finalizando a aula...', { fase: 'validacao' });
+
+    const cleaned = normalizarEspacamentoMd(repararSlidesDoConteudo(inserirSeparadoresAusentes(normalizeMarpMarkdown(res.content))));
+    const validacaoFinal = validarAulaMarp(cleaned);
+    if (!validacaoFinal.valido) {
+      throw new Error(`A aula gerada ficou com problemas de estrutura: ${validacaoFinal.erros.slice(0, 5).join(' ')}`);
+    }
+
+    const matchTitulo = cleaned.match(/title:\s*([^\n\r]+)/i) || cleaned.match(/^#\s+([^\n\r]+)/m);
+    const tituloSugerido = matchTitulo ? matchTitulo[1].replace(/["']/g, '').trim() : (tema || 'Nova Aula');
+
+    const totalSlides = dividirEmSlides(cleaned).length;
+    if (totalSlides > SLIDES_TOTAIS_MAX) {
+      avisos.push(`A aula ficou com ${totalSlides} slides (acima de ${SLIDES_TOTAIS_MAX}); considere dividi-la em duas aulas.`);
+    }
+    avisos.push(...avisosDensidade(cleaned));
+
+    return {
+      success: true,
+      conteudo_md: cleaned,
+      titulo_sugerido: tituloSugerido,
+      modelo_utilizado: res.modelUsed,
+      outline: JSON.stringify({ titulo: tituloSugerido, secoes: [] }),
+      execucao: execucao.concluir(),
+      ...(avisos.length > 0 ? { avisos } : {}),
+    };
   }
 
-  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
-
-  const { systemPrompt: plannerSystemPrompt, userPrompt: plannerUserPrompt } = promptPlanejadorAula({
+  const planner = promptPlanejadorAula({
     tema,
     observacoes,
-    aulasContexto,
+    aulasContexto: distribuirOrcamentoContexto(aulas, AULA_CONTEXTO_PLANEJADOR_CHARS),
     docsContexto,
   });
 
-  const execucao = new ExecucaoAi('aula', { maxChamadas: 8, isCancelled });
   let outline: AulaOutline | null = null;
-  let outlineResult = '';
-  let modeloUtilizado = '';
-  const avisos: string[] = [];
-
   try {
-    const plannerMessages: AiMessage[] = [
-      { role: 'system', content: plannerSystemPrompt },
-      { role: 'user', content: plannerUserPrompt },
-    ];
-    const pRes = await execucao.executar({
-      messages: plannerMessages,
+    const res = await execucao.executar({
+      messages: [
+        { role: 'system', content: planner.systemPrompt },
+        { role: 'user', content: planner.userPrompt },
+      ],
       temperature: 0.4,
       timeoutMs: 120000,
-      diagnose: (conteudoPlanner) => {
-        const parsed = parseOutline(conteudoPlanner);
-        if (!parsed) return ['A resposta não contém o objeto JSON do outline esperado.'];
-        return diagnosticarOutline(parsed);
+      diagnose: (conteudo) => {
+        const parsed = parseOutline(conteudo);
+        return parsed ? diagnosticarOutline(parsed) : ['A resposta não contém o objeto JSON do outline esperado.'];
       },
     });
-    outline = parseOutline(pRes.content);
-    modeloUtilizado = pRes.modelUsed;
+    outline = parseOutline(res.content);
+    modeloUtilizado = res.modelUsed;
   } catch (e: any) {
     throw new Error(
       `Falha ao planejar a estrutura da aula com IA: ${e.message || 'Erro de conexão/timeout'}. Tente novamente.`,
       { cause: e }
     );
   }
+  if (!outline) throw new Error('A IA não retornou um outline pedagógico válido. Tente novamente.');
+  const outlineFinal = outline;
 
-  if (!outline) {
-    throw new Error('A IA não retornou um outline pedagógico válido. Tente novamente.');
-  }
+  cancelar();
+  await checkpoint?.('35% - Planejando estrutura pedagógica e tópicos...', { fase: 'outline', outline: JSON.stringify(outlineFinal) });
 
-  outlineResult = JSON.stringify(outline);
+  const contextoSecao = [
+    distribuirOrcamentoContexto(aulas, AULA_CONTEXTO_SECAO_CHARS),
+    docsContexto.slice(0, AULA_CONTEXTO_SECAO_CHARS),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 
-  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
-
-  await checkpoint?.('35% - Planejando estrutura pedagógica e tópicos...', { fase: 'outline', outline: outlineResult });
-
-  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
-
-  let autor = '';
-  if (professorId) {
-    const profRow = db.query('SELECT nome FROM professores WHERE id = ?').get(professorId) as
-      | { nome: string }
-      | undefined;
-    autor = profRow?.nome || '';
-  }
-
-  const capa = gerarFrontMatterEPrimeiroSlide(outline, autor);
-  const conceitosJaCobertos: string[] = [];
-  const titulosSlidesAnteriores: string[] = [];
-  const secoesMd: string[] = [];
-  const totalSecoes = outline.secoes.length;
-
-  for (let i = 0; i < totalSecoes; i++) {
-    if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
-    const secao = outline.secoes[i];
-    const pctSecao = 35 + Math.round((i / totalSecoes) * 45);
-    await checkpoint?.(`${pctSecao}% - Redigindo seção ${i + 1} de ${totalSecoes}: ${secao.titulo}...`, {
+  const total = outlineFinal.secoes.length;
+  let concluidas = 0;
+  const tarefas = outlineFinal.secoes.map((secao, i) => async () => {
+    cancelar();
+    await checkpoint?.(`${35 + Math.round((concluidas / total) * 45)}% - Redigindo seção ${i + 1} de ${total}: ${secao.titulo}...`, {
       fase: 'secoes',
       secao: i + 1,
-      total: totalSecoes,
+      total,
     });
-
-    const { systemPrompt: secSys, userPrompt: secUser } = promptSecaoAula({
-      outline,
-      indiceSecao: i,
-      conceitosJaCobertos,
-      titulosSlidesAnteriores,
-      contextoLimpo: [aulasContexto, docsContexto].filter(Boolean).join('\n\n'),
-    });
-
-    let secaoLimpa = '';
+    const { systemPrompt, userPrompt } = promptSecaoAula({ outline: outlineFinal, indiceSecao: i, contextoLimpo: contextoSecao });
+    const limpar = (conteudo: string) =>
+      repararSlidesDoConteudo(inserirSeparadoresAusentes(removerFrontMatterRestante(conteudo)));
     try {
-      const resSecao = await execucao.executar({
+      const res = await execucao.executar({
         messages: [
-          { role: 'system', content: secSys },
-          { role: 'user', content: secUser },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
         ],
         temperature: 0.45,
         timeoutMs: 180000,
-        diagnose: (conteudo) => {
-          const secaoMd = inserirSeparadoresAusentes(removerFrontMatterRestante(conteudo));
-          const erros = validarSecaoMarp(secaoMd);
-          const qtdSlides = dividirEmSlides(secaoMd).length;
-          if (qtdSlides > SLIDES_SECAO_MAX) {
-            erros.push(`A seção ficou com ${qtdSlides} slides; comprima para no máximo ${SLIDES_SECAO_MAX}, mantendo um conceito por slide.`);
-          }
-          return erros;
-        },
+        maxTokens: 12288,
+        reasoningEffort: 'none',
+        diagnose: (conteudo) => validarSecaoMarp(limpar(conteudo)),
       });
-      modeloUtilizado = resSecao.modelUsed;
-      secaoLimpa = repararSlidesDoConteudo(inserirSeparadoresAusentes(removerFrontMatterRestante(resSecao.content)));
+      modeloUtilizado = res.modelUsed;
+      concluidas += 1;
+      return limpar(res.content);
     } catch (e: any) {
       throw new Error(`Não foi possível gerar a seção ${i + 1} (${secao.titulo}) sem problemas de estrutura: ${e.message}`, { cause: e });
     }
+  });
+  const secoesMd = await executarComLimite(tarefas, AULA_CONCORRENCIA);
 
-    secoesMd.push(secaoLimpa);
-    for (const linha of secaoLimpa.split('\n')) {
-      const mTitulo = linha.match(/^#{1,2}\s+(.*)/);
-      if (mTitulo) titulosSlidesAnteriores.push(mTitulo[1].trim());
-    }
-    conceitosJaCobertos.push(...secao.conceitos);
-  }
-
-  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
-
-  const fechamento = renderBlocoFechamento(outline);
-  const content = [capa, ...secoesMd, fechamento].filter(Boolean).join('\n\n---\n\n');
-
-  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
-
+  cancelar();
   await checkpoint?.('85% - Validando e finalizando a aula...', { fase: 'validacao' });
 
-  if (isCancelled?.()) throw new Error('Job cancelado pelo usuário');
+  const content = [gerarFrontMatterEPrimeiroSlide(outlineFinal), ...secoesMd, renderBlocoFechamento(outlineFinal)]
+    .filter(Boolean)
+    .join('\n\n---\n\n');
+  const cleaned = normalizarEspacamentoMd(repararSlidesDoConteudo(normalizeMarpMarkdown(content)));
 
-  const cleaned = repararSlidesDoConteudo(normalizeMarpMarkdown(content));
-
-  if (!cleaned || !cleaned.includes('---')) {
-    throw new Error('A IA não retornou Markdown Marp válido');
-  }
+  if (!cleaned.includes('---')) throw new Error('A IA não retornou Markdown Marp válido');
 
   const validacaoFinal = validarAulaMarp(cleaned);
   if (!validacaoFinal.valido) {
-    throw new Error(
-      `A aula gerada ficou com problemas de estrutura: ${validacaoFinal.erros.slice(0, 5).join(' ')}`
-    );
+    throw new Error(`A aula gerada ficou com problemas de estrutura: ${validacaoFinal.erros.slice(0, 5).join(' ')}`);
   }
 
   const totalSlides = dividirEmSlides(cleaned).length;
   if (totalSlides > SLIDES_TOTAIS_MAX) {
-    avisos.push(
-      `A aula ficou com ${totalSlides} slides (acima de ${SLIDES_TOTAIS_MAX}); considere dividi-la em duas aulas.`
-    );
+    avisos.push(`A aula ficou com ${totalSlides} slides (acima de ${SLIDES_TOTAIS_MAX}); considere dividi-la em duas aulas.`);
   }
+  avisos.push(...avisosDensidade(cleaned));
 
   return {
     success: true,
     conteudo_md: cleaned,
-    titulo_sugerido: outline.titulo.trim(),
+    titulo_sugerido: outlineFinal.titulo.trim(),
     modelo_utilizado: modeloUtilizado,
-    outline: outlineResult,
+    outline: JSON.stringify(outlineFinal),
     execucao: execucao.concluir(),
     ...(avisos.length > 0 ? { avisos } : {}),
   };

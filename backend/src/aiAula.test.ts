@@ -8,10 +8,12 @@ import {
   parseOutline,
   promptPlanejadorAula,
   promptSecaoAula,
+  promptAulaDireta,
   removerFrontMatterRestante,
   renderBlocoFechamento,
   repararSlideMarp,
   repararSlidesDoConteudo,
+  avisosDensidade,
   validarAulaMarp,
   validarDensidadeSlide,
   validarSecaoMarp,
@@ -99,29 +101,30 @@ describe('aiAula: outline', () => {
     expect(diagnosticarOutline(outlineValido())).toEqual([]);
   });
 
-  test('diagnosticarOutline detecta conceito duplicado entre secoes', () => {
-    const outline = outlineValido();
-    outline.secoes[1].conceitos = ['while'];
-    const erros = diagnosticarOutline(outline);
-    expect(erros.some((e) => e.includes('duplicado'))).toBe(true);
+  test('normalizarOutline remove conceito repetido entre secoes em vez de reprovar', () => {
+    const base = outlineValido();
+    const outline = normalizarOutline({ ...base, secoes: base.secoes.map((s, i) => (i === 1 ? { ...s, conceitos: ['while', 'for'] } : s)) });
+    expect(outline?.secoes[1].conceitos).toEqual(['for']);
   });
 
-  test('diagnosticarOutline detecta poucas secoes e fixacao fora da faixa', () => {
+  test('diagnosticarOutline detecta poucas secoes e secao sem conceito', () => {
     const outline = outlineValido();
     outline.secoes = outline.secoes.slice(0, 1);
-    outline.fixacao = ['unica'];
+    outline.secoes[0].conceitos = [];
     const erros = diagnosticarOutline(outline);
     expect(erros.some((e) => e.includes('Secoes'))).toBe(true);
-    expect(erros.some((e) => e.includes('Fixacao'))).toBe(true);
+    expect(erros.some((e) => e.includes('nenhum conceito'))).toBe(true);
   });
 
-  test('diagnosticarOutline exige sintese e material complementar', () => {
+  test('sintese e material complementar sao opcionais e limitados na normalizacao', () => {
     const outline = outlineValido();
     outline.sintese = [];
     outline.material_complementar = [];
-    const erros = diagnosticarOutline(outline);
-    expect(erros.some((e) => e.includes('Sintese'))).toBe(true);
-    expect(erros.some((e) => e.includes('Material complementar'))).toBe(true);
+    expect(diagnosticarOutline(outline)).toEqual([]);
+    const bruto = { ...outlineValido(), material_complementar: [{ titulo: 'A', detalhe: 'x', url: 'ftp://invalido' }, ...Array.from({ length: 9 }, (_, i) => ({ titulo: 'R' + i, detalhe: '' }))] };
+    const norm = normalizarOutline(bruto);
+    expect(norm?.material_complementar.length).toBe(5);
+    expect(norm?.material_complementar[0].url).toBeUndefined();
   });
 
   test('diagnosticarOutline recusa outline null ou sem secoes', () => {
@@ -231,9 +234,10 @@ describe('aiAula: validacao de slides Marp', () => {
     expect(validarDensidadeSlide(longo).some((e) => e.includes('conteudo demais'))).toBe(true);
   });
 
-  test('validarSecaoMarp inclui a checagem de densidade por slide', () => {
+  test('densidade nao bloqueia a secao e aparece como aviso', () => {
     const densa = ['## Titulo', ...Array.from({ length: 40 }, (_, i) => `texto ${i}`)].join('\n');
-    expect(validarSecaoMarp(densa).some((e) => e.startsWith('Slide 1:') && e.includes('conteudo demais'))).toBe(true);
+    expect(validarSecaoMarp(densa)).toEqual([]);
+    expect(avisosDensidade(densa).some((e) => e.startsWith('Slide 1:') && e.includes('conteudo demais'))).toBe(true);
   });
 
   test('inserirSeparadoresAusentes separa titulos consecutivos sem tocar nos separadores existentes', () => {
@@ -300,24 +304,39 @@ describe('aiAula: montagem e prompts', () => {
     expect(systemPrompt).toContain('PRINCÍPIOS DIDÁTICOS');
     expect(systemPrompt).toContain('RECURSOS DO MOTOR');
     expect(systemPrompt).toContain('"material_complementar"');
+    expect(systemPrompt).toContain(':fas-nome:');
+    expect(systemPrompt).not.toContain(':fa-solid fa-nome:');
+    expect(systemPrompt).not.toContain('SKILL: RECURSOS INTERATIVOS');
     expect(systemPrompt).not.toMatch(/Total de \d+ a \d+ slides/);
   });
 
   test('promptSecaoAula proibe slides de fechamento e nao impoe contagem de slides', () => {
-    const { systemPrompt, userPrompt } = promptSecaoAula({
-      outline: outlineValido(),
-      indiceSecao: 0,
-      conceitosJaCobertos: [],
-      titulosSlidesAnteriores: [],
-      contextoLimpo: '',
-    });
+    const { systemPrompt, userPrompt } = promptSecaoAula({ outline: outlineValido(), indiceSecao: 0 });
     expect(systemPrompt).toContain('PRINCÍPIOS DIDÁTICOS');
     expect(systemPrompt).toContain('PROIBIDO criar slides de "Reflexão"');
     expect(systemPrompt).toContain('SEPARADOR OBRIGATÓRIO');
     expect(systemPrompt).toContain('LIMITE VERTICAL');
+    expect(systemPrompt).toContain('SKILL: RECURSOS INTERATIVOS');
+    expect(systemPrompt).toContain('GSAP 3.12.5 já vem carregado');
+    expect(systemPrompt).toContain(':fas-nome:');
     expect(systemPrompt).not.toMatch(/Total de \d+ a \d+ slides/);
     expect(userPrompt).toContain('SEÇÃO ATUAL (1 de 3)');
     expect(userPrompt).toContain('ANALOGIA CONDUTORA');
     expect(userPrompt).toContain('Uma fila de banco');
+    expect(userPrompt).toContain('OUTRAS SEÇÕES DA AULA');
+    expect(userPrompt).toContain('- Seção 2 (Lacos contados): for, range');
+  });
+
+  test('promptAulaDireta embute densidade de 10-30 linhas, linearidade sem vazamentos e regras negativas', () => {
+    const { systemPrompt, userPrompt } = promptAulaDireta({ tema: 'Joins em SQL' });
+    expect(systemPrompt).toContain('GeracaoDidaticaAutoAvaliativa');
+    expect(systemPrompt).toContain('mínimo de 10 linhas e máximo de 25-30 linhas');
+    expect(systemPrompt).toContain('EXPLICAR ANTES DE CITAR');
+    expect(systemPrompt).toContain('PROIBIDO VAZAMENTO DE CONTEÚDO');
+    expect(systemPrompt).toContain('SEM TERMOS VAGOS OU GENÉRICOS');
+    expect(systemPrompt).toContain('SKILL: RECURSOS INTERATIVOS');
+    expect(systemPrompt).toContain('NÃO IMPORTAR');
+    expect(systemPrompt).toContain('Não incluir metadados: "Público-Alvo", "Duração"');
+    expect(userPrompt).toContain('TEMA DA AULA: Joins em SQL');
   });
 });
