@@ -118,6 +118,7 @@ export function generateMarpNextStandaloneHtml(titulo: string, mdContent: string
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.475.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
 <style>
 ${MARP_THEME_CSS}
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }

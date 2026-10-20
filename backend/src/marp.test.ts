@@ -136,4 +136,73 @@ title: Aula Hash
       expect(() => new Function(match[1])).not.toThrow();
     }
   });
+
+  test('Marp Standalone HTML: layout em colunas embutido no tema', () => {
+    const md = `---
+theme: default
+title: Aula com Colunas
+---
+
+## Comparação lado a lado
+<div class="cols-2">
+<div>
+
+### Antes
+Texto da primeira coluna.
+
+</div>
+<div>
+
+### Depois
+Texto da segunda coluna.
+
+</div>
+</div>
+
+---
+
+## Larguras assimétricas
+<div class="grid gap-sm">
+<div class="col-5">
+
+### Tabela
+
+| id | nome |
+| --- | --- |
+| 1 | Ana |
+</div>
+<div class="col-7">
+
+### Explicação
+Coluna mais larga, alinhada pelo topo.
+</div>
+</div>
+`;
+    const html = generateMarpNextStandaloneHtml('Aula com Colunas', md);
+
+    expect(html).toContain('.slide-content :is(.grid, .grid-auto, .cols-2, .cols-3, .cols-4)');
+    expect(html).toContain('.slide-content :is(.grid, .grid-auto, .cols-2, .cols-3, .cols-4) table');
+    expect(html).toContain('.slide-content .grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }');
+    expect(html).toContain('.slide-content .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }');
+    expect(html).toContain('.slide-content .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }');
+    expect(html).toContain('.slide-content .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }');
+    expect(html).toContain('.slide-content .grid-auto');
+    expect(html).toContain('.slide-content .gap-sm { gap:');
+    expect(html).toContain('.slide-content .gap-lg { gap:');
+    expect(html).toContain('.slide-content .items-center { align-items: center; }');
+    expect(html).toContain('.slide-content .items-end { align-items: end; }');
+
+    for (let n = 1; n <= 12; n++) {
+      expect(html).toContain(`.slide-content .col-${n} { grid-column: span ${n}; }`);
+    }
+
+    expect(html).toMatch(/<div class="cols-2">[\s\S]*?<div>[\s\S]*?<h3>Antes<\/h3>[\s\S]*?<\/div>[\s\S]*?<div>[\s\S]*?<h3>Depois<\/h3>/);
+    expect(html).toMatch(/<div class="grid gap-sm">[\s\S]*?<div class="col-5">[\s\S]*?<div class="table-wrap">[\s\S]*?<div class="col-7">/);
+    expect(html).toContain('<div class="col-5">');
+    expect(html).toContain('<div class="col-7">');
+    expect(html).not.toContain('&lt;div class="cols-2"');
+
+    expect(html).not.toMatch(/^[ \t]*\.grid[ \t]*\{/m);
+    expect(html).not.toMatch(/^[ \t]*\.items-center[ \t]*\{/m);
+  });
 });
