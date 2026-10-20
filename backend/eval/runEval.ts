@@ -77,7 +77,7 @@ export async function rodarCaso(caso: Caso): Promise<string[]> {
     const result = await generateAulaOutlineAndContent({ tema: caso.tema, observacoes: caso.observacoes });
     const outline = parseOutline(result.outline);
     const erros = [...diagnosticarOutline(outline), ...validarAulaMarp(result.conteudo_md).erros];
-    if (outline && outline.fixacao.length < Number(caso.expectativa.fixacao_min ?? 0)) erros.push('Fixação abaixo do mínimo esperado.');
+    if (outline && (outline.fixacao?.length ?? 0) < Number(caso.expectativa.fixacao_min ?? 0)) erros.push('Fixação abaixo do mínimo esperado.');
     return erros;
   }
   if (caso.tarefa === 'avaliacao') {

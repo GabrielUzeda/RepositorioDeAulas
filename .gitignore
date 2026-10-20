@@ -39,6 +39,10 @@ frontend/src/materias/
 # Database Backups
 backups/*.sql
 
+# Eval artifacts
+backend/eval/output/
+backend/eval/scratch/
+
 # Playwright & E2E artifacts
 .playwright-mcp/
 test-results/
