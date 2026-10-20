@@ -37,7 +37,7 @@ export async function extractTextFromPdf(buffer: Uint8Array): Promise<string> {
     console.error('Erro ao extrair texto do PDF via unpdf:', err);
   }
 
-  const raw = new TextDecoder('latin1').decode(buffer);
+  const raw = Buffer.from(buffer).toString('latin1');
   const textChunks: string[] = [];
 
   const tjRegex = /\(([^)]*)\)\s*Tj/g;
