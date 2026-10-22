@@ -3,7 +3,7 @@ import { signJwt } from './auth';
 import app from './routes';
 import { db } from './db';
 import { hashEmail, encryptData } from './utils';
-import { diagnosticarLoteSintese, diagnosticarParecerTurma } from './aiSintese';
+import { diagnosticarLoteSintese, diagnosticarParecerTurma, dividirLotesSintese, dividirAtividadesSintese, resumoDeterministicoAluno } from './aiSintese';
 
 const ENV_KEYS = [
   'AI_PROVIDER',
@@ -296,6 +296,90 @@ describe('aiSintese: pseudonimizacao, remapeamento e sintese com disciplina_id',
     expect(corpo).not.toContain('Maria Silva');
     expect(corpo).toContain('"A01"');
     expect(data.alunos_sintese[0].aluno_email).toBe('maria@teste.com');
+  });
+
+  test('lotes respeitam o teto de alunos e o orçamento de caracteres', () => {
+    const aluno = (id: string, chars: number) => ({
+      id,
+      media_calculada: 80,
+      feedback_geral: '',
+      atividades: [{ titulo: 'Atividade', nota: 80, feedback: 'x'.repeat(chars) }],
+      atividades_pendentes: [],
+    });
+    const alunos = [aluno('A01', 10), aluno('A02', 10), aluno('A03', 10)];
+    expect(dividirLotesSintese(alunos, 8, 100000)).toHaveLength(1);
+    expect(dividirLotesSintese(alunos, 2, 100000).map((lote) => lote.length)).toEqual([2, 1]);
+    expect(dividirLotesSintese(alunos, 8, 200).length).toBeGreaterThan(1);
+  });
+
+  test('aluno acima do orçamento é comprimido em partes antes da síntese', async () => {
+    const atividades = Array.from({ length: 40 }, (_, i) => ({
+      atividade_titulo: 'Atividade ' + i,
+      nota: 80,
+      feedback: 'x'.repeat(4000),
+    }));
+    const res = await app.request('/ai/synthesize-class-feedback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + adminToken,
+      },
+      body: JSON.stringify({
+        disciplina_nome: 'Disciplina Grande',
+        alunos_detalhes: [
+          {
+            aluno_nome: 'Aluno Grande',
+            aluno_email: 'aluno-grande@teste.com',
+            media_calculada: 80,
+            atividades,
+            atividades_pendentes: [],
+          },
+        ],
+      }),
+    });
+    const data = (await res.json()) as any;
+    expect(res.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.alunos_sintese[0].aluno_email).toBe('aluno-grande@teste.com');
+    const corpo = corpoCapturado();
+    expect(corpo).toContain('PARTE 1 DE');
+    expect(corpo).toContain('resumo_consolidado');
+    expect(data.execucao.estado).toBe('completed');
+  });
+
+  test('unidades de compressão respeitam orçamento e resumo determinístico é limitado', () => {
+    const atividades = Array.from({ length: 10 }, (_, i) => ({
+      titulo: 'Atividade ' + i,
+      nota: 70,
+      feedback: 'y'.repeat(3000),
+    }));
+    const chunks = dividirAtividadesSintese(atividades, 7000);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(JSON.stringify(chunk).length).toBeLessThanOrEqual(7000);
+    }
+    expect(chunks.flat()).toHaveLength(atividades.length);
+
+    const resumo = resumoDeterministicoAluno(
+      {
+        id: 'A01',
+        media_calculada: 70,
+        feedback_geral: '',
+        atividades,
+        atividades_pendentes: [{ titulo: 'Atividade pendente' }],
+      },
+      500
+    );
+    expect(resumo.length).toBeLessThanOrEqual(500);
+    expect(
+      resumoDeterministicoAluno({
+        id: 'A01',
+        media_calculada: 70,
+        feedback_geral: '',
+        atividades: [],
+        atividades_pendentes: [{ titulo: 'Atividade pendente' }],
+      })
+    ).toContain('Pendências');
   });
 
   test('diagnóstico rejeita IDs ausentes, duplicados, estranhos e arrays de parecer inválidos', () => {
