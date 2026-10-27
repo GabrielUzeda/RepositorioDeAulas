@@ -541,7 +541,7 @@ export async function generateAulaOutlineAndContent(options: {
       secao: i + 1,
       total,
     });
-    const { systemPrompt, userPrompt } = promptSecaoAula({ outline: outlineFinal, indiceSecao: i, contextoLimpo: contextoSecao });
+    const { systemPrompt, userPrompt } = promptSecaoAula({ outline: outlineFinal, indiceSecao: i, contextoLimpo: contextoSecao, observacoes });
     const limpar = (conteudo: string) =>
       repararSlidesDoConteudo(inserirSeparadoresAusentes(removerFrontMatterRestante(conteudo)));
     try {

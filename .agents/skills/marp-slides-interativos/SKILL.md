@@ -25,7 +25,7 @@ Use um fence interactive com JSON válido, aspas duplas e `\n` nas quebras inter
 
 steps e compare exigem 2–6 states:
 - label (1–60) e text (1–400).
-- code opcional (até 800 caracteres/12 linhas), focus opcional (trecho exato de code).
+- code opcional (até 800 caracteres/12 linhas), focus opcional (trecho exato de code, até 100 caracteres).
 - value opcional: número para contador animado.
 - rows opcionais: 1–8 objetos label/result, match/muted booleanos opcionais e key opcional.
 - chips opcionais: até 12 strings/números/null.
@@ -57,7 +57,7 @@ O motor calcula referências e seleção, move a linha e anima o contador. Com e
 
 ## Varredura
 
-rows: 1–8 objetos label/result/match, key opcional; chips opcionais. key liga a linha aos chips com o mesmo texto. variants: 1–4 objetos label/stopAtMatch.
+rows: 1–8 objetos label/result/match, key opcional; chips opcionais. key liga a linha aos chips com o mesmo texto. variants opcional: 1–4 objetos label/stopAtMatch.
 - true: para no primeiro match e esmaece linhas não visitadas.
 - false: visita todas.
 O contador mostra visitas, não a quantidade de matches. match/result são fornecidos pelo autor; o motor não executa SQL.
@@ -77,7 +77,7 @@ items: 1–12 objetos label/group/value (até 4 grupos). O motor move os chips e
 ## Referências contextuais
 
 code: até 800 caracteres/12 linhas. tables: 1–4 objetos term/headers/rows.
-term: identificador único, até 40 caracteres, letras/dígitos/underscore. Tabelas: 1–4 colunas, 1–8 linhas, células string/número/null.
+term: identificador único, até 40 caracteres, começando com letra/underscore e seguido de letras/dígitos/underscore. Tabelas: 1–4 colunas, 1–8 linhas, células string/número/null.
 scope: widget (padrão) ou deck. deck também anota os termos nos outros blocos de código da aula, preservando o destaque de sintaxe. Tooltip abre ao apontar/focar; Escape fecha. Não use observer global ou scripts no MD.
 
 ```interactive
@@ -95,10 +95,10 @@ Prefira os seis componentes simples para aulas novas. Use scene quando precisar 
 - next opcional: {to,delay}, em milissegundos (0–10000). Sem ciclos automáticos e até 30000 ms por cadeia; cliques podem voltar ao início.
 - intro, text, value, valuePrefix: strings até 400 caracteres. valueTone opcional (success/danger) colore o valor como certo/errado. textRuns opcional: até 24 trechos {text,strong?,tone?}, tone success/danger; a concatenação deve reproduzir text, sem HTML.
 - code: texto puro até 800 caracteres/12 linhas. focus: trecho exato do code (até 100 caracteres) a destacar; codeHidden opcional.
-- rows: até 8 objetos label/result, active/muted e tone. result é o valor da linha (até 100 caracteres, aceita o apelido value) e é opcional: omita quando a linha for só um item da lista.
+- rows: até 8 objetos label/result, active/muted e tone. label é obrigatório (até 100 caracteres). result é o valor da linha (texto até 100 caracteres, aceita o apelido value; se ambos forem usados devem ser iguais) e é opcional: omita quando a linha for só um item da lista.
 - chips: até 12 strings (até 100 caracteres); hits: índices válidos desses chips (exigem chips no mesmo quadro).
-- chart: objeto com values e maximum (até 12 valores entre 0 e maximum); lines (até 6 linhas {label,value,previous?}) e matches (mesmo tamanho de values) são opcionais. Não acrescente type nem outros campos. Valores não negativos até maximum; o autor fornece os cálculos.
-- groups: até 4 objetos name/items/total (exatamente esses campos), até 12 itens por grupo. cells: objeto com columns (1–4) e values (até 32 strings).
+- chart: objeto com values e maximum (até 12 valores entre 0 e maximum); lines (até 6 linhas {label,value,previous?}) e matches (mesmo tamanho de values) são opcionais. Não acrescente type nem outros campos. maximum deve estar entre 1 e 1000000; barras e linhas de referência devem ficar entre 0 e maximum. O autor fornece os cálculos.
+- groups: até 4 objetos name/items/total (exatamente esses campos), name até 60 caracteres; total e itens são strings até 100 caracteres, até 12 itens por grupo. cells: objeto com columns (1–4) e values (até 32 strings de até 100 caracteres).
 - JSON de scene: até 64000 caracteres; os outros tipos continuam limitados a 12000.
 - O motor escapa textos, mantém foco do botão após trocar o quadro, anima contadores/linhas/destaques e pausa transições ao navegar, ocultar ou imprimir. Edição descarta listeners e timers.
 - Impressão de scene: snapshot do quadro inicial, sem controles. Não imprime automaticamente todos os caminhos de uma cena. PPTX continua textual.
@@ -113,7 +113,7 @@ Exemplo mínimo:
 Exemplo com linhas, gráfico e valor final (repare em result, não value):
 
 ```interactive
-{"type":"scene","title":"Somar os pedidos","initial":"inicio","layout":["text","rows","chart","value","buttons"],"frames":[{"id":"inicio","text":"Três pedidos, dois clientes.","rows":[{"label":"Pedido 1 - Ana","result":"130"},{"label":"Pedido 2 - Ana","result":"100"},{"label":"Pedido 3 - Bruno","result":"200"}],"chart":{"values":[130,100,200],"matches":[false,false,false],"maximum":200,"lines":[{"label":"Ana","value":230}]},"value":"0","buttons":[{"label":"Somar","to":"total"}]},{"id":"total","text":"Ana: 230. Total geral: 430.","rows":[{"label":"Ana","result":"230","active":true},{"label":"Bruno","result":"200","active":true}],"chart":{"values":[130,100,200],"matches":[true,true,false],"maximum":200,"lines":[{"label":"Ana","value":230}]},"value":"430","valueTone":"success","buttons":[{"label":"Voltar","to":"inicio"}]}]}
+{"type":"scene","title":"Somar os pedidos","initial":"inicio","layout":["text","rows","chart","value","buttons"],"frames":[{"id":"inicio","text":"Três pedidos, dois clientes.","rows":[{"label":"Pedido 1 - Ana","result":"130"},{"label":"Pedido 2 - Ana","result":"100"},{"label":"Pedido 3 - Bruno","result":"200"}],"chart":{"values":[130,100,200],"matches":[false,false,false],"maximum":250,"lines":[{"label":"Ana","value":230}]},"value":"0","buttons":[{"label":"Somar","to":"total"}]},{"id":"total","text":"Ana: 230. Total geral: 430.","rows":[{"label":"Ana","result":"230","active":true},{"label":"Bruno","result":"200","active":true}],"chart":{"values":[130,100,200],"matches":[true,true,false],"maximum":250,"lines":[{"label":"Ana","value":230}]},"value":"430","valueTone":"success","buttons":[{"label":"Voltar","to":"inicio"}]}]}
 ```
 
 Não use scene para executar SQL ou simular um motor de consultas: cada resultado é declarado e deve ser revisado. Para migrações, compare também os textos revelados após cada clique com o original.
@@ -131,7 +131,8 @@ Use details.gab com summary e Markdown separado por linhas em branco. name compa
 5. steps/compare expõem os estados na impressão; os demais usam snapshots (scene usa o quadro inicial). Não guardar gabaritos secretos no componente. PPTX continua textual e pode omitir estados ocultos.
 6. Movimento reduzido desliga animações; navegar, reiniciar ou editar cancela a reprodução anterior.
 7. Testar seleção, reprodução/pausa/reinício, cliques rápidos, teclado, impressão e re-render na prévia e standalone.
-8. Não declarar sucesso apenas porque renderizou. Conferir aritmética, significado didático e corte de conteúdo.
+8. Conferir cada recurso exigido pelo professor no JSON e no layout: não omitir focus ou next explicitamente pedidos, nem substituí-los por texto ou botões manuais.
+9. Não declarar sucesso apenas porque renderizou. Conferir aritmética, significado didático e corte de conteúdo.
 
 ## Fontes e demonstração
 
@@ -143,3 +144,7 @@ Use details.gab com summary e Markdown separado por linhas em branco. name compa
 - Cenas: backend/src/slideScene.ts, espelhado em frontend/src/shared/slideScene.ts.
 - Mapa das duas migrações: backend/eval/referencias/COBERTURA_INTERATIVOS.md.
 - Skill interna: backend/src/aiSkillRenderer.ts, injetada nas vias direta e decomposta. O backend não lê este SKILL.md automaticamente.
+
+## Avaliação real de cenas
+
+Via Docker, rode em backend/: bun run eval/testarSceneValores.ts --live (direta) ou acrescente --decomposta. Consome tokens; exige DATABASE_PATH com test no nome. Confere valores exatos, associação da soma à Ana, gráfico, foco SQL e sequência temporizada, sem rebaixar requisitos a opcionais. Artefatos e resultado.json ficam em backend/eval/output/scene-valores-<modo>/. Um exemplo válido não prova consistência do modelo.

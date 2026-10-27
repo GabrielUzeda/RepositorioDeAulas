@@ -35,8 +35,7 @@ export function validateSlideScene(value: unknown): value is SceneInteractive {
   if (!array(value.layout, 10) || !value.layout.length) fail('layout deve listar de 1 a 10 campos.');
   if (new Set(value.layout).size !== value.layout.length) fail('layout não pode repetir campos.');
   const layoutKeys = ['intro', 'rows', 'value', 'buttons', 'text', 'chart', 'code', 'chips', 'groups', 'cells'];
-  const badLayout = value.layout.map(String).find(k => !layoutKeys.includes(k));
-  if (badLayout) fail('campo desconhecido no layout: ' + badLayout + '.');
+  if (!value.layout.every(k => typeof k === 'string' && layoutKeys.includes(k))) fail('layout aceita apenas nomes de campos do catálogo.');
   if (!array(value.frames, 64) || !value.frames.length) fail('frames deve ter de 1 a 64 quadros.');
   const ids = new Set<string>();
   for (const f of value.frames as unknown[]) {
@@ -77,9 +76,13 @@ export function validateSlideScene(value: unknown): value is SceneInteractive {
       if (!array(f.rows, 8)) fail('rows do quadro ' + f.id + ' deve ter até 8 linhas.');
       for (const r of f.rows as unknown[]) {
         if (!obj(r)) fail('linha de rows deve ser objeto.');
-        if (r.result === undefined && typeof r.value === 'string') { r.result = r.value; }
-        delete r.value;
-        keys(r, ['label', 'result', 'active', 'muted', 'tone'], 'rows');
+        keys(r, ['label', 'result', 'value', 'active', 'muted', 'tone'], 'rows');
+        if (r.value !== undefined) {
+          if (!str(r.value, 100)) fail('value da linha deve ser texto de até 100 caracteres.');
+          if (r.result !== undefined && r.result !== r.value) fail('result e value da linha devem ser iguais quando ambos são usados.');
+          r.result = r.value;
+          delete r.value;
+        }
         if (!str(r.label, 100) || (r.result !== undefined && !str(r.result, 100)) || !bool(r.active) || !bool(r.muted) || (r.tone !== undefined && r.tone !== 'success' && r.tone !== 'danger')) fail('rows do quadro ' + f.id + ' aceita label/result (até 100), active/muted booleanos e tone success/danger.');
       }
     }
@@ -94,7 +97,8 @@ export function validateSlideScene(value: unknown): value is SceneInteractive {
       for (const l of (f.chart.lines ?? []) as unknown[]) {
         if (!obj(l)) fail('linha do chart deve ser objeto.');
         keys(l, ['label', 'value', 'previous'], 'linha do chart');
-        if (!str(l.label, 100) || !num(l.value) || l.value > maximum || !bool(l.previous)) fail('linha do chart aceita label (até 100), value até maximum e previous booleano.');
+        if (!str(l.label, 100) || !num(l.value) || !bool(l.previous)) fail('linha do chart no quadro ' + f.id + ' aceita label (até 100), value numérico e previous booleano.');
+        if (l.value > maximum) fail('linha do chart no quadro ' + f.id + ': value ' + l.value + ' excede maximum ' + maximum + '. Aumente maximum para incluir barras e linhas de referência, sem alterar os dados.');
       }
     }
     if (f.groups !== undefined) {

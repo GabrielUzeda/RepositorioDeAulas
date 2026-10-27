@@ -112,11 +112,57 @@ describe('Cenas declarativas e migração fiel', () => {
     expect(renderSlideInteractive(raw)).not.toContain('slide-widget-error');
   });
 
+  test('rejeita apelidos inválidos ou conflitantes sem apagar dados', () => {
+    for (const row of [
+      { label: 'Ana', value: 230 },
+      { label: 'Ana', value: null },
+      { label: 'Ana', value: {} },
+      { label: 'Ana', value: 'x'.repeat(101) },
+      { label: 'Ana', result: '230', value: '360' },
+      { label: 'Ana', result: '230', value: false },
+      { label: 'Ana', result: '230', script: 'alert(1)' },
+    ]) {
+      const raw = JSON.stringify({ ...scene, frames: [{ id: 'a', buttons: [], rows: [row] }] });
+      expect(() => parseSlideInteractive(raw)).toThrow();
+      expect(renderSlideInteractive(raw)).toContain('role="alert"');
+    }
+    const parsed = parseSlideInteractive(JSON.stringify({ ...scene, frames: [
+      { id: 'a', buttons: [], rows: [{ label: 'Ana', result: '230', value: '230' }] },
+    ] }));
+    if (parsed.type !== 'scene') throw new Error('Esperava scene.');
+    expect(parsed.frames[0].rows).toEqual([{ label: 'Ana', result: '230' }]);
+  });
+
+  test('layout só aceita strings conhecidas, nunca coerção de arrays ou valores vazios', () => {
+    for (const field of [null, false, 0, '', [], ['buttons'], {}]) {
+      expect(() => parseSlideInteractive(JSON.stringify({ ...scene, layout: [field] }))).toThrow('layout');
+    }
+  });
+
+  test('limites opcionais continuam estritos e diagnóstico identifica a causa', () => {
+    for (const [frame, error] of [
+      [{ chart: { values: [1], maximum: 0 } }, 'maximum'],
+      [{ chart: { values: [1], maximum: 2, matches: [] } }, 'matches'],
+      [{ chart: { values: [1], maximum: 2, matches: ['true'] } }, 'matches'],
+      [{ chart: { values: [1], maximum: 2, lines: null } }, 'chart'],
+      [{ chart: { values: [1], maximum: 2, lines: [{ label: 'Fora', value: 3 }] } }, 'linha do chart'],
+      [{ chart: { values: [1], maximum: 2, type: 'bar' } }, 'aceitas:'],
+      [{ rows: [{ label: 'Ana', active: 'true' }] }, 'rows'],
+      [{ rows: [{ result: '230' }] }, 'rows'],
+      [{ focus: 'x'.repeat(101), code: 'x'.repeat(101) }, 'focus'],
+      [{ next: { to: 'a', delay: -1 } }, 'next.delay'],
+    ] as const) {
+      expect(() => parseSlideInteractive(JSON.stringify({ ...scene, frames: [
+        { id: 'a', buttons: [], ...frame },
+      ] }))).toThrow(error);
+    }
+  });
+
   test('exemplos da skill do agente são aceitos pelo motor, inclusive scene', () => {
     const skill = join(import.meta.dir, '../../.agents/skills/marp-slides-interativos/SKILL.md');
     if (!existsSync(skill)) return;
     const blocks = [...readFileSync(skill, 'utf8').matchAll(/```interactive\n([\s\S]*?)\n```/g)];
-    expect(blocks.length).toBeGreaterThanOrEqual(7);
+    expect(blocks.length).toBe(7);
     const types = blocks.map(block => parseSlideInteractive(block[1]).type);
     expect(types).toContain('scene');
   });

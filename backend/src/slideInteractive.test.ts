@@ -31,6 +31,15 @@ describe('Interativos nativos', () => {
     expect(() => parseSlideInteractive('x'.repeat(12001))).toThrow();
   });
 
+  test('referências e operadores não aceitam arrays por coerção para string', () => {
+    const bars = { type: 'bars', title: 'Valores', values: [1, 2], labels: ['A', 'B'] };
+    for (const fields of [
+      { references: [['AVG']] }, { references: [{}] },
+      { operators: [['>']] }, { operators: [null] },
+    ]) expect(() => parseSlideInteractive(JSON.stringify({ ...bars, ...fields }))).toThrow();
+    expect(parseSlideInteractive(JSON.stringify({ ...bars, references: ['AVG', 1], operators: ['>', '='] })).type).toBe('bars');
+  });
+
   test('escapa todo conteúdo e não injeta scripts ou HTML dos dados', () => {
     const unsafe = '<img src=x onerror=alert(1)><script>alert(1)</script>';
     const html = renderSlideInteractive(JSON.stringify({ ...config, title: unsafe, states: config.states.map(() => ({ label: unsafe, text: unsafe, code: unsafe })) }));
@@ -57,7 +66,7 @@ describe('Interativos nativos', () => {
 
   test('todos os exemplos da skill interna são aceitos pelo motor', () => {
     const blocks = [...SKILL_RECURSOS_RENDER.matchAll(/```interactive\n([\s\S]*?)\n```/g)];
-    expect(blocks.length).toBe(7);
+    expect(blocks.length).toBe(8);
     expect(blocks.map(b => JSON.parse(b[1]).type)).toContain('scene');
     for (const block of blocks) expect(() => parseSlideInteractive(block[1])).not.toThrow();
   });

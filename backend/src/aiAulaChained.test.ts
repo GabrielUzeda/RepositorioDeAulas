@@ -163,10 +163,11 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
   });
 
   test('via decomposta injeta o mesmo contrato na redação de todas as seções', async () => {
-    await generateAulaOutlineAndContent({ tema: 'Execução', modo: 'decomposta' });
+    await generateAulaOutlineAndContent({ tema: 'Execução', modo: 'decomposta', observacoes: 'Preservar foco SQL e reprodução temporizada.' });
     expect(chamadas).toBe(4);
     const sections = prompts.filter(p => p.includes('Você redige os slides de UMA seção'));
     expect(sections.length).toBe(3);
+    expect(sections.every(p => p.includes('Preservar foco SQL e reprodução temporizada.'))).toBe(true);
     expect(sections.every(p => p.includes('SKILL: RECURSOS INTERATIVOS') && p.includes('\\"type\\":\\"steps\\"'))).toBe(true);
   });
 

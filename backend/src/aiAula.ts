@@ -502,8 +502,9 @@ export function promptSecaoAula(params: {
   outline: AulaOutline;
   indiceSecao: number;
   contextoLimpo?: string;
+  observacoes?: string;
 }): { systemPrompt: string; userPrompt: string } {
-  const { outline, indiceSecao, contextoLimpo = '' } = params;
+  const { outline, indiceSecao, contextoLimpo = '', observacoes = '' } = params;
   const secao = outline.secoes[indiceSecao];
   const primeira = indiceSecao === 0;
   const numDesafio = String(indiceSecao + 1).padStart(2, '0');
@@ -550,6 +551,7 @@ ${SKILL_RECURSOS_RENDER}
   if (primeira && outline.prerequisitos.length > 0) userPrompt += `PRÉ-REQUISITOS A RETOMAR: ${outline.prerequisitos.join('; ')}\n`;
   if (primeira && outline.objetivos.length > 0) userPrompt += `OBJETIVOS DA AULA: ${outline.objetivos.join('; ')}\n`;
   if (outras.length > 0) userPrompt += `OUTRAS SEÇÕES DA AULA (cobertas lá, não repetir):\n${outras.join('\n')}\n`;
+  if (observacoes) userPrompt += `OBSERVAÇÕES DO PROFESSOR (preservar na redação, aplicando os recursos pedidos na seção pertinente):\n${observacoes}\n`;
   if (contextoLimpo) userPrompt += `CONTEXTO DE REFERÊNCIA:\n${contextoLimpo}\n`;
   userPrompt += `Redija os slides da seção "${secao.titulo}".\n</TAREFA>`;
 

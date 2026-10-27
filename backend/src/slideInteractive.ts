@@ -80,9 +80,9 @@ export function parseSlideInteractive(source: string): SlideInteractive {
         value.labels.length !== value.values.length || !value.labels.every(l => text(l, 40)) ||
         (value.mode !== undefined && value.mode !== 'aggregate' && value.mode !== 'filter') ||
         (value.references !== undefined && (!Array.isArray(value.references) || !value.references.length || value.references.length > 6 ||
-          !value.references.every(r => (number(r) && r >= 0) || ['AVG', 'MIN', 'MAX', 'SUM', 'COUNT'].includes(String(r))))) ||
+          !value.references.every(r => (number(r) && r >= 0) || (typeof r === 'string' && ['AVG', 'MIN', 'MAX', 'SUM', 'COUNT'].includes(r))))) ||
         (value.operators !== undefined && (!Array.isArray(value.operators) || !value.operators.length || value.operators.length > 5 ||
-          !value.operators.every(op => ['>', '>=', '<', '<=', '='].includes(String(op)))))) {
+          !value.operators.every(op => typeof op === 'string' && ['>', '>=', '<', '<=', '='].includes(op))))) {
       fail('Barras exigem 1–12 values não negativos e labels correspondentes; confira mode, references e operators.');
     }
     if (value.extra !== undefined) {
