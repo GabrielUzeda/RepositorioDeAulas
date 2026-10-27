@@ -442,6 +442,18 @@ Itens reconhecidos e **não** implementados, com o motivo e o ponto de entrada p
 - **Rubrica discursiva**: questões podem carregar `resposta_esperada` e `rubrica` (pesos somando 100, normalizados no backend); `stripGabarito` remove esses campos de **todos** os tipos e o `correct` apenas em normal/prova (reforço/roleta/minigame preservam `correct` para o feedback imediato do cliente).
 - **Suite de eval offline** (usa rede e custa tokens — FORA do `bun test`): `cd backend && bun run eval:ai` roda `eval/runEval.ts` contra os casos de `eval/casos/*.json`, aplicando `diagnosticarQuestoes`/`normalizarQuestoesComRubrica`/`diagnosticarOutline`/`validarAulaMarp` na saída real do provider e saindo com código 0 quando todos passam.
 
+### Interativos nativos e teste da via direta
+
+- `backend/src/slideInteractive.ts` (contrato/cálculos/render) e `slideInteractiveRuntime.ts` (DOM/movimento/lifecycle) são espelhados byte a byte em `frontend/src/shared/`, como o tema. O backend embute o runtime e suas dependências puras no standalone; o editor importa os mesmos arquivos. Teste de paridade exige o checkout completo.
+- Fence `interactive` com JSON e title. Tipos steps/compare (estados com code/focus/value/rows/chips/table), bars (cálculos/agregações/referência móvel/novo dado), scan (varredura e parada no primeiro match), group (agrupamento animado), reference (tooltips; scope deck anota os códigos da aula). Não executa SQL/JS. Contrato validado nas duas vias; detalhes e limites na skill.
+- A via expressa é `modo: direta`; a detalhada é `modo: decomposta`. Sem modo explícito, `AI_MODO_AULA=direta` ativa a direta; o padrão é decomposta. O editor não possui seletor de modo.
+- Ambas recebem a skill de `aiSkillRenderer.ts` na redação. Agentes usam `.agents/skills/marp-slides-interativos/SKILL.md`; o backend não carrega esse arquivo automaticamente.
+- E2E: `e2e/tests/aula-interativos-nativos.spec.ts` cobre standalone sem CDNs, teclado, impressão e re-render da prévia.
+- Eval real (consome tokens, fora de bun test): `backend/eval/testarInterativo.ts --live`, via Docker com provider configurado. Exige banco cujo nome contenha test (padrão em /tmp), não salva aulas e produz MD/HTML/resultado em `backend/eval/output/interativo-direta/`. Testa um slide compare pela via direta.
+- Aula inteira modularizada: `backend/eval/referencias/subconsultas-modular.md`; matriz de cobertura/limitações: `COBERTURA_INTERATIVOS.md` no mesmo diretório. `eval/modularizarExemplo.ts` converte o examplo.md sem alterá-lo. E2E `aula-catalogo-completo.spec.ts` interage com os 19 componentes em ambas as superfícies. `e2e/verificar-catalogo.mjs` mede interação/layout e salva screenshots.
+- Eval amplo: `eval/testarCatalogo.ts --live`, seis tipos pela via direta; os artefatos/relatórios preservam falhas, inclusive capa extra e conteúdo pedagógico inconsistente. O prompt direto não exige mais 10–25 linhas contra o limite vertical. Contrato válido não implica texto correto.
+- Limites: bars não aceita negativos; scan não executa SQL; group não é drag-and-drop; PDF usa snapshots/estados estáticos (manter curto); PPTX permanece textual. Scripts legados continuam permitidos.
+
 ## 15. Backlog e Pendências de IA
 - **Validação semântica de integridade do Markdown de IA**: além da checagem estrutural por slide já implementada em `aiAula.ts` (fences, `$$`, tags HTML e tipos Mermaid balanceados por slide com reparo cirúrgico), falta plugar `validarAulaMarp` no save (`POST /marp/render`, `POST /aulas`, `PUT /aulas/:id`) como barreira preventiva antes de gravar `conteudo_md`.
 

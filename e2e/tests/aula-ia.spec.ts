@@ -142,7 +142,7 @@ test.describe('Professor — Gerador de Aula por IA (MarpEditor)', () => {
     await expect(page.getByRole('button', { name: 'Gerar Aula' })).toBeDisabled();
   });
 
-  test('botão Cancelar fecha o painel de IA', async ({ page }) => {
+  test('botão Fechar fecha o painel de IA', async ({ page }) => {
     await loginViaUI(page, profEmail, profPassword, /\/professor/);
     await page.locator('h3', { hasText: cursoNome }).click();
     await page.locator('h3', { hasText: materiaNome }).click();
@@ -151,8 +151,7 @@ test.describe('Professor — Gerador de Aula por IA (MarpEditor)', () => {
     await page.getByTitle('Gerar Aula com IA').click();
     await expect(page.getByText('Gerar Aula com IA')).toBeVisible();
 
-    const cancelarBtns = page.getByRole('button', { name: 'Cancelar' });
-    await cancelarBtns.last().click();
+    await page.locator('.ai-panel-actions').getByRole('button', { name: 'Fechar', exact: true }).click();
     await expect(page.getByText('Gerar Aula com IA')).not.toBeVisible();
     await expect(page.getByPlaceholder('Título da Aula')).toBeVisible();
   });

@@ -58,8 +58,14 @@ function parseSlides(source: string) {
 }
 
 import MarkdownIt from 'markdown-it';
+import { renderSlideInteractive, calculateBarInteractive, parseSlideInteractive } from './slideInteractive';
+import { mountSlideInteractives } from './slideInteractiveRuntime';
 
 const mdParser = new MarkdownIt({ html: true, linkify: true, typographer: true });
+const defaultFence = mdParser.renderer.rules.fence!;
+mdParser.renderer.rules.fence = (tokens, idx, options, env, self) => tokens[idx].info.trim() === 'interactive'
+  ? renderSlideInteractive(tokens[idx].content)
+  : defaultFence(tokens, idx, options, env, self);
 
 function renderMarkdown(mdText: string): string {
   let html = mdParser.render(mdText);
@@ -399,6 +405,7 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
 </div>
 
 <script>
+(${mountSlideInteractives.toString()})(document, ${calculateBarInteractive.toString()}, ${parseSlideInteractive.toString()});
 function updateClock() {
   const clockEl = document.getElementById('clock-display');
   if (clockEl) {
@@ -623,7 +630,7 @@ document.addEventListener('keydown', e => {
      target.tagName === 'TEXTAREA' ||
      target.tagName === 'SELECT' ||
      target.isContentEditable ||
-     (typeof target.closest === 'function' && target.closest('[contenteditable="true"], input, textarea, select, #landscape-modal')))
+     (typeof target.closest === 'function' && target.closest('[contenteditable="true"], input, textarea, select, button, summary, [data-slide-widget], #landscape-modal')))
   ) {
     return;
   }

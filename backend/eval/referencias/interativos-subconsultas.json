@@ -1,0 +1,796 @@
+{
+  "widgets": [
+    {
+      "id": "subq-cad",
+      "source": "caderno",
+      "config": {
+        "type": "steps",
+        "title": "Calcular antes de comparar",
+        "states": [
+          {
+            "label": "Primeiro pedido",
+            "text": "Somamos o primeiro valor.",
+            "value": 130,
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "130",
+                "match": true
+              },
+              {
+                "label": "Bruno",
+                "result": "100",
+                "match": true
+              },
+              {
+                "label": "Carla",
+                "result": "200",
+                "match": false
+              }
+            ]
+          },
+          {
+            "label": "Segundo pedido",
+            "text": "A soma parcial é 230.",
+            "value": 230,
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "130",
+                "match": true
+              },
+              {
+                "label": "Bruno",
+                "result": "100",
+                "match": true
+              },
+              {
+                "label": "Carla",
+                "result": "200",
+                "match": false
+              }
+            ]
+          },
+          {
+            "label": "Média calculada",
+            "text": "A soma é 430; dividindo por 3, a média é 143,33.",
+            "value": 143.33,
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "130",
+                "match": true
+              },
+              {
+                "label": "Bruno",
+                "result": "100",
+                "match": true
+              },
+              {
+                "label": "Carla",
+                "result": "200",
+                "match": false
+              }
+            ]
+          },
+          {
+            "label": "Pedido 1",
+            "text": "130 não supera a média.",
+            "rows": [
+              {
+                "label": "Pedido 1",
+                "result": "Não passa",
+                "match": false
+              }
+            ]
+          },
+          {
+            "label": "Pedido 2",
+            "text": "100 não supera a média.",
+            "rows": [
+              {
+                "label": "Pedido 2",
+                "result": "Não passa",
+                "match": false
+              }
+            ]
+          },
+          {
+            "label": "Pedido 3",
+            "text": "200 supera a média. A segunda pergunta dependeu da primeira.",
+            "rows": [
+              {
+                "label": "Pedido 3",
+                "result": "Passa",
+                "match": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-live",
+      "source": "live",
+      "config": {
+        "type": "bars",
+        "title": "A média muda com um novo pedido",
+        "values": [
+          130,
+          100,
+          200
+        ],
+        "labels": [
+          "Pedido 1",
+          "Pedido 2",
+          "Pedido 3"
+        ],
+        "references": [
+          "AVG"
+        ],
+        "extra": {
+          "label": "Pedido 4",
+          "value": 300
+        }
+      }
+    },
+    {
+      "id": "subq-nest",
+      "source": "nested",
+      "config": {
+        "type": "steps",
+        "title": "Execução de dentro para fora",
+        "states": [
+          {
+            "label": "Consulta interna",
+            "text": "Primeiro, resolvemos a média.",
+            "code": "SELECT id FROM pedidos\nWHERE valor > (SELECT AVG(valor) FROM pedidos);",
+            "focus": "SELECT AVG(valor) FROM pedidos"
+          },
+          {
+            "label": "Substituição",
+            "text": "O resultado da subconsulta ocupa o seu lugar.",
+            "code": "SELECT id FROM pedidos\nWHERE valor > 143.33;",
+            "focus": "143.33"
+          },
+          {
+            "label": "Consulta externa",
+            "text": "A comparação seleciona apenas o pedido 3.",
+            "code": "SELECT id FROM pedidos WHERE valor > 143.33;",
+            "rows": [
+              {
+                "label": "Pedido 3",
+                "result": "200 > 143,33",
+                "match": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-ex1",
+      "source": "bars",
+      "config": {
+        "type": "bars",
+        "title": "Pedidos acima da média",
+        "values": [
+          130,
+          100,
+          200
+        ],
+        "labels": [
+          "Pedido 1",
+          "Pedido 2",
+          "Pedido 3"
+        ],
+        "references": [
+          "AVG"
+        ],
+        "operators": [
+          ">"
+        ]
+      }
+    },
+    {
+      "id": "subq-fn",
+      "source": "fn",
+      "config": {
+        "type": "bars",
+        "title": "Funções de resumo",
+        "mode": "aggregate",
+        "values": [
+          130,
+          100,
+          200
+        ],
+        "labels": [
+          "Pedido 1",
+          "Pedido 2",
+          "Pedido 3"
+        ],
+        "references": [
+          "AVG",
+          "MAX",
+          "MIN",
+          "SUM",
+          "COUNT"
+        ]
+      }
+    },
+    {
+      "id": "subq-lab",
+      "source": "lab",
+      "config": {
+        "type": "bars",
+        "title": "Mude a referência e o operador",
+        "values": [
+          130,
+          100,
+          200
+        ],
+        "labels": [
+          "Pedido 1",
+          "Pedido 2",
+          "Pedido 3"
+        ],
+        "references": [
+          "AVG",
+          "MAX",
+          130
+        ],
+        "operators": [
+          ">",
+          ">=",
+          "<",
+          "<=",
+          "="
+        ]
+      }
+    },
+    {
+      "id": "subq-scan-in",
+      "source": "scan",
+      "config": {
+        "type": "scan",
+        "title": "IN confere a lista",
+        "chips": [
+          1,
+          1,
+          2
+        ],
+        "rows": [
+          {
+            "label": "Ana",
+            "result": "Está na lista",
+            "match": true,
+            "key": "1"
+          },
+          {
+            "label": "Bruno",
+            "result": "Está na lista",
+            "match": true,
+            "key": "2"
+          },
+          {
+            "label": "Carla",
+            "result": "Não está na lista",
+            "match": false,
+            "key": "3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-scan-notin",
+      "source": "scan",
+      "config": {
+        "type": "scan",
+        "title": "NOT IN inverte a seleção",
+        "chips": [
+          1,
+          1,
+          2
+        ],
+        "rows": [
+          {
+            "label": "Ana",
+            "result": "Está na lista: fora",
+            "match": false,
+            "key": "1"
+          },
+          {
+            "label": "Bruno",
+            "result": "Está na lista: fora",
+            "match": false,
+            "key": "2"
+          },
+          {
+            "label": "Carla",
+            "result": "Fora da lista: entra",
+            "match": true,
+            "key": "3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-nul",
+      "source": "nul",
+      "config": {
+        "type": "compare",
+        "title": "NULL torna a comparação desconhecida",
+        "states": [
+          {
+            "label": "Lista sem NULL",
+            "text": "3 é diferente de 1 e de 2; Carla entra.",
+            "chips": [
+              1,
+              1,
+              2
+            ],
+            "rows": [
+              {
+                "label": "Carla",
+                "result": "Entra",
+                "match": true
+              }
+            ]
+          },
+          {
+            "label": "Lista com NULL",
+            "text": "3 <> NULL é desconhecido. O WHERE só aceita verdadeiro.",
+            "chips": [
+              1,
+              1,
+              2,
+              null
+            ],
+            "rows": [
+              {
+                "label": "Carla",
+                "result": "Desconhecido: fora",
+                "match": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-parou",
+      "source": "parou",
+      "config": {
+        "type": "scan",
+        "title": "Encontrar um ou contar todos",
+        "rows": [
+          {
+            "label": "Pedido 1",
+            "result": "PAGO: encontrado",
+            "match": true
+          },
+          {
+            "label": "Pedido 2",
+            "result": "PAGO: encontrado",
+            "match": true
+          }
+        ],
+        "variants": [
+          {
+            "label": "EXISTS",
+            "stopAtMatch": true
+          },
+          {
+            "label": "COUNT",
+            "stopAtMatch": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-scan-ex",
+      "source": "scan",
+      "config": {
+        "type": "scan",
+        "title": "Conferência correlacionada",
+        "rows": [
+          {
+            "label": "Ana",
+            "result": "2 pedidos pagos: existe",
+            "match": true
+          },
+          {
+            "label": "Bruno",
+            "result": "1 pedido pago: existe",
+            "match": true
+          },
+          {
+            "label": "Carla",
+            "result": "0 pedidos: não existe",
+            "match": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-vezes",
+      "source": "vezes",
+      "config": {
+        "type": "steps",
+        "title": "Modelo conceitual de execução",
+        "states": [
+          {
+            "label": "Escalar",
+            "text": "Um resultado pode ser reutilizado por todos. O otimizador pode reescrever a execução.",
+            "value": 1,
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "Usa 143,33",
+                "match": true
+              },
+              {
+                "label": "Bruno",
+                "result": "Usa 143,33",
+                "match": true
+              },
+              {
+                "label": "Carla",
+                "result": "Usa 143,33",
+                "match": true
+              }
+            ]
+          },
+          {
+            "label": "Correlacionada: Ana",
+            "text": "A pergunta depende da linha externa.",
+            "value": 1,
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "Conferida",
+                "match": true
+              }
+            ]
+          },
+          {
+            "label": "Correlacionada: Bruno",
+            "text": "Agora usamos o id do Bruno.",
+            "value": 2,
+            "rows": [
+              {
+                "label": "Bruno",
+                "result": "Conferido",
+                "match": true
+              }
+            ]
+          },
+          {
+            "label": "Correlacionada: Carla",
+            "text": "Conceitualmente, uma conferência por cliente; não é uma promessa sobre o plano físico.",
+            "value": 3,
+            "rows": [
+              {
+                "label": "Carla",
+                "result": "Conferida",
+                "match": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-forma",
+      "source": "forma",
+      "config": {
+        "type": "compare",
+        "title": "Formato do resultado",
+        "states": [
+          {
+            "label": "Um valor",
+            "text": "Uma linha e uma coluna: escalar.",
+            "table": {
+              "headers": [
+                "média"
+              ],
+              "rows": [
+                [
+                  143.33
+                ]
+              ]
+            }
+          },
+          {
+            "label": "Uma lista",
+            "text": "Uma coluna com várias linhas.",
+            "table": {
+              "headers": [
+                "id_cliente"
+              ],
+              "rows": [
+                [
+                  1
+                ],
+                [
+                  1
+                ],
+                [
+                  2
+                ]
+              ]
+            }
+          },
+          {
+            "label": "Uma tabela",
+            "text": "Linhas e colunas: cabe no FROM com apelido.",
+            "table": {
+              "headers": [
+                "id_cliente",
+                "total_gasto"
+              ],
+              "rows": [
+                [
+                  1,
+                  230
+                ],
+                [
+                  2,
+                  200
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-pile",
+      "source": "montinhos",
+      "config": {
+        "type": "group",
+        "title": "Separar pedidos por cliente",
+        "items": [
+          {
+            "label": "Pedido 1",
+            "group": "Ana",
+            "value": 130
+          },
+          {
+            "label": "Pedido 2",
+            "group": "Ana",
+            "value": 100
+          },
+          {
+            "label": "Pedido 3",
+            "group": "Bruno",
+            "value": 200
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-join",
+      "source": "join",
+      "config": {
+        "type": "compare",
+        "title": "Manter ou excluir linhas sem par",
+        "states": [
+          {
+            "label": "JOIN",
+            "text": "Somente clientes com par no resumo.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "230",
+                "match": true
+              },
+              {
+                "label": "Bruno",
+                "result": "200",
+                "match": true
+              },
+              {
+                "label": "Carla",
+                "result": "Sem par: excluída",
+                "match": false,
+                "muted": true
+              }
+            ]
+          },
+          {
+            "label": "LEFT JOIN",
+            "text": "Todos os clientes continuam no resultado.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "230",
+                "match": true
+              },
+              {
+                "label": "Bruno",
+                "result": "200",
+                "match": true
+              },
+              {
+                "label": "Carla",
+                "result": "NULL",
+                "match": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-ord",
+      "source": "ord",
+      "config": {
+        "type": "compare",
+        "title": "A ordem muda o total",
+        "states": [
+          {
+            "label": "Juntar antes de somar",
+            "text": "O pedido 1 entrou duas vezes: 130 + 130 + 100.",
+            "value": 360,
+            "chips": [
+              130,
+              130,
+              100
+            ]
+          },
+          {
+            "label": "Resumir antes de juntar",
+            "text": "Cada pedido entra uma vez: 130 + 100.",
+            "value": 230,
+            "chips": [
+              130,
+              100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-coal",
+      "source": "coal",
+      "config": {
+        "type": "compare",
+        "title": "NULL não é zero",
+        "states": [
+          {
+            "label": "Sem COALESCE",
+            "text": "A linha de Carla não tem par no resumo.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2",
+                "match": true
+              },
+              {
+                "label": "Bruno",
+                "result": "1",
+                "match": true
+              },
+              {
+                "label": "Carla",
+                "result": "NULL",
+                "match": false
+              }
+            ]
+          },
+          {
+            "label": "Com COALESCE",
+            "text": "A ausência de pedidos é apresentada como zero.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2",
+                "match": true
+              },
+              {
+                "label": "Bruno",
+                "result": "1",
+                "match": true
+              },
+              {
+                "label": "Carla",
+                "result": "0",
+                "match": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "subq-traduz",
+      "source": "traduz",
+      "config": {
+        "type": "compare",
+        "title": "Da pergunta ao SQL",
+        "collapse": true,
+        "states": [
+          {
+            "label": "Acima da média",
+            "text": "Subconsulta escalar.",
+            "code": "SELECT id, valor FROM pedidos\nWHERE valor > (SELECT AVG(valor) FROM pedidos);"
+          },
+          {
+            "label": "Quem já pagou",
+            "text": "Lista com IN.",
+            "code": "SELECT nome FROM clientes\nWHERE id IN (SELECT id_cliente FROM pedidos WHERE status = 'PAGO');"
+          },
+          {
+            "label": "Quem nunca pediu",
+            "text": "Subconsulta correlacionada com NOT EXISTS.",
+            "code": "SELECT cli.nome FROM clientes cli\nWHERE NOT EXISTS (SELECT 1 FROM pedidos ped WHERE ped.id_cliente = cli.id);"
+          },
+          {
+            "label": "Quanto cada um gastou",
+            "text": "Tabela derivada no FROM.",
+            "code": "SELECT cli.nome, resumo.total_gasto\nFROM clientes cli LEFT JOIN (\n SELECT id_cliente, SUM(valor) AS total_gasto\n FROM pedidos GROUP BY id_cliente\n) resumo ON cli.id = resumo.id_cliente;"
+          }
+        ]
+      }
+    }
+  ],
+  "reference": {
+    "type": "reference",
+    "title": "Consulte os dados sem sair do código",
+    "scope": "deck",
+    "code": "SELECT clientes.nome, pedidos.valor\nFROM clientes JOIN pedidos ON clientes.id = pedidos.id_cliente;",
+    "tables": [
+      {
+        "term": "clientes",
+        "headers": [
+          "id",
+          "nome"
+        ],
+        "rows": [
+          [
+            1,
+            "Ana"
+          ],
+          [
+            2,
+            "Bruno"
+          ],
+          [
+            3,
+            "Carla"
+          ]
+        ]
+      },
+      {
+        "term": "pedidos",
+        "headers": [
+          "id",
+          "id_cliente",
+          "valor",
+          "status"
+        ],
+        "rows": [
+          [
+            1,
+            1,
+            130,
+            "PAGO"
+          ],
+          [
+            2,
+            1,
+            100,
+            "PAGO"
+          ],
+          [
+            3,
+            2,
+            200,
+            "PAGO"
+          ]
+        ]
+      }
+    ]
+  }
+}

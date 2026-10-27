@@ -50,6 +50,7 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
   let server: ReturnType<typeof Bun.serve>;
   let globalTestMode = '';
   let chamadas = 0;
+  let prompts: string[] = [];
 
   beforeAll(() => {
     for (const key of ENV_KEYS) originalEnv.set(key, process.env[key]);
@@ -60,6 +61,7 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
       async fetch(request: Request): Promise<Response> {
         const bodyText = await request.text();
         chamadas += 1;
+        prompts.push(bodyText);
         const isPlanner = bodyText.includes('coordenador pedagógico e designer instrucional sênior');
         const isSecao = bodyText.includes('Você redige os slides de UMA seção');
 
@@ -75,6 +77,11 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
           );
         }
 
+        if (globalTestMode === 'native_direct') {
+          const invalid = chamadas === 1;
+          const widget = invalid ? '{}' : JSON.stringify({ type: 'steps', title: 'Execução', states: [{ label: 'Primeiro', text: 'Calcular a média.' }, { label: 'Depois', text: 'Comparar os pedidos.' }] });
+          return Response.json({ choices: [{ message: { content: '---\ntitle: Teste direto\n---\n\n## Execução\n\n```interactive\n' + widget + '\n```' } }] });
+        }
         if (isPlanner) {
           return new Response(JSON.stringify({ choices: [{ message: { content: OUTLINE_MOCK } }] }), {
             status: 200,
@@ -122,6 +129,7 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
   beforeEach(() => {
     globalTestMode = '';
     chamadas = 0;
+    prompts = [];
   });
 
   test('generateAulaOutlineAndContent executa as fases e invoca checkpoints', async () => {
@@ -140,6 +148,26 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
     expect(checkpoints.some((c) => c.includes('35%'))).toBe(true);
     expect(checkpoints.some((c) => c.includes('85%'))).toBe(true);
     expect(res.conteudo_md).toContain('## Sintese do percurso');
+  });
+
+  test('via direta usa a skill e repara configuração nativa inválida sem acionar planner', async () => {
+    globalTestMode = 'native_direct';
+    const result = await generateAulaOutlineAndContent({ tema: 'Execução', modo: 'direta' });
+    expect(result.success).toBe(true);
+    expect(result.execucao.chamadas).toBe(2);
+    expect(result.execucao.reparos).toBe(1);
+    expect(result.conteudo_md).toContain('```interactive');
+    expect(prompts[0]).toContain('SKILL: RECURSOS INTERATIVOS');
+    expect(prompts[1]).toContain('Interativo inválido');
+    expect(prompts.every(p => !p.includes('coordenador pedagógico e designer instrucional sênior'))).toBe(true);
+  });
+
+  test('via decomposta injeta o mesmo contrato na redação de todas as seções', async () => {
+    await generateAulaOutlineAndContent({ tema: 'Execução', modo: 'decomposta' });
+    expect(chamadas).toBe(4);
+    const sections = prompts.filter(p => p.includes('Você redige os slides de UMA seção'));
+    expect(sections.length).toBe(3);
+    expect(sections.every(p => p.includes('SKILL: RECURSOS INTERATIVOS') && p.includes('\\"type\\":\\"steps\\"'))).toBe(true);
   });
 
   test('os dois reparos são compartilhados pela aula inteira, não por seção', async () => {

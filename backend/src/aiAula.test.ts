@@ -318,6 +318,8 @@ describe('aiAula: montagem e prompts', () => {
     expect(systemPrompt).toContain('LIMITE VERTICAL');
     expect(systemPrompt).toContain('SKILL: RECURSOS INTERATIVOS');
     expect(systemPrompt).toContain('GSAP 3.12.5 já vem carregado');
+    expect(systemPrompt).toContain('"type":"steps"');
+    expect(systemPrompt).toContain('"type":"compare"');
     expect(systemPrompt).toContain(':fas-nome:');
     expect(systemPrompt).not.toMatch(/Total de \d+ a \d+ slides/);
     expect(userPrompt).toContain('SEÇÃO ATUAL (1 de 3)');
@@ -327,15 +329,19 @@ describe('aiAula: montagem e prompts', () => {
     expect(userPrompt).toContain('- Seção 2 (Lacos contados): for, range');
   });
 
-  test('promptAulaDireta embute densidade de 10-30 linhas, linearidade sem vazamentos e regras negativas', () => {
+  test('promptAulaDireta respeita altura do motor, linearidade e recursos nativos', () => {
     const { systemPrompt, userPrompt } = promptAulaDireta({ tema: 'Joins em SQL' });
     expect(systemPrompt).toContain('GeracaoDidaticaAutoAvaliativa');
-    expect(systemPrompt).toContain('mínimo de 10 linhas e máximo de 25-30 linhas');
+    expect(systemPrompt).not.toContain('entre 10 e 25 linhas');
+    expect(systemPrompt).not.toContain('mínimo de 10 linhas');
+    expect(systemPrompt).toContain('no máximo 2 frases curtas fora do widget');
     expect(systemPrompt).toContain('EXPLICAR ANTES DE CITAR');
     expect(systemPrompt).toContain('PROIBIDO VAZAMENTO DE CONTEÚDO');
     expect(systemPrompt).toContain('SEM TERMOS VAGOS OU GENÉRICOS');
     expect(systemPrompt).toContain('SKILL: RECURSOS INTERATIVOS');
     expect(systemPrompt).toContain('NÃO IMPORTAR');
+    expect(systemPrompt).toContain('"type":"steps"');
+    expect(systemPrompt).toContain('"type":"compare"');
     expect(systemPrompt).toContain('Não incluir metadados: "Público-Alvo", "Duração"');
     expect(userPrompt).toContain('TEMA DA AULA: Joins em SQL');
   });

@@ -11,6 +11,10 @@ import { THEME_LABELS, NEXT_THEME, normalizeTheme, MERMAID_THEME_VARIABLES, type
 // não alcança conteúdo injetado. Os seletores [data-theme=...] só ativam dentro do
 // wrapper do modal, que carrega o atributo data-theme.
 import marpThemeCss from '@/shared/marpTheme.css?inline';
+import { renderSlideInteractive } from '@/shared/slideInteractive';
+import { mountSlideInteractives } from '@/shared/slideInteractiveRuntime';
+
+let cleanupInteractives = () => {};
 
 const props = withDefaults(
   defineProps<{
@@ -681,7 +685,12 @@ function escapeHtml(str: string): string {
 function getMarkdownIt() {
   const w = window as any;
   if (w.markdownit) {
-    return w.markdownit({ html: true, linkify: true, typographer: true });
+    const md = w.markdownit({ html: true, linkify: true, typographer: true });
+    const fence = md.renderer.rules.fence;
+    md.renderer.rules.fence = (tokens: { info: string; content: string }[], idx: number, ...args: unknown[]) => tokens[idx].info.trim() === 'interactive'
+      ? renderSlideInteractive(tokens[idx].content)
+      : fence(tokens, idx, ...args);
+    return md;
   }
   return null;
 }
@@ -775,6 +784,7 @@ function renderSlides(source: string) {
 
   const container = previewPaneRef.value;
   if (!container) return;
+  cleanupInteractives();
   container.innerHTML = '';
 
   const md = getMarkdownIt();
@@ -812,6 +822,7 @@ function renderSlides(source: string) {
     renderAllCodeHighlight(el);
   });
 
+  cleanupInteractives = mountSlideInteractives(container);
   const wLucide = window as any;
   if (wLucide.lucide && typeof wLucide.lucide.createIcons === 'function') wLucide.lucide.createIcons();
 
@@ -1621,7 +1632,7 @@ function handleGlobalKeydown(e: KeyboardEvent) {
     target.tagName === 'TEXTAREA' ||
     target.tagName === 'SELECT' ||
     (target as any).isContentEditable ||
-    !!target.closest?.('#find-bar, [contenteditable="true"], input, textarea, select')
+    !!target.closest?.('#find-bar, [contenteditable="true"], input, textarea, select, button, summary, [data-slide-widget]')
   );
 
   if ((e.key === 'f' || e.key === 'F') && !isCtrlOrCmd) {
@@ -1741,6 +1752,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  cleanupInteractives();
   cleanupAutoSave();
   if (clockTimer) clearInterval(clockTimer);
   const themeStyle = document.getElementById('marp-theme-css');

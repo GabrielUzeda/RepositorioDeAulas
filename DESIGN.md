@@ -185,6 +185,25 @@ Configurada em `theme.extend.fontSize`. Fonte base: **Inter** (via Google Fonts 
 
 ---
 
+## Interativos nativos nos slides
+
+Os componentes dos slides não são componentes Vue da interface do app. Vivem em `slideInteractive.ts` e `slideInteractiveRuntime.ts` (espelhado entre backend/src e frontend/src/shared), com aparência em `marpTheme.css` nos dois diretórios.
+
+| Recurso | Contrato | Comportamento |
+|---|---|---|
+| Sequência guiada | fence interactive, type steps, title, states | Anterior, Próximo e Reiniciar |
+| Comparação | fence interactive, type compare, title, states | Botões de cenários com aria-pressed; collapse opcional |
+| Barras | type bars, values, labels, references/operators/extra opcionais | Cálculo real, linha móvel, referência anterior e contador |
+| Varredura | type scan, rows, chips/variants opcionais | Destaque por linha; parada no primeiro match |
+| Agrupamento | type group, items (label/group/value) | Movimento de itens e soma por grupo |
+| Referências | type reference, code, tables; scope opcional | Tooltip de tabela por hover/foco, inclusive nos outros códigos da aula |
+
+steps/compare aceitam 2–6 estados com label/text; code, focus, value, rows, chips e table são opcionais. Contadores, fade, destaque e entrada escalonada são nativos. Reprodução, pausa, reset e navegação cancelam trabalho anterior. Movimento reduzido elimina animações sem remover os controles. Gabaritos details.gab têm estilo nativo e são abertos/restaurados na impressão. O renderer escapa o conteúdo e mostra alerta quando o JSON ou contrato é inválido. Prévia e standalone usam o mesmo runtime, com descarte na edição, teclado nativo e sem dependência de animações/CDNs. Na impressão, todos os estados ficam visíveis e os controles são ocultos; o autor deve manter o conteúdo curto para caber na página. O PPTX permanece textual, sem preservar interatividade ou todos os estados ocultos.
+
+A linguagem visual dos interativos é outline: superfície neutra, controles com contorno neutro e seleção com borda dupla/sublinhado interno, fundo suave e peso maior. A seleção usa accent; resultados correspondentes usam syntax-string; varredura/NULL e marcação de código usam syntax-number. Os grupos reaproveitam os tokens de sintaxe em contornos distintos. Cor não é o único sinal: há rótulos, espessuras, estilos de linha e indicadores de estado. Os termos interativos no código permanecem inline, sem herdar padding dos controles. O CSS é idêntico no backend e frontend.
+
+Documentação de autoria: `.agents/skills/marp-slides-interativos/SKILL.md`. Contrato injetado nas duas vias de geração: `backend/src/aiSkillRenderer.ts`.
+
 ## 8. Como Estender
 
 1. Adicionar `--c-novo-token` em `:root` e `.dark` em `style.css`.

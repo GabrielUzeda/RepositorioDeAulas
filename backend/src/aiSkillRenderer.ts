@@ -1,48 +1,66 @@
 export const SKILL_RECURSOS_RENDER = `SKILL: RECURSOS INTERATIVOS E ILUSTRAÇÃO (Marp Next)
 
-ÍCONES
-- Font Awesome 6.5.1 está disponível. Use os atalhos de dois-pontos, que o motor converte em <i> com a classe correta:
-  :fas-nome: (solid, o mais usado), :far-nome: (regular), :fab-nome: (marcas) e :fa-nome: (solid).
-  Exemplos válidos: :fas-database:, :fas-magnifying-glass:, :far-clock:, :fab-github:.
-- Lucide também está disponível: :lucide-nome: (ex.: :lucide-search:, :lucide-arrow-right:).
-- NUNCA escreva a classe HTML crua dentro do atalho: ':fa-solid fa-nome:' não é convertido e aparece como texto literal na aula.
-- Ícone acompanha uma palavra (antes do rótulo); não substitui texto e não serve de botão.
-- Emojis continuam proibidos em qualquer lugar.
+INTERATIVOS NATIVOS — PRIORIDADE
+- Use fence interactive com JSON. O motor fornece controles, movimentos, teclado e impressão. NÃO gere HTML/CSS/scripts/imports para reproduzir estes recursos.
+- Catálogo: steps, compare, bars, scan, group, reference. Se não ajudar a ensinar, use Markdown comum.
+- Todos exigem title (1–100 caracteres). Nenhum campo fora do contrato é aceito. Texto é puro, HTML é escapado. JSON usa aspas duplas e \\n nas quebras internas de strings.
+- No máximo um bloco interativo por slide. Título ## fora do fence. Nunca inventar SQL executável: o motor não executa SQL nem JavaScript da aula.
 
-GSAP (JÁ DISPONÍVEL - NÃO IMPORTAR)
-- O GSAP 3.12.5 já vem carregado pelo motor (no <head> do HTML final e na prévia do editor). NUNCA adicione <script src="...gsap..."> no Markdown; apenas use gsap.
-- Estrutura de um interativo, no MESMO slide: primeiro um <div> com id único, depois o <script>. O script roda quando o slide é renderizado, então o markup precisa existir antes dele.
-- Abra o script com uma guarda para não duplicar ao re-renderizar:
-  var s=document.getElementById('id-unico');if(!s||s.dataset.init)return;s.dataset.init='1';
-- Proteja a animação com if (window.gsap) e deixe um estado final estático legível quando o GSAP não carregar (offline): o conteúdo precisa fazer sentido sem animação.
-- Sequências: use uma gsap.timeline() encadeando um passo após o outro, em vez de encadear delays; use stagger para animar uma lista.
-- As animações de entrada do slide já são do motor. Esta skill serve para interações internas (gráfico que cresce, contador, conferência item a item), nunca para repetir a entrada.
+SEQUÊNCIAS E CENÁRIOS
+- steps: states com 2–6 estados, controles Anterior/Próximo/Reproduzir/Pausar/Reiniciar. compare: botões de cenários; collapse:true permite abrir/fechar clicando novamente.
+- Estado: label (1–60), text (1–400); code opcional (até 800 caracteres/12 linhas), focus opcional (trecho exato de code a destacar), value opcional (número, contador animado).
+- Estado também aceita rows (1–8 objetos label/result, match e muted booleanos opcionais), chips (até 12 strings/números/null), table (headers com 1–4 colunas, rows com 1–8 linhas).
+- O motor faz fade, entrada escalonada e contador. Não programe timelines próprias.
 
-CSS ESCOPADO (só quando o interativo precisar)
-- Um <style> pequeno, escopado pela classe raiz do próprio widget (ex.: .meu-grafico), nunca por tag global.
-- Use os tokens do tema em vez de cores fixas: var(--accent), var(--accent-dim), var(--border), var(--text-primary), var(--text-muted).
-- Estados semânticos: declare variáveis locais e ajuste no tema escuro.
-  .meu-grafico{--g-ok:#059669;--g-no:#dc2626;--g-warn:#b45309}
-  [data-theme="dark"] .meu-grafico{--g-ok:#34d399;--g-no:#f87171;--g-warn:#fbbf24}
-- Respeite o limite vertical: no máximo um bloco interativo por slide.
+\`\`\`interactive
+{"type":"steps","title":"Resolver de dentro para fora","states":[{"label":"Consulta interna","text":"Calcule a média primeiro.","code":"SELECT AVG(valor) FROM pedidos;","focus":"AVG(valor)","value":143.33},{"label":"Comparação externa","text":"Apenas o pedido de 200 supera a média.","rows":[{"label":"Pedido 3","result":"200 > 143,33","match":true}]}]}
+\`\`\`
 
-DEMAIS RECURSOS DO MOTOR
-- Colunas do tema (nunca copiar esse CSS): cols-2/cols-3/cols-4, grid com col-1..col-12, grid-auto, gap-sm/gap-lg, items-center/items-end.
-- KaTeX ($...$ e $$...$$ em bloco próprio), diagramas Mermaid cercados por \`\`\`mermaid, tabelas (até 4 colunas) e código com linguagem para realce.
-- Todo slide separado por --- em linha isolada; no máximo um bloco pesado (código, tabela, diagrama ou interativo) por slide.
+\`\`\`interactive
+{"type":"compare","title":"O total depende da ordem","states":[{"label":"Juntar antes","text":"O pedido repetido infla a soma.","value":360,"chips":[130,130,100]},{"label":"Resumir antes","text":"Cada pedido conta uma vez.","value":230,"chips":[130,100]}]}
+\`\`\`
 
-EXEMPLO MÍNIMO (barras que crescem), tudo no mesmo slide:
-<div class="meu-grafico" id="grafico-1">
-<div class="mg-w"><div class="mg-b" style="height:60px"></div><div class="mg-b" style="height:30px"></div></div>
-</div>
-<style>
-.mg-w{display:flex;align-items:flex-end;gap:18px;height:140px;border-bottom:2px solid var(--border)}
-.mg-b{width:48px;background:var(--accent);border-radius:6px 6px 0 0}
-</style>
-<script>
-(function(){
-  var s=document.getElementById('grafico-1');if(!s||s.dataset.init)return;s.dataset.init='1';
-  var bs=s.querySelectorAll('.mg-b');
-  if(window.gsap)gsap.from(bs,{scaleY:0,transformOrigin:'50% 100%',stagger:.15,duration:.5});
-})();
-</script>`;
+BARRAS COM CÁLCULO REAL
+- bars: values (1–12 números não negativos até 1000000), labels correspondentes. mode:"filter" (padrão) ou "aggregate".
+- references: até 6 referências, cada uma AVG/MAX/MIN/SUM/COUNT ou número não negativo. operators: subconjunto de >, >=, <, <=, =.
+- extra opcional: {label,value}, para incluir/remover um novo dado. O motor recalcula referências, move a linha, destaca barras e anima o contador; a linha pontilhada mostra a referência anterior.
+- Não calcule alturas em pixels nem copie médias arredondadas como referência numérica: use AVG.
+
+\`\`\`interactive
+{"type":"bars","title":"A média acompanha os dados","values":[130,100,200],"labels":["Pedido 1","Pedido 2","Pedido 3"],"references":["AVG","MAX",130],"operators":[">",">=","="],"extra":{"label":"Pedido 4","value":300}}
+\`\`\`
+
+VARREDURA
+- scan: rows (1–8 objetos label/result/match, key opcional) e chips opcionais. key liga uma linha aos chips com o mesmo texto.
+- variants opcional (1–4 objetos label/stopAtMatch). stopAtMatch:true interrompe a varredura no primeiro match; false visita todas as linhas. O contador mostra linhas visitadas, não resultados positivos.
+- match/result são fornecidos pela aula, não calculados por um executor SQL. A reprodução é um modelo didático, não uma medição do otimizador.
+
+\`\`\`interactive
+{"type":"scan","title":"Encontrar um ou contar todos","rows":[{"label":"Pedido 1","result":"Pago","match":true},{"label":"Pedido 2","result":"Pago","match":true}],"variants":[{"label":"EXISTS","stopAtMatch":true},{"label":"COUNT","stopAtMatch":false}]}
+\`\`\`
+
+AGRUPAMENTO
+- group: items (1–12 objetos label/group/value, até 4 grupos). O motor move os itens, soma valores por grupo e anima os totais. Não forneça totais pré-calculados.
+
+\`\`\`interactive
+{"type":"group","title":"Separar antes de somar","items":[{"label":"Pedido 1","group":"Ana","value":130},{"label":"Pedido 2","group":"Ana","value":100},{"label":"Pedido 3","group":"Bruno","value":200}]}
+\`\`\`
+
+REFERÊNCIAS CONTEXTUAIS
+- reference: code (até 800 caracteres/12 linhas), tables (1–4 objetos term/headers/rows). term é identificador simples único (letras/dígitos/underscore, até 40 caracteres).
+- Ao apontar ou focar o termo no código, o motor mostra a tabela. Escape fecha. scope:"deck" também anota ocorrências em outros blocos de código da aula; padrão é apenas o widget.
+- Tabelas: 1–4 headers, 1–8 rows, cada linha com a mesma quantidade de células. Células são strings, números ou null.
+
+\`\`\`interactive
+{"type":"reference","title":"Dados à mão","scope":"deck","code":"SELECT nome FROM clientes;","tables":[{"term":"clientes","headers":["id","nome"],"rows":[[1,"Ana"],[2,"Bruno"]]}]}
+\`\`\`
+
+GABARITOS E COMPATIBILIDADE
+- Gabaritos: HTML nativo <details class="gab"><summary>Ver gabarito</summary> ... </details>, com linhas em branco ao redor do Markdown interno. name compartilhado cria um acordeão. Não copie CSS/JS.
+- Todos os estados textuais e snapshots de dados ficam expostos na impressão; manter curtos. PPTX é textual, não interativo.
+- Os controles são botões: não instrua o aluno a arrastar itens, digitar SQL ou editar dados quando esses controles não existem. Não repita cálculos no texto sem conferi-los com os dados do componente.
+- Movimento reduzido desliga animações; navegação/reinício/edição cancelam reprodução e efeitos anteriores.
+- Font Awesome :fas-nome:/:far-nome:/:fab-nome: e Lucide :lucide-nome: acompanham texto. Sem emojis.
+- Colunas já disponíveis: cols-2/cols-3/cols-4, grid com col-1..col-12, grid-auto, gap-sm/gap-lg, items-center/items-end. KaTeX, Mermaid e código com linguagem continuam disponíveis.
+- GSAP 3.12.5 já vem carregado (NÃO IMPORTAR). O catálogo nativo não depende dele. Scripts legados seguem suportados, mas não devem reproduzir componentes já disponíveis.
+`;

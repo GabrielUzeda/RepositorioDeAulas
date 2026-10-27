@@ -1,5 +1,9 @@
 import { GUIA_DIDATICO, CONTRATO_RENDERER } from './aiGuiaDidatica';
 import { SKILL_RECURSOS_RENDER } from './aiSkillRenderer';
+import MarkdownIt from 'markdown-it';
+import { parseSlideInteractive } from './slideInteractive';
+
+const interactiveMarkdown = new MarkdownIt();
 
 export interface AulaOutlineSlide {
   titulo: string;
@@ -225,6 +229,12 @@ export function validarSlideMarp(slideMd: string): string[] {
     if (abre !== fecha) {
       erros.push(`Tag <${tag}> aberta e nao fechada dentro do slide.`);
     }
+  }
+
+  for (const token of interactiveMarkdown.parse(slideMd, {})) {
+    if (token.type !== 'fence' || token.info.trim() !== 'interactive') continue;
+    try { parseSlideInteractive(token.content); }
+    catch (error) { erros.push(`Interativo inválido: ${error instanceof Error ? error.message : 'JSON inválido'}`); }
   }
 
   const mermaidMatch = slideMd.match(/```mermaid\s*\n\s*([a-zA-Z]+)/);
@@ -568,7 +578,7 @@ ${CONTRATO_RENDERER}
 ${SKILL_RECURSOS_RENDER}
 
 <DENSIDADE_E_PROFUNDIDADE_DO_SLIDE>
-1. EXTENSÃO E SUBSTÂNCIA: Cada slide deve conter entre 10 e 25 linhas de conteúdo útil (texto explicativo + blocos de código/tabelas + explicações linha a linha). É PROIBIDO criar slides telegráficos ou vazios de apenas 2 a 4 frases soltas.
+1. EXTENSÃO E SUBSTÂNCIA: Respeite o LIMITE VERTICAL do motor: até 8 linhas de texto, 6 itens de lista, 4 linhas de tabela ou 12 linhas de código, e um único bloco pesado por slide. Profundidade vem da progressão entre slides, não de parágrafos longos. Em slide interativo, use no máximo 2 frases curtas fora do widget e coloque a explicação nas etapas; não acrescente parágrafos antes e depois do componente.
 2. SEM TERMOS VAGOS OU GENÉRICOS:
    - Proibido usar frases vagas como "ajuda a organizar os dados", "deixa a consulta mais rápida", "permite fazer cálculos".
    - Seja concreto e cirúrgico: dê números reais, nomes de colunas, valores exatos e mostre o estado dos dados antes e depois do comando.
@@ -653,7 +663,7 @@ animation-duration: 0.5s
 </ESTRUTURA_DA_AULA>
 
 <PROIBICOES_NEGATIVAS>
-- Proibido criar slides telegráficos (mínimo de 10 linhas e máximo de 25-30 linhas por slide).
+- Proibido exceder a altura do slide para cumprir uma contagem mínima de linhas. Não há mínimo de linhas: cada slide deve explicar uma ideia concreta, com dados e exemplos.
 - Proibido usar emojis.
 - Não incluir metadados: "Público-Alvo", "Duração", "Materiais Necessários".
 - Não citar metodologias pedagógicas ("Ciclo de Gibbs", "Educação Preventiva").

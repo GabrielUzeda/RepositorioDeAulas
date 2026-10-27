@@ -71,6 +71,7 @@ services:
       PROFESSOR_PASSWORD: ${PROFESSOR_PASSWORD:-ProfessorUzeda!}
     volumes:
       - ./e2e:/app
+      - ./backend/eval/referencias:/fixtures:ro
     working_dir: /app
     ipc: host
     networks:
