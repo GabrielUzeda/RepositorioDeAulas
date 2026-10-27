@@ -88,17 +88,17 @@ scope: widget (padrão) ou deck. deck também anota os termos nos outros blocos 
 
 Prefira os seis componentes simples para aulas novas. Use scene quando precisar manter os rótulos, os estados iniciais e as mensagens exatas de uma interação existente, sem scripts no Markdown.
 
-- type: scene; title acessível (não acrescenta título visível); initial: id de um quadro.
+- type: scene; title acessível (não acrescenta título visível); initial: id de um quadro; align opcional (left/center) alinha controles e mensagens.
 - layout: lista sem repetições que ordena intro, rows, value, buttons, text, chart, code, chips, groups e cells. Colunas externas continuam sendo divs com as classes do tema, sem alteração.
 - frames: 1–64 quadros, id único de letras/dígitos/underscore/hífen (até 40 caracteres).
 - Cada quadro exige buttons: até 8 objetos label/to; selected/disabled booleanos e row (0–3) opcionais. to aponta para um quadro existente; os rótulos não são substituídos por controles genéricos.
 - next opcional: {to,delay}, em milissegundos (0–10000). Sem ciclos automáticos e até 30000 ms por cadeia; cliques podem voltar ao início.
 - intro, text, value, valuePrefix: strings até 400 caracteres. valueTone opcional (success/danger) colore o valor como certo/errado. textRuns opcional: até 24 trechos {text,strong?,tone?}, tone success/danger; a concatenação deve reproduzir text, sem HTML.
-- code/focus: texto puro até 800 caracteres/12 linhas, destaque de trecho exato; codeHidden opcional.
-- rows: até 8 objetos label/result (até 100 caracteres), active/muted booleanos e tone success/danger opcionais.
-- chips: até 12 strings (até 100 caracteres); hits: índices dos chips destacados.
-- chart: values/matches (até 12), maximum positivo e lines (até 6 objetos label/value/previous?). Valores não negativos até maximum; o autor fornece os cálculos.
-- groups: até 4 objetos name/items/total, até 12 itens por grupo. cells: columns (1–4), values (até 32 strings).
+- code: texto puro até 800 caracteres/12 linhas. focus: trecho exato do code (até 100 caracteres) a destacar; codeHidden opcional.
+- rows: até 8 objetos label/result, active/muted e tone. result é o valor da linha (até 100 caracteres, aceita o apelido value) e é opcional: omita quando a linha for só um item da lista.
+- chips: até 12 strings (até 100 caracteres); hits: índices válidos desses chips (exigem chips no mesmo quadro).
+- chart: objeto com values e maximum (até 12 valores entre 0 e maximum); lines (até 6 linhas {label,value,previous?}) e matches (mesmo tamanho de values) são opcionais. Não acrescente type nem outros campos. Valores não negativos até maximum; o autor fornece os cálculos.
+- groups: até 4 objetos name/items/total (exatamente esses campos), até 12 itens por grupo. cells: objeto com columns (1–4) e values (até 32 strings).
 - JSON de scene: até 64000 caracteres; os outros tipos continuam limitados a 12000.
 - O motor escapa textos, mantém foco do botão após trocar o quadro, anima contadores/linhas/destaques e pausa transições ao navegar, ocultar ou imprimir. Edição descarta listeners e timers.
 - Impressão de scene: snapshot do quadro inicial, sem controles. Não imprime automaticamente todos os caminhos de uma cena. PPTX continua textual.
@@ -108,6 +108,12 @@ Exemplo mínimo:
 
 ```interactive
 {"type":"scene","title":"Duas perguntas","initial":"inicio","layout":["buttons","text"],"frames":[{"id":"inicio","buttons":[{"label":"Iniciar: calcular a média","to":"resultado"}],"text":"Calcule primeiro."},{"id":"resultado","buttons":[{"label":"Reiniciar","to":"inicio"}],"text":"Agora compare com a média."}]}
+```
+
+Exemplo com linhas, gráfico e valor final (repare em result, não value):
+
+```interactive
+{"type":"scene","title":"Somar os pedidos","initial":"inicio","layout":["text","rows","chart","value","buttons"],"frames":[{"id":"inicio","text":"Três pedidos, dois clientes.","rows":[{"label":"Pedido 1 - Ana","result":"130"},{"label":"Pedido 2 - Ana","result":"100"},{"label":"Pedido 3 - Bruno","result":"200"}],"chart":{"values":[130,100,200],"matches":[false,false,false],"maximum":200,"lines":[{"label":"Ana","value":230}]},"value":"0","buttons":[{"label":"Somar","to":"total"}]},{"id":"total","text":"Ana: 230. Total geral: 430.","rows":[{"label":"Ana","result":"230","active":true},{"label":"Bruno","result":"200","active":true}],"chart":{"values":[130,100,200],"matches":[true,true,false],"maximum":200,"lines":[{"label":"Ana","value":230}]},"value":"430","valueTone":"success","buttons":[{"label":"Voltar","to":"inicio"}]}]}
 ```
 
 Não use scene para executar SQL ou simular um motor de consultas: cada resultado é declarado e deve ser revisado. Para migrações, compare também os textos revelados após cada clique com o original.

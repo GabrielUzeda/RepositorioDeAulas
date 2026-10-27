@@ -320,6 +320,8 @@ describe('aiAula: montagem e prompts', () => {
     expect(systemPrompt).toContain('GSAP 3.12.5 já vem carregado');
     expect(systemPrompt).toContain('"type":"steps"');
     expect(systemPrompt).toContain('"type":"compare"');
+    expect(systemPrompt).toContain('"type":"scene"');
+    expect(systemPrompt).toContain('valueTone');
     expect(systemPrompt).toContain(':fas-nome:');
     expect(systemPrompt).not.toMatch(/Total de \d+ a \d+ slides/);
     expect(userPrompt).toContain('SEÇÃO ATUAL (1 de 3)');
@@ -342,6 +344,8 @@ describe('aiAula: montagem e prompts', () => {
     expect(systemPrompt).toContain('NÃO IMPORTAR');
     expect(systemPrompt).toContain('"type":"steps"');
     expect(systemPrompt).toContain('"type":"compare"');
+    expect(systemPrompt).toContain('"type":"scene"');
+    expect(systemPrompt).toContain('valueTone');
     expect(systemPrompt).toContain('Não incluir metadados: "Público-Alvo", "Duração"');
     expect(userPrompt).toContain('TEMA DA AULA: Joins em SQL');
   });

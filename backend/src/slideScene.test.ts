@@ -86,6 +86,32 @@ describe('Cenas declarativas e migração fiel', () => {
     expect(() => parseSlideInteractive(JSON.stringify({ ...reference, scope: 'widget' }))).toThrow();
   });
 
+  test('chart aceita matches e lines ausentes e rows aceita linha sem valor', () => {
+    const raw = JSON.stringify({ ...scene, layout: ['buttons', 'rows', 'chart'], frames: [{
+      id: 'a', buttons: [{ label: 'Ir', to: 'a' }],
+      chart: { values: [130, 100, 200], maximum: 200 },
+      rows: [{ label: 'Pedido 1' }, { label: 'Pedido 2', result: '100', muted: true }],
+    }] });
+    const parsed = parseSlideInteractive(raw);
+    expect(parsed.type).toBe('scene');
+    if (parsed.type !== 'scene') return;
+    expect(parsed.frames[0].chart?.matches).toBeUndefined();
+    const html = renderSlideInteractive(raw);
+    expect(html).not.toContain('slide-widget-error');
+    expect(html).toContain('slide-widget-row');
+    expect(html).toContain('100');
+  });
+
+  test('linha com value é normalizada para result', () => {
+    const raw = JSON.stringify({ ...scene, frames: [{ id: 'a', buttons: [{ label: 'Ir', to: 'a' }], rows: [{ label: 'Pedido 1', value: '130', active: true }, { label: 'Pedido 2', result: '100' }] }] });
+    const parsed = parseSlideInteractive(raw);
+    expect(parsed.type).toBe('scene');
+    if (parsed.type !== 'scene') return;
+    expect(parsed.frames[0].rows).toEqual([{ label: 'Pedido 1', result: '130', active: true }, { label: 'Pedido 2', result: '100' }]);
+    expect(renderSlideInteractive(raw)).toContain('130');
+    expect(renderSlideInteractive(raw)).not.toContain('slide-widget-error');
+  });
+
   test('exemplos da skill do agente são aceitos pelo motor, inclusive scene', () => {
     const skill = join(import.meta.dir, '../../.agents/skills/marp-slides-interativos/SKILL.md');
     if (!existsSync(skill)) return;

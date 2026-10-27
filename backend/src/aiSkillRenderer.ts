@@ -56,8 +56,8 @@ REFERÊNCIAS CONTEXTUAIS
 \`\`\`
 
 MIGRAÇÃO FIEL, SOMENTE QUANDO NECESSÁRIA
-- scene permite preservar falas e controles existentes, sem scripts: title, initial (id), layout (ordem dos campos) e frames (1–64 quadros). Prefira o catálogo simples para aulas novas.
-- Cada quadro tem id e buttons (até 8 objetos label/to, selected/disabled/row opcionais) e conteúdo opcional: intro/text (textRuns {text,strong?,tone?}), value (valuePrefix e valueTone success/danger), code/focus/codeHidden, rows (active/muted/tone), chips/hits, chart, groups e cells; next:{to,delay} permite sequência automática limitada a 30 segundos, sem ciclos. Destinos devem existir. JSON até 64000 caracteres. Resultados são declarados pelo autor, não calculados por SQL.
+- scene permite preservar falas e controles existentes, sem scripts: title, initial (id), align (left/center), layout (ordem dos campos) e frames (1–64 quadros). Prefira o catálogo simples para aulas novas.
+- Cada quadro tem id e buttons (até 8 objetos label/to, selected/disabled/row opcionais) e conteúdo opcional: intro/text (textRuns {text,strong?,tone?}), value (valuePrefix e valueTone success/danger), code (até 800 caracteres/12 linhas) com focus (trecho exato até 100 caracteres)/codeHidden, rows (label/result opcional, active/muted/tone), chips/hits, chart {values,matches,maximum,lines} (sem campo type), groups {name,items,total} e cells {columns,values}; next:{to,delay} permite sequência automática limitada a 30 segundos, sem ciclos. Destinos devem existir. JSON até 64000 caracteres. Resultados são declarados pelo autor, não calculados por SQL.
 \`\`\`interactive
 {"type":"scene","title":"Comparar as duas ordens","initial":"juntar","layout":["value","buttons","text"],"frames":[{"id":"juntar","value":"360","valueTone":"danger","text":"Juntar antes de somar: o pedido 1 entrou duas vezes.","buttons":[{"label":"Resumir antes de juntar","to":"resumir"}]},{"id":"resumir","value":"230","valueTone":"success","text":"Cada pedido entrou uma vez.","buttons":[{"label":"Repetir comparação","to":"juntar"}]}]}
 \`\`\`
