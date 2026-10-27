@@ -18,6 +18,7 @@ import BaseBadge from '@/shared/components/BaseBadge.vue';
 import BaseSpinner from '@/shared/components/BaseSpinner.vue';
 import EmptyState from '@/shared/components/EmptyState.vue';
 import ConfirmDialog from '@/shared/components/ConfirmDialog.vue';
+import { shuffleArray } from '@/shared/utils/shuffle';
 
 const tipoOptions = [
   { label: 'Normal', value: 'normal' },
@@ -400,6 +401,13 @@ function moveQuestion(index: number, direction: 'up' | 'down') {
     questions.value[target] = temp;
     activeQIndex.value = target;
   }
+}
+
+function shuffleCurrentOptions(qIndex: number) {
+  const q = questions.value[qIndex];
+  if (!q?.options || q.options.length < 2) return;
+  q.options = shuffleArray(q.options);
+  scheduleAutoSave();
 }
 
 function addOption(qIndex: number) {
@@ -936,9 +944,20 @@ async function handleDeleteDraft(draftId: number) {
               <div v-if="usesOptions" class="space-y-3">
                 <div class="flex justify-between items-center">
                   <label class="text-xs font-semibold uppercase tracking-wider text-secondary">Alternativas de Resposta</label>
-                  <BaseButton variant="ghost" size="sm" @click="addOption(activeQIndex)">
-                    <span class="material-icons text-xs mr-1">add</span> + Adicionar Opção
-                  </BaseButton>
+                  <div class="flex items-center gap-2">
+                    <BaseButton
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      title="Embaralhar ordem das alternativas"
+                      @click="shuffleCurrentOptions(activeQIndex)"
+                    >
+                      <span class="material-icons text-xs mr-1">shuffle</span> Embaralhar
+                    </BaseButton>
+                    <BaseButton variant="ghost" size="sm" type="button" @click="addOption(activeQIndex)">
+                      <span class="material-icons text-xs mr-1">add</span> + Adicionar Opção
+                    </BaseButton>
+                  </div>
                 </div>
 
                 <div class="space-y-2">

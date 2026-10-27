@@ -80,6 +80,39 @@ describe('aiQuestoes', () => {
     expect(normalizadas[1].options[1].correct).toBe(true);
   });
 
+  it('normalizarQuestoesComRubrica embaralha alternativas em questões objetivas sem alterar opções sensíveis à ordem', () => {
+    const questaoObjetiva = {
+      title: 'Objetiva Reforço',
+      content: 'Qual a resposta certa?',
+      options: [
+        { text: 'Brasília', correct: true },
+        { text: 'Rio de Janeiro', correct: false },
+        { text: 'Belo Horizonte', correct: false },
+        { text: 'Salvador', correct: false },
+      ],
+    };
+
+    const ordens = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      const [norm] = normalizarQuestoesComRubrica([questaoObjetiva], 'reforco');
+      expect(norm.options.filter((o: any) => o.correct).length).toBe(1);
+      ordens.add(norm.options.map((o: any) => o.text).join('|'));
+    }
+    expect(ordens.size).toBeGreaterThan(1);
+
+    const sensivel = {
+      title: 'Meta Opção',
+      content: 'Qual das afirmações?',
+      options: [
+        { text: 'Item A', correct: false },
+        { text: 'Item B', correct: false },
+        { text: 'Todas as anteriores', correct: true },
+      ],
+    };
+    const [normSensivel] = normalizarQuestoesComRubrica([sensivel], 'reforco');
+    expect(normSensivel.options.map((o: any) => o.text)).toEqual(['Item A', 'Item B', 'Todas as anteriores']);
+  });
+
   it('montarPromptQuestoes gera prompts válidos', () => {
     const prompts = montarPromptQuestoes({
       tipo: 'objetiva',

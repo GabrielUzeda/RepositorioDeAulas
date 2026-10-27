@@ -176,6 +176,34 @@ export function validarHtmlEnunciado(conteudo: string): string[] {
   return erros;
 }
 
+const ORDER_SENSITIVE_PATTERNS = [
+  /\b(nenhuma|nenhum|todas|todos)\b/i,
+  /\balternativas?\b/i,
+  /\bopç(ão|ões)\b/i,
+  /\b(itens?|acima|abaixo|anteriores|seguintes|respectivamente)\b/i,
+  /\b(verdadeiro|falso|afirmativas?|assertivas?)\b/i,
+  /^(i{1,3}|iv|v|vi{0,3}|ix|x|xi{0,3})$/i,
+  /\b(I{1,3}|IV|V|VI{0,3}|IX|X|XI{0,3})\b/,
+];
+
+function embaralharArray<T>(items: readonly T[]): T[] {
+  const out = [...(items || [])];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const swap = out[i];
+    out[i] = out[j];
+    out[j] = swap;
+  }
+  return out;
+}
+
+function opcaoSensivelAOrdem(option: { text?: string } | string | null | undefined): boolean {
+  const text = typeof option === 'string' ? option : option?.text;
+  if (!text) return false;
+  const normalized = String(text).trim();
+  return ORDER_SENSITIVE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 export function normalizarQuestoesComRubrica(questoes: any[], tipo: string): any[] {
   if (!Array.isArray(questoes)) return [];
 
@@ -201,11 +229,15 @@ export function normalizarQuestoesComRubrica(questoes: any[], tipo: string): any
       }
     } else {
       if (Array.isArray(copia.options)) {
-        copia.options = copia.options.map((opt: any) => ({
+        let opts = copia.options.map((opt: any) => ({
           text: String(opt?.text || ''),
           correct: Boolean(opt?.correct),
           feedback: opt?.feedback ? String(opt.feedback) : undefined,
         }));
+        if (opts.length > 1 && !opts.some((o: any) => opcaoSensivelAOrdem(o))) {
+          opts = embaralharArray(opts);
+        }
+        copia.options = opts;
       }
     }
 
