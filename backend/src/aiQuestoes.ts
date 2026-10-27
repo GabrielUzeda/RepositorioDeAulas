@@ -42,6 +42,9 @@ export function diagnosticarQuestoes(
     const isDiscursiva = tipo === 'normal' || tipo === 'prova' || (!q.options && !Array.isArray(q.options));
 
     if (isDiscursiva) {
+      if (Array.isArray(q.options) && q.options.length > 0) {
+        erros.push(`${prefix}: Questão discursiva não deve conter alternativas (options). Remova o campo options.`);
+      }
       if (!q.resposta_esperada || typeof q.resposta_esperada !== 'string' || q.resposta_esperada.trim().length < 15) {
         erros.push(`${prefix}: resposta_esperada ausente ou com menos de 15 caracteres`);
       }
@@ -233,29 +236,55 @@ export function montarPromptQuestoes(params: {
 
   const isDiscursiva = tipo === 'normal' || tipo === 'prova';
 
-  const systemPrompt = `Você é um especialista em elaboração de questões educacionais rigorosas e alinhadas pedagogicamente.
-Sua tarefa é gerar exatamente ${quantidade} questões do tipo "${tipo}" sobre o tema "${tema}".
-
-Diretrizes pedagógicas estritas:
-1. Distratores baseados em equívocos conceituais comuns dos alunos.
-2. Proibição absoluta de alternativas do tipo "todas as anteriores" ou "nenhuma das anteriores".
-3. Alternativas de comprimentos homogêneos e gramaticalmente consistentes.
-4. Nível cognitivo balanceado (lembrar, aplicar, analisar).
-5. Posicione a alternativa correta aleatoriamente (em A, B, C ou D), sem padrão repetitivo.
-${
-  isDiscursiva
-    ? '6. Para questões discursivas, exija "resposta_esperada" detalhada (mínimo 15 caracteres) e "rubrica" com ao menos 2 critérios conceituais avaliáveis com pesos numéricos somando exatamente 100.'
-    : '6. Para questões objetivas, forneça exatamente 4 alternativas, sendo exatamente 1 correta (correct: true).'
-}
-7. O campo "title" nomeia o conceito avaliado (ex.: "Closures e escopo de variáveis"). Títulos genéricos como "Questão 1" ou "Pergunta 2" são reprovados na validação.
-8. Para o tipo "reforco", toda alternativa incorreta deve trazer "feedback" explicando o erro do aluno.
-
-Formatação do campo "content" (enunciado):
+  const formatacaoHtml = `Formatação do campo "content" (enunciado):
 - Use APENAS estas tags HTML: <p>, <br>, <strong>, <em>, <u>, <s>, <h2>-<h4>, <ul>, <ol>, <li>, <blockquote>, <pre> e <code>.
 - É PROIBIDO usar <table>, <a>, <img>, <h1>, <h5>, <h6>, <hr>, <iframe>, <style>, <script> ou qualquer atributo (só 'class' é aceito em <pre>, <code> e <span>). A validação reprova tags fora da lista.
 - Para trechos de código (ex.: JavaScript, Python, SQL), SEMPRE envolva o código em <pre><code class="language-linguagem">...código escapado...</code></pre> (escape <, > e & dentro do código; NUNCA use <script>).
 - Destaque termos-chave com <strong>. Use listas <ul>/<ol> quando o enunciado tiver múltiplos passos ou itens.
-- Todas as tags abertas devem ser fechadas.
+- Todas as tags abertas devem ser fechadas.`;
+
+  const systemPrompt = isDiscursiva
+    ? `Você é um especialista em elaboração de questões educacionais discursivas rigorosas e alinhadas pedagogicamente.
+Sua tarefa é gerar exatamente ${quantidade} questões DISCURSIVAS (abertas / dissertativas, sem alternativas ou múltipla escolha) para a atividade do tipo "${tipo}" sobre o tema "${tema}".
+
+Diretrizes pedagógicas estritas para questões discursivas:
+1. Questões puramente discursivas: o aluno responderá escrevendo texto dissertativo ou código. É ESTRITAMENTE PROIBIDO incluir o campo "options" ou criar alternativas de múltipla escolha.
+2. Nível cognitivo balanceado (aplicar, analisar, avaliar, solucionar problemas práticos ou analisar código).
+3. O campo "title" nomeia o conceito avaliado (ex.: "Closures e escopo de variáveis"). Títulos genéricos como "Questão 1" ou "Pergunta 2" são reprovados na validação.
+4. O campo "resposta_esperada": texto detalhado e claro (mínimo 15 caracteres) com o gabarito ou modelo de resposta ideal esperado do aluno.
+5. O campo "rubrica": array com ao menos 2 critérios conceituais avaliáveis com pesos numéricos ("criterio" e "peso") somando exatamente 100.
+
+${formatacaoHtml}
+
+Retorne ESTRITAMENTE um array JSON puro (sem markdown extra, sem comentários) contendo os objetos de questão discursiva (PROIBIDO incluir o campo "options"):
+[
+  {
+    "title": "Análise de Algoritmo",
+    "content": "<p>Explique a diferença entre <strong>busca binária</strong> e <strong>busca linear</strong>, destacando a complexidade assintótica no pior caso de cada uma.</p>",
+    "resposta_esperada": "Espera-se que o aluno explique que a busca linear percorre elemento por elemento (O(n)), enquanto a busca binária divide o espaço de busca pela metade a cada passo (O(log n)), exigindo vetor ordenado.",
+    "rubrica": [
+      { "criterio": "Explicação correta da busca linear e complexidade O(n)", "peso": 50 },
+      { "criterio": "Explicação da busca binária, ordenação prévia e complexidade O(log n)", "peso": 50 }
+    ]
+  }
+]`
+    : `Você é um especialista em elaboração de questões educacionais objetivas rigorosas e alinhadas pedagogicamente.
+Sua tarefa é gerar exatamente ${quantidade} questões OBJETIVAS de múltipla escolha para a atividade do tipo "${tipo}" sobre o tema "${tema}".
+
+Diretrizes pedagógicas estritas para questões objetivas:
+1. Forneça exatamente 4 alternativas no campo "options", sendo exatamente 1 correta (correct: true) e 3 incorretas (correct: false).
+2. Distratores baseados em equívocos conceituais comuns dos alunos.
+3. Proibição absoluta de alternativas do tipo "todas as anteriores" ou "nenhuma das anteriores".
+4. Alternativas de comprimentos homogêneos e gramaticalmente consistentes.
+5. Nível cognitivo balanceado (lembrar, aplicar, analisar).
+6. Posicione a alternativa correta aleatoriamente (em A, B, C ou D), sem padrão repetitivo.
+7. O campo "title" nomeia o conceito avaliado (ex.: "Closures e escopo de variáveis"). Títulos genéricos como "Questão 1" ou "Pergunta 2" são reprovados na validação.
+${
+  tipo === 'reforco'
+    ? '8. Para o tipo "reforco", toda alternativa incorreta deve trazer "feedback" explicando o erro do aluno.\n'
+    : ''
+}
+${formatacaoHtml}
 
 Retorne ESTRITAMENTE um array JSON puro (sem markdown extra, sem comentários) contendo os objetos de questão.
 Exemplo de formato para objetiva (correta em C):
@@ -283,21 +312,21 @@ Exemplo de formato para objetiva (correta em A — a posição da correta DEVE v
       { "text": "Alternativa D incorreta.", "correct": false, "feedback": "Explicação do erro D." }
     ]
   }
-]
-Exemplo de formato para discursiva:
-[
-  {
-    "title": "Análise Y",
-    "content": "Explique o funcionamento de Y no contexto abordado.",
-    "resposta_esperada": "Espera-se que o aluno mencione os pontos A, B e C de forma estruturada.",
-    "rubrica": [
-      { "criterio": "Menção correta ao ponto A", "peso": 50 },
-      { "criterio": "Explicação do impacto B", "peso": 50 }
-    ]
-  }
 ]`;
 
-  const userPrompt = `Gere ${quantidade} questões para a atividade "${titulo}" sobre o tema "${tema}".
+  const userPrompt = isDiscursiva
+    ? `Gere ${quantidade} questões DISCURSIVAS (abertas/dissertativas, sem alternativas/options) para a atividade "${titulo}" sobre o tema "${tema}".
+Observações adicionais: ${observacoes || 'Nenhuma'}
+
+Contexto das aulas:
+${aulasContexto || 'Nenhum'}
+
+Documentos de referência:
+${docsContexto || 'Nenhum'}
+
+Questões já existentes (evitar duplicar):
+${JSON.stringify(questoes_existentes || [], null, 2)}`
+    : `Gere ${quantidade} questões OBJETIVAS de múltipla escolha para a atividade "${titulo}" sobre o tema "${tema}".
 Observações adicionais: ${observacoes || 'Nenhuma'}
 
 Contexto das aulas:

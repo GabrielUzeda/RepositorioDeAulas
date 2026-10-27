@@ -177,6 +177,76 @@ describe('aiQuestoes', () => {
     });
     expect(discursiva).toContain('somando exatamente 100');
   });
+
+  it('montarPromptQuestoes separa estritamente discursiva (normal/prova) de objetiva', () => {
+    const discursiva = montarPromptQuestoes({
+      tipo: 'normal',
+      titulo: 'Avaliação Final',
+      tema: 'SQL Avançado',
+      observacoes: '',
+      quantidade: 3,
+      aulasContexto: '',
+      docsContexto: '',
+      questoes_existentes: [],
+    });
+    expect(discursiva.systemPrompt).toContain('DISCURSIVAS');
+    expect(discursiva.systemPrompt).toContain('PROIBIDO incluir o campo "options"');
+    expect(discursiva.systemPrompt).toContain('resposta_esperada');
+    expect(discursiva.systemPrompt).toContain('rubrica');
+    expect(discursiva.systemPrompt).not.toContain('Distratores');
+    expect(discursiva.systemPrompt).not.toContain('Alternativa A');
+    expect(discursiva.userPrompt).toContain('DISCURSIVAS');
+
+    const prova = montarPromptQuestoes({
+      tipo: 'prova',
+      titulo: 'Prova 1',
+      tema: 'Estruturas de Dados',
+      observacoes: '',
+      quantidade: 2,
+      aulasContexto: '',
+      docsContexto: '',
+      questoes_existentes: [],
+    });
+    expect(prova.systemPrompt).toContain('DISCURSIVAS');
+    expect(prova.systemPrompt).toContain('PROIBIDO incluir o campo "options"');
+    expect(prova.userPrompt).toContain('DISCURSIVAS');
+
+    const objetiva = montarPromptQuestoes({
+      tipo: 'roleta',
+      titulo: 'Roleta de Perguntas',
+      tema: 'Algoritmos',
+      observacoes: '',
+      quantidade: 4,
+      aulasContexto: '',
+      docsContexto: '',
+      questoes_existentes: [],
+    });
+    expect(objetiva.systemPrompt).toContain('OBJETIVAS de múltipla escolha');
+    expect(objetiva.systemPrompt).toContain('Distratores baseados em equívocos');
+    expect(objetiva.systemPrompt).toContain('"options"');
+    expect(objetiva.systemPrompt).not.toContain('resposta_esperada');
+    expect(objetiva.userPrompt).toContain('OBJETIVAS de múltipla escolha');
+  });
+
+  it('diagnosticarQuestoes rejeita alternativas (options) em questão discursiva (normal/prova)', () => {
+    const comOptionsInvalida = [
+      {
+        title: 'Análise de Query',
+        content: '<p>Explique o plano de execução da query abaixo.</p>',
+        resposta_esperada: 'Espera-se que o aluno identifique o sequential scan e o índice ausente.',
+        rubrica: [
+          { criterio: 'Identificação do Seq Scan', peso: 50 },
+          { criterio: 'Proposta de índice', peso: 50 },
+        ],
+        options: [
+          { text: 'Opção A incorreta', correct: false },
+          { text: 'Opção B correta', correct: true },
+        ],
+      },
+    ];
+    const erros = diagnosticarQuestoes(comOptionsInvalida, { qtdSolicitada: 1, tipo: 'normal' });
+    expect(erros.some((e) => e.includes('não deve conter alternativas (options)'))).toBe(true);
+  });
 });
 
 describe('formatacao rica do enunciado (HTML permitido)', () => {
