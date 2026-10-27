@@ -9,7 +9,7 @@ const fixture = JSON.parse(readFileSync(join(dir, 'interativos-subconsultas.json
   widgets: { id: string; source: string; config: unknown }[];
   reference: unknown;
 };
-const original = readFileSync(join(import.meta.dir, '../../examplo.md'), 'utf8');
+const original = readFileSync(join(dir, 'examplo-original.md'), 'utf8');
 let markdown = original.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 const block = (value: unknown) => {
   const json = JSON.stringify(value);

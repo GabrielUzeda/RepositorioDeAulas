@@ -60,6 +60,7 @@ function parseSlides(source: string) {
 import MarkdownIt from 'markdown-it';
 import { renderSlideInteractive, calculateBarInteractive, parseSlideInteractive } from './slideInteractive';
 import { mountSlideInteractives } from './slideInteractiveRuntime';
+import { validateSlideScene } from './slideScene';
 
 const mdParser = new MarkdownIt({ html: true, linkify: true, typographer: true });
 const defaultFence = mdParser.renderer.rules.fence!;
@@ -405,6 +406,7 @@ body.anim-mode .slide.active[data-anim-stagger] .slide-content>*:nth-child(8) { 
 </div>
 
 <script>
+const validateSlideScene = ${validateSlideScene.toString()};
 (${mountSlideInteractives.toString()})(document, ${calculateBarInteractive.toString()}, ${parseSlideInteractive.toString()});
 function updateClock() {
   const clockEl = document.getElementById('clock-display');

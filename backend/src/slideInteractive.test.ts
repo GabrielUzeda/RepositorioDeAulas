@@ -57,7 +57,8 @@ describe('Interativos nativos', () => {
 
   test('todos os exemplos da skill interna são aceitos pelo motor', () => {
     const blocks = [...SKILL_RECURSOS_RENDER.matchAll(/```interactive\n([\s\S]*?)\n```/g)];
-    expect(blocks.length).toBe(6);
+    expect(blocks.length).toBe(7);
+    expect(blocks.map(b => JSON.parse(b[1]).type)).toContain('scene');
     for (const block of blocks) expect(() => parseSlideInteractive(block[1])).not.toThrow();
   });
 

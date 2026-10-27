@@ -804,11 +804,18 @@
   display: flex; justify-content: space-between; align-items: center; gap: 1rem;
   border: 1px solid var(--widget-line); border-radius: 0.5rem;
   padding: 0.4rem 0.7rem; margin: 0.35rem 0;
-  transition: border-color 300ms ease, background-color 300ms ease;
+  transition: border-color 300ms ease, background-color 300ms ease, box-shadow 300ms ease, color 300ms ease;
 }
 .slide-content .slide-widget-row strong,
 .slide-content .slide-widget-group > strong { color: inherit; }
-.slide-content .slide-widget .is-scan { outline: 2px solid var(--widget-attention); outline-offset: 2px; }
+.slide-content .slide-widget .is-scan { border-color: var(--widget-attention); background: color-mix(in srgb, var(--widget-attention) 10%, var(--slide-bg)); }
+.slide-content .slide-widget-row .slide-scene-success { color: var(--widget-result); border-color: color-mix(in srgb, var(--widget-result) 45%, transparent); }
+.slide-content .slide-widget-row .slide-scene-danger { color: var(--syntax-literal); border-color: color-mix(in srgb, var(--syntax-literal) 45%, transparent); }
+.slide-content .slide-widget-scene .slide-scene-value output.is-tone-success { color: var(--widget-result); }
+.slide-content .slide-widget-scene .slide-scene-value output.is-tone-danger { color: var(--syntax-literal); }
+.slide-content .slide-widget-scene .slide-scene-cells .slide-widget-chip { animation: slide-scene-cell-in 320ms ease-out both; }
+@keyframes slide-scene-cell-in { from { opacity: 0; transform: translateY(6px); } }
+.slide-content .slide-widget-message .slide-scene-success, .slide-content .slide-widget-message .slide-scene-danger { font-weight: 700; }
 .slide-content .slide-widget .is-match {
   border-color: var(--widget-result);
   background: color-mix(in srgb, var(--widget-result) 8%, var(--slide-bg));
@@ -878,6 +885,28 @@
   .slide-content .slide-widget-print { display: block !important; }
   .slide-content .slide-widget [hidden].slide-widget-state { display: block !important; }
 }
+
+.slide-content .slide-widget-scene { padding: 0; border: 0; margin-top: 0.5em; background: transparent; }
+.slide-content .slide-widget-scene .slide-widget-controls { flex-direction: column; gap: 0.3rem; }
+.slide-content .slide-scene-control-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.slide-content .slide-widget-scene[data-scene-align="center"] .slide-scene-control-row { justify-content: center; }
+.slide-content .slide-widget-scene[data-scene-align="center"] .slide-widget-message { text-align: center; }
+.slide-content .slide-scene-value { text-align: center; font-variant-numeric: tabular-nums; }
+.slide-content .slide-scene-value output { font-size: 1.6rem; font-weight: 700; }
+.slide-content .slide-widget-scene .slide-widget-controls { margin-top: 0.65rem; }
+.slide-content .slide-widget-scene .slide-widget-bar { background: color-mix(in srgb, var(--accent) 18%, var(--slide-bg)); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--slide-bg)); }
+.slide-content .slide-widget-scene .slide-widget-bar.is-match { background: var(--widget-result); box-shadow: none; }
+.slide-content .slide-widget-scene .slide-widget-row { background: var(--accent-dim); }
+.slide-content .slide-widget-scene .slide-widget-row.is-match { background: color-mix(in srgb, var(--widget-result) 18%, var(--slide-bg)); }
+.slide-content .slide-widget-scene .slide-widget-row.is-scan { border-color: var(--widget-attention); background: color-mix(in srgb, var(--widget-attention) 12%, var(--slide-bg)); }
+.slide-content .slide-widget-chip.is-match { box-shadow: none; }
+.slide-content .slide-widget-scene .slide-widget-chip.is-match { background: var(--widget-result); border-color: var(--widget-result); color: var(--slide-bg); }
+.slide-content .slide-widget-scene .slide-widget-group { border-style: dashed; box-shadow: none; min-height: 100px; }
+.slide-content .slide-widget-scene .slide-widget-chart { height: 170px; max-width: 540px; padding: 0 24px; box-sizing: border-box; gap: 22px; margin: 26px auto 14px; }
+.slide-content .slide-widget-scene .slide-widget-bar { width: 54px; flex: none; }
+.slide-content .slide-scene-cells { display: grid; gap: 6px; justify-content: center; margin: 10px auto; }
+.slide-content .slide-scene-cells .slide-widget-chip { text-align: center; }
+.slide-content .slide-widget-scene .slide-widget-message:empty { display: none; }
 
 /* ===== Impressão ===== */
 @media print {

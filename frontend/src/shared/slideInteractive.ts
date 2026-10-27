@@ -1,3 +1,5 @@
+import { validateSlideScene, renderSlideScene, type SceneInteractive } from './slideScene';
+
 export type Aggregate = 'AVG' | 'MAX' | 'MIN' | 'SUM' | 'COUNT';
 export type Operator = '>' | '>=' | '<' | '<=' | '=';
 export interface InteractiveTable { headers: string[]; rows: (string | number | null)[][] }
@@ -20,15 +22,19 @@ export interface GroupInteractive {
   type: 'group'; title: string; items: { label: string; group: string; value: number }[];
 }
 export interface ReferenceInteractive {
-  type: 'reference'; title: string; code: string; scope?: 'widget' | 'deck'; tables: (InteractiveTable & { term: string })[];
+  type: 'reference'; title: string; code: string; scope?: 'widget' | 'deck'; annotationOnly?: boolean; tables: (InteractiveTable & { term: string })[];
 }
-export type SlideInteractive = StateInteractive | BarInteractive | ScanInteractive | GroupInteractive | ReferenceInteractive;
+export type SlideInteractive = StateInteractive | BarInteractive | ScanInteractive | GroupInteractive | ReferenceInteractive | SceneInteractive;
 
 export function parseSlideInteractive(source: string): SlideInteractive {
-  if (source.length > 12000) throw new Error('Interativo excede 12000 caracteres.');
+  if (source.length > 64000) throw new Error('Interativo excede 64000 caracteres.');
   let value: unknown;
   try { value = JSON.parse(source); }
   catch { throw new Error('O bloco interactive deve conter JSON válido.'); }
+  if (value && typeof value === 'object' && 'type' in value && value.type === 'scene') {
+    if (validateSlideScene(value)) return value;
+  }
+  if (source.length > 12000) throw new Error('Interativo excede 12000 caracteres.');
   function fail(message: string): never { throw new Error(message); }
   const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
   const text = (v: unknown, max = 100): v is string => typeof v === 'string' && !!v.trim() && v.length <= max;
@@ -104,7 +110,8 @@ export function parseSlideInteractive(source: string): SlideInteractive {
     }
     if (groups.size > 4) fail('Use no máximo 4 grupos por slide.');
   } else if (value.type === 'reference') {
-    keys(value, ['type', 'title', 'code', 'tables', 'scope']);
+    keys(value, ['type', 'title', 'code', 'tables', 'scope', 'annotationOnly']);
+    if (value.annotationOnly !== undefined && (typeof value.annotationOnly !== 'boolean' || value.scope !== 'deck')) fail('annotationOnly exige scope deck.');
     if (value.scope !== undefined && value.scope !== 'widget' && value.scope !== 'deck') fail('scope deve ser widget ou deck.');
     if (!code(value.code) || !Array.isArray(value.tables) || !value.tables.length || value.tables.length > 4) fail('Referência exige code e 1–4 tables.');
     const terms = new Set<string>();
@@ -141,6 +148,10 @@ export function renderSlideInteractive(source: string): string {
   const playback = button('Reproduzir', 'data-widget-play') + button('Próximo', 'data-widget-next') + button('Reiniciar', 'data-widget-reset');
   try {
     const config = parseSlideInteractive(source);
+    if (config.type === 'scene') {
+      const frame = config.frames.find(f => f.id === config.initial)!;
+      return `<div class="slide-widget slide-widget-scene" data-scene-align="${config.align ?? 'left'}" data-slide-widget="scene" data-widget-config="${esc(JSON.stringify(config))}" role="group" aria-label="${esc(config.title)}"><div class="slide-widget-live" aria-live="polite" aria-atomic="true">${renderSlideScene(config, frame)}</div><div class="slide-widget-print">${renderSlideScene(config, frame)}</div>${config.frames.map(f => `<template data-scene-frame="${esc(f.id)}">${renderSlideScene(config, f)}</template>`).join('')}</div>`;
+    }
     let controls = '', body = '', snapshot = '';
     if (config.type === 'steps' || config.type === 'compare') {
       body = config.states.map(state => {
@@ -177,11 +188,11 @@ export function renderSlideInteractive(source: string): string {
     } else if (config.type === 'reference') {
       const names = config.tables.map(t => t.term);
       const code = config.code.split(/([a-zA-Z_][a-zA-Z0-9_]*)/).map(part => names.includes(part)
-        ? `<button type="button" class="slide-widget-term" data-term="${names.indexOf(part)}">${esc(part)}</button>` : esc(part)).join('');
+        ? `<span class="slide-widget-term" role="button" tabindex="0" data-term="${names.indexOf(part)}">${esc(part)}</span>` : esc(part)).join('');
       body = `<div class="slide-widget-live"><pre><code>${code}</code></pre><div class="slide-widget-tooltip" role="tooltip" hidden></div></div>`;
       snapshot = `<pre><code>${esc(config.code)}</code></pre>` + config.tables.map(t => `<h3>${esc(t.term)}</h3>${table(t)}`).join('');
     }
-    return `<div class="slide-widget" data-slide-widget="${config.type}" data-widget-config="${esc(JSON.stringify(config))}" role="group" aria-label="${esc(config.title)}"><p class="slide-widget-title">${esc(config.title)}</p><div class="slide-widget-controls" hidden>${controls}</div><div class="slide-widget-panels" aria-live="polite" aria-atomic="false">${body}</div><p class="slide-widget-progress" role="status"></p>${snapshot ? `<div class="slide-widget-print">${snapshot}</div>` : ''}</div>`;
+    return `<div class="slide-widget"${config.type === 'reference' && config.annotationOnly ? ' hidden' : ''} data-slide-widget="${config.type}" data-widget-config="${esc(JSON.stringify(config))}" role="group" aria-label="${esc(config.title)}"><p class="slide-widget-title">${esc(config.title)}</p><div class="slide-widget-controls" hidden>${controls}</div><div class="slide-widget-panels" aria-live="polite" aria-atomic="false">${body}</div><p class="slide-widget-progress" role="status"></p>${snapshot ? `<div class="slide-widget-print">${snapshot}</div>` : ''}</div>`;
   } catch (error) {
     return `<p class="slide-widget-error" role="alert">Interativo inválido: ${esc(error instanceof Error ? error.message : 'Configuração inválida.')}</p>`;
   }

@@ -17,6 +17,7 @@ O Markdown descreve dados e intenção. O motor fornece interface e movimento. U
 | IN/NOT IN/EXISTS, visita linha a linha | scan | title, rows, chips, variants |
 | Distribuir itens e somar por grupo | group | title, items |
 | Consultar tabelas apontando nomes no código | reference | title, code, tables, scope |
+| Migrar falas, controles e sequência exatos | scene | title, initial, layout, frames |
 
 Use um fence interactive com JSON válido, aspas duplas e `\n` nas quebras internas das strings. Todos os tipos exigem title (1–100 caracteres). Nenhum campo desconhecido é aceito.
 
@@ -83,6 +84,34 @@ scope: widget (padrão) ou deck. deck também anota os termos nos outros blocos 
 {"type":"reference","title":"Dados à mão","scope":"deck","code":"SELECT nome FROM clientes;","tables":[{"term":"clientes","headers":["id","nome"],"rows":[[1,"Ana"],[2,"Bruno"]]}]}
 ```
 
+## Cenas para migração fiel
+
+Prefira os seis componentes simples para aulas novas. Use scene quando precisar manter os rótulos, os estados iniciais e as mensagens exatas de uma interação existente, sem scripts no Markdown.
+
+- type: scene; title acessível (não acrescenta título visível); initial: id de um quadro.
+- layout: lista sem repetições que ordena intro, rows, value, buttons, text, chart, code, chips, groups e cells. Colunas externas continuam sendo divs com as classes do tema, sem alteração.
+- frames: 1–64 quadros, id único de letras/dígitos/underscore/hífen (até 40 caracteres).
+- Cada quadro exige buttons: até 8 objetos label/to; selected/disabled booleanos e row (0–3) opcionais. to aponta para um quadro existente; os rótulos não são substituídos por controles genéricos.
+- next opcional: {to,delay}, em milissegundos (0–10000). Sem ciclos automáticos e até 30000 ms por cadeia; cliques podem voltar ao início.
+- intro, text, value, valuePrefix: strings até 400 caracteres. valueTone opcional (success/danger) colore o valor como certo/errado. textRuns opcional: até 24 trechos {text,strong?,tone?}, tone success/danger; a concatenação deve reproduzir text, sem HTML.
+- code/focus: texto puro até 800 caracteres/12 linhas, destaque de trecho exato; codeHidden opcional.
+- rows: até 8 objetos label/result (até 100 caracteres), active/muted booleanos e tone success/danger opcionais.
+- chips: até 12 strings (até 100 caracteres); hits: índices dos chips destacados.
+- chart: values/matches (até 12), maximum positivo e lines (até 6 objetos label/value/previous?). Valores não negativos até maximum; o autor fornece os cálculos.
+- groups: até 4 objetos name/items/total, até 12 itens por grupo. cells: columns (1–4), values (até 32 strings).
+- JSON de scene: até 64000 caracteres; os outros tipos continuam limitados a 12000.
+- O motor escapa textos, mantém foco do botão após trocar o quadro, anima contadores/linhas/destaques e pausa transições ao navegar, ocultar ou imprimir. Edição descarta listeners e timers.
+- Impressão de scene: snapshot do quadro inicial, sem controles. Não imprime automaticamente todos os caminhos de uma cena. PPTX continua textual.
+- reference com scope deck pode usar annotationOnly:true para anotar o código da aula sem criar conteúdo visível nem um slide extra.
+
+Exemplo mínimo:
+
+```interactive
+{"type":"scene","title":"Duas perguntas","initial":"inicio","layout":["buttons","text"],"frames":[{"id":"inicio","buttons":[{"label":"Iniciar: calcular a média","to":"resultado"}],"text":"Calcule primeiro."},{"id":"resultado","buttons":[{"label":"Reiniciar","to":"inicio"}],"text":"Agora compare com a média."}]}
+```
+
+Não use scene para executar SQL ou simular um motor de consultas: cada resultado é declarado e deve ser revisado. Para migrações, compare também os textos revelados após cada clique com o original.
+
 ## Gabaritos
 
 Use details.gab com summary e Markdown separado por linhas em branco. name compartilhado cria acordeão. O motor abre todos ao imprimir e restaura o estado depois.
@@ -93,7 +122,7 @@ Use details.gab com summary e Markdown separado por linhas em branco. name compa
 2. Um interativo por slide, título ## fora do fence; no máximo duas frases curtas fora do widget. Conferir altura, não só JSON.
 3. Texto/code são texto puro; HTML é escapado. SQL/JS não são executados.
 4. Não inventar controles: os itens não são arrastáveis pelo aluno; são movidos pela reprodução.
-5. Todos os estados ou snapshots ficam expostos na impressão. Não guardar gabaritos secretos no componente. PPTX continua textual e pode omitir estados ocultos.
+5. steps/compare expõem os estados na impressão; os demais usam snapshots (scene usa o quadro inicial). Não guardar gabaritos secretos no componente. PPTX continua textual e pode omitir estados ocultos.
 6. Movimento reduzido desliga animações; navegar, reiniciar ou editar cancela a reprodução anterior.
 7. Testar seleção, reprodução/pausa/reinício, cliques rápidos, teclado, impressão e re-render na prévia e standalone.
 8. Não declarar sucesso apenas porque renderizou. Conferir aritmética, significado didático e corte de conteúdo.
@@ -104,5 +133,7 @@ Use details.gab com summary e Markdown separado por linhas em branco. name compa
 - Runtime: backend/src/slideInteractiveRuntime.ts.
 - Ambos são espelhados byte a byte em frontend/src/shared; tema também é espelhado.
 - Exemplos da aula inteira: backend/eval/referencias/subconsultas-modular.md.
-- Mapa da migração: backend/eval/referencias/COBERTURA_INTERATIVOS.md.
+- Migração fiel: examplo.md; fonte preservada em backend/eval/referencias/examplo-original.md; reprodução via backend/eval/migrarExemploFiel.ts.
+- Cenas: backend/src/slideScene.ts, espelhado em frontend/src/shared/slideScene.ts.
+- Mapa das duas migrações: backend/eval/referencias/COBERTURA_INTERATIVOS.md.
 - Skill interna: backend/src/aiSkillRenderer.ts, injetada nas vias direta e decomposta. O backend não lê este SKILL.md automaticamente.

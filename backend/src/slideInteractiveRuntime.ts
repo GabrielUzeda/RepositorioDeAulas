@@ -11,6 +11,137 @@ export function mountSlideInteractives(
     if (widget.dataset.widgetMounted || !widget.dataset.widgetConfig) return;
     let config: ReturnType<typeof parse>;
     try { config = parse(widget.dataset.widgetConfig); } catch { return; }
+    if (config.type === 'scene') {
+      const host = widget.querySelector<HTMLElement>('.slide-widget-live');
+      if (!host || config.frames.some(f => !widget.querySelector('[data-scene-frame="' + f.id + '"]'))) return;
+      widget.dataset.widgetMounted = 'true';
+      const scene = config;
+      let current = scene.frames.find(f => f.id === scene.initial)!;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const motions = new Set<Animation>();
+      let countFrame: number | undefined;
+      let focusIndex: string | undefined;
+      const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      const cancel = () => {
+        if (timer !== undefined) clearTimeout(timer);
+        timer = undefined; motions.forEach(a => { a.finish(); }); motions.clear();
+        if (countFrame !== undefined) cancelAnimationFrame(countFrame);
+        countFrame = undefined;
+        const counter = host.querySelector('output');
+        if (counter && current.value !== undefined) counter.textContent = current.value;
+      };
+      const stateStyle = (el: HTMLElement) => {
+        const style = getComputedStyle(el);
+        return { backgroundColor: style.backgroundColor, borderColor: style.borderColor, boxShadow: style.boxShadow, color: style.color };
+      };
+      const highlight = (el: HTMLElement) => el.classList.contains('is-match') || el.classList.contains('is-scan') || el.classList.contains('is-null') || !!el.querySelector('[class*="slide-scene-"]');
+      const paint = (id: string, animate = true) => {
+        const oldValue = host.querySelector('.slide-scene-value output')?.textContent;
+        const replay = id === current.id;
+        const oldChips = [...host.querySelectorAll<HTMLElement>('.slide-widget-chip')].map(el => ({ text: el.textContent ?? '', hl: highlight(el), style: stateStyle(el), rect: el.getBoundingClientRect() }));
+        const oldRows = [...host.querySelectorAll<HTMLElement>('.slide-widget-row')].map(el => ({ label: el.firstElementChild?.textContent ?? '', hl: highlight(el), style: stateStyle(el) }));
+        cancel();
+        const before = current, oldLines = [...host.querySelectorAll<HTMLElement>('.slide-widget-threshold')].map(el => el.style.bottom);
+        const oldBars = [...host.querySelectorAll<HTMLElement>('.slide-widget-bar')].map(el => ({ height: el.style.height, color: getComputedStyle(el).backgroundColor }));
+        current = scene.frames.find(f => f.id === id)!;
+        widget.dataset.sceneFrame = current.id;
+        const template = widget.querySelector<HTMLTemplateElement>('[data-scene-frame="' + current.id + '"]')!;
+        host.replaceChildren(template.content.cloneNode(true));
+        if (focusIndex !== undefined) host.querySelector<HTMLButtonElement>('[data-scene-button="' + focusIndex + '"]:not(:disabled)')?.focus({ preventScroll: true });
+        if (animate && !reduced()) {
+          const pulse = (el: HTMLElement) => {
+            const a = el.animate([{ opacity: 0.5 }, { opacity: 1 }], { duration: 280 });
+            motions.add(a); a.onfinish = () => { motions.delete(a); };
+          };
+          if (oldValue && current.value && /^-?\d+(?:,\d+)?$/.test(oldValue) && /^-?\d+(?:,\d+)?$/.test(current.value) && before.valuePrefix === current.valuePrefix && oldValue !== current.value) {
+            const counter = host.querySelector('.slide-scene-value output')!;
+            const from = Number(oldValue.replace(',', '.')), to = Number(current.value.replace(',', '.'));
+            const decimals = current.value.includes(',') ? 2 : 0, start = performance.now();
+            counter.textContent = oldValue;
+            const tick = (time: number) => {
+              const t = Math.min(1, (time - start) / 480);
+              counter.textContent = (from + (to - from) * (1 - (1 - t) ** 3)).toFixed(decimals).replace('.', ',');
+              if (t < 1) countFrame = requestAnimationFrame(tick);
+              else { counter.textContent = current.value!; countFrame = undefined; }
+            };
+            countFrame = requestAnimationFrame(tick);
+          }
+          const animateStyle = (el: HTMLElement, frames: Keyframe[], options: KeyframeAnimationOptions) => {
+            const animation = el.animate(frames, options);
+            motions.add(animation); animation.onfinish = () => { motions.delete(animation); };
+          };
+          const morph = (el: HTMLElement, previous: { hl: boolean; style: ReturnType<typeof stateStyle> } | undefined, hl: boolean) => {
+            const to = stateStyle(el);
+            const from = previous?.style ?? { backgroundColor: 'transparent', borderColor: 'transparent', boxShadow: 'none', color: to.color };
+            const fromShadow = from.boxShadow === 'none' && to.boxShadow !== 'none' ? 'rgba(0, 0, 0, 0) ' + to.boxShadow.replace(/^\S+\([^)]*\)\s*/, '') : from.boxShadow;
+            const same = from.backgroundColor === to.backgroundColor && from.borderColor === to.borderColor && fromShadow === to.boxShadow && from.color === to.color;
+            if (previous ? same : !hl) return;
+            animateStyle(el, [{ ...from, boxShadow: fromShadow }, to], { duration: 480, easing: 'ease-out' });
+          };
+          [...host.querySelectorAll<HTMLElement>('.slide-widget-bar')].forEach((bar, i) => {
+            const previous = oldBars[i];
+            animateStyle(bar, [
+              { height: replay || !previous ? '0%' : previous.height, backgroundColor: replay || !previous ? 'transparent' : previous.color },
+              { height: bar.style.height || '0%', backgroundColor: getComputedStyle(bar).backgroundColor },
+            ], { duration: 520, easing: 'ease-out' });
+          });
+          const seen = new Map<string, typeof oldChips>();
+          for (const chip of oldChips) seen.set(chip.text, [...(seen.get(chip.text) ?? []), chip]);
+          [...host.querySelectorAll<HTMLElement>('.slide-widget-chip')].forEach(chip => {
+            const text = chip.textContent ?? '', previous = seen.get(text)?.shift();
+            const group = !!chip.closest('.slide-widget-items');
+            if (previous && group) {
+              const now = chip.getBoundingClientRect();
+              const x = previous.rect.left - now.left, y = previous.rect.top - now.top;
+              if (x || y) animateStyle(chip, [{ transform: 'translate(' + x + 'px,' + y + 'px)' }, { transform: 'translate(0,0)' }], { duration: 480, easing: 'ease-out' });
+            } else if (!previous && group) {
+              animateStyle(chip, [{ opacity: 0, transform: 'scale(0.6)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' });
+            }
+            morph(chip, previous, highlight(chip));
+          });
+          const rowPrev = new Map(oldRows.map(row => [row.label, row]));
+          [...host.querySelectorAll<HTMLElement>('.slide-widget-row')].forEach(row => {
+            morph(row, rowPrev.get(row.firstElementChild?.textContent ?? ''), highlight(row));
+          });
+          if (before.value !== current.value) host.querySelectorAll<HTMLElement>('.slide-scene-value').forEach(pulse);
+          if (before.text !== current.text) host.querySelectorAll<HTMLElement>('.slide-widget-message').forEach(pulse);
+          host.querySelectorAll<HTMLElement>('.slide-widget-threshold').forEach((line, i) => {
+            if (oldLines[i] && oldLines[i] !== line.style.bottom) {
+              const a = line.animate([{ bottom: oldLines[i] }, { bottom: line.style.bottom }], { duration: 480, easing: 'ease-out' });
+              motions.add(a); a.onfinish = () => { motions.delete(a); };
+            }
+          });
+        }
+        widget.dispatchEvent(new Event('slide-widget-content', { bubbles: true }));
+        if (current.next && (!slide || slide.classList.contains('active')) && !doc.hidden) timer = setTimeout(() => { paint(current.next!.to); }, reduced() ? Math.round(current.next.delay * 0.45) : current.next.delay);
+      };
+      const click = (event: Event) => {
+        const button = (event.target as Element).closest<HTMLButtonElement>('[data-scene-button]');
+        if (!button || !host.contains(button) || button.disabled) return;
+        focusIndex = button.dataset.sceneButton;
+        const action = current.buttons[Number(focusIndex)];
+        if (action) paint(action.to);
+      };
+      const slide = widget.closest('.slide');
+      const resume = () => {
+        if (current.next && timer === undefined && !doc.hidden && (!slide || slide.classList.contains('active'))) paint(current.id, false);
+      };
+      const leave = () => { if (slide && !slide.classList.contains('active')) cancel(); else resume(); };
+      const observer = new MutationObserver(leave);
+      if (slide) observer.observe(slide, { attributes: true, attributeFilter: ['class'] });
+      const visibility = () => { if (doc.hidden) cancel(); else resume(); };
+      widget.addEventListener('click', click);
+      doc.addEventListener('visibilitychange', visibility);
+      window.addEventListener('beforeprint', cancel);
+      window.addEventListener('afterprint', resume);
+      paint(scene.initial, false);
+      cleanups.push(() => {
+        cancel(); observer.disconnect(); widget.removeEventListener('click', click);
+        doc.removeEventListener('visibilitychange', visibility); window.removeEventListener('beforeprint', cancel); window.removeEventListener('afterprint', resume);
+        delete widget.dataset.widgetMounted; delete widget.dataset.sceneFrame;
+      });
+      return;
+    }
     const controls = widget.querySelector<HTMLElement>('.slide-widget-controls');
     const progress = widget.querySelector<HTMLElement>('.slide-widget-progress');
     if (!controls || !progress) return;
@@ -266,6 +397,7 @@ export function mountSlideInteractives(
         pending = undefined;
         if (config.scope !== 'deck') return;
         eventRoot.querySelectorAll<HTMLElement>('.slide-content pre code').forEach(code => {
+          codeObserver.observe(code, { childList: true, subtree: true, characterData: true });
           const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT), nodes: Text[] = [];
           for (let node = walker.nextNode(); node; node = walker.nextNode()) {
             if (!node.parentElement?.closest('[data-term]')) nodes.push(node as Text);
@@ -277,16 +409,18 @@ export function mountSlideInteractives(
             parts.forEach(part => {
               const index = config.tables.findIndex(t => t.term === part);
               if (index < 0) { fragment.append(document.createTextNode(part)); return; }
-              const button = document.createElement('button');
-              button.type = 'button'; button.className = 'slide-widget-term';
-              button.dataset.term = String(index); button.dataset.refOwner = owner; button.textContent = part;
-              annotated.add(button); fragment.append(button);
+              const term = document.createElement('span');
+              term.className = 'slide-widget-term'; term.setAttribute('role', 'button'); term.tabIndex = 0;
+              term.dataset.term = String(index); term.dataset.refOwner = owner; term.textContent = part;
+              annotated.add(term); fragment.append(term);
             });
             text.replaceWith(fragment);
           });
         });
       };
-      const codeObserver = new MutationObserver(() => { if (pending === undefined) pending = requestAnimationFrame(wrap); });
+      const schedule = () => { if (pending === undefined) pending = requestAnimationFrame(wrap); };
+      const codeObserver = new MutationObserver(schedule);
+      eventRoot.addEventListener('slide-widget-content', schedule);
       if (config.scope === 'deck') {
         eventRoot.querySelectorAll('.slide-content pre code').forEach(code => { codeObserver.observe(code, { childList: true, subtree: true, characterData: true }); });
         wrap();
@@ -298,11 +432,12 @@ export function mountSlideInteractives(
       eventRoot.addEventListener('pointerout', out); eventRoot.addEventListener('focusout', hide);
       eventRoot.addEventListener('keydown', key as EventListener); window.addEventListener('resize', hide);
       cleanups.push(() => {
+        eventRoot.removeEventListener('slide-widget-content', schedule);
         codeObserver.disconnect(); moved.disconnect(); if (pending !== undefined) cancelAnimationFrame(pending);
         eventRoot.removeEventListener('pointerover', over); eventRoot.removeEventListener('focusin', over);
         eventRoot.removeEventListener('pointerout', out); eventRoot.removeEventListener('focusout', hide);
         eventRoot.removeEventListener('keydown', key as EventListener); window.removeEventListener('resize', hide); hide();
-        annotated.forEach(button => { button.replaceWith(document.createTextNode(button.textContent ?? '')); });
+        annotated.forEach(term => { term.replaceWith(document.createTextNode(term.textContent ?? '')); });
         positions.forEach((position, host) => { host.style.position = position; }); tooltip.remove();
       });
       reset = hide;

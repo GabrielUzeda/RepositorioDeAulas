@@ -1,0 +1,6349 @@
+{
+  "widgets": [
+    {
+      "id": "subq-cad",
+      "config": {
+        "type": "scene",
+        "title": "Pare e pense: acima da média",
+        "align": "center",
+        "initial": "f0",
+        "layout": [
+          "rows",
+          "value",
+          "buttons",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Iniciar: calcular a média",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "text": "Faça no papel e depois clique.",
+            "value": "?",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200"
+              }
+            ]
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Iniciar: calcular a média",
+                "to": "f1",
+                "row": 0,
+                "disabled": true
+              }
+            ],
+            "text": "Faça no papel e depois clique.",
+            "value": "?",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200"
+              }
+            ],
+            "next": {
+              "to": "f2",
+              "delay": 0
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Iniciar: calcular a média",
+                "to": "f1",
+                "row": 0,
+                "disabled": true
+              }
+            ],
+            "text": "Faça no papel e depois clique.",
+            "value": "soma: 130",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130",
+                "active": true
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200"
+              }
+            ],
+            "next": {
+              "to": "f3",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Iniciar: calcular a média",
+                "to": "f1",
+                "row": 0,
+                "disabled": true
+              }
+            ],
+            "text": "Faça no papel e depois clique.",
+            "value": "soma: 230",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100",
+                "active": true
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200"
+              }
+            ],
+            "next": {
+              "to": "f4",
+              "delay": 648.8888888888889
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "Iniciar: calcular a média",
+                "to": "f1",
+                "row": 0,
+                "disabled": true
+              }
+            ],
+            "text": "Faça no papel e depois clique.",
+            "value": "soma: 430",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200",
+                "active": true
+              }
+            ],
+            "next": {
+              "to": "f5",
+              "delay": 871.1111111111111
+            }
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "Iniciar comparação",
+                "to": "f6",
+                "row": 0
+              }
+            ],
+            "text": "Primeira pergunta respondida.",
+            "value": "média: 143,33",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200"
+              }
+            ]
+          },
+          {
+            "id": "f6",
+            "buttons": [
+              {
+                "label": "Iniciar comparação",
+                "to": "f6",
+                "row": 0,
+                "disabled": true
+              }
+            ],
+            "text": "Primeira pergunta respondida.",
+            "value": "média: 143,33",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200"
+              }
+            ],
+            "next": {
+              "to": "f7",
+              "delay": 0
+            }
+          },
+          {
+            "id": "f7",
+            "buttons": [
+              {
+                "label": "Iniciar comparação",
+                "to": "f6",
+                "row": 0,
+                "disabled": true
+              }
+            ],
+            "text": "Primeira pergunta respondida.",
+            "value": "média: 143,33",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130: não passa",
+                "active": true,
+                "tone": "danger"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200"
+              }
+            ],
+            "next": {
+              "to": "f8",
+              "delay": 800
+            }
+          },
+          {
+            "id": "f8",
+            "buttons": [
+              {
+                "label": "Iniciar comparação",
+                "to": "f6",
+                "row": 0,
+                "disabled": true
+              }
+            ],
+            "text": "Primeira pergunta respondida.",
+            "value": "média: 143,33",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130: não passa",
+                "tone": "danger"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100: não passa",
+                "active": true,
+                "tone": "danger"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200"
+              }
+            ],
+            "next": {
+              "to": "f9",
+              "delay": 800
+            }
+          },
+          {
+            "id": "f9",
+            "buttons": [
+              {
+                "label": "Iniciar comparação",
+                "to": "f6",
+                "row": 0,
+                "disabled": true
+              }
+            ],
+            "text": "Primeira pergunta respondida.",
+            "value": "média: 143,33",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130: não passa",
+                "tone": "danger"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100: não passa",
+                "tone": "danger"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200: passa da média",
+                "active": true,
+                "tone": "success"
+              }
+            ],
+            "next": {
+              "to": "f10",
+              "delay": 1020
+            }
+          },
+          {
+            "id": "f10",
+            "buttons": [
+              {
+                "label": "Reiniciar",
+                "to": "f0",
+                "row": 0
+              }
+            ],
+            "text": "Conclusão: A segunda pergunta só fez sentido depois da primeira.",
+            "value": "média: 143,33",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana)",
+                "result": "130: não passa",
+                "tone": "danger"
+              },
+              {
+                "label": "Pedido 2 (Ana)",
+                "result": "100: não passa",
+                "tone": "danger"
+              },
+              {
+                "label": "Pedido 3 (Bruno)",
+                "result": "200: passa da média",
+                "tone": "success"
+              }
+            ]
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Pedido 1 (Ana) 130 Pedido 2 (Ana) 100 Pedido 3 (Bruno) 200 ? Iniciar: calcular a média Faça no papel e depois clique.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Pedido 1 (Ana) 130 Pedido 2 (Ana) 100 Pedido 3 (Bruno) 200 ? Iniciar: calcular a média Faça no papel e depois clique.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Pedido 1 (Ana) 130 Pedido 2 (Ana) 100 Pedido 3 (Bruno) 200 soma: 130 Iniciar: calcular a média Faça no papel e depois clique.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "Pedido 1 (Ana) 130 Pedido 2 (Ana) 100 Pedido 3 (Bruno) 200 soma: 230 Iniciar: calcular a média Faça no papel e depois clique.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "Pedido 1 (Ana) 130 Pedido 2 (Ana) 100 Pedido 3 (Bruno) 200 soma: 430 Iniciar: calcular a média Faça no papel e depois clique.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "Pedido 1 (Ana) 130 Pedido 2 (Ana) 100 Pedido 3 (Bruno) 200 média: 143,33 Iniciar comparação Primeira pergunta respondida.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f6",
+          "text": "Pedido 1 (Ana) 130 Pedido 2 (Ana) 100 Pedido 3 (Bruno) 200 média: 143,33 Iniciar comparação Primeira pergunta respondida.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f7",
+          "text": "Pedido 1 (Ana) 130: não passa Pedido 2 (Ana) 100 Pedido 3 (Bruno) 200 média: 143,33 Iniciar comparação Primeira pergunta respondida.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f8",
+          "text": "Pedido 1 (Ana) 130: não passa Pedido 2 (Ana) 100: não passa Pedido 3 (Bruno) 200 média: 143,33 Iniciar comparação Primeira pergunta respondida.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f9",
+          "text": "Pedido 1 (Ana) 130: não passa Pedido 2 (Ana) 100: não passa Pedido 3 (Bruno) 200: passa da média média: 143,33 Iniciar comparação Primeira pergunta respondida.",
+          "keys": [
+            "step:"
+          ]
+        },
+        {
+          "id": "f10",
+          "text": "Pedido 1 (Ana) 130: não passa Pedido 2 (Ana) 100: não passa Pedido 3 (Bruno) 200: passa da média média: 143,33 Reiniciar Conclusão: A segunda pergunta só fez sentido depois da primeira.",
+          "keys": [
+            "step:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-live",
+      "config": {
+        "type": "scene",
+        "title": "O que você acabou de fazer?",
+        "align": "left",
+        "initial": "f0",
+        "layout": [
+          "chart",
+          "value",
+          "buttons",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "+ chegou um pedido novo (300)",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "text": "Clique no botão para simular a chegada de um pedido.",
+            "value": "143,33",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "143,33 (digitado)",
+                  "value": 143.333273,
+                  "previous": true
+                },
+                {
+                  "label": "AVG ao vivo",
+                  "value": 143.333273
+                }
+              ]
+            }
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Reiniciar",
+                "to": "f0",
+                "row": 0
+              }
+            ],
+            "text": "A média real agora é 182,50, mas a consulta digitada ainda usa 143.33.",
+            "textRuns": [
+              {
+                "text": "A média real agora é "
+              },
+              {
+                "text": "182,50",
+                "strong": true,
+                "tone": "success"
+              },
+              {
+                "text": ", mas a consulta digitada ainda usa "
+              },
+              {
+                "text": "143.33",
+                "strong": true,
+                "tone": "danger"
+              },
+              {
+                "text": "."
+              }
+            ],
+            "value": "182,50",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200,
+                300
+              ],
+              "matches": [
+                false,
+                false,
+                false,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "143,33 (digitado)",
+                  "value": 143.333273,
+                  "previous": true
+                },
+                {
+                  "label": "AVG ao vivo 182,50",
+                  "value": 182.5
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "130 100 200 143,33 (digitado) AVG ao vivo 143,33 + chegou um pedido novo (300) Clique no botão para simular a chegada de um pedido.",
+          "keys": [
+            "add:"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "130 100 200 300 143,33 (digitado) AVG ao vivo 182,50 182,50 Reiniciar A média real agora é 182,50, mas a consulta digitada ainda usa 143.33.",
+          "keys": [
+            "add:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-nest",
+      "config": {
+        "type": "scene",
+        "title": "A de fora e a de dentro",
+        "align": "left",
+        "initial": "f0",
+        "layout": [
+          "code",
+          "buttons",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Iniciar execução",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "text": "Clique para ver em que ordem o banco executa.",
+            "code": "SELECT id, valor FROM pedidos\nWHERE valor > ( SELECT AVG(valor) FROM pedidos );"
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Reiniciar",
+                "to": "f0",
+                "row": 0
+              }
+            ],
+            "text": "Clique para ver em que ordem o banco executa.",
+            "code": "SELECT id, valor FROM pedidos\nWHERE valor > ( SELECT AVG(valor) FROM pedidos );",
+            "next": {
+              "to": "f2",
+              "delay": 180
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Reiniciar",
+                "to": "f0",
+                "row": 0
+              }
+            ],
+            "text": "1. O banco resolve primeiro o que está dentro dos parênteses.",
+            "code": "SELECT id, valor FROM pedidos\nWHERE valor > ( SELECT AVG(valor) FROM pedidos );",
+            "focus": "SELECT AVG(valor) FROM pedidos",
+            "next": {
+              "to": "f3",
+              "delay": 1471.111111111111
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Reiniciar",
+                "to": "f0",
+                "row": 0
+              }
+            ],
+            "text": "2. O resultado ocupa o lugar da subconsulta.",
+            "code": "SELECT id, valor FROM pedidos\nWHERE valor > ( 143.33 );",
+            "focus": "143.33",
+            "next": {
+              "to": "f4",
+              "delay": 1548.888888888889
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "Reiniciar",
+                "to": "f0",
+                "row": 0
+              }
+            ],
+            "text": "3. Agora a consulta de fora roda: só o pedido 3 passa.",
+            "code": "SELECT id, valor FROM pedidos\nWHERE valor > ( 143.33 );",
+            "focus": "143.33"
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "SELECT id, valor FROM pedidos WHERE valor > ( SELECT AVG(valor) FROM pedidos ); Iniciar execução Clique para ver em que ordem o banco executa.",
+          "keys": [
+            "run:"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "SELECT id, valor FROM pedidos WHERE valor > ( SELECT AVG(valor) FROM pedidos ); Reiniciar Clique para ver em que ordem o banco executa.",
+          "keys": [
+            "run:"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "SELECT id, valor FROM pedidos WHERE valor > ( SELECT AVG(valor) FROM pedidos ); Reiniciar 1. O banco resolve primeiro o que está dentro dos parênteses.",
+          "keys": [
+            "run:"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "SELECT id, valor FROM pedidos WHERE valor > ( 143.33 ); Reiniciar 2. O resultado ocupa o lugar da subconsulta.",
+          "keys": [
+            "run:"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "SELECT id, valor FROM pedidos WHERE valor > ( 143.33 ); Reiniciar 3. Agora a consulta de fora roda: só o pedido 3 passa.",
+          "keys": [
+            "run:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-ex1",
+      "config": {
+        "type": "scene",
+        "title": "Veja nos nossos dados",
+        "align": "center",
+        "initial": "f0",
+        "layout": [
+          "chart",
+          "buttons",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Iniciar comparação",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "text": "",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "AVG 143,33",
+                  "value": 143.333273
+                }
+              ]
+            }
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Repetir comparação",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "text": "Pedidos que passam: 3",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                true
+              ],
+              "lines": [
+                {
+                  "label": "AVG 143,33",
+                  "value": 143.333273
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "130 100 200 AVG 143,33 Iniciar comparação",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "130 100 200 AVG 143,33 Repetir comparação Pedidos que passam: 3",
+          "keys": [
+            "replay:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-fn",
+      "config": {
+        "type": "scene",
+        "title": "Como resumir várias linhas em um valor?",
+        "align": "center",
+        "initial": "f0",
+        "layout": [
+          "chart",
+          "buttons",
+          "value",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MIN",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "SUM",
+                "to": "f4",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Clique em uma função para ver qual barra ela escolhe.",
+            "value": "?",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                false
+              ],
+              "lines": []
+            }
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "MAX",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MIN",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "SUM",
+                "to": "f4",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "AVG: a média de todos os valores",
+            "value": "143,33",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                true,
+                true
+              ],
+              "lines": []
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f2",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "MIN",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "SUM",
+                "to": "f4",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "MAX: o maior valor",
+            "value": "200",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                true
+              ],
+              "lines": []
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MIN",
+                "to": "f3",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "SUM",
+                "to": "f4",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "MIN: o menor valor",
+            "value": "100",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                true,
+                false
+              ],
+              "lines": []
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MIN",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "SUM",
+                "to": "f4",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "SUM: a soma de todos os valores",
+            "value": "430",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                true,
+                true
+              ],
+              "lines": []
+            }
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MIN",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "SUM",
+                "to": "f4",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "COUNT: quantas linhas existem",
+            "value": "3",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                true,
+                true
+              ],
+              "lines": []
+            }
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "130 100 200 AVG MAX MIN SUM COUNT ? Clique em uma função para ver qual barra ela escolhe.",
+          "keys": [
+            "f:AVG",
+            "f:MAX",
+            "f:MIN",
+            "f:SUM",
+            "f:COUNT"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "130 100 200 AVG MAX MIN SUM COUNT 143,33 AVG: a média de todos os valores",
+          "keys": [
+            "f:AVG",
+            "f:MAX",
+            "f:MIN",
+            "f:SUM",
+            "f:COUNT"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "130 100 200 AVG MAX MIN SUM COUNT 200 MAX: o maior valor",
+          "keys": [
+            "f:AVG",
+            "f:MAX",
+            "f:MIN",
+            "f:SUM",
+            "f:COUNT"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "130 100 200 AVG MAX MIN SUM COUNT 100 MIN: o menor valor",
+          "keys": [
+            "f:AVG",
+            "f:MAX",
+            "f:MIN",
+            "f:SUM",
+            "f:COUNT"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "130 100 200 AVG MAX MIN SUM COUNT 430 SUM: a soma de todos os valores",
+          "keys": [
+            "f:AVG",
+            "f:MAX",
+            "f:MIN",
+            "f:SUM",
+            "f:COUNT"
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "130 100 200 AVG MAX MIN SUM COUNT 3 COUNT: quantas linhas existem",
+          "keys": [
+            "f:AVG",
+            "f:MAX",
+            "f:MIN",
+            "f:SUM",
+            "f:COUNT"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-lab",
+      "config": {
+        "type": "scene",
+        "title": "Laboratório: mude a pergunta e observe",
+        "align": "center",
+        "initial": "f0",
+        "layout": [
+          "chart",
+          "buttons",
+          "code",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "MAX",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f12",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f1",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": ">=",
+                "to": "f2",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f3",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f4",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f5",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Escolha a referência ou o operador para ver a comparação.",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "AVG 143,33",
+                  "value": 143.333273
+                }
+              ]
+            },
+            "code": "WHERE valor > (SELECT AVG(valor) FROM pedidos)"
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "MAX",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f12",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f1",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": ">=",
+                "to": "f2",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f3",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f4",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f5",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 3",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                true
+              ],
+              "lines": [
+                {
+                  "label": "AVG 143,33",
+                  "value": 143.333273
+                }
+              ]
+            },
+            "code": "WHERE valor > (SELECT AVG(valor) FROM pedidos)"
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f2",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "MAX",
+                "to": "f8",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f13",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f1",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f2",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": "<",
+                "to": "f3",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f4",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f5",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 3",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                true
+              ],
+              "lines": [
+                {
+                  "label": "AVG 143,33",
+                  "value": 143.333273
+                }
+              ]
+            },
+            "code": "WHERE valor >= (SELECT AVG(valor) FROM pedidos)"
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f3",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "MAX",
+                "to": "f9",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f14",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f1",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f2",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f3",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": "<=",
+                "to": "f4",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f5",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 1, 2",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                true,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "AVG 143,33",
+                  "value": 143.333273
+                }
+              ]
+            },
+            "code": "WHERE valor < (SELECT AVG(valor) FROM pedidos)"
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f4",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "MAX",
+                "to": "f10",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f15",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f1",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f2",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f3",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f4",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": "=",
+                "to": "f5",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 1, 2",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                true,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "AVG 143,33",
+                  "value": 143.333273
+                }
+              ]
+            },
+            "code": "WHERE valor <= (SELECT AVG(valor) FROM pedidos)"
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f5",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "MAX",
+                "to": "f6",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f11",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f1",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f2",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f3",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f4",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f5",
+                "row": 1,
+                "selected": true
+              }
+            ],
+            "text": "Pedidos que passam: nenhum",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "AVG 143,33",
+                  "value": 143.333273
+                }
+              ]
+            },
+            "code": "WHERE valor = (SELECT AVG(valor) FROM pedidos)"
+          },
+          {
+            "id": "f6",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f6",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "pedido 1",
+                "to": "f11",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f7",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f8",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f9",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f10",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f6",
+                "row": 1,
+                "selected": true
+              }
+            ],
+            "text": "Pedidos que passam: 3",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                true
+              ],
+              "lines": [
+                {
+                  "label": "MAX 200",
+                  "value": 200
+                }
+              ]
+            },
+            "code": "WHERE valor = (SELECT MAX(valor) FROM pedidos)"
+          },
+          {
+            "id": "f7",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f7",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "pedido 1",
+                "to": "f12",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f7",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": ">=",
+                "to": "f8",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f9",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f10",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f6",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: nenhum",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "MAX 200",
+                  "value": 200
+                }
+              ]
+            },
+            "code": "WHERE valor > (SELECT MAX(valor) FROM pedidos)"
+          },
+          {
+            "id": "f8",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f8",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "pedido 1",
+                "to": "f13",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f7",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f8",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": "<",
+                "to": "f9",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f10",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f6",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 3",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                true
+              ],
+              "lines": [
+                {
+                  "label": "MAX 200",
+                  "value": 200
+                }
+              ]
+            },
+            "code": "WHERE valor >= (SELECT MAX(valor) FROM pedidos)"
+          },
+          {
+            "id": "f9",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f9",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "pedido 1",
+                "to": "f14",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f7",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f8",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f9",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": "<=",
+                "to": "f10",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f6",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 1, 2",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                true,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "MAX 200",
+                  "value": 200
+                }
+              ]
+            },
+            "code": "WHERE valor < (SELECT MAX(valor) FROM pedidos)"
+          },
+          {
+            "id": "f10",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f4",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f10",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "pedido 1",
+                "to": "f15",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": ">",
+                "to": "f7",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f8",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f9",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f10",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": "=",
+                "to": "f6",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 1, 2, 3",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                true,
+                true
+              ],
+              "lines": [
+                {
+                  "label": "MAX 200",
+                  "value": 200
+                }
+              ]
+            },
+            "code": "WHERE valor <= (SELECT MAX(valor) FROM pedidos)"
+          },
+          {
+            "id": "f11",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f6",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f11",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": ">",
+                "to": "f12",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f13",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f14",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f15",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f11",
+                "row": 1,
+                "selected": true
+              }
+            ],
+            "text": "Pedidos que passam: 1",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                false,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "pedido 1 = 130",
+                  "value": 130
+                }
+              ]
+            },
+            "code": "WHERE valor = (SELECT valor FROM pedidos WHERE id = 1)"
+          },
+          {
+            "id": "f12",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f12",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": ">",
+                "to": "f12",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": ">=",
+                "to": "f13",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f14",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f15",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f11",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 3",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                false,
+                true
+              ],
+              "lines": [
+                {
+                  "label": "pedido 1 = 130",
+                  "value": 130
+                }
+              ]
+            },
+            "code": "WHERE valor > (SELECT valor FROM pedidos WHERE id = 1)"
+          },
+          {
+            "id": "f13",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f8",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f13",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": ">",
+                "to": "f12",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f13",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": "<",
+                "to": "f14",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f15",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f11",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 1, 3",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                false,
+                true
+              ],
+              "lines": [
+                {
+                  "label": "pedido 1 = 130",
+                  "value": 130
+                }
+              ]
+            },
+            "code": "WHERE valor >= (SELECT valor FROM pedidos WHERE id = 1)"
+          },
+          {
+            "id": "f14",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f9",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f14",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": ">",
+                "to": "f12",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f13",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f14",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": "<=",
+                "to": "f15",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "=",
+                "to": "f11",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 2",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                false,
+                true,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "pedido 1 = 130",
+                  "value": 130
+                }
+              ]
+            },
+            "code": "WHERE valor < (SELECT valor FROM pedidos WHERE id = 1)"
+          },
+          {
+            "id": "f15",
+            "buttons": [
+              {
+                "label": "AVG",
+                "to": "f4",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "MAX",
+                "to": "f10",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "pedido 1",
+                "to": "f15",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": ">",
+                "to": "f12",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": ">=",
+                "to": "f13",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<",
+                "to": "f14",
+                "row": 1,
+                "selected": false
+              },
+              {
+                "label": "<=",
+                "to": "f15",
+                "row": 1,
+                "selected": true
+              },
+              {
+                "label": "=",
+                "to": "f11",
+                "row": 1,
+                "selected": false
+              }
+            ],
+            "text": "Pedidos que passam: 1, 2",
+            "chart": {
+              "maximum": 305.45454545454544,
+              "values": [
+                130,
+                100,
+                200
+              ],
+              "matches": [
+                true,
+                true,
+                false
+              ],
+              "lines": [
+                {
+                  "label": "pedido 1 = 130",
+                  "value": 130
+                }
+              ]
+            },
+            "code": "WHERE valor <= (SELECT valor FROM pedidos WHERE id = 1)"
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "130 100 200 AVG 143,33 AVG MAX pedido 1 > >= < <= = WHERE valor > (SELECT AVG(valor) FROM pedidos) Escolha a referência ou o operador para ver a comparação.",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "130 100 200 AVG 143,33 AVG MAX pedido 1 > >= < <= = WHERE valor > (SELECT AVG(valor) FROM pedidos) Pedidos que passam: 3",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "130 100 200 AVG 143,33 AVG MAX pedido 1 > >= < <= = WHERE valor >= (SELECT AVG(valor) FROM pedidos) Pedidos que passam: 3",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "130 100 200 AVG 143,33 AVG MAX pedido 1 > >= < <= = WHERE valor < (SELECT AVG(valor) FROM pedidos) Pedidos que passam: 1, 2",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "130 100 200 AVG 143,33 AVG MAX pedido 1 > >= < <= = WHERE valor <= (SELECT AVG(valor) FROM pedidos) Pedidos que passam: 1, 2",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "130 100 200 AVG 143,33 AVG MAX pedido 1 > >= < <= = WHERE valor = (SELECT AVG(valor) FROM pedidos) Pedidos que passam: nenhum",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f6",
+          "text": "130 100 200 MAX 200 AVG MAX pedido 1 > >= < <= = WHERE valor = (SELECT MAX(valor) FROM pedidos) Pedidos que passam: 3",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f7",
+          "text": "130 100 200 MAX 200 AVG MAX pedido 1 > >= < <= = WHERE valor > (SELECT MAX(valor) FROM pedidos) Pedidos que passam: nenhum",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f8",
+          "text": "130 100 200 MAX 200 AVG MAX pedido 1 > >= < <= = WHERE valor >= (SELECT MAX(valor) FROM pedidos) Pedidos que passam: 3",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f9",
+          "text": "130 100 200 MAX 200 AVG MAX pedido 1 > >= < <= = WHERE valor < (SELECT MAX(valor) FROM pedidos) Pedidos que passam: 1, 2",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f10",
+          "text": "130 100 200 MAX 200 AVG MAX pedido 1 > >= < <= = WHERE valor <= (SELECT MAX(valor) FROM pedidos) Pedidos que passam: 1, 2, 3",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f11",
+          "text": "130 100 200 pedido 1 = 130 AVG MAX pedido 1 > >= < <= = WHERE valor = (SELECT valor FROM pedidos WHERE id = 1) Pedidos que passam: 1",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f12",
+          "text": "130 100 200 pedido 1 = 130 AVG MAX pedido 1 > >= < <= = WHERE valor > (SELECT valor FROM pedidos WHERE id = 1) Pedidos que passam: 3",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f13",
+          "text": "130 100 200 pedido 1 = 130 AVG MAX pedido 1 > >= < <= = WHERE valor >= (SELECT valor FROM pedidos WHERE id = 1) Pedidos que passam: 1, 3",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f14",
+          "text": "130 100 200 pedido 1 = 130 AVG MAX pedido 1 > >= < <= = WHERE valor < (SELECT valor FROM pedidos WHERE id = 1) Pedidos que passam: 2",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        },
+        {
+          "id": "f15",
+          "text": "130 100 200 pedido 1 = 130 AVG MAX pedido 1 > >= < <= = WHERE valor <= (SELECT valor FROM pedidos WHERE id = 1) Pedidos que passam: 1, 2",
+          "keys": [
+            "ref:AVG",
+            "ref:MAX",
+            "ref:P1",
+            "op:>",
+            "op:>=",
+            "op:<",
+            "op:<=",
+            "op:="
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-scan-in",
+      "config": {
+        "type": "scene",
+        "title": "IN: o porteiro confere a lista",
+        "align": "left",
+        "initial": "f0",
+        "layout": [
+          "intro",
+          "chips",
+          "rows",
+          "buttons"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Iniciar conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": ""
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": []
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": ""
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f2",
+              "delay": 0
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "",
+                "active": true
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [
+              0,
+              1
+            ],
+            "next": {
+              "to": "f3",
+              "delay": 380
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista? Sim",
+                "active": true,
+                "tone": "success"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [
+              0,
+              1
+            ],
+            "next": {
+              "to": "f4",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f5",
+              "delay": 148.88888888888889
+            }
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "",
+                "active": true
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [
+              2
+            ],
+            "next": {
+              "to": "f6",
+              "delay": 380
+            }
+          },
+          {
+            "id": "f6",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista? Sim",
+                "active": true,
+                "tone": "success"
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [
+              2
+            ],
+            "next": {
+              "to": "f7",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f7",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f8",
+              "delay": 148.88888888888889
+            }
+          },
+          {
+            "id": "f8",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Carla (3)",
+                "result": "",
+                "active": true
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f9",
+              "delay": 380
+            }
+          },
+          {
+            "id": "f9",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Carla (3)",
+                "result": "Está na lista? Não",
+                "active": true,
+                "tone": "danger"
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f10",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f10",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista? Sim",
+                "tone": "success"
+              },
+              {
+                "label": "Carla (3)",
+                "result": "Está na lista? Não",
+                "tone": "danger"
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": []
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Bruno (2) Carla (3) Iniciar conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista? Sim Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista? Sim Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista? Sim Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f6",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista? Sim Bruno (2) Está na lista? Sim Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f7",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista? Sim Bruno (2) Está na lista? Sim Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f8",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista? Sim Bruno (2) Está na lista? Sim Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f9",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista? Sim Bruno (2) Está na lista? Sim Carla (3) Está na lista? Não Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f10",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista? Sim Bruno (2) Está na lista? Sim Carla (3) Está na lista? Não Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-scan-notin",
+      "config": {
+        "type": "scene",
+        "title": "NOT IN: quem ficou de fora da lista",
+        "align": "left",
+        "initial": "f0",
+        "layout": [
+          "intro",
+          "chips",
+          "rows",
+          "buttons"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Iniciar conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": ""
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": []
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": ""
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f2",
+              "delay": 0
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "",
+                "active": true
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [
+              0,
+              1
+            ],
+            "next": {
+              "to": "f3",
+              "delay": 380
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista: fora",
+                "active": true,
+                "tone": "danger"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [
+              0,
+              1
+            ],
+            "next": {
+              "to": "f4",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": ""
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f5",
+              "delay": 148.88888888888889
+            }
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "",
+                "active": true
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [
+              2
+            ],
+            "next": {
+              "to": "f6",
+              "delay": 380
+            }
+          },
+          {
+            "id": "f6",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista: fora",
+                "active": true,
+                "tone": "danger"
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [
+              2
+            ],
+            "next": {
+              "to": "f7",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f7",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Carla (3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f8",
+              "delay": 148.88888888888889
+            }
+          },
+          {
+            "id": "f8",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Carla (3)",
+                "result": "",
+                "active": true
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f9",
+              "delay": 380
+            }
+          },
+          {
+            "id": "f9",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Carla (3)",
+                "result": "Fora da lista: entra",
+                "active": true,
+                "tone": "success"
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f10",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f10",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "rows": [
+              {
+                "label": "Ana (1)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Bruno (2)",
+                "result": "Está na lista: fora",
+                "tone": "danger"
+              },
+              {
+                "label": "Carla (3)",
+                "result": "Fora da lista: entra",
+                "tone": "success"
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": []
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Bruno (2) Carla (3) Iniciar conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista: fora Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista: fora Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista: fora Bruno (2) Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f6",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista: fora Bruno (2) Está na lista: fora Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f7",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista: fora Bruno (2) Está na lista: fora Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f8",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista: fora Bruno (2) Está na lista: fora Carla (3) Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f9",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista: fora Bruno (2) Está na lista: fora Carla (3) Fora da lista: entra Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f10",
+          "text": "Lista devolvida pela subconsulta: 112 Ana (1) Está na lista: fora Bruno (2) Está na lista: fora Carla (3) Fora da lista: entra Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-nul",
+      "config": {
+        "type": "scene",
+        "title": "Cuidado: o nome borrado na lista",
+        "align": "left",
+        "initial": "f0",
+        "layout": [
+          "intro",
+          "chips",
+          "buttons",
+          "rows",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "+ pedido sem cliente (NULL)",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "Clique no botão para acrescentar o pedido sem cliente e ver o que acontece.",
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": ""
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": []
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Tirar o pedido sem cliente",
+                "to": "f6",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "",
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": "",
+                "active": true
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2",
+              "NULL"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f2",
+              "delay": 200
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Tirar o pedido sem cliente",
+                "to": "f6",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "",
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": "3 ≠ 1? sim",
+                "active": true
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2",
+              "NULL"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f3",
+              "delay": 800
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Tirar o pedido sem cliente",
+                "to": "f6",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "",
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": "3 ≠ 2? sim",
+                "active": true
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2",
+              "NULL"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f4",
+              "delay": 800
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "Tirar o pedido sem cliente",
+                "to": "f6",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "",
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": "3 ≠ NULL? desconhecido",
+                "active": true
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2",
+              "NULL"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f5",
+              "delay": 860
+            }
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "Tirar o pedido sem cliente",
+                "to": "f6",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "Resultado: vazio, sem nenhum erro.",
+            "textRuns": [
+              {
+                "text": "Resultado: "
+              },
+              {
+                "text": "vazio",
+                "strong": true,
+                "tone": "danger"
+              },
+              {
+                "text": ", sem nenhum erro."
+              }
+            ],
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": "em dúvida: Carla fica de fora",
+                "tone": "danger"
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2",
+              "NULL"
+            ],
+            "hits": []
+          },
+          {
+            "id": "f6",
+            "buttons": [
+              {
+                "label": "+ pedido sem cliente (NULL)",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "",
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": "",
+                "active": true
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f7",
+              "delay": 200
+            }
+          },
+          {
+            "id": "f7",
+            "buttons": [
+              {
+                "label": "+ pedido sem cliente (NULL)",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "",
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": "3 ≠ 1? sim",
+                "active": true
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f8",
+              "delay": 800
+            }
+          },
+          {
+            "id": "f8",
+            "buttons": [
+              {
+                "label": "+ pedido sem cliente (NULL)",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "",
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": "3 ≠ 2? sim",
+                "active": true
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": [],
+            "next": {
+              "to": "f9",
+              "delay": 860
+            }
+          },
+          {
+            "id": "f9",
+            "buttons": [
+              {
+                "label": "+ pedido sem cliente (NULL)",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "intro": "Lista devolvida pela subconsulta:",
+            "text": "Resultado: Carla.",
+            "textRuns": [
+              {
+                "text": "Resultado: "
+              },
+              {
+                "text": "Carla",
+                "strong": true,
+                "tone": "success"
+              },
+              {
+                "text": "."
+              }
+            ],
+            "rows": [
+              {
+                "label": "Carla (id 3)",
+                "result": "todas dão sim: Carla entra",
+                "tone": "success"
+              }
+            ],
+            "chips": [
+              "1",
+              "1",
+              "2"
+            ],
+            "hits": []
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Lista devolvida pela subconsulta: 112 + pedido sem cliente (NULL) Carla (id 3) Clique no botão para acrescentar o pedido sem cliente e ver o que acontece.",
+          "keys": [
+            "nul:"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Lista devolvida pela subconsulta: 112NULL Tirar o pedido sem cliente Carla (id 3)",
+          "keys": [
+            "nul:"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Lista devolvida pela subconsulta: 112NULL Tirar o pedido sem cliente Carla (id 3) 3 ≠ 1? sim",
+          "keys": [
+            "nul:"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "Lista devolvida pela subconsulta: 112NULL Tirar o pedido sem cliente Carla (id 3) 3 ≠ 2? sim",
+          "keys": [
+            "nul:"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "Lista devolvida pela subconsulta: 112NULL Tirar o pedido sem cliente Carla (id 3) 3 ≠ NULL? desconhecido",
+          "keys": [
+            "nul:"
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "Lista devolvida pela subconsulta: 112NULL Tirar o pedido sem cliente Carla (id 3) em dúvida: Carla fica de fora Resultado: vazio, sem nenhum erro.",
+          "keys": [
+            "nul:"
+          ]
+        },
+        {
+          "id": "f6",
+          "text": "Lista devolvida pela subconsulta: 112 + pedido sem cliente (NULL) Carla (id 3)",
+          "keys": [
+            "nul:"
+          ]
+        },
+        {
+          "id": "f7",
+          "text": "Lista devolvida pela subconsulta: 112 + pedido sem cliente (NULL) Carla (id 3) 3 ≠ 1? sim",
+          "keys": [
+            "nul:"
+          ]
+        },
+        {
+          "id": "f8",
+          "text": "Lista devolvida pela subconsulta: 112 + pedido sem cliente (NULL) Carla (id 3) 3 ≠ 2? sim",
+          "keys": [
+            "nul:"
+          ]
+        },
+        {
+          "id": "f9",
+          "text": "Lista devolvida pela subconsulta: 112 + pedido sem cliente (NULL) Carla (id 3) todas dão sim: Carla entra Resultado: Carla.",
+          "keys": [
+            "nul:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-parou",
+      "config": {
+        "type": "scene",
+        "title": "Basta um: o EXISTS para no primeiro achado",
+        "align": "left",
+        "initial": "f0",
+        "layout": [
+          "buttons",
+          "rows",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "EXISTS",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha EXISTS ou COUNT para ver como cada um trabalha.",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana, 130)",
+                "result": ""
+              },
+              {
+                "label": "Pedido 2 (Ana, 100)",
+                "result": ""
+              }
+            ]
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "EXISTS",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana, 130)",
+                "result": ""
+              },
+              {
+                "label": "Pedido 2 (Ana, 100)",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f2",
+              "delay": 220
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "EXISTS",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana, 130)",
+                "result": "",
+                "active": true
+              },
+              {
+                "label": "Pedido 2 (Ana, 100)",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f3",
+              "delay": 520
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "EXISTS",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana, 130)",
+                "result": "PAGO: achei!",
+                "active": true,
+                "tone": "success"
+              },
+              {
+                "label": "Pedido 2 (Ana, 100)",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f4",
+              "delay": 820
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "EXISTS",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "O EXISTS parou no primeiro achado: verdadeiro.",
+            "textRuns": [
+              {
+                "text": "O EXISTS parou no primeiro achado: "
+              },
+              {
+                "text": "verdadeiro",
+                "strong": true,
+                "tone": "success"
+              },
+              {
+                "text": "."
+              }
+            ],
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana, 130)",
+                "result": "PAGO: achei!",
+                "tone": "success"
+              },
+              {
+                "label": "Pedido 2 (Ana, 100)",
+                "result": "nem precisa olhar",
+                "muted": true
+              }
+            ]
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "EXISTS",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana, 130)",
+                "result": ""
+              },
+              {
+                "label": "Pedido 2 (Ana, 100)",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f6",
+              "delay": 220
+            }
+          },
+          {
+            "id": "f6",
+            "buttons": [
+              {
+                "label": "EXISTS",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana, 130)",
+                "result": "",
+                "active": true
+              },
+              {
+                "label": "Pedido 2 (Ana, 100)",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f7",
+              "delay": 660
+            }
+          },
+          {
+            "id": "f7",
+            "buttons": [
+              {
+                "label": "EXISTS",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "",
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana, 130)",
+                "result": "conta 1",
+                "tone": "success"
+              },
+              {
+                "label": "Pedido 2 (Ana, 100)",
+                "result": "",
+                "active": true
+              }
+            ],
+            "next": {
+              "to": "f8",
+              "delay": 680
+            }
+          },
+          {
+            "id": "f8",
+            "buttons": [
+              {
+                "label": "EXISTS",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "COUNT",
+                "to": "f5",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "O COUNT olhou todos: 2 pedidos. Trabalho extra para saber só se existe.",
+            "textRuns": [
+              {
+                "text": "O COUNT olhou todos: "
+              },
+              {
+                "text": "2 pedidos",
+                "strong": true,
+                "tone": "success"
+              },
+              {
+                "text": ". Trabalho extra para saber só se existe."
+              }
+            ],
+            "rows": [
+              {
+                "label": "Pedido 1 (Ana, 130)",
+                "result": "conta 1",
+                "tone": "success"
+              },
+              {
+                "label": "Pedido 2 (Ana, 100)",
+                "result": "conta 2",
+                "tone": "success"
+              }
+            ]
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "EXISTS COUNT Pedido 1 (Ana, 130) Pedido 2 (Ana, 100) Escolha EXISTS ou COUNT para ver como cada um trabalha.",
+          "keys": [
+            "k:ex",
+            "k:ct"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "EXISTS COUNT Pedido 1 (Ana, 130) Pedido 2 (Ana, 100)",
+          "keys": [
+            "k:ex",
+            "k:ct"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "EXISTS COUNT Pedido 1 (Ana, 130) Pedido 2 (Ana, 100)",
+          "keys": [
+            "k:ex",
+            "k:ct"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "EXISTS COUNT Pedido 1 (Ana, 130) PAGO: achei! Pedido 2 (Ana, 100)",
+          "keys": [
+            "k:ex",
+            "k:ct"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "EXISTS COUNT Pedido 1 (Ana, 130) PAGO: achei! Pedido 2 (Ana, 100) nem precisa olhar O EXISTS parou no primeiro achado: verdadeiro.",
+          "keys": [
+            "k:ex",
+            "k:ct"
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "EXISTS COUNT Pedido 1 (Ana, 130) Pedido 2 (Ana, 100)",
+          "keys": [
+            "k:ex",
+            "k:ct"
+          ]
+        },
+        {
+          "id": "f6",
+          "text": "EXISTS COUNT Pedido 1 (Ana, 130) Pedido 2 (Ana, 100)",
+          "keys": [
+            "k:ex",
+            "k:ct"
+          ]
+        },
+        {
+          "id": "f7",
+          "text": "EXISTS COUNT Pedido 1 (Ana, 130) conta 1 Pedido 2 (Ana, 100)",
+          "keys": [
+            "k:ex",
+            "k:ct"
+          ]
+        },
+        {
+          "id": "f8",
+          "text": "EXISTS COUNT Pedido 1 (Ana, 130) conta 1 Pedido 2 (Ana, 100) conta 2 O COUNT olhou todos: 2 pedidos. Trabalho extra para saber só se existe.",
+          "keys": [
+            "k:ex",
+            "k:ct"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-scan-ex",
+      "config": {
+        "type": "scene",
+        "title": "Passo a passo: um cliente por vez",
+        "align": "left",
+        "initial": "f0",
+        "layout": [
+          "rows",
+          "buttons"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Iniciar conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": ""
+              },
+              {
+                "label": "Bruno",
+                "result": ""
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ]
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": ""
+              },
+              {
+                "label": "Bruno",
+                "result": ""
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f2",
+              "delay": 0
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "",
+                "active": true
+              },
+              {
+                "label": "Bruno",
+                "result": ""
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f3",
+              "delay": 380
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2 pedidos pagos: existe",
+                "active": true,
+                "tone": "success"
+              },
+              {
+                "label": "Bruno",
+                "result": ""
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f4",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2 pedidos pagos: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno",
+                "result": ""
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f5",
+              "delay": 148.88888888888889
+            }
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2 pedidos pagos: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno",
+                "result": "",
+                "active": true
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f6",
+              "delay": 380
+            }
+          },
+          {
+            "id": "f6",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2 pedidos pagos: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno",
+                "result": "1 pedido pago: existe",
+                "active": true,
+                "tone": "success"
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f7",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f7",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2 pedidos pagos: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno",
+                "result": "1 pedido pago: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f8",
+              "delay": 148.88888888888889
+            }
+          },
+          {
+            "id": "f8",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2 pedidos pagos: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno",
+                "result": "1 pedido pago: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Carla",
+                "result": "",
+                "active": true
+              }
+            ],
+            "next": {
+              "to": "f9",
+              "delay": 380
+            }
+          },
+          {
+            "id": "f9",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2 pedidos pagos: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno",
+                "result": "1 pedido pago: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Carla",
+                "result": "0 pedidos: não existe",
+                "active": true,
+                "tone": "danger"
+              }
+            ],
+            "next": {
+              "to": "f10",
+              "delay": 651.1111111111111
+            }
+          },
+          {
+            "id": "f10",
+            "buttons": [
+              {
+                "label": "Repetir conferência",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2 pedidos pagos: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Bruno",
+                "result": "1 pedido pago: existe",
+                "tone": "success"
+              },
+              {
+                "label": "Carla",
+                "result": "0 pedidos: não existe",
+                "tone": "danger"
+              }
+            ]
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Ana Bruno Carla Iniciar conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Ana Bruno Carla Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Ana Bruno Carla Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "Ana 2 pedidos pagos: existe Bruno Carla Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "Ana 2 pedidos pagos: existe Bruno Carla Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "Ana 2 pedidos pagos: existe Bruno Carla Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f6",
+          "text": "Ana 2 pedidos pagos: existe Bruno 1 pedido pago: existe Carla Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f7",
+          "text": "Ana 2 pedidos pagos: existe Bruno 1 pedido pago: existe Carla Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f8",
+          "text": "Ana 2 pedidos pagos: existe Bruno 1 pedido pago: existe Carla Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f9",
+          "text": "Ana 2 pedidos pagos: existe Bruno 1 pedido pago: existe Carla 0 pedidos: não existe Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f10",
+          "text": "Ana 2 pedidos pagos: existe Bruno 1 pedido pago: existe Carla 0 pedidos: não existe Repetir conferência",
+          "keys": [
+            "replay:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-vezes",
+      "config": {
+        "type": "scene",
+        "title": "Por que ela se chama correlacionada?",
+        "align": "center",
+        "initial": "f0",
+        "layout": [
+          "buttons",
+          "rows",
+          "value",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Escalar (AVG)",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Correlacionada (EXISTS)",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha uma opção para ver quantas vezes a subconsulta roda.",
+            "value": "0",
+            "valuePrefix": "Execuções da subconsulta: ",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": ""
+              },
+              {
+                "label": "Bruno",
+                "result": ""
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ]
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Escalar (AVG)",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "Correlacionada (EXISTS)",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "",
+            "value": "0",
+            "valuePrefix": "Execuções da subconsulta: ",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": ""
+              },
+              {
+                "label": "Bruno",
+                "result": ""
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f2",
+              "delay": 320
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Escalar (AVG)",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "Correlacionada (EXISTS)",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Rodou uma vez, antes de tudo. Todos usam o mesmo resultado.",
+            "value": "1",
+            "valuePrefix": "Execuções da subconsulta: ",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "usa 143,33",
+                "active": true
+              },
+              {
+                "label": "Bruno",
+                "result": "usa 143,33",
+                "active": true
+              },
+              {
+                "label": "Carla",
+                "result": "usa 143,33",
+                "active": true
+              }
+            ]
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Escalar (AVG)",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Correlacionada (EXISTS)",
+                "to": "f3",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "",
+            "value": "0",
+            "valuePrefix": "Execuções da subconsulta: ",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": ""
+              },
+              {
+                "label": "Bruno",
+                "result": ""
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f4",
+              "delay": 300
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "Escalar (AVG)",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Correlacionada (EXISTS)",
+                "to": "f3",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "",
+            "value": "1",
+            "valuePrefix": "Execuções da subconsulta: ",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "roda para Ana",
+                "active": true
+              },
+              {
+                "label": "Bruno",
+                "result": ""
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f5",
+              "delay": 1180
+            }
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "Escalar (AVG)",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Correlacionada (EXISTS)",
+                "to": "f3",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "",
+            "value": "2",
+            "valuePrefix": "Execuções da subconsulta: ",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "roda para Ana"
+              },
+              {
+                "label": "Bruno",
+                "result": "roda para Bruno",
+                "active": true
+              },
+              {
+                "label": "Carla",
+                "result": ""
+              }
+            ],
+            "next": {
+              "to": "f6",
+              "delay": 1180
+            }
+          },
+          {
+            "id": "f6",
+            "buttons": [
+              {
+                "label": "Escalar (AVG)",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Correlacionada (EXISTS)",
+                "to": "f3",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "",
+            "value": "3",
+            "valuePrefix": "Execuções da subconsulta: ",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "roda para Ana"
+              },
+              {
+                "label": "Bruno",
+                "result": "roda para Bruno"
+              },
+              {
+                "label": "Carla",
+                "result": "roda para Carla",
+                "active": true
+              }
+            ],
+            "next": {
+              "to": "f7",
+              "delay": 1080
+            }
+          },
+          {
+            "id": "f7",
+            "buttons": [
+              {
+                "label": "Escalar (AVG)",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Correlacionada (EXISTS)",
+                "to": "f3",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "Rodou uma vez para cada cliente, porque depende de quem está na porta.",
+            "value": "3",
+            "valuePrefix": "Execuções da subconsulta: ",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "roda para Ana"
+              },
+              {
+                "label": "Bruno",
+                "result": "roda para Bruno"
+              },
+              {
+                "label": "Carla",
+                "result": "roda para Carla"
+              }
+            ]
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Escalar (AVG) Correlacionada (EXISTS) Ana Bruno Carla Execuções da subconsulta: 0 Escolha uma opção para ver quantas vezes a subconsulta roda.",
+          "keys": [
+            "k:esc",
+            "k:cor"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Escalar (AVG) Correlacionada (EXISTS) Ana Bruno Carla Execuções da subconsulta: 0",
+          "keys": [
+            "k:esc",
+            "k:cor"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Escalar (AVG) Correlacionada (EXISTS) Ana usa 143,33 Bruno usa 143,33 Carla usa 143,33 Execuções da subconsulta: 1 Rodou uma vez, antes de tudo. Todos usam o mesmo resultado.",
+          "keys": [
+            "k:esc",
+            "k:cor"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "Escalar (AVG) Correlacionada (EXISTS) Ana Bruno Carla Execuções da subconsulta: 0",
+          "keys": [
+            "k:esc",
+            "k:cor"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "Escalar (AVG) Correlacionada (EXISTS) Ana roda para Ana Bruno Carla Execuções da subconsulta: 1",
+          "keys": [
+            "k:esc",
+            "k:cor"
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "Escalar (AVG) Correlacionada (EXISTS) Ana roda para Ana Bruno roda para Bruno Carla Execuções da subconsulta: 2",
+          "keys": [
+            "k:esc",
+            "k:cor"
+          ]
+        },
+        {
+          "id": "f6",
+          "text": "Escalar (AVG) Correlacionada (EXISTS) Ana roda para Ana Bruno roda para Bruno Carla roda para Carla Execuções da subconsulta: 3",
+          "keys": [
+            "k:esc",
+            "k:cor"
+          ]
+        },
+        {
+          "id": "f7",
+          "text": "Escalar (AVG) Correlacionada (EXISTS) Ana roda para Ana Bruno roda para Bruno Carla roda para Carla Execuções da subconsulta: 3 Rodou uma vez para cada cliente, porque depende de quem está na porta.",
+          "keys": [
+            "k:esc",
+            "k:cor"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-forma",
+      "config": {
+        "type": "scene",
+        "title": "E se a resposta for uma tabela inteira?",
+        "align": "center",
+        "initial": "f0",
+        "layout": [
+          "buttons",
+          "cells",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Um valor",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Uma lista",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Uma tabela",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha um formato para ver o que cabe no WHERE ou no FROM.",
+            "cells": {
+              "columns": 1,
+              "values": []
+            }
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Um valor",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "Uma lista",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Uma tabela",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Um valor: cabe no WHERE com =, > ou <. É a subconsulta escalar.",
+            "cells": {
+              "columns": 1,
+              "values": [
+                "143,33"
+              ]
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Um valor",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Uma lista",
+                "to": "f2",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "Uma tabela",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Uma lista: cabe no WHERE com IN ou NOT IN.",
+            "cells": {
+              "columns": 1,
+              "values": [
+                "1",
+                "1",
+                "2"
+              ]
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Um valor",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Uma lista",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Uma tabela",
+                "to": "f3",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "Uma tabela: cabe no FROM, com apelido. É a tabela derivada.",
+            "cells": {
+              "columns": 2,
+              "values": [
+                "id_cliente",
+                "total_gasto",
+                "1",
+                "230",
+                "2",
+                "200"
+              ]
+            }
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Um valor Uma lista Uma tabela Escolha um formato para ver o que cabe no WHERE ou no FROM.",
+          "keys": [
+            "s:1",
+            "s:2",
+            "s:3"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Um valor Uma lista Uma tabela 143,33 Um valor: cabe no WHERE com =, > ou <. É a subconsulta escalar.",
+          "keys": [
+            "s:1",
+            "s:2",
+            "s:3"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Um valor Uma lista Uma tabela 1 1 2 Uma lista: cabe no WHERE com IN ou NOT IN.",
+          "keys": [
+            "s:1",
+            "s:2",
+            "s:3"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "Um valor Uma lista Uma tabela id_cliente total_gasto 1 230 2 200 Uma tabela: cabe no FROM, com apelido. É a tabela derivada.",
+          "keys": [
+            "s:1",
+            "s:2",
+            "s:3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-pile",
+      "config": {
+        "type": "scene",
+        "title": "O caixa separa em montinhos",
+        "align": "center",
+        "initial": "f0",
+        "layout": [
+          "groups",
+          "buttons"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Iniciar: separar em montinhos",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "groups": [
+              {
+                "name": "Ana",
+                "items": [],
+                "total": "total: 0"
+              },
+              {
+                "name": "Bruno",
+                "items": [],
+                "total": "total: 0"
+              }
+            ]
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Repetir separação",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "groups": [
+              {
+                "name": "Ana",
+                "items": [],
+                "total": "total: 0"
+              },
+              {
+                "name": "Bruno",
+                "items": [],
+                "total": "total: 0"
+              }
+            ],
+            "next": {
+              "to": "f2",
+              "delay": 240
+            }
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Repetir separação",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "groups": [
+              {
+                "name": "Ana",
+                "items": [
+                  "130"
+                ],
+                "total": "total: 130"
+              },
+              {
+                "name": "Bruno",
+                "items": [],
+                "total": "total: 0"
+              }
+            ],
+            "next": {
+              "to": "f3",
+              "delay": 800
+            }
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Repetir separação",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "groups": [
+              {
+                "name": "Ana",
+                "items": [
+                  "130",
+                  "100"
+                ],
+                "total": "total: 230"
+              },
+              {
+                "name": "Bruno",
+                "items": [],
+                "total": "total: 0"
+              }
+            ],
+            "next": {
+              "to": "f4",
+              "delay": 800
+            }
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "Repetir separação",
+                "to": "f1",
+                "row": 0
+              }
+            ],
+            "groups": [
+              {
+                "name": "Ana",
+                "items": [
+                  "130",
+                  "100"
+                ],
+                "total": "total: 230"
+              },
+              {
+                "name": "Bruno",
+                "items": [
+                  "200"
+                ],
+                "total": "total: 200"
+              }
+            ]
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Ana total: 0 Bruno total: 0 Iniciar: separar em montinhos",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Ana total: 0 Bruno total: 0 Repetir separação",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Ana 130 total: 130 Bruno total: 0 Repetir separação",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "Ana 130100 total: 230 Bruno total: 0 Repetir separação",
+          "keys": [
+            "replay:"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "Ana 130100 total: 230 Bruno 200 total: 200 Repetir separação",
+          "keys": [
+            "replay:"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-join",
+      "config": {
+        "type": "scene",
+        "title": "Resumir antes de juntar",
+        "align": "left",
+        "initial": "f0",
+        "layout": [
+          "buttons",
+          "rows",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "JOIN",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "LEFT JOIN",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha JOIN ou LEFT JOIN para ver o que acontece com a Carla.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "230"
+              },
+              {
+                "label": "Bruno",
+                "result": "200"
+              },
+              {
+                "label": "Carla",
+                "result": "NULL"
+              }
+            ]
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "JOIN",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "LEFT JOIN",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "JOIN só mantém quem tem par no resumo: a Carla some.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "230"
+              },
+              {
+                "label": "Bruno",
+                "result": "200"
+              },
+              {
+                "label": "Carla",
+                "result": "sem par: some",
+                "muted": true,
+                "tone": "danger"
+              }
+            ]
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "JOIN",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "LEFT JOIN",
+                "to": "f2",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "LEFT JOIN mantém todos os clientes: a Carla fica com NULL, sem informação.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "230"
+              },
+              {
+                "label": "Bruno",
+                "result": "200"
+              },
+              {
+                "label": "Carla",
+                "result": "NULL",
+                "tone": "success"
+              }
+            ]
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "JOIN LEFT JOIN Ana 230 Bruno 200 Carla NULL Escolha JOIN ou LEFT JOIN para ver o que acontece com a Carla.",
+          "keys": [
+            "j:join",
+            "j:left"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "JOIN LEFT JOIN Ana 230 Bruno 200 Carla sem par: some JOIN só mantém quem tem par no resumo: a Carla some.",
+          "keys": [
+            "j:join",
+            "j:left"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "JOIN LEFT JOIN Ana 230 Bruno 200 Carla NULL LEFT JOIN mantém todos os clientes: a Carla fica com NULL, sem informação.",
+          "keys": [
+            "j:join",
+            "j:left"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-ord",
+      "config": {
+        "type": "scene",
+        "title": "Por que a ordem importa",
+        "align": "center",
+        "initial": "f0",
+        "layout": [
+          "value",
+          "buttons",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Juntar antes de somar",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Resumir antes de juntar",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha uma opção para ver como o total muda.",
+            "value": "230",
+            "valuePrefix": "Total da Ana: "
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Juntar antes de somar",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "Resumir antes de juntar",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "O pedido 1 entrou duas vezes: 130 + 130 + 100.",
+            "value": "360",
+            "valuePrefix": "Total da Ana: "
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Juntar antes de somar",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Resumir antes de juntar",
+                "to": "f2",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "Cada pedido entrou uma vez: 130 + 100.",
+            "value": "230",
+            "valuePrefix": "Total da Ana: "
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Total da Ana: 230 Juntar antes de somar Resumir antes de juntar Escolha uma opção para ver como o total muda.",
+          "keys": [
+            "m:join",
+            "m:sum"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Total da Ana: 360 Juntar antes de somar Resumir antes de juntar O pedido 1 entrou duas vezes: 130 + 130 + 100.",
+          "keys": [
+            "m:join",
+            "m:sum"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Total da Ana: 230 Juntar antes de somar Resumir antes de juntar Cada pedido entrou uma vez: 130 + 100.",
+          "keys": [
+            "m:join",
+            "m:sum"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-coal",
+      "config": {
+        "type": "scene",
+        "title": "Contar pedidos e trocar NULL por zero",
+        "align": "left",
+        "initial": "f0",
+        "layout": [
+          "buttons",
+          "rows",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Sem COALESCE",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Com COALESCE",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "A Carla fez zero pedidos: \"NULL\" fica estranho num relatório.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2"
+              },
+              {
+                "label": "Bruno",
+                "result": "1"
+              },
+              {
+                "label": "Carla",
+                "result": "NULL"
+              }
+            ]
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Sem COALESCE",
+                "to": "f1",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "Com COALESCE",
+                "to": "f2",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "A Carla fez zero pedidos: \"NULL\" fica estranho num relatório.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2"
+              },
+              {
+                "label": "Bruno",
+                "result": "1"
+              },
+              {
+                "label": "Carla",
+                "result": "NULL",
+                "tone": "danger"
+              }
+            ]
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Sem COALESCE",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Com COALESCE",
+                "to": "f2",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "A Carla fez zero pedidos: \"NULL\" fica estranho num relatório.",
+            "rows": [
+              {
+                "label": "Ana",
+                "result": "2"
+              },
+              {
+                "label": "Bruno",
+                "result": "1"
+              },
+              {
+                "label": "Carla",
+                "result": "0",
+                "tone": "success"
+              }
+            ]
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Sem COALESCE Com COALESCE Ana 2 Bruno 1 Carla NULL A Carla fez zero pedidos: \"NULL\" fica estranho num relatório.",
+          "keys": [
+            "k:no",
+            "k:yes"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Sem COALESCE Com COALESCE Ana 2 Bruno 1 Carla NULL A Carla fez zero pedidos: \"NULL\" fica estranho num relatório.",
+          "keys": [
+            "k:no",
+            "k:yes"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Sem COALESCE Com COALESCE Ana 2 Bruno 1 Carla 0 A Carla fez zero pedidos: \"NULL\" fica estranho num relatório.",
+          "keys": [
+            "k:no",
+            "k:yes"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subq-traduz",
+      "config": {
+        "type": "scene",
+        "title": "Voltando à lanchonete: lendo o mundo com SQL",
+        "align": "center",
+        "initial": "f0",
+        "layout": [
+          "buttons",
+          "code",
+          "text"
+        ],
+        "frames": [
+          {
+            "id": "f0",
+            "buttons": [
+              {
+                "label": "Quem pediu acima da média?",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem já pagou algum pedido?",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem nunca pediu?",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quanto cada um gastou?",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha uma pergunta da Dona Marta.",
+            "code": "",
+            "codeHidden": true
+          },
+          {
+            "id": "f1",
+            "buttons": [
+              {
+                "label": "Quem pediu acima da média?",
+                "to": "f2",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "Quem já pagou algum pedido?",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem nunca pediu?",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quanto cada um gastou?",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Tipo: Subconsulta escalar (um valor)",
+            "code": "SELECT id, valor FROM pedidos\nWHERE valor > (SELECT AVG(valor) FROM pedidos);"
+          },
+          {
+            "id": "f2",
+            "buttons": [
+              {
+                "label": "Quem pediu acima da média?",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem já pagou algum pedido?",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem nunca pediu?",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quanto cada um gastou?",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha uma pergunta da Dona Marta.",
+            "code": "SELECT id, valor FROM pedidos\nWHERE valor > (SELECT AVG(valor) FROM pedidos);",
+            "codeHidden": true
+          },
+          {
+            "id": "f3",
+            "buttons": [
+              {
+                "label": "Quem pediu acima da média?",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem já pagou algum pedido?",
+                "to": "f4",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "Quem nunca pediu?",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quanto cada um gastou?",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Tipo: Subconsulta de lista (IN)",
+            "code": "SELECT nome FROM clientes\nWHERE id IN (\n  SELECT id_cliente FROM pedidos\n  WHERE status = 'PAGO'\n);"
+          },
+          {
+            "id": "f4",
+            "buttons": [
+              {
+                "label": "Quem pediu acima da média?",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem já pagou algum pedido?",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem nunca pediu?",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quanto cada um gastou?",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha uma pergunta da Dona Marta.",
+            "code": "SELECT nome FROM clientes\nWHERE id IN (\n  SELECT id_cliente FROM pedidos\n  WHERE status = 'PAGO'\n);",
+            "codeHidden": true
+          },
+          {
+            "id": "f5",
+            "buttons": [
+              {
+                "label": "Quem pediu acima da média?",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem já pagou algum pedido?",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem nunca pediu?",
+                "to": "f6",
+                "row": 0,
+                "selected": true
+              },
+              {
+                "label": "Quanto cada um gastou?",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Tipo: Subconsulta correlacionada (NOT EXISTS)",
+            "code": "SELECT cli.nome FROM clientes cli\nWHERE NOT EXISTS (\n  SELECT 1 FROM pedidos ped\n  WHERE ped.id_cliente = cli.id\n);"
+          },
+          {
+            "id": "f6",
+            "buttons": [
+              {
+                "label": "Quem pediu acima da média?",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem já pagou algum pedido?",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem nunca pediu?",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quanto cada um gastou?",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha uma pergunta da Dona Marta.",
+            "code": "SELECT cli.nome FROM clientes cli\nWHERE NOT EXISTS (\n  SELECT 1 FROM pedidos ped\n  WHERE ped.id_cliente = cli.id\n);",
+            "codeHidden": true
+          },
+          {
+            "id": "f7",
+            "buttons": [
+              {
+                "label": "Quem pediu acima da média?",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem já pagou algum pedido?",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem nunca pediu?",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quanto cada um gastou?",
+                "to": "f8",
+                "row": 0,
+                "selected": true
+              }
+            ],
+            "text": "Tipo: Tabela derivada (no FROM)",
+            "code": "SELECT cli.nome, resumo.total_gasto\nFROM clientes cli\nLEFT JOIN (\n  SELECT id_cliente, SUM(valor) AS total_gasto\n  FROM pedidos GROUP BY id_cliente\n) resumo ON cli.id = resumo.id_cliente;"
+          },
+          {
+            "id": "f8",
+            "buttons": [
+              {
+                "label": "Quem pediu acima da média?",
+                "to": "f1",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem já pagou algum pedido?",
+                "to": "f3",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quem nunca pediu?",
+                "to": "f5",
+                "row": 0,
+                "selected": false
+              },
+              {
+                "label": "Quanto cada um gastou?",
+                "to": "f7",
+                "row": 0,
+                "selected": false
+              }
+            ],
+            "text": "Escolha uma pergunta da Dona Marta.",
+            "code": "SELECT cli.nome, resumo.total_gasto\nFROM clientes cli\nLEFT JOIN (\n  SELECT id_cliente, SUM(valor) AS total_gasto\n  FROM pedidos GROUP BY id_cliente\n) resumo ON cli.id = resumo.id_cliente;",
+            "codeHidden": true
+          }
+        ]
+      },
+      "snapshots": [
+        {
+          "id": "f0",
+          "text": "Quem pediu acima da média? Quem já pagou algum pedido? Quem nunca pediu? Quanto cada um gastou? Escolha uma pergunta da Dona Marta.",
+          "keys": [
+            "q:a",
+            "q:b",
+            "q:c",
+            "q:d"
+          ]
+        },
+        {
+          "id": "f1",
+          "text": "Quem pediu acima da média? Quem já pagou algum pedido? Quem nunca pediu? Quanto cada um gastou? SELECT id, valor FROM pedidos WHERE valor > (SELECT AVG(valor) FROM pedidos); Tipo: Subconsulta escalar (um valor)",
+          "keys": [
+            "q:a",
+            "q:b",
+            "q:c",
+            "q:d"
+          ]
+        },
+        {
+          "id": "f2",
+          "text": "Quem pediu acima da média? Quem já pagou algum pedido? Quem nunca pediu? Quanto cada um gastou? Escolha uma pergunta da Dona Marta.",
+          "keys": [
+            "q:a",
+            "q:b",
+            "q:c",
+            "q:d"
+          ]
+        },
+        {
+          "id": "f3",
+          "text": "Quem pediu acima da média? Quem já pagou algum pedido? Quem nunca pediu? Quanto cada um gastou? SELECT nome FROM clientes WHERE id IN ( SELECT id_cliente FROM pedidos WHERE status = 'PAGO' ); Tipo: Subconsulta de lista (IN)",
+          "keys": [
+            "q:a",
+            "q:b",
+            "q:c",
+            "q:d"
+          ]
+        },
+        {
+          "id": "f4",
+          "text": "Quem pediu acima da média? Quem já pagou algum pedido? Quem nunca pediu? Quanto cada um gastou? Escolha uma pergunta da Dona Marta.",
+          "keys": [
+            "q:a",
+            "q:b",
+            "q:c",
+            "q:d"
+          ]
+        },
+        {
+          "id": "f5",
+          "text": "Quem pediu acima da média? Quem já pagou algum pedido? Quem nunca pediu? Quanto cada um gastou? SELECT cli.nome FROM clientes cli WHERE NOT EXISTS ( SELECT 1 FROM pedidos ped WHERE ped.id_cliente = cli.id ); Tipo: Subconsulta correlacionada (NOT EXISTS)",
+          "keys": [
+            "q:a",
+            "q:b",
+            "q:c",
+            "q:d"
+          ]
+        },
+        {
+          "id": "f6",
+          "text": "Quem pediu acima da média? Quem já pagou algum pedido? Quem nunca pediu? Quanto cada um gastou? Escolha uma pergunta da Dona Marta.",
+          "keys": [
+            "q:a",
+            "q:b",
+            "q:c",
+            "q:d"
+          ]
+        },
+        {
+          "id": "f7",
+          "text": "Quem pediu acima da média? Quem já pagou algum pedido? Quem nunca pediu? Quanto cada um gastou? SELECT cli.nome, resumo.total_gasto FROM clientes cli LEFT JOIN ( SELECT id_cliente, SUM(valor) AS total_gasto FROM pedidos GROUP BY id_cliente ) resumo ON cli.id = resumo.id_cliente; Tipo: Tabela derivada (no FROM)",
+          "keys": [
+            "q:a",
+            "q:b",
+            "q:c",
+            "q:d"
+          ]
+        },
+        {
+          "id": "f8",
+          "text": "Quem pediu acima da média? Quem já pagou algum pedido? Quem nunca pediu? Quanto cada um gastou? Escolha uma pergunta da Dona Marta.",
+          "keys": [
+            "q:a",
+            "q:b",
+            "q:c",
+            "q:d"
+          ]
+        }
+      ]
+    }
+  ]
+}

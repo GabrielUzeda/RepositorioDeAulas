@@ -55,9 +55,18 @@ REFERÊNCIAS CONTEXTUAIS
 {"type":"reference","title":"Dados à mão","scope":"deck","code":"SELECT nome FROM clientes;","tables":[{"term":"clientes","headers":["id","nome"],"rows":[[1,"Ana"],[2,"Bruno"]]}]}
 \`\`\`
 
+MIGRAÇÃO FIEL, SOMENTE QUANDO NECESSÁRIA
+- scene permite preservar falas e controles existentes, sem scripts: title, initial (id), layout (ordem dos campos) e frames (1–64 quadros). Prefira o catálogo simples para aulas novas.
+- Cada quadro tem id e buttons (até 8 objetos label/to, selected/disabled/row opcionais) e conteúdo opcional: intro/text (textRuns {text,strong?,tone?}), value (valuePrefix e valueTone success/danger), code/focus/codeHidden, rows (active/muted/tone), chips/hits, chart, groups e cells; next:{to,delay} permite sequência automática limitada a 30 segundos, sem ciclos. Destinos devem existir. JSON até 64000 caracteres. Resultados são declarados pelo autor, não calculados por SQL.
+\`\`\`interactive
+{"type":"scene","title":"Comparar as duas ordens","initial":"juntar","layout":["value","buttons","text"],"frames":[{"id":"juntar","value":"360","valueTone":"danger","text":"Juntar antes de somar: o pedido 1 entrou duas vezes.","buttons":[{"label":"Resumir antes de juntar","to":"resumir"}]},{"id":"resumir","value":"230","valueTone":"success","text":"Cada pedido entrou uma vez.","buttons":[{"label":"Repetir comparação","to":"juntar"}]}]}
+\`\`\`
+
+- reference com scope deck aceita annotationOnly:true para anotar código sem acrescentar conteúdo visível ou slide.
+
 GABARITOS E COMPATIBILIDADE
 - Gabaritos: HTML nativo <details class="gab"><summary>Ver gabarito</summary> ... </details>, com linhas em branco ao redor do Markdown interno. name compartilhado cria um acordeão. Não copie CSS/JS.
-- Todos os estados textuais e snapshots de dados ficam expostos na impressão; manter curtos. PPTX é textual, não interativo.
+- steps/compare expõem estados na impressão; os demais usam snapshots de dados. scene imprime o quadro inicial, não todos os caminhos. Manter curtos. PPTX é textual, não interativo.
 - Os controles são botões: não instrua o aluno a arrastar itens, digitar SQL ou editar dados quando esses controles não existem. Não repita cálculos no texto sem conferi-los com os dados do componente.
 - Movimento reduzido desliga animações; navegação/reinício/edição cancelam reprodução e efeitos anteriores.
 - Font Awesome :fas-nome:/:far-nome:/:fab-nome: e Lucide :lucide-nome: acompanham texto. Sem emojis.
