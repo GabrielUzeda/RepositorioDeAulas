@@ -61,6 +61,17 @@ describe('ExecucaoAi: orçamento, evidência e falhas explícitas', () => {
     expect(requests).toHaveLength(5);
   });
 
+  test('segundo reparo envia a última versão sem acumular versões descartadas', async () => {
+    handler = () => resposta(requests.length < 3 ? String(requests.length).repeat(800) : 'valido');
+    const execucao = new ExecucaoAi('aula', { maxPromptChars: 1200 });
+    expect((await execucao.executar(etapa)).content).toBe('valido');
+    expect(requests).toHaveLength(3);
+    expect(requests[2].messages).toHaveLength(3);
+    expect(requests[2].messages[0]).toEqual(etapa.messages[0]);
+    expect(requests[2].messages[1].content).toBe('2'.repeat(800));
+    expect(execucao.concluir()).toMatchObject({ chamadas: 3, reparos: 2 });
+  });
+
   test('concorrência não multiplica o orçamento de reparos', async () => {
     handler = () => resposta('invalido');
     const execucao = new ExecucaoAi('sintese', { maxChamadas: 10 });

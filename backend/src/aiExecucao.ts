@@ -190,7 +190,7 @@ export class ExecucaoAi {
       this.reparos += 1;
       reparosEtapa += 1;
       messages = [
-        ...messages,
+        ...options.messages,
         { role: 'assistant', content: result.content },
         { role: 'user', content: `Corrija somente os problemas diagnosticados e devolva o conteúdo completo no formato solicitado:\n- ${erros.join('\n- ')}` },
       ];

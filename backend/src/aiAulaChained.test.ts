@@ -166,6 +166,8 @@ describe('AI Chained 2-Step Lesson Generation with Checkpoints', () => {
     await generateAulaOutlineAndContent({ tema: 'Execução', modo: 'decomposta', observacoes: 'Preservar foco SQL e reprodução temporizada.' });
     expect(chamadas).toBe(4);
     const sections = prompts.filter(p => p.includes('Você redige os slides de UMA seção'));
+    const plannerBody = JSON.parse(prompts.find(p => p.includes('coordenador pedagógico e designer instrucional sênior'))!);
+    expect(plannerBody.max_tokens).toBe(6144);
     expect(sections.length).toBe(3);
     expect(sections.every(p => p.includes('Preservar foco SQL e reprodução temporizada.'))).toBe(true);
     expect(sections.every(p => p.includes('SKILL: RECURSOS INTERATIVOS') && p.includes('\\"type\\":\\"steps\\"'))).toBe(true);

@@ -65,12 +65,14 @@ export function parseSlideInteractive(source: string): SlideInteractive {
     for (const state of value.states) {
       if (!record(state)) fail('Estado inválido.');
       keys(state, ['label', 'text', 'code', 'focus', 'value', 'rows', 'chips', 'table']);
-      if (!text(state.label, 60) || !text(state.text, 400) || (state.code !== undefined && !code(state.code)) ||
-          (state.focus !== undefined && (!text(state.focus) || typeof state.code !== 'string' || !state.code.includes(state.focus))) ||
-          (state.value !== undefined && !number(state.value)) || (state.rows !== undefined && !rows(state.rows)) ||
-          (state.chips !== undefined && !chips(state.chips)) || (state.table !== undefined && !table(state.table))) {
-        fail('Estado inválido: label/text obrigatórios; confira limites de code, focus, value, rows, chips e table.');
-      }
+      if (!text(state.label, 60)) fail('Estado inválido: label deve ter de 1 a 60 caracteres.');
+      if (!text(state.text, 400)) fail('Estado ' + state.label + ': text obrigatório, de 1 a 400 caracteres.');
+      if (state.code !== undefined && !code(state.code)) fail('Estado ' + state.label + ': code deve ter até 800 caracteres e 12 linhas.');
+      if (state.focus !== undefined && (!text(state.focus) || typeof state.code !== 'string' || !state.code.includes(state.focus))) fail('Estado ' + state.label + ': focus deve ser trecho exato de code, de 1 a 100 caracteres.');
+      if (state.value !== undefined && !number(state.value)) fail('Estado ' + state.label + ': value deve ser número finito entre -1000000 e 1000000, não string.');
+      if (state.rows !== undefined && !rows(state.rows)) fail('Estado ' + state.label + ': rows deve ter 1–8 objetos label (texto até 60), result (texto até 100), match/muted booleanos opcionais.');
+      if (state.chips !== undefined && !chips(state.chips)) fail('Estado ' + state.label + ': chips aceita até 12 strings (1–100 caracteres), números ou null.');
+      if (state.table !== undefined && !table(state.table)) fail('Estado ' + state.label + ': table exige 1–4 headers (texto até 60), 1–8 rows de células string/número/null, com o mesmo tamanho de headers.');
       if (record(state.table)) keys(state.table, ['headers', 'rows']);
     }
   } else if (value.type === 'bars') {

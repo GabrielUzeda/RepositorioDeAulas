@@ -1,4 +1,8 @@
 import { describe, expect, test } from 'bun:test';
+import { Database } from 'bun:sqlite';
+import MarkdownIt from 'markdown-it';
+import { calculateBarInteractive, parseSlideInteractive } from './slideInteractive';
+import { EXEMPLO_PADRAO_AULA } from './aiGuiaDidatica';
 import {
   diagnosticarOutline,
   dividirEmSlides,
@@ -280,6 +284,62 @@ describe('aiAula: montagem e prompts', () => {
     expect(md).toContain('# Estruturas de repeticao em Python');
     expect(md).toContain('## Do while ao for');
     expect(md).toContain('**Prof. Ana**');
+  });
+
+  test('preserva título e subtítulo da capa apenas na aula completa', () => {
+    const md = '---\nmarp: true\n---\n\n# Aula\n\n## Subtítulo\n\n---\n\n## Conteúdo\n\nTexto.\n\n## Próximo';
+    expect(dividirEmSlides(inserirSeparadoresAusentes(md, true)).length).toBe(3);
+    expect(dividirEmSlides(inserirSeparadoresAusentes(md)).length).toBe(4);
+  });
+
+  test('exemplo de estilo é válido e chega só aos prompts de redação', () => {
+    expect(validarAulaMarp(EXEMPLO_PADRAO_AULA).valido).toBe(true);
+    expect(promptPlanejadorAula({ tema: 'SQL' }).systemPrompt).not.toContain('EXCERTO DE ESTILO');
+    expect(promptSecaoAula({ outline: outlineValido(), indiceSecao: 0 }).systemPrompt).toContain('EXCERTO DE ESTILO');
+    expect(promptAulaDireta({ tema: 'SQL' }).systemPrompt).toContain('EXCERTO DE ESTILO');
+  });
+
+  test('exemplo de estilo confere a conta do gráfico e restaura os dados antes do SQL', () => {
+    const tokens = new MarkdownIt().parse(EXEMPLO_PADRAO_AULA, {});
+    const bar = tokens.filter(t => t.type === 'fence' && t.info === 'interactive')
+      .map(t => parseSlideInteractive(t.content)).find(w => w.type === 'bars');
+    if (!bar || bar.type !== 'bars') throw new Error('Gráfico ausente');
+    expect(calculateBarInteractive(bar, 'AVG', '>').threshold).toBeCloseTo(430 / 3);
+    const extra = calculateBarInteractive(bar, 'AVG', '>', true);
+    expect(extra.threshold).toBe(120);
+    expect(extra.matches).toEqual([true, false, true, false]);
+    expect(EXEMPLO_PADRAO_AULA.indexOf('Voltamos aos três pedidos')).toBeLessThan(EXEMPLO_PADRAO_AULA.indexOf('## Uma pergunta entra na outra'));
+    const db = new Database(':memory:');
+    try {
+      db.exec('CREATE TABLE pedidos (id INTEGER, valor REAL); INSERT INTO pedidos VALUES (1,130),(2,100),(3,200)');
+      const sql = tokens.find(t => t.type === 'fence' && t.info === 'sql')?.content;
+      if (!sql) throw new Error('Consulta ausente');
+      expect(db.query(sql).all()).toEqual([{ id: 3, valor: 200 }]);
+      expect(db.query('SELECT 1 NOT IN (1,2,NULL) AS presente, 3 NOT IN (1,2,NULL) AS ausente').get()).toEqual({ presente: 0, ausente: null });
+    } finally {
+      db.close();
+    }
+  });
+
+  test('fio condutor e interação planejada sobrevivem ao outline e chegam ao redator', () => {
+    const base = outlineValido();
+    const outline = normalizarOutline({ ...base, fio_condutor: 'Cenário e dados compartilhados.', secoes: base.secoes.map(s => ({ ...s, pergunta: 'Qual seria o resultado?', interacao: 'compare antes e depois' })) });
+    expect(outline?.fio_condutor).toBe('Cenário e dados compartilhados.');
+    if (!outline) throw new Error('Outline ausente');
+    const prompt = promptSecaoAula({ outline, indiceSecao: 0 });
+    expect(prompt.userPrompt).toContain('Cenário e dados compartilhados.');
+    expect(prompt.userPrompt).toContain('Qual seria o resultado?');
+    expect(prompt.userPrompt).toContain('compare antes e depois');
+    expect(promptAulaDireta({ tema: 'Python' }).systemPrompt).toContain('PADRÃO DA AULA APROVADA');
+    expect(prompt.systemPrompt).toContain('PADRÃO DA AULA APROVADA');
+  });
+
+  test('síntese longa é dividida para não estourar a altura', () => {
+    const outline = outlineValido();
+    outline.sintese = [...outline.sintese, ...outline.sintese];
+    const slides = dividirEmSlides(renderBlocoFechamento(outline)).filter(s => s.includes('## Sintese'));
+    expect(slides.length).toBe(2);
+    for (const slide of slides) expect((slide.match(/\| \*\*/g) ?? []).length).toBe(4);
   });
 
   test('removerFrontMatterRestante limpa front-matter, fences e --- espurios da secao', () => {

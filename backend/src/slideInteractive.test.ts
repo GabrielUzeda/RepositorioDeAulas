@@ -40,6 +40,23 @@ describe('Interativos nativos', () => {
     expect(parseSlideInteractive(JSON.stringify({ ...bars, references: ['AVG', 1], operators: ['>', '='] })).type).toBe('bars');
   });
 
+  test('reparo recebe diagnóstico do campo exato do estado', () => {
+    for (const [fields, message] of [
+      [{ label: '' }, 'label'],
+      [{ text: '' }, 'text'],
+      [{ code: 'x'.repeat(801) }, 'code'],
+      [{ code: 'SELECT 1', focus: 'SELECT 2' }, 'focus'],
+      [{ value: '230' }, 'value'],
+      [{ rows: [{ label: 'Ana', result: 230 }] }, 'rows'],
+      [{ chips: Array(13).fill('x') }, 'chips'],
+      [{ table: { headers: ['id'], rows: [[1, 2]] } }, 'table'],
+    ] as const) {
+      expect(() => parseSlideInteractive(JSON.stringify({
+        ...config, states: [{ ...config.states[0], ...fields }, config.states[1]],
+      }))).toThrow(message);
+    }
+  });
+
   test('escapa todo conteúdo e não injeta scripts ou HTML dos dados', () => {
     const unsafe = '<img src=x onerror=alert(1)><script>alert(1)</script>';
     const html = renderSlideInteractive(JSON.stringify({ ...config, title: unsafe, states: config.states.map(() => ({ label: unsafe, text: unsafe, code: unsafe })) }));

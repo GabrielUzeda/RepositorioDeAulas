@@ -455,7 +455,7 @@ export async function generateAulaOutlineAndContent(options: {
       maxTokens: 16384,
       reasoningEffort: 'none',
       diagnose: (conteudo) => {
-        const limpo = normalizarEspacamentoMd(repararSlidesDoConteudo(inserirSeparadoresAusentes(normalizeMarpMarkdown(conteudo))));
+        const limpo = normalizarEspacamentoMd(repararSlidesDoConteudo(inserirSeparadoresAusentes(normalizeMarpMarkdown(conteudo), true)));
         const v = validarAulaMarp(limpo);
         return v.valido ? [] : v.erros;
       },
@@ -464,7 +464,7 @@ export async function generateAulaOutlineAndContent(options: {
     cancelar();
     await checkpoint?.('85% - Validando e finalizando a aula...', { fase: 'validacao' });
 
-    const cleaned = normalizarEspacamentoMd(repararSlidesDoConteudo(inserirSeparadoresAusentes(normalizeMarpMarkdown(res.content))));
+    const cleaned = normalizarEspacamentoMd(repararSlidesDoConteudo(inserirSeparadoresAusentes(normalizeMarpMarkdown(res.content), true)));
     const validacaoFinal = validarAulaMarp(cleaned);
     if (!validacaoFinal.valido) {
       throw new Error(`A aula gerada ficou com problemas de estrutura: ${validacaoFinal.erros.slice(0, 5).join(' ')}`);
@@ -506,6 +506,8 @@ export async function generateAulaOutlineAndContent(options: {
       ],
       temperature: 0.4,
       timeoutMs: 120000,
+      maxTokens: 6144,
+      reasoningEffort: 'none',
       diagnose: (conteudo) => {
         const parsed = parseOutline(conteudo);
         return parsed ? diagnosticarOutline(parsed) : ['A resposta não contém o objeto JSON do outline esperado.'];
@@ -553,7 +555,7 @@ export async function generateAulaOutlineAndContent(options: {
         temperature: 0.45,
         timeoutMs: 180000,
         maxTokens: 12288,
-        reasoningEffort: 'none',
+        reasoningEffort: 'low',
         diagnose: (conteudo) => validarSecaoMarp(limpar(conteudo)),
       });
       modeloUtilizado = res.modelUsed;

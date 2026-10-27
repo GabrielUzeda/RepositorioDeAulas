@@ -1,4 +1,4 @@
-import { GUIA_DIDATICO, CONTRATO_RENDERER } from './aiGuiaDidatica';
+import { GUIA_DIDATICO, CONTRATO_RENDERER, EXEMPLO_PADRAO_AULA } from './aiGuiaDidatica';
 import { SKILL_RECURSOS_RENDER } from './aiSkillRenderer';
 import MarkdownIt from 'markdown-it';
 import { parseSlideInteractive } from './slideInteractive';
@@ -19,6 +19,8 @@ export interface AulaOutlineSecao {
   analogia?: string;
   exemplo?: string;
   desafio_pontual?: string;
+  pergunta?: string;
+  interacao?: string;
 }
 
 export interface AulaOutlineSintese {
@@ -36,6 +38,7 @@ export interface AulaOutline {
   titulo: string;
   subtitulo: string;
   problematica?: string;
+  fio_condutor?: string;
   objetivos: string[];
   prerequisitos: string[];
   secoes: AulaOutlineSecao[];
@@ -111,6 +114,8 @@ export function normalizarOutline(raw: any): AulaOutline | null {
         analogia: texto(s?.analogia) || undefined,
         exemplo: texto(s?.exemplo) || undefined,
         desafio_pontual: texto(s?.desafio_pontual || s?.atividade || s?.desafio) || undefined,
+        pergunta: texto(s?.pergunta) || undefined,
+        interacao: texto(s?.interacao) || undefined,
       };
     })
     .filter((s: AulaOutlineSecao) => s.titulo);
@@ -132,6 +137,7 @@ export function normalizarOutline(raw: any): AulaOutline | null {
     titulo,
     subtitulo: texto(raw.subtitulo),
     problematica: texto(raw.problematica || raw.gancho || raw.problema) || undefined,
+    fio_condutor: texto(raw.fio_condutor) || undefined,
     objetivos: listaDeTextos(raw.objetivos).slice(0, OBJETIVOS_MAX),
     prerequisitos: listaDeTextos(raw.prerequisitos),
     secoes,
@@ -319,11 +325,13 @@ export function repararSlidesDoConteudo(conteudoMd: string): string {
   return slides.map(repararSlideMarp).join('\n\n---\n\n');
 }
 
-export function inserirSeparadoresAusentes(md: string): string {
+export function inserirSeparadoresAusentes(md: string, preservarCapa = false): string {
   const linhas = md.split('\n');
   const saida: string[] = [];
   let dentroDeFence = false;
   let slideIniciado = false;
+  let primeiroTitulo = -1;
+  let totalTitulos = 0;
 
   for (const linha of linhas) {
     if (/^[ \t]*```/.test(linha)) {
@@ -340,11 +348,15 @@ export function inserirSeparadoresAusentes(md: string): string {
 
     const abreSlide = !dentroDeFence && /^[ \t]{0,3}#{1,2}\s+\S/.test(linha);
     if (abreSlide) {
-      if (slideIniciado) {
+      const subtituloCapa = preservarCapa && totalTitulos === 1 && /^##\s/.test(linha) &&
+        /^#\s/.test(saida[primeiroTitulo] ?? '') && saida.slice(primeiroTitulo + 1).every(l => !l.trim());
+      totalTitulos += 1;
+      if (slideIniciado && !subtituloCapa) {
         while (saida.length > 0 && saida[saida.length - 1].trim() === '') saida.pop();
         saida.push('', '---', '');
       }
       slideIniciado = true;
+      if (primeiroTitulo < 0) primeiroTitulo = saida.length;
     }
 
     saida.push(linha);
@@ -408,10 +420,12 @@ export function renderBlocoFechamento(outline: AulaOutline): string {
   const partes: string[] = [];
 
   if (outline.sintese && outline.sintese.length > 0) {
-    const linhas = outline.sintese.map((s) => `| **${s.conceito}** | ${s.resumo} |`);
-    partes.push(
-      ['## Sintese do percurso', '', '| Conceito | Em uma frase |', '| :--- | :--- |', ...linhas].join('\n')
-    );
+    for (let i = 0; i < outline.sintese.length; i += 4) {
+      const linhas = outline.sintese.slice(i, i + 4).map((s) => `| **${s.conceito}** | ${s.resumo} |`);
+      partes.push(
+        ['## Sintese do percurso' + (i === 0 ? '' : ' (continuação)'), '', '| Conceito | Em uma frase |', '| :--- | :--- |', ...linhas].join('\n')
+      );
+    }
   }
 
   if (Array.isArray(outline.fixacao) && outline.fixacao.length > 0) {
@@ -453,6 +467,7 @@ Retorne ESTRITAMENTE um objeto JSON (sem markdown, sem blocos externos de códig
   "titulo": "Título principal da aula",
   "subtitulo": "Comandos ou conceitos técnicos centrais, direto e específico",
   "problematica": "Pergunta provocativa ou situação-problema concreta para a capa",
+  "fio_condutor": "História única, personagens, dados canônicos, resultados esperados e o que NÃO deve mudar entre seções",
   "objetivos": ["O que o aluno será capaz de fazer ao final"],
   "prerequisitos": ["O que o aluno já deve saber"],
   "secoes": [
@@ -462,10 +477,13 @@ Retorne ESTRITAMENTE um objeto JSON (sem markdown, sem blocos externos de códig
       "conceitos": ["Conceito-chave"],
       "analogia": "Analogia concreta condutora",
       "exemplo": "Exemplo central simplificado",
-      "desafio_pontual": "Micro-desafio prático para fechar a seção"
+      "desafio_pontual": "Micro-desafio prático para fechar a seção",
+      "pergunta": "Previsão que o aluno fará antes de ver a solução",
+      "interacao": "Tipo nativo e estados/dados que demonstram a operação, sem escrever JSON do componente"
     }
   ],
   "sintese": [{ "conceito": "Conceito", "resumo": "Explicação em uma frase" }],
+  "fixacao": ["Pergunta de previsão", "Diagnóstico de erro", "Transferência para uma situação nova"],
   "material_complementar": [{ "titulo": "Livro ou documentação oficial", "detalhe": "Para que serve", "url": "https://..." }]
 }
 </FORMATO_RESPOSTA>
@@ -475,6 +493,11 @@ Retorne ESTRITAMENTE um objeto JSON (sem markdown, sem blocos externos de códig
 2. Cada seção tem de 1 a 3 conceitos-chave exclusivos, sem repetir entre seções.
 3. Objetivos: até ${OBJETIVOS_MAX}. Síntese: de 4 a ${SINTESE_MAX} linhas.
 4. Material complementar: de 3 a ${REFERENCIAS_MAX} referências reais (livros canônicos ou documentações oficiais).
+5. Preencha fio_condutor com o cenário, esquema/dados mínimos e resultados de referência. Preserve a unidade da pergunta (por pedido, cliente ou grupo); dados adicionais só entram quando anunciados.
+6. Cada seção resolve uma limitação anterior e prepara a próxima, sem recomeçar a história. Planeje pergunta de previsão, exemplo resolvido e interação observável; não empilhe comandos desconectados.
+7. JSON de planejamento é compacto: fio_condutor até 900 caracteres, exemplos e instruções de interação até 350 cada. Sem SQL completo nem diálogos extensos no outline.
+8. Reserve espaço para desenvolver os conceitos em passos pequenos: motivação, tentativa, solução, evidência, variação e prática. Não comprima um percurso inteiro em 3 slides nem conte linhas de JSON como texto visível.
+9. fixacao: 3–5 perguntas específicas de interpretação, diagnóstico e transferência. Não dê a resposta na pergunta.
 </REGRAS_PLANEJAMENTO>
 
 <PROIBICOES_NEGATIVAS>
@@ -521,12 +544,16 @@ ${CONTRATO_RENDERER}
 
 ${SKILL_RECURSOS_RENDER}
 
+${EXEMPLO_PADRAO_AULA}
+
 <REGRAS_SECAO>
 1. TÍTULO ÚNICO: Todo slide tem rigorosamente um título '## Título' (proibido '#' e proibido '###').
 2. SEPARADOR OBRIGATÓRIO: Todo slide é separado pelo delimitador '---' em linha isolada. Sem ele dois slides viram um e cortam texto.
-3. EXTENSÃO: Entre 3 e 6 slides por seção, exatamente um conceito por slide. Máximo de 10 frases ou linhas visíveis por slide.
+3. EXTENSÃO: desenvolva o percurso em slides pequenos, sem quantidade fixa: uma pergunta, operação ou mudança por slide. Um conceito pode precisar de vários slides complementares; não repita definições. Respeite o LIMITE VERTICAL, não um mínimo de linhas.
 4. DESAFIO PONTUAL: O último slide desta seção deve ser intitulado rigorosamente '## Desafio ${numDesafio}' (sem dois pontos, sem texto adicional no título).
-5. ABERTURA EXCLUSIVA DA SEÇÃO 1: Apenas a primeira seção abre com '## Retomando conceitos' e '## Analogia: <Nome do Enredo>'. As seções seguintes entram DIRETO no conteúdo técnico.
+5. A primeira seção apresenta história e dados, propõe uma previsão e uma tentativa ANTES de formalizar. As demais retomam a pergunta pendente da seção anterior em uma frase, sem repetir capa, tabelas-base ou introdução.
+6. Inclua o interativo planejado com dados e resultados coerentes e uma variação interativa do mesmo conceito, uma comparação em cols-2 quando couber e pelo menos uma pausa de previsão com resposta recolhível. A animação deve demonstrar a operação, não apenas trocar textos genéricos.
+7. Não resolva conceitos reservados a outras seções. Um exemplo pode preparar a próxima pergunta sem antecipar toda a sintaxe.
 </REGRAS_SECAO>
 
 <PROIBICOES_NEGATIVAS>
@@ -544,6 +571,9 @@ ${SKILL_RECURSOS_RENDER}
   let userPrompt = `<TAREFA>\nTÍTULO DA AULA: ${outline.titulo}${outline.subtitulo ? ` — ${outline.subtitulo}` : ''}\n`;
   userPrompt += `SEÇÃO ATUAL (${indiceSecao + 1} de ${outline.secoes.length}): ${secao.titulo}\n`;
   userPrompt += `PROPÓSITO: ${secao.proposito}\n`;
+  if (outline.fio_condutor) userPrompt += `FIO CONDUTOR E DADOS CANÔNICOS (iguais em todas as seções):\n${outline.fio_condutor}\n`;
+  if (secao.pergunta) userPrompt += `PERGUNTA ANTES DA REVELAÇÃO: ${secao.pergunta}\n`;
+  if (secao.interacao) userPrompt += `INTERAÇÃO PLANEJADA: ${secao.interacao}\n`;
   userPrompt += `CONCEITOS A ENSINAR:\n- ${secao.conceitos.join('\n- ')}\n`;
   if (secao.analogia) userPrompt += `ANALOGIA CONDUTORA: ${secao.analogia}\n`;
   if (secao.exemplo) userPrompt += `EXEMPLO CENTRAL: ${secao.exemplo}\n`;
@@ -568,112 +598,45 @@ export function promptAulaDireta(params: {
 
   const systemPrompt = `<PROMPT name="GeracaoDidaticaAutoAvaliativa">
 <INSTRUCOES>
-Você é um especialista sênior em didática, design instrucional e metodologias de ensino inclusivo para adolescentes e adultos.
-Você combina rigor técnico com clareza acessível, narrativas realistas e educação preventiva de erros.
-Sua tarefa é gerar uma AULA COMPLETA, PROFUNDA E DIDÁTICA em formato Marp Next Markdown a partir do tema solicitado.
-Lembre-se: slides são materiais de estudo permanentes do aluno. Devem conter explicações substanciais, claras e organizadas, sem jamais parecer resumos telegráficos ou rascunhos rasos.
-Responda EXCLUSIVAMENTE com a aula em Markdown (começando com o front-matter '---'). Sem introduções ou conclusões fora do Markdown.
+Você redige uma aula em Marp Next no padrão de uma boa conversa de sala de aula.
+Responda exclusivamente com Markdown, começando com front-matter. O modo expresso elimina o planner externo, não a profundidade didática.
 </INSTRUCOES>
+
+${GUIA_DIDATICO}
 
 ${CONTRATO_RENDERER}
 
 ${SKILL_RECURSOS_RENDER}
 
-<DENSIDADE_E_PROFUNDIDADE_DO_SLIDE>
-1. EXTENSÃO E SUBSTÂNCIA: Respeite o LIMITE VERTICAL do motor: até 8 linhas de texto, 6 itens de lista, 4 linhas de tabela ou 12 linhas de código, e um único bloco pesado por slide. Profundidade vem da progressão entre slides, não de parágrafos longos. Em slide interativo, use no máximo 2 frases curtas fora do widget e coloque a explicação nas etapas; não acrescente parágrafos antes e depois do componente.
-2. SEM TERMOS VAGOS OU GENÉRICOS:
-   - Proibido usar frases vagas como "ajuda a organizar os dados", "deixa a consulta mais rápida", "permite fazer cálculos".
-   - Seja concreto e cirúrgico: dê números reais, nomes de colunas, valores exatos e mostre o estado dos dados antes e depois do comando.
-3. LINGUAGEM ACESSÍVEL E FORMAL:
-   - Explique o "porquê" de cada decisão técnica com clareza cotidiana, sem infantilizar e sem recorrer a jargão não explicado.
-</DENSIDADE_E_PROFUNDIDADE_DO_SLIDE>
+${EXEMPLO_PADRAO_AULA}
 
-<PROGRESSAO_LINEAR_E_SEM_ATROPELOS>
-1. EXPLICAR ANTES DE CITAR (REGRA DE OURO):
-   - NUNCA use um comando, cláusula, operador ou conceito técnico no código ou no texto sem tê-lo definido e explicado antes.
-   - Sempre que apresentar um bloco de código, dissecá-lo linha por linha: explique o papel de cada cláusula (o que cada palavra faz e o que o banco de dados executa naquele passo).
-2. PROGRESSÃO RIGOROSAMENTE LINEAR:
-   - O conhecimento deve ser construído passo a passo em cadeia causal: Situação real -> Limitação da abordagem anterior -> Novo conceito -> Sintaxe explicada -> Tabela de exemplo concreto -> Resultado visual -> Armadilha comum.
-3. PROIBIDO VAZAMENTO DE CONTEÚDO (SEM ATROPELOS):
-   - Nunca mencione comandos ou tópicos avançados em slides introdutórios. Cada ferramenta tem seu momento exato na aula.
-   - Exemplo: enquanto estiver ensinando JOIN, é expressamente proibido citar GROUP BY, HAVING ou funções agregadas. Esgote a motivação, sintaxe e armadilhas do JOIN antes de passar ao próximo degrau.
-</PROGRESSAO_LINEAR_E_SEM_ATROPELOS>
+<PLANEJAMENTO_INTERNO>
+Antes de redigir, organize silenciosamente 3–5 blocos conceituais encadeados:
+- Uma história e um conjunto canônico de dados; confira operações e resultados e a pergunta que cada exemplo responde.
+- Para cada bloco: necessidade -> previsão -> tentativa/limitação -> solução -> resultado -> variação -> prática com gabarito. Distribua esses passos em slides, não em parágrafos densos.
+- Escolha a interação que torna o raciocínio visível e uma comparação em colunas quando houver antes/depois. Planeje momentos de observar, clicar e conferir em cada bloco.
+- Feche voltando à história, não com uma lista de comandos.
+Não exiba o planejamento. Não force 18–26 slides nem compacte para caber numa contagem: a extensão decorre do percurso, sempre respeitando a altura.
+</PLANEJAMENTO_INTERNO>
 
 <ESTRUTURA_DA_AULA>
-A aula deve conter entre 18 e 26 slides robustos, seguindo este arco completo:
-
----
-marp: true
-theme: default
-title: [TÍTULO DA AULA]
-animation: fade-up
-animation-stagger: 0.12s
-animation-duration: 0.5s
----
-
-# [TÍTULO DA AULA]
-## [SUBTÍTULO TÉCNICO DIRETO]
-> *"[PERGUNTA PROVOCATIVA OU PROBLEMA CONCRETO DA VIDA REAL]"*
-
----
-
-## Retomando conceitos
-[Recapitulação detalhada e contextualizada dos conceitos pré-requisitos necessários para hoje, conectando o que o aluno já sabe com o desafio que enfrentará]
-
----
-
-## Analogia: [Nome do Enredo]
-[História rica e detalhada do mundo real com personagens, papéis do dia a dia e documentos físicos, criando uma imagem mental clara do problema antes de qualquer sintaxe técnica]
-
----
-
-[Desenvolvimento de 12 a 18 slides técnicos aprofundados explorando o tema passo a passo, com tabelas antes/depois, código dissecado linha por linha e justificativas do funcionamento interno]
-
----
-
-## O erro ao [Armadilha Comum sem prefixo de dois pontos]
-[Caso prático do erro mais frequente que os alunos cometem, explicando a causa da falha e mostrando em seguida a correção explicada]
-
----
-
-## Desafio 01
-[Primeiro desafio prático com contexto realista, enunciando claramente a tarefa e os critérios de validação]
-
----
-
-## Desafio 02
-[Segundo desafio com maior nível de autonomia ou análise crítica para consolidar o aprendizado]
-
----
-
-## Sintese do percurso
-| Conceito | Em uma frase |
-| :--- | :--- |
-| **[Conceito]** | [Definição concisa e precisa] |
-
----
-
-## Verifique o que voce aprendeu
-1. [Pergunta reflexiva e conceitual 1]
-2. [Pergunta de análise prática 2]
-3. [Pergunta de diagnóstico de erro 3]
-
----
-
-## Material Complementar
-- **[Nome da Documentação Oficial ou Livro Canônico]** — [Descrição específica do que o aluno encontrará lá] <https://url-real>
+Front-matter: marp:true, theme:default, title e animation:fade-up.
+Capa única: # título e ## subtítulo no mesmo slide, sem separador entre os dois.
+Apresente cenário e dados, faça a pergunta concreta e peça uma previsão. Formalize depois da primeira tentativa, não na capa.
+Desenvolva todos os blocos em progressão; inclua interativos nativos pertinentes, código completo com linguagem, resultados conferidos e exercícios distribuídos com details.gab.
+Cada título ## abre um slide separado por --- (exceto subtítulo da capa). Títulos naturais, sem etiquetas repetitivas. Perguntas específicas como "o que muda com um dado novo?" são preferíveis a "Pergunta antes de revelar".
+Conclua com retorno ao problema, síntese em tabelas curtas (até 4 linhas por slide), prática de transferência com gabarito, 3–5 perguntas e referências reais.
 </ESTRUTURA_DA_AULA>
 
-<PROIBICOES_NEGATIVAS>
-- Proibido exceder a altura do slide para cumprir uma contagem mínima de linhas. Não há mínimo de linhas: cada slide deve explicar uma ideia concreta, com dados e exemplos.
-- Proibido usar emojis.
-- Não incluir metadados: "Público-Alvo", "Duração", "Materiais Necessários".
-- Não citar metodologias pedagógicas ("Ciclo de Gibbs", "Educação Preventiva").
-- Não usar placeholders como [Image of ...] nem inventar links de imagem.
-- Não inventar livros ou referências fictícias (como "Guia de Programação Inclusiva").
-- Todo título deve ser exclusivamente '## Título' (exceto a capa).
-- Todo slide deve ser separado com '---' em linha isolada.
-</PROIBICOES_NEGATIVAS>
+<REVISAO_ANTES_DE_ENTREGAR>
+EXPLICAR ANTES DE CITAR: apresente cada operação antes de usá-la em uma consulta maior.
+PROIBIDO VAZAMENTO DE CONTEÚDO: não resolva um conceito avançado no exemplo de introdução; não disfarce mudança de pergunta como correção.
+SEM TERMOS VAGOS OU GENÉRICOS: diga qual dado mudou, por que uma linha entra/sai e o que o aluno deve concluir.
+Em slide com interativo, no máximo 2 frases curtas fora do widget; as etapas carregam a explicação, com textos curtos e dados do cenário.
+Confira conta, cardinalidade, tipos, aliases e resultados. NULL e otimização não devem virar simplificações falsas.
+Sem scripts/CSS próprios para recursos nativos, imagens, emojis ou referências inventadas.
+Não incluir metadados: "Público-Alvo", "Duração", "Materiais Necessários".
+</REVISAO_ANTES_DE_ENTREGAR>
 </PROMPT>`;
 
   let userPrompt = `<SOLICITACAO>\nTEMA DA AULA: ${tema || 'Conteudo geral'}\n`;
