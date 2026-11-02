@@ -60,8 +60,14 @@ async function handleSelectCurso(curso: Curso) {
   }
 
   activeView.value = 'disciplinas';
-  const carregou = await cursoStore.fetchDisciplinas(curso.id, senha);
-  if (carregou) return;
+  const status = await cursoStore.fetchDisciplinas(curso.id, senha);
+  if (status === 200) return;
+
+  if (status !== 401) {
+    error('Não foi possível carregar as disciplinas. Verifique a conexão e tente novamente.');
+    activeView.value = 'cursos';
+    return;
+  }
 
   if (curso.possui_senha) {
     await secureRemove(`curso_senha_${curso.id}`);
@@ -91,12 +97,16 @@ async function handleSelectDisciplina(disciplina: Disciplina) {
   }
 
   activeView.value = 'content';
-  const success = await cursoStore.loadDisciplinaContent(disciplina.id, cursoPwd);
-  if (!success) {
-    activeView.value = 'disciplinas';
-    pendingCurso.value = selectedCurso.value;
-    showPasswordModal.value = true;
+  const status = await cursoStore.loadDisciplinaContent(disciplina.id, cursoPwd);
+  if (status === 200) return;
+
+  activeView.value = 'disciplinas';
+  if (status !== 401) {
+    error('Não foi possível carregar o conteúdo. Verifique a conexão e tente novamente.');
+    return;
   }
+  pendingCurso.value = selectedCurso.value;
+  showPasswordModal.value = true;
 }
 
 const isCheckingPassword = ref(false);
@@ -118,7 +128,11 @@ async function handlePasswordSubmit(password: string) {
 
         await handleSelectCurso(curso);
       } else {
-        error('Senha do curso incorreta!');
+        error(
+          res.status === 401
+            ? 'Senha do curso incorreta!'
+            : 'Falha ao validar a senha. Verifique a conexão e tente novamente.'
+        );
       }
     } else if (pendingActivity.value) {
       const res = await apiClient.get<Atividade>(`/atividades/${pendingActivity.value.id}?senha=${encodeURIComponent(password)}`);

@@ -304,6 +304,7 @@ describe('Senha de curso e proteção do conteúdo estático', () => {
 
     const senhaNaQuery = await app.request(`/cursos/${cursoAbertoId}/disciplinas?senha=senha-forte-123`);
     expect(senhaNaQuery.status).toBe(200);
+    expect(senhaNaQuery.headers.get('cache-control')).toBe('no-store');
     expect((await readBody(senhaNaQuery)).length).toBeGreaterThan(0);
 
     const senhaNoHeader = await app.request(`/cursos/${cursoAbertoId}/disciplinas`, {
@@ -388,6 +389,8 @@ describe('Senha de curso e proteção do conteúdo estático', () => {
   test('health responde e /db-test exige admin', async () => {
     const health = await app.request('/health');
     expect(health.status).toBe(200);
+    expect(health.headers.get('x-instance')).toBeTruthy();
+    expect((await readBody(health)).instancia).toBeTruthy();
 
     const semAuth = await app.request('/db-test');
     expect(semAuth.status).toBe(401);

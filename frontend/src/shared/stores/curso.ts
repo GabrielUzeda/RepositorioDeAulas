@@ -31,7 +31,7 @@ export const useCursoStore = defineStore('curso', () => {
     }
   }
 
-  async function fetchDisciplinas(cursoId: number, senha?: string): Promise<boolean> {
+  async function fetchDisciplinas(cursoId: number, senha?: string): Promise<number> {
     if (loadedCursoId.value !== cursoId) {
       disciplinas.value = [];
       loadedCursoId.value = cursoId;
@@ -40,17 +40,14 @@ export const useCursoStore = defineStore('curso', () => {
     try {
       const senhaParam = senha ? `?senha=${encodeURIComponent(senha)}` : '';
       const res = await apiClient.get<Disciplina[]>(`/cursos/${cursoId}/disciplinas${senhaParam}`);
-      if (res.success && res.data) {
-        disciplinas.value = res.data;
-        return true;
-      }
-      return false;
+      if (res.success && res.data) disciplinas.value = res.data;
+      return res.status ?? 0;
     } finally {
       loadingDisciplinas.value = false;
     }
   }
 
-  async function loadDisciplinaContent(disciplinaId: number, password?: string): Promise<boolean> {
+  async function loadDisciplinaContent(disciplinaId: number, password?: string): Promise<number> {
     if (loadedDisciplinaId.value !== disciplinaId) {
       aulas.value = [];
       atividades.value = [];
@@ -66,9 +63,8 @@ export const useCursoStore = defineStore('curso', () => {
       if (aulasRes.success && atvRes.success) {
         aulas.value = aulasRes.data || [];
         atividades.value = atvRes.data || [];
-        return true;
       }
-      return false;
+      return Math.max(aulasRes.status ?? 0, atvRes.status ?? 0);
     } finally {
       loadingContent.value = false;
     }

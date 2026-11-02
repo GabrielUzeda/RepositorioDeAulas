@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { existsSync, rmdirSync, statSync, unlinkSync } from 'node:fs';
+import { hostname } from 'node:os';
 import path from 'node:path';
 import { db, purgeOldRanking } from './db';
 import { sanitizeSlug, sanitizePathOrUrl, encryptData, decryptData, hashEmail, hashSenhaCurso, parseJsonOrNull } from './utils';
@@ -28,6 +29,19 @@ import { clientAcceptsGzip, isCompressible, getGzipSidecar, cacheControlFor } fr
 import { indexarDocumento, removerIndiceDocumento } from './documentIndexer';
 
 const app = new Hono();
+
+// Identifica QUAL processo respondeu (host + pid + boot). Depois de uma troca de
+// IP/DNS, um 401 inesperado mostra no DevTools se a resposta veio do servidor novo.
+const INSTANCIA = `${hostname()}#${process.pid}`;
+const INICIADO_EM = new Date().toISOString();
+
+app.use('*', async (c, next) => {
+  await next();
+  c.header('X-Instance', INSTANCIA);
+  // Senha de curso viaja na URL: a resposta derivada dela nunca pode ser cacheada
+  // (nem o 401) por cache de navegador ou proxy.
+  if (c.req.method === 'GET' && c.req.query('senha')) c.header('Cache-Control', 'no-store');
+});
 
 async function logAudit(c: any, acao: string, recurso: string, detalhes?: Record<string, unknown>) {
   try {
@@ -1923,7 +1937,7 @@ app.post('/send-mail', adminAuth, async (c) => {
 });
 
 app.get('/health', (c) => {
-  return c.json({ status: 'ok' }, 200);
+  return c.json({ status: 'ok', instancia: INSTANCIA, iniciado_em: INICIADO_EM }, 200);
 });
 
 app.get('/db-test', adminAuth, (c) => {
